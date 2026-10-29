@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="question practice icon">
+  <!-- A single mathematical question mark, blue on solid black. -->
+  <rect width="512" height="512" fill="#000000"/>
+  <path d="M181 201 C181 150 212 118 257 118 C302 118 333 150 333 201 C333 233 313 251 289 268 C267 283 255 300 255 323 L255 328"
+        fill="none" stroke="#4C8DFF" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="255" cy="374" r="25" fill="#4C8DFF"/>
+</svg>

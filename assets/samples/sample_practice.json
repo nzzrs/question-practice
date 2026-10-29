@@ -1,0 +1,133 @@
+{
+  "formatVersion": 1,
+  "topics": [
+    {
+      "name": "Cloud fundamentals",
+      "description": "Core Google Cloud services and how to choose between them.",
+      "priority": 1,
+      "practices": [
+        {
+          "name": "Compute choices",
+          "description": "Pick the right compute service for a workload.",
+          "questions": [
+            {
+              "prompt": "Which Google Cloud service runs a container image without requiring you to manage a cluster?",
+              "alternatives": ["Compute Engine", "Cloud Run", "Google Kubernetes Engine", "Cloud Functions"],
+              "correctIndex": 1,
+              "explanation": "Cloud Run is a managed container platform. You give it a container image and it handles scaling and the underlying infrastructure.",
+              "alternativeExplanations": [
+                "Compute Engine gives you virtual machines, so you manage the operating system and runtime yourself.",
+                "Correct. Cloud Run runs containers on fully managed infrastructure and scales with requests.",
+                "Google Kubernetes Engine runs containers, but you still manage a cluster and its node pools.",
+                "Cloud Functions runs event-driven functions, not arbitrary long-running container images."
+              ]
+            },
+            {
+              "prompt": "A batch job needs a virtual machine with a specific GPU and a custom kernel. Which service fits best?",
+              "alternatives": ["Cloud Run", "Cloud Functions", "Compute Engine", "App Engine standard"],
+              "correctIndex": 2,
+              "explanation": "Compute Engine provides full control over the VM, including GPU selection and a custom kernel.",
+              "alternativeExplanations": [
+                "Cloud Run abstracts the host and does not let you choose a kernel or attach a GPU.",
+                "Cloud Functions is limited to supported runtimes and short-lived event handlers.",
+                "Correct. Compute Engine lets you choose the machine type, GPU, and boot image.",
+                "App Engine standard restricts the runtime and does not expose the host kernel."
+              ]
+            },
+            {
+              "prompt": "Which service is designed for a globally distributed NoSQL document database?",
+              "alternatives": ["Cloud SQL", "Firestore", "Bigtable", "Spanner"],
+              "correctIndex": 1,
+              "explanation": "Firestore is a managed NoSQL document database with real-time synchronization and global distribution.",
+              "alternativeExplanations": [
+                "Cloud SQL is a managed relational database for MySQL, PostgreSQL, and SQL Server.",
+                "Correct. Firestore stores JSON-like documents and scales across regions.",
+                "Bigtable is a wide-column NoSQL database for very large analytical and time-series workloads, not documents.",
+                "Spanner is a globally distributed relational database with strong consistency, not a document store."
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Storage and messaging",
+          "description": "Choose storage and messaging primitives.",
+          "questions": [
+            {
+              "prompt": "Which storage class in Cloud Storage is cheapest for long-term archives that are rarely read?",
+              "alternatives": ["Standard", "Nearline", "Coldline", "Archive"],
+              "correctIndex": 3,
+              "explanation": "Archive storage has the lowest storage price but the highest retrieval cost and minimum storage duration.",
+              "alternativeExplanations": [
+                "Standard is the most expensive class and is meant for frequently accessed data.",
+                "Nearline is cheaper than Standard but still designed for monthly access.",
+                "Coldline is cheaper than Nearline but Archive is cheaper still for long-term retention.",
+                "Correct. Archive is the lowest-cost class for rarely accessed long-term data."
+              ]
+            },
+            {
+              "prompt": "What is the main purpose of Pub/Sub?",
+              "alternatives": ["Running SQL queries", "Asynchronous messaging between services", "Serving static websites", "Managing TLS certificates"],
+              "correctIndex": 1,
+              "explanation": "Pub/Sub is a messaging service that decouples producers and consumers with topics and subscriptions.",
+              "alternativeExplanations": [
+                "SQL queries are handled by databases such as Cloud SQL or BigQuery.",
+                "Correct. Pub/Sub delivers messages asynchronously between services.",
+                "Static websites are served by Cloud Storage or Firebase Hosting.",
+                "TLS certificates are managed by services such as Certificate Manager, not Pub/Sub."
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Networking basics",
+      "description": "IP addressing, DNS, and transport-layer behaviour.",
+      "priority": 2,
+      "practices": [
+        {
+          "name": "TCP/IP",
+          "description": "Transport and internet-layer fundamentals.",
+          "questions": [
+            {
+              "prompt": "Which transport protocol provides reliable, ordered delivery of a byte stream?",
+              "alternatives": ["UDP", "TCP", "ICMP", "ARP"],
+              "correctIndex": 1,
+              "explanation": "TCP establishes a connection, acknowledges segments, and retransmits lost data to preserve order and reliability.",
+              "alternativeExplanations": [
+                "UDP is connectionless and does not guarantee delivery or ordering.",
+                "Correct. TCP provides a reliable, ordered byte stream.",
+                "ICMP carries control and error messages, such as ping requests.",
+                "ARP resolves IPv4 addresses to link-layer addresses; it does not carry a byte stream."
+              ]
+            },
+            {
+              "prompt": "What does the Domain Name System (DNS) primarily do?",
+              "alternatives": ["Encrypts web traffic", "Maps domain names to IP addresses", "Assigns MAC addresses", "Routes packets between autonomous systems"],
+              "correctIndex": 1,
+              "explanation": "DNS resolves human-readable names such as example.com into IP addresses that clients can connect to.",
+              "alternativeExplanations": [
+                "TLS encrypts web traffic; DNS does not provide encryption.",
+                "Correct. DNS resolves names to addresses.",
+                "MAC addresses are assigned by hardware vendors and used on local links, not by DNS.",
+                "Inter-domain routing is handled by BGP between autonomous systems."
+              ]
+            },
+            {
+              "prompt": "A client can reach a server by IP address but not by hostname. Which layer is the most likely source of the problem?",
+              "alternatives": ["DNS resolution", "TCP congestion control", "TLS certificate validation", "Ethernet framing"],
+              "correctIndex": 0,
+              "explanation": "If the IP works but the name does not, name resolution is the first suspect.",
+              "alternativeExplanations": [
+                "Correct. The name must be resolved to the working IP before a connection can start.",
+                "Congestion control affects throughput after a connection exists.",
+                "TLS validation happens after the TCP connection is established.",
+                "Ethernet framing would also break direct IP access on the local link."
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

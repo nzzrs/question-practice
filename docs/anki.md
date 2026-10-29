@@ -11,9 +11,26 @@ Question Practice writes to AnkiDroid through its supported Instant-Add API (`co
 
 The manifest declares the database permission and a `<queries>` entry for `com.ichi2.anki`, required for package visibility on Android 11+.
 
-## Created deck and note types
+## Decks: default and per topic
 
-Deck: **Question Practice** (editable in Settings; created if missing).
+Every topic can target its own AnkiDroid deck:
+
+1. Open **Settings → AnkiDroid → Deck name** and set the default deck, for example `Question Practice`.
+2. Open a topic → **Edit** → **AnkiDroid deck** → **Choose AnkiDroid deck**.
+3. Pick an existing deck from AnkiDroid, or type a new name. A missing deck is created on export.
+4. Leave the field blank to use the default deck.
+
+The picker reads the live deck list through AnkiDroid's API (`AddContentApi.deckList`). If the AnkiDroid API or database permission is unavailable, the picker explains the problem and still allows typing a deck name.
+
+Routing uses the topic name captured on each card:
+
+- concept cards use the topic name captured when the term was looked up;
+- error cards use the topic name captured when the wrong answer was recorded;
+- skipped-question basic cards use the topic name captured in the review.
+
+If a topic is renamed, cards created before the rename keep the old captured topic name and fall back to the default deck. Cards created after the rename use the new topic name and its deck. File exports do not encode a deck; choose the deck when importing the file into Anki.
+
+## Created note types
 
 | Model | Fields | Used for |
 |---|---|---|
@@ -63,5 +80,7 @@ On a connected Android device with AnkiDroid installed:
    - concept notes render as cloze cards;
    - error notes show all five fields;
    - basic notes show front and back.
-5. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.
-6. Disable the AnkiDroid API and confirm the app reports the problem without losing cards.
+5. Set the Cloud topic to a separate deck (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck.
+6. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
+7. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.
+8. Disable the AnkiDroid API and confirm the app reports the problem without losing cards.

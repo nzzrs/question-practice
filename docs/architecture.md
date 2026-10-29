@@ -14,12 +14,13 @@ Domain models in `lib/core/domain/models.dart` are immutable plain Dart. Reposit
 
 ## Database
 
-One `AppDatabase` with tables for topics, practices, questions, sessions, session questions, attempts, concepts, error cards, manual cards and settings. The schema is version 1.
+One `AppDatabase` with tables for topics, practices, questions, sessions, session questions, attempts, concepts, error cards, manual cards and settings. The schema is version 2; the upgrade from version 1 adds the topic deck and manual-card topic columns.
 
 - Timestamps are UTC; rows are converted back to UTC in mappers.
 - Questions store alternatives and per-alternative explanations as JSON arrays.
 - A partial unique index enforces one active error card per question.
 - Error cards snapshot the question, alternatives and reasoning so history survives edits.
+- Topics store an optional AnkiDroid deck name. Cards snapshot the topic name; export resolves a deck per card, falling back to the Settings default.
 - Sessions are created on start and can be resumed if the app is killed.
 - Deleting a topic/practice cascades through its content; deleting a session removes its attempts and cards created by it.
 
@@ -44,7 +45,7 @@ Skipped answers never create error cards. They are handled by the skipped branch
 
 ## Platform services
 
-- `AnkiGateway` (Dart) ↔ `AnkiBridge` (Kotlin) over a MethodChannel. Kotlin uses AnkiDroid's AddContentApi and broadcasts DO_SYNC.
+- `AnkiGateway` (Dart) ↔ `AnkiBridge` (Kotlin) over a MethodChannel. Kotlin uses AnkiDroid's AddContentApi, groups notes by target deck, creates missing decks, and broadcasts DO_SYNC. `deckNames()` reads live decks for the topic picker.
 - `WebLauncher` wraps Chrome Custom Tabs.
 - `SecureKeyStore` wraps Android secure storage.
 - `http.Client` is injected so lookup tests use mock responses.

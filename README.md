@@ -16,6 +16,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Re-test errors after 48 hours. A correct answer resolves the card but keeps the history.
 - Look up a selected term with an optional OpenAI-compatible endpoint (Claude and Gemini are available through OpenRouter), or in DuckDuckGo/Wikipedia through a Custom Tab.
 - Export selected cards directly to AnkiDroid or share Anki-compatible files.
+- Give each topic its own AnkiDroid deck; topics without one use the default deck.
 - See per-topic accuracy and progress, and a mixed shuffled session across all topics.
 - A subtle reminder every five minutes. There is no timer.
 
@@ -47,6 +48,16 @@ Install it on a connected device:
 adb install -r build/app/outputs/flutter-apk/app-debug.apk
 ```
 
+## Documentation
+
+All documentation is in English. Start at [docs/README.md](docs/README.md).
+
+- [User guide](docs/user-guide.md)
+- [Import format](docs/json-format.md)
+- [AnkiDroid export and per-topic decks](docs/anki.md)
+- [Architecture](docs/architecture.md)
+- [Testing](docs/testing.md)
+
 ## Import
 
 The importer validates the whole file before writing anything. A broken file is rejected with the JSON path of the problem. See [docs/json-format.md](docs/json-format.md).
@@ -55,7 +66,7 @@ A sample with two topics and eight questions lives at [assets/samples/sample_pra
 
 ## Anki export
 
-See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze** note type. Error and basic note types are created automatically the first time.
+See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze** note type. Error and basic note types are created automatically the first time. Each topic can target its own deck; the topic editor loads deck names from AnkiDroid. Blank topics use the default deck from Settings.
 
 ## Data and privacy
 

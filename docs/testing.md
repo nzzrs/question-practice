@@ -16,7 +16,7 @@ The suite runs on the Dart VM. Drift uses an in-memory SQLite database; HTTP and
 | Error queue | Exact 48-hour boundary, due query, resolution, history, wrong retry scheduling |
 | Review | Error steps, skipped concept/basic branches, missing definitions |
 | Lookup | AI JSON parsing, fenced JSON, 401 fallback, missing key/model, web URL selection, auto-saved concepts |
-| Export | Cloze format, HTML/cloze escaping, exactly five error fields, TSV content, permission/status failures, partial failures |
+| Export | Cloze format, HTML/cloze escaping, exactly five error fields, TSV content, per-topic deck routing, default deck fallback, permission/status failures, partial failures |
 | Data | Topic/practice summaries, accuracy/progress, due counts, unfinished sessions excluded |
 | Widgets | Empty home, help, topic list, topic details, question feedback/explanation, five-minute reminder, sample import |
 
@@ -32,13 +32,14 @@ Use the connected Pixel 9 Pro XL (Android 17) and AnkiDroid 2.25.3.
 6. Finish; confirm the score and looked-up count.
 7. Complete the error review: bias, vaccine, concept card and basic card.
 8. Open Cards; preview, deselect and delete a card.
-9. Export to AnkiDroid; verify the deck and all three note types.
-10. Use Define with web mode; confirm the Custom Tab opens and a concept is saved.
-11. Configure an AI endpoint, save the key, and test one definition.
-12. Seed an old error (or use a clock override in development), confirm it is hidden until 48 hours and resolves after a correct answer.
-13. Toggle wallpaper colors and dark mode; check contrast.
-14. Set the font scale to 2.0; confirm no overflow on home, session, review and cards.
-15. Erase all data; confirm topics, cards, settings and key are gone.
+9. Set a topic's deck from the live AnkiDroid list (or type a new deck), export, and verify cards land in that deck while a blank topic uses the default.
+10. Export to AnkiDroid; verify the deck and all three note types.
+11. Use Define with web mode; confirm the Custom Tab opens and a concept is saved.
+12. Configure an AI endpoint, save the key, and test one definition.
+13. Seed an old error (or use a clock override in development), confirm it is hidden until 48 hours and resolves after a correct answer.
+14. Toggle wallpaper colors and dark mode; check contrast.
+15. Set the font scale to 2.0; confirm no overflow on home, session, review and cards.
+16. Erase all data; confirm topics, cards, settings and key are gone.
 
 ## Notes
 

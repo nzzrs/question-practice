@@ -121,6 +121,7 @@ void main() {
       topicName: 'Networking',
       practiceName: 'TCP/IP',
       count: 2,
+      ankiDeck: 'Cloud deck',
     );
     await pumpTestApp(
       tester,
@@ -129,6 +130,7 @@ void main() {
     );
     expect(find.text('Networking'), findsOneWidget);
     expect(find.text('P1'), findsOneWidget);
+    expect(find.text('Anki deck: Cloud deck'), findsOneWidget);
     expect(find.text('Progress'), findsOneWidget);
     expect(find.text('TCP/IP'), findsOneWidget);
   });

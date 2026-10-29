@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/data/card_repository.dart';
+import '../../../core/data/practice_repository.dart';
 import '../../../core/platform/anki_gateway.dart';
 import 'anki_note_builder.dart';
 
@@ -28,15 +29,18 @@ class ExportService {
   ExportService({
     required AnkiGateway gateway,
     required CardRepository cards,
+    required PracticeRepository practices,
     required Clock clock,
     AnkiNoteBuilder builder = const AnkiNoteBuilder(),
   }) : _gateway = gateway,
        _cards = cards,
+       _practices = practices,
        _clock = clock,
        _builder = builder;
 
   final AnkiGateway _gateway;
   final CardRepository _cards;
+  final PracticeRepository _practices;
   final Clock _clock;
   final AnkiNoteBuilder _builder;
 
@@ -88,11 +92,21 @@ class ExportService {
       );
     }
 
-    final notes = _builder.notes(selection);
-    final result = await _gateway.importNotes(
-      deckName: deckName.trim().isEmpty ? 'Question Practice' : deckName.trim(),
-      notes: notes,
+    final defaultDeck = deckName.trim().isEmpty
+        ? 'Question Practice'
+        : deckName.trim();
+    final topics = await _practices.allTopics();
+    final deckByTopic = <String, String>{
+      for (final topic in topics)
+        if (topic.ankiDeck != null && topic.ankiDeck!.trim().isNotEmpty)
+          topic.name: topic.ankiDeck!.trim(),
+    };
+    final notes = _builder.notes(
+      selection,
+      defaultDeck: defaultDeck,
+      deckByTopic: deckByTopic,
     );
+    final result = await _gateway.importNotes(notes: notes);
     final success = result.failed == 0 && result.added == notes.length;
     if (success) {
       await _cards.markExported(

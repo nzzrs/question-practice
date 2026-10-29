@@ -6,6 +6,7 @@ class Topics extends Table {
   TextColumn get name => text().withLength(min: 1, max: 120)();
   TextColumn get description => text().withDefault(const Constant(''))();
   IntColumn get priority => integer().nullable()();
+  TextColumn get ankiDeck => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
 }
 
@@ -154,6 +155,7 @@ class ManualCards extends Table {
   )();
   TextColumn get question => text()();
   TextColumn get answer => text()();
+  TextColumn get topicName => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get exportedAt => dateTime().nullable()();
 }

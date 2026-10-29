@@ -95,7 +95,10 @@ class HelpPage extends StatelessWidget {
                 'The Cards screen previews and selects concepts (cloze), error cards (five fields) and basic cards. '
                 'Export straight to AnkiDroid through its supported API, or share Anki-compatible text files. '
                 'AnkiDroid must have its API enabled and this app must have database permission. '
-                'Concept cards use the Cloze note type already in AnkiDroid; create a Cloze note type there if it was deleted.',
+                'Concept cards use the Cloze note type already in AnkiDroid; create a Cloze note type there if it was deleted. '
+                'Each topic can target its own AnkiDroid deck. Open a topic, tap Edit, then Choose AnkiDroid deck. '
+                'A topic with no deck uses the default deck from Settings. The picker reads live deck names from AnkiDroid; '
+                'if the API or permission is unavailable, type the deck name manually.',
           ),
           _Section(
             title: 'Privacy and data',

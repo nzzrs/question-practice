@@ -7,6 +7,7 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/session_page.dart';
+import 'anki_deck_picker.dart';
 
 class TopicPage extends ConsumerStatefulWidget {
   const TopicPage({required this.topicId, super.key});
@@ -24,6 +25,8 @@ class _TopicPageState extends ConsumerState<TopicPage> {
   Widget build(BuildContext context) {
     final summary = ref.watch(topicSummaryProvider(widget.topicId));
     final practices = ref.watch(practiceSummariesProvider(widget.topicId));
+    final defaultDeck =
+        ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
 
     return AppScaffold(
       title: summary.value?.topic.name ?? 'Topic',
@@ -84,6 +87,14 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                 ),
                 const SizedBox(height: 10),
               ],
+              Text(
+                'Anki deck: ${data.topic.ankiDeck ?? '$defaultDeck (default)'}',
+                style: M3ETheme.of(context).typography.baseline.labelSmall
+                    .copyWith(
+                      color: M3ETheme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: 12),
               if (data.topic.description.isNotEmpty) ...[
                 Text(
                   data.topic.description,
@@ -160,6 +171,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     final priority = TextEditingController(
       text: topic.priority?.toString() ?? '',
     );
+    final deck = TextEditingController(text: topic.ankiDeck ?? '');
     String? error;
     final saved = await M3EDialog.show<bool>(
       context,
@@ -189,6 +201,30 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                     label: 'Priority (1 highest, optional)',
                     keyboardType: TextInputType.number,
                     errorText: error,
+                  ),
+                  const SizedBox(height: 12),
+                  M3ETextField(
+                    controller: deck,
+                    label: 'AnkiDroid deck',
+                    supportingText:
+                        'Blank uses the default deck from Settings.',
+                  ),
+                  const SizedBox(height: 6),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: M3EButton.tonal(
+                      onPressed: () async {
+                        final selected = await showAnkiDeckPicker(
+                          context,
+                          ref,
+                          current: deck.text,
+                        );
+                        if (selected == null) return;
+                        setDialogState(() => deck.text = selected);
+                      },
+                      icon: const Icon(Icons.style_outlined),
+                      label: const Text('Choose AnkiDroid deck'),
+                    ),
                   ),
                 ],
               ),
@@ -222,6 +258,9 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                         name: trimmedName,
                         description: description.text.trim(),
                         priority: parsedPriority,
+                        ankiDeck: deck.text.trim().isEmpty
+                            ? null
+                            : deck.text.trim(),
                       );
                   if (context.mounted) Navigator.of(context).pop(true);
                 },
@@ -235,6 +274,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     name.dispose();
     description.dispose();
     priority.dispose();
+    deck.dispose();
     if (saved == true && mounted) {
       await showSnack(context, 'Topic updated.');
     }

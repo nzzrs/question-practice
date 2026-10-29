@@ -64,11 +64,13 @@ class TestHarness {
     String practiceName = 'Practice',
     int count = 2,
     int? priority = 1,
+    String? ankiDeck,
   }) async {
     final topicId = await practices.createTopic(
       name: topicName,
       description: 'Topic description',
       priority: priority,
+      ankiDeck: ankiDeck,
       createdAt: clock.now().toUtc(),
     );
     final practiceId = await practices.createPractice(

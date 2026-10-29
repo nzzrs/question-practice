@@ -159,6 +159,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           sessionId: widget.sessionId,
           question: _newQuestion.text,
           answer: _newAnswer.text,
+          topicName: step.topicName,
         );
       }
       if (!mounted) return;

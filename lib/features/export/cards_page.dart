@@ -48,6 +48,22 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final conceptsAsync = ref.watch(allConceptsProvider);
     final errorsAsync = ref.watch(allErrorCardsProvider);
     final manualsAsync = ref.watch(allManualCardsProvider);
+    final topicSummaries = ref.watch(topicSummariesProvider).value ?? const [];
+    final defaultDeck =
+        ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
+    final deckByTopic = {
+      for (final topic in topicSummaries)
+        if (topic.topic.ankiDeck != null &&
+            topic.topic.ankiDeck!.trim().isNotEmpty)
+          topic.topic.name: topic.topic.ankiDeck!.trim(),
+    };
+    String deckFor(String topicName) {
+      final configured = deckByTopic[topicName.trim()];
+      return configured == null || configured.isEmpty
+          ? defaultDeck
+          : configured;
+    }
+
     final allConcepts = conceptsAsync.value ?? const <Concept>[];
     final allErrors = errorsAsync.value ?? const <ErrorCard>[];
     final allManuals = manualsAsync.value ?? const <ManualCard>[];
@@ -162,7 +178,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 Text(
-                  'Review what goes to Anki. Concepts become cloze cards, errors have five fields, and skipped-question cards are basic front/back.',
+                  'Review what goes to Anki. Concepts become cloze cards, errors have five fields, and skipped-question cards are basic front/back. Each topic uses its own deck; topics without one use the default deck from Settings.',
                   style: theme.typography.baseline.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     height: 1.45,
@@ -213,6 +229,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                   for (final concept in concepts) ...[
                     _ConceptRow(
                       concept: concept,
+                      deckName: deckFor(concept.topicName),
                       selected: _selectedConcepts.contains(concept.id),
                       onSelected: (value) => setState(() {
                         if (value) {
@@ -259,6 +276,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                   for (final card in errors) ...[
                     _ErrorRow(
                       card: card,
+                      deckName: deckFor(card.topicName),
                       selected: _selectedErrors.contains(card.id),
                       onSelected: (value) => setState(() {
                         if (value) {
@@ -299,6 +317,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                   for (final card in manuals) ...[
                     _ManualRow(
                       card: card,
+                      deckName: deckFor(card.topicName),
                       selected: _selectedBasic.contains(card.id),
                       onSelected: (value) => setState(() {
                         if (value) {
@@ -530,12 +549,15 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         style: const TextStyle(fontFamily: 'monospace', height: 1.5),
       ),
       const SizedBox(height: 8),
-      Text('One cloze note · ${concept.source.name} · ${concept.topicName}'),
+      Text(
+        'One cloze note · ${concept.source.name} · ${concept.topicName} · deck: ${_deckForTopic(concept.topicName)}',
+      ),
     ]);
   }
 
   Future<void> _previewError(ErrorCard card) {
     return _previewDialog('Error card preview', [
+      _PreviewField(label: 'Deck', value: _deckForTopic(card.topicName)),
       _PreviewField(label: 'Question', value: card.question),
       _PreviewField(label: 'Wrong answer', value: card.wrongAnswer),
       _PreviewField(label: 'Correct answer', value: card.correctAnswer),
@@ -552,9 +574,24 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
   Future<void> _previewManual(ManualCard card) {
     return _previewDialog('Basic card preview', [
+      _PreviewField(label: 'Deck', value: _deckForTopic(card.topicName)),
       _PreviewField(label: 'Front', value: card.question),
       _PreviewField(label: 'Back', value: card.answer),
     ]);
+  }
+
+  String _deckForTopic(String topicName) {
+    final topics = ref.read(topicSummariesProvider).value ?? const [];
+    final defaultDeck =
+        ref.read(settingsProvider).value?.ankiDeck ?? 'Question Practice';
+    for (final summary in topics) {
+      if (summary.topic.name == topicName &&
+          summary.topic.ankiDeck != null &&
+          summary.topic.ankiDeck!.trim().isNotEmpty) {
+        return summary.topic.ankiDeck!.trim();
+      }
+    }
+    return defaultDeck;
   }
 
   Future<void> _previewDialog(String title, List<Widget> children) {
@@ -623,6 +660,7 @@ class _SelectAllButton extends StatelessWidget {
 class _ConceptRow extends StatelessWidget {
   const _ConceptRow({
     required this.concept,
+    required this.deckName,
     required this.selected,
     required this.onSelected,
     required this.onPreview,
@@ -630,6 +668,7 @@ class _ConceptRow extends StatelessWidget {
   });
 
   final Concept concept;
+  final String deckName;
   final bool selected;
   final ValueChanged<bool> onSelected;
   final VoidCallback onPreview;
@@ -677,8 +716,10 @@ class _ConceptRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${concept.source.name} · ${concept.topicName}'
+                      '${concept.source.name} · ${concept.topicName} · deck: $deckName'
                       '${concept.exportedAt != null ? ' · exported' : ''}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.typography.baseline.labelSmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -702,6 +743,7 @@ class _ConceptRow extends StatelessWidget {
 class _ErrorRow extends StatelessWidget {
   const _ErrorRow({
     required this.card,
+    required this.deckName,
     required this.selected,
     required this.onSelected,
     required this.onPreview,
@@ -709,6 +751,7 @@ class _ErrorRow extends StatelessWidget {
   });
 
   final ErrorCard card;
+  final String deckName;
   final bool selected;
   final ValueChanged<bool> onSelected;
   final VoidCallback onPreview;
@@ -758,8 +801,11 @@ class _ErrorRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '${card.topicName}${card.isResolved ? ' · resolved' : ''}'
+                      '${card.topicName} · deck: $deckName'
+                      '${card.isResolved ? ' · resolved' : ''}'
                       '${card.exportedAt != null ? ' · exported' : ''}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: theme.typography.baseline.labelSmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -783,12 +829,14 @@ class _ErrorRow extends StatelessWidget {
 class _ManualRow extends StatelessWidget {
   const _ManualRow({
     required this.card,
+    required this.deckName,
     required this.selected,
     required this.onSelected,
     required this.onPreview,
   });
 
   final ManualCard card;
+  final String deckName;
   final bool selected;
   final ValueChanged<bool> onSelected;
   final VoidCallback onPreview;
@@ -828,6 +876,15 @@ class _ManualRow extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: theme.typography.baseline.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${card.topicName} · deck: $deckName',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.typography.baseline.labelSmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),

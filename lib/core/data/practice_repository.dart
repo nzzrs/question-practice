@@ -89,12 +89,14 @@ class PracticeRepository {
     required String name,
     required String description,
     required int? priority,
+    String? ankiDeck,
     required DateTime createdAt,
   }) {
     return _db.topicDao.insertTopic(
       name: name,
       description: description,
       priority: priority,
+      ankiDeck: ankiDeck,
       createdAt: createdAt,
     );
   }
@@ -137,12 +139,14 @@ class PracticeRepository {
     required String name,
     required String description,
     required int? priority,
+    String? ankiDeck,
   }) {
     return _db.topicDao.updateTopic(
       id: id,
       name: name,
       description: description,
       priority: priority,
+      ankiDeck: ankiDeck,
     );
   }
 

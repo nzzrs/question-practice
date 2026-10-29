@@ -17,6 +17,7 @@ void main() {
     service = ExportService(
       gateway: gateway,
       cards: harness.cards,
+      practices: harness.practices,
       clock: harness.clock,
     );
   });
@@ -26,7 +27,11 @@ void main() {
   });
 
   Future<ExportSelection> selection() async {
-    final practice = await harness.seedPractice(count: 1);
+    final practice = await harness.seedPractice(
+      topicName: 'Cloud',
+      count: 1,
+      ankiDeck: 'Cloud deck',
+    );
     final question = (await harness.practices.questionsForPractice(
       practice.practiceId,
     )).single;
@@ -63,6 +68,7 @@ void main() {
       sessionId: null,
       question: 'Manual question',
       answer: 'Manual answer',
+      topicName: 'Cloud',
       createdAt: harness.clock.now().toUtc(),
     );
     final concepts = await harness.cards.watchConcepts().first;
@@ -93,6 +99,9 @@ void main() {
       AnkiModel.error,
       AnkiModel.basic,
     ]);
+    expect(gateway.importedNotes.map((note) => note.deckName).toSet(), {
+      'Cloud deck',
+    });
     expect(gateway.syncCount, 1);
     expect(await harness.cards.watchConcepts().first, isEmpty);
     expect(await harness.cards.watchErrorCards().first, isEmpty);

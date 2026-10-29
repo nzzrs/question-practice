@@ -20,6 +20,7 @@ Topic topicFromRow(TopicRow row) {
     name: row.name,
     description: row.description,
     priority: row.priority,
+    ankiDeck: row.ankiDeck,
     createdAt: row.createdAt.toUtc(),
   );
 }
@@ -121,6 +122,7 @@ ManualCard manualCardFromRow(ManualCardRow row) {
     sessionId: row.sessionId,
     question: row.question,
     answer: row.answer,
+    topicName: row.topicName,
     createdAt: row.createdAt.toUtc(),
     exportedAt: row.exportedAt?.toUtc(),
   );
@@ -133,6 +135,7 @@ TopicSummary topicSummaryFromRow(TopicSummaryRow row) {
       name: row.topicName,
       description: row.topicDescription,
       priority: row.topicPriority,
+      ankiDeck: row.topicAnkiDeck,
       createdAt: row.topicCreatedAt,
     ),
     practiceCount: row.practiceCount,

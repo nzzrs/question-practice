@@ -23,6 +23,7 @@ void main() {
     final notes = builder.notes(ExportSelection(errorCards: [card]));
     expect(notes, hasLength(1));
     expect(notes.single.model, AnkiModel.error);
+    expect(notes.single.deckName, 'Question Practice');
     expect(notes.single.fields, [
       'Question &lt;one&gt;?',
       'Wrong &amp; answer',
@@ -36,6 +37,36 @@ void main() {
     expect(builder.html('a\nb\tc'), 'a<br>b c');
   });
 
+  test('notes follow per-topic deck overrides', () {
+    final notes = builder.notes(
+      ExportSelection(
+        concepts: [_concept()],
+        errorCards: [_errorCard()],
+        manualCards: [
+          ManualCard(
+            id: 2,
+            sessionId: 1,
+            question: 'Front',
+            answer: 'Back',
+            topicName: 'Cloud',
+            createdAt: DateTime.utc(2026),
+            exportedAt: null,
+          ),
+        ],
+      ),
+      defaultDeck: 'Default deck',
+      deckByTopic: const {
+        'Networking basics': 'Networking deck',
+        'Cloud': 'Cloud deck',
+      },
+    );
+    expect(notes.map((note) => note.deckName), [
+      'Networking deck',
+      'Networking deck',
+      'Cloud deck',
+    ]);
+  });
+
   test('files contain the selected cards only', () {
     final concept = _concept();
     final basic = ManualCard(
@@ -43,6 +74,7 @@ void main() {
       sessionId: 1,
       question: 'Front',
       answer: 'Back',
+      topicName: 'Networking basics',
       createdAt: DateTime.utc(2026),
       exportedAt: null,
     );
@@ -82,7 +114,7 @@ ErrorCard _errorCard() {
     reasoning: 'Reason',
     bias: 'Bias line',
     vaccine: 'Vaccine line',
-    topicName: 'Topic',
+    topicName: 'Networking basics',
     practiceName: 'Practice',
     status: ErrorCardStatus.active,
     createdAt: DateTime.utc(2026),

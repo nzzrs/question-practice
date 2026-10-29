@@ -120,6 +120,7 @@ void main() {
       sessionId: start.session.id,
       question: 'What is a subnet?',
       answer: 'A range of IP addresses.',
+      topicName: 'Networking',
     );
     final cards = await harness.cards.watchManualCards().first;
     expect(cards.single.question, 'What is a subnet?');

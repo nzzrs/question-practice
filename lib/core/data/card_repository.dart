@@ -174,6 +174,7 @@ class CardRepository {
     required int? sessionId,
     required String question,
     required String answer,
+    required String topicName,
     required DateTime createdAt,
   }) {
     return _db.cardDao.insertManualCard(
@@ -181,6 +182,7 @@ class CardRepository {
         sessionId: Value(sessionId),
         question: question,
         answer: answer,
+        topicName: Value(topicName),
         createdAt: createdAt,
       ),
     );

@@ -102,6 +102,7 @@ void main() {
     final export = ExportService(
       gateway: gateway,
       cards: harness.cards,
+      practices: harness.practices,
       clock: harness.clock,
     );
     final outcome = await export.exportToAnki(

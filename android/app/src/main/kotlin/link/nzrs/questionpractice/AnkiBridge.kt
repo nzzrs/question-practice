@@ -46,6 +46,7 @@ class AnkiBridge(
         when (call.method) {
             "status" -> result.success(statusMap())
             "requestPermission" -> requestPermission(result)
+            "deckNames" -> result.success(deckNames())
             "importNotes" -> importNotes(call, result)
             "triggerSync" -> {
                 triggerSync()
@@ -85,7 +86,6 @@ class AnkiBridge(
     }
 
     private fun importNotes(call: MethodCall, result: MethodChannel.Result) {
-        val deckName = call.argument<String>("deckName") ?: "Question Practice"
         val rawNotes = call.argument<List<Map<String, Any?>>>("notes") ?: emptyList()
         if (rawNotes.isEmpty()) {
             result.success(
@@ -109,7 +109,7 @@ class AnkiBridge(
         }
         executor.execute {
             val response = try {
-                doImport(deckName, rawNotes)
+                doImport(rawNotes)
             } catch (error: Exception) {
                 mapOf(
                     "added" to 0,
@@ -122,16 +122,9 @@ class AnkiBridge(
     }
 
     private fun doImport(
-        deckName: String,
         rawNotes: List<Map<String, Any?>>,
     ): Map<String, Any> {
         val api = AddContentApi(activity)
-        val deckId = ensureDeck(api, deckName)
-            ?: return mapOf(
-                "added" to 0,
-                "failed" to rawNotes.size,
-                "message" to "Could not create the AnkiDroid deck.",
-            )
 
         val cloze = findClozeModel()
             ?: return mapOf(
@@ -152,50 +145,62 @@ class AnkiBridge(
                 "message" to "Could not create the basic note type.",
             )
 
-        val grouped = rawNotes.groupBy { (it["model"] as? String) ?: "basic" }
+        val byDeck = rawNotes.groupBy {
+            (it["deckName"] as? String)?.trim().takeUnless { name -> name.isNullOrEmpty() }
+                ?: "Question Practice"
+        }
         var added = 0
         var failed = 0
         var firstError: String? = null
 
-        for ((modelName, notes) in grouped) {
-            val modelId: Long
-            val fieldCount: Int
-            when (modelName) {
-                "concept" -> {
-                    modelId = cloze.id
-                    fieldCount = cloze.fieldNames.size
-                }
-                "error" -> {
-                    modelId = errorModel
-                    fieldCount = ERROR_FIELDS.size
-                }
-                else -> {
-                    modelId = basicModel
-                    fieldCount = 2
-                }
+        for ((deckName, deckNotes) in byDeck) {
+            val deckId = ensureDeck(api, deckName)
+            if (deckId == null) {
+                failed += deckNotes.size
+                firstError = firstError ?: "Could not create the AnkiDroid deck \"$deckName\"."
+                continue
             }
-            val fieldsList = ArrayList<Array<String>>(notes.size)
-            val tagsList = ArrayList<Set<String>>(notes.size)
-            for (note in notes) {
-                val rawFields = (note["fields"] as? List<*>)?.map { it?.toString() ?: "" }
-                    ?: emptyList()
-                val fields = Array(fieldCount) { index -> rawFields.getOrElse(index) { "" } }
-                val rawTags = (note["tags"] as? List<*>)?.mapNotNull { it?.toString() }
-                    ?: emptyList()
-                fieldsList.add(fields)
-                tagsList.add(rawTags.toSet())
-            }
-            val count = try {
-                api.addNotes(modelId, deckId, fieldsList, tagsList)
-            } catch (error: Exception) {
-                firstError = firstError ?: (error.message ?: "AnkiDroid rejected a note.")
-                -1
-            }
-            if (count < 0) {
-                failed += notes.size
-            } else {
-                added += count
-                failed += (notes.size - count).coerceAtLeast(0)
+            val grouped = deckNotes.groupBy { (it["model"] as? String) ?: "basic" }
+            for ((modelName, notes) in grouped) {
+                val modelId: Long
+                val fieldCount: Int
+                when (modelName) {
+                    "concept" -> {
+                        modelId = cloze.id
+                        fieldCount = cloze.fieldNames.size
+                    }
+                    "error" -> {
+                        modelId = errorModel
+                        fieldCount = ERROR_FIELDS.size
+                    }
+                    else -> {
+                        modelId = basicModel
+                        fieldCount = 2
+                    }
+                }
+                val fieldsList = ArrayList<Array<String>>(notes.size)
+                val tagsList = ArrayList<Set<String>>(notes.size)
+                for (note in notes) {
+                    val rawFields = (note["fields"] as? List<*>)?.map { it?.toString() ?: "" }
+                        ?: emptyList()
+                    val fields = Array(fieldCount) { index -> rawFields.getOrElse(index) { "" } }
+                    val rawTags = (note["tags"] as? List<*>)?.mapNotNull { it?.toString() }
+                        ?: emptyList()
+                    fieldsList.add(fields)
+                    tagsList.add(rawTags.toSet())
+                }
+                val count = try {
+                    api.addNotes(modelId, deckId, fieldsList, tagsList)
+                } catch (error: Exception) {
+                    firstError = firstError ?: (error.message ?: "AnkiDroid rejected a note.")
+                    -1
+                }
+                if (count < 0) {
+                    failed += notes.size
+                } else {
+                    added += count
+                    failed += (notes.size - count).coerceAtLeast(0)
+                }
             }
         }
 
@@ -208,6 +213,15 @@ class AnkiBridge(
                 else -> "$added cards added, $failed rejected."
             },
         )
+    }
+
+    private fun deckNames(): List<String> {
+        if (!hasPermission()) return emptyList()
+        return try {
+            AddContentApi(activity).deckList?.values?.sorted() ?: emptyList()
+        } catch (error: Exception) {
+            emptyList()
+        }
     }
 
     private fun ensureDeck(api: AddContentApi, deckName: String): Long? {

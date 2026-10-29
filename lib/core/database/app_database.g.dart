@@ -57,6 +57,17 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _ankiDeckMeta = const VerificationMeta(
+    'ankiDeck',
+  );
+  @override
+  late final GeneratedColumn<String> ankiDeck = GeneratedColumn<String>(
+    'anki_deck',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -74,6 +85,7 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
     name,
     description,
     priority,
+    ankiDeck,
     createdAt,
   ];
   @override
@@ -114,6 +126,12 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
         priority.isAcceptableOrUnknown(data['priority']!, _priorityMeta),
       );
     }
+    if (data.containsKey('anki_deck')) {
+      context.handle(
+        _ankiDeckMeta,
+        ankiDeck.isAcceptableOrUnknown(data['anki_deck']!, _ankiDeckMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -147,6 +165,10 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
         DriftSqlType.int,
         data['${effectivePrefix}priority'],
       ),
+      ankiDeck: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}anki_deck'],
+      ),
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -165,12 +187,14 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
   final String name;
   final String description;
   final int? priority;
+  final String? ankiDeck;
   final DateTime createdAt;
   const TopicRow({
     required this.id,
     required this.name,
     required this.description,
     this.priority,
+    this.ankiDeck,
     required this.createdAt,
   });
   @override
@@ -181,6 +205,9 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     map['description'] = Variable<String>(description);
     if (!nullToAbsent || priority != null) {
       map['priority'] = Variable<int>(priority);
+    }
+    if (!nullToAbsent || ankiDeck != null) {
+      map['anki_deck'] = Variable<String>(ankiDeck);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
     return map;
@@ -194,6 +221,9 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       priority: priority == null && nullToAbsent
           ? const Value.absent()
           : Value(priority),
+      ankiDeck: ankiDeck == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ankiDeck),
       createdAt: Value(createdAt),
     );
   }
@@ -208,6 +238,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       name: serializer.fromJson<String>(json['name']),
       description: serializer.fromJson<String>(json['description']),
       priority: serializer.fromJson<int?>(json['priority']),
+      ankiDeck: serializer.fromJson<String?>(json['ankiDeck']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
     );
   }
@@ -219,6 +250,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       'name': serializer.toJson<String>(name),
       'description': serializer.toJson<String>(description),
       'priority': serializer.toJson<int?>(priority),
+      'ankiDeck': serializer.toJson<String?>(ankiDeck),
       'createdAt': serializer.toJson<DateTime>(createdAt),
     };
   }
@@ -228,12 +260,14 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     String? name,
     String? description,
     Value<int?> priority = const Value.absent(),
+    Value<String?> ankiDeck = const Value.absent(),
     DateTime? createdAt,
   }) => TopicRow(
     id: id ?? this.id,
     name: name ?? this.name,
     description: description ?? this.description,
     priority: priority.present ? priority.value : this.priority,
+    ankiDeck: ankiDeck.present ? ankiDeck.value : this.ankiDeck,
     createdAt: createdAt ?? this.createdAt,
   );
   TopicRow copyWithCompanion(TopicsCompanion data) {
@@ -244,6 +278,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           ? data.description.value
           : this.description,
       priority: data.priority.present ? data.priority.value : this.priority,
+      ankiDeck: data.ankiDeck.present ? data.ankiDeck.value : this.ankiDeck,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
     );
   }
@@ -255,13 +290,15 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('priority: $priority, ')
+          ..write('ankiDeck: $ankiDeck, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, description, priority, createdAt);
+  int get hashCode =>
+      Object.hash(id, name, description, priority, ankiDeck, createdAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -270,6 +307,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           other.name == this.name &&
           other.description == this.description &&
           other.priority == this.priority &&
+          other.ankiDeck == this.ankiDeck &&
           other.createdAt == this.createdAt);
 }
 
@@ -278,12 +316,14 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
   final Value<String> name;
   final Value<String> description;
   final Value<int?> priority;
+  final Value<String?> ankiDeck;
   final Value<DateTime> createdAt;
   const TopicsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.description = const Value.absent(),
     this.priority = const Value.absent(),
+    this.ankiDeck = const Value.absent(),
     this.createdAt = const Value.absent(),
   });
   TopicsCompanion.insert({
@@ -291,6 +331,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     required String name,
     this.description = const Value.absent(),
     this.priority = const Value.absent(),
+    this.ankiDeck = const Value.absent(),
     required DateTime createdAt,
   }) : name = Value(name),
        createdAt = Value(createdAt);
@@ -299,6 +340,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     Expression<String>? name,
     Expression<String>? description,
     Expression<int>? priority,
+    Expression<String>? ankiDeck,
     Expression<DateTime>? createdAt,
   }) {
     return RawValuesInsertable({
@@ -306,6 +348,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
       if (name != null) 'name': name,
       if (description != null) 'description': description,
       if (priority != null) 'priority': priority,
+      if (ankiDeck != null) 'anki_deck': ankiDeck,
       if (createdAt != null) 'created_at': createdAt,
     });
   }
@@ -315,6 +358,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     Value<String>? name,
     Value<String>? description,
     Value<int?>? priority,
+    Value<String?>? ankiDeck,
     Value<DateTime>? createdAt,
   }) {
     return TopicsCompanion(
@@ -322,6 +366,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
       name: name ?? this.name,
       description: description ?? this.description,
       priority: priority ?? this.priority,
+      ankiDeck: ankiDeck ?? this.ankiDeck,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -341,6 +386,9 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     if (priority.present) {
       map['priority'] = Variable<int>(priority.value);
     }
+    if (ankiDeck.present) {
+      map['anki_deck'] = Variable<String>(ankiDeck.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -354,6 +402,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('priority: $priority, ')
+          ..write('ankiDeck: $ankiDeck, ')
           ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
@@ -4435,6 +4484,18 @@ class $ManualCardsTable extends ManualCards
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _topicNameMeta = const VerificationMeta(
+    'topicName',
+  );
+  @override
+  late final GeneratedColumn<String> topicName = GeneratedColumn<String>(
+    'topic_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4463,6 +4524,7 @@ class $ManualCardsTable extends ManualCards
     sessionId,
     question,
     answer,
+    topicName,
     createdAt,
     exportedAt,
   ];
@@ -4503,6 +4565,12 @@ class $ManualCardsTable extends ManualCards
     } else if (isInserting) {
       context.missing(_answerMeta);
     }
+    if (data.containsKey('topic_name')) {
+      context.handle(
+        _topicNameMeta,
+        topicName.isAcceptableOrUnknown(data['topic_name']!, _topicNameMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -4542,6 +4610,10 @@ class $ManualCardsTable extends ManualCards
         DriftSqlType.string,
         data['${effectivePrefix}answer'],
       )!,
+      topicName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}topic_name'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -4564,6 +4636,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
   final int? sessionId;
   final String question;
   final String answer;
+  final String topicName;
   final DateTime createdAt;
   final DateTime? exportedAt;
   const ManualCardRow({
@@ -4571,6 +4644,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     this.sessionId,
     required this.question,
     required this.answer,
+    required this.topicName,
     required this.createdAt,
     this.exportedAt,
   });
@@ -4583,6 +4657,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     }
     map['question'] = Variable<String>(question);
     map['answer'] = Variable<String>(answer);
+    map['topic_name'] = Variable<String>(topicName);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || exportedAt != null) {
       map['exported_at'] = Variable<DateTime>(exportedAt);
@@ -4598,6 +4673,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
           : Value(sessionId),
       question: Value(question),
       answer: Value(answer),
+      topicName: Value(topicName),
       createdAt: Value(createdAt),
       exportedAt: exportedAt == null && nullToAbsent
           ? const Value.absent()
@@ -4615,6 +4691,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       sessionId: serializer.fromJson<int?>(json['sessionId']),
       question: serializer.fromJson<String>(json['question']),
       answer: serializer.fromJson<String>(json['answer']),
+      topicName: serializer.fromJson<String>(json['topicName']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       exportedAt: serializer.fromJson<DateTime?>(json['exportedAt']),
     );
@@ -4627,6 +4704,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       'sessionId': serializer.toJson<int?>(sessionId),
       'question': serializer.toJson<String>(question),
       'answer': serializer.toJson<String>(answer),
+      'topicName': serializer.toJson<String>(topicName),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'exportedAt': serializer.toJson<DateTime?>(exportedAt),
     };
@@ -4637,6 +4715,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     Value<int?> sessionId = const Value.absent(),
     String? question,
     String? answer,
+    String? topicName,
     DateTime? createdAt,
     Value<DateTime?> exportedAt = const Value.absent(),
   }) => ManualCardRow(
@@ -4644,6 +4723,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     sessionId: sessionId.present ? sessionId.value : this.sessionId,
     question: question ?? this.question,
     answer: answer ?? this.answer,
+    topicName: topicName ?? this.topicName,
     createdAt: createdAt ?? this.createdAt,
     exportedAt: exportedAt.present ? exportedAt.value : this.exportedAt,
   );
@@ -4653,6 +4733,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
       question: data.question.present ? data.question.value : this.question,
       answer: data.answer.present ? data.answer.value : this.answer,
+      topicName: data.topicName.present ? data.topicName.value : this.topicName,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       exportedAt: data.exportedAt.present
           ? data.exportedAt.value
@@ -4667,6 +4748,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
           ..write('sessionId: $sessionId, ')
           ..write('question: $question, ')
           ..write('answer: $answer, ')
+          ..write('topicName: $topicName, ')
           ..write('createdAt: $createdAt, ')
           ..write('exportedAt: $exportedAt')
           ..write(')'))
@@ -4674,8 +4756,15 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, sessionId, question, answer, createdAt, exportedAt);
+  int get hashCode => Object.hash(
+    id,
+    sessionId,
+    question,
+    answer,
+    topicName,
+    createdAt,
+    exportedAt,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4684,6 +4773,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
           other.sessionId == this.sessionId &&
           other.question == this.question &&
           other.answer == this.answer &&
+          other.topicName == this.topicName &&
           other.createdAt == this.createdAt &&
           other.exportedAt == this.exportedAt);
 }
@@ -4693,6 +4783,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
   final Value<int?> sessionId;
   final Value<String> question;
   final Value<String> answer;
+  final Value<String> topicName;
   final Value<DateTime> createdAt;
   final Value<DateTime?> exportedAt;
   const ManualCardsCompanion({
@@ -4700,6 +4791,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     this.sessionId = const Value.absent(),
     this.question = const Value.absent(),
     this.answer = const Value.absent(),
+    this.topicName = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.exportedAt = const Value.absent(),
   });
@@ -4708,6 +4800,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     this.sessionId = const Value.absent(),
     required String question,
     required String answer,
+    this.topicName = const Value.absent(),
     required DateTime createdAt,
     this.exportedAt = const Value.absent(),
   }) : question = Value(question),
@@ -4718,6 +4811,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     Expression<int>? sessionId,
     Expression<String>? question,
     Expression<String>? answer,
+    Expression<String>? topicName,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? exportedAt,
   }) {
@@ -4726,6 +4820,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
       if (sessionId != null) 'session_id': sessionId,
       if (question != null) 'question': question,
       if (answer != null) 'answer': answer,
+      if (topicName != null) 'topic_name': topicName,
       if (createdAt != null) 'created_at': createdAt,
       if (exportedAt != null) 'exported_at': exportedAt,
     });
@@ -4736,6 +4831,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     Value<int?>? sessionId,
     Value<String>? question,
     Value<String>? answer,
+    Value<String>? topicName,
     Value<DateTime>? createdAt,
     Value<DateTime?>? exportedAt,
   }) {
@@ -4744,6 +4840,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
       sessionId: sessionId ?? this.sessionId,
       question: question ?? this.question,
       answer: answer ?? this.answer,
+      topicName: topicName ?? this.topicName,
       createdAt: createdAt ?? this.createdAt,
       exportedAt: exportedAt ?? this.exportedAt,
     );
@@ -4764,6 +4861,9 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     if (answer.present) {
       map['answer'] = Variable<String>(answer.value);
     }
+    if (topicName.present) {
+      map['topic_name'] = Variable<String>(topicName.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -4780,6 +4880,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
           ..write('sessionId: $sessionId, ')
           ..write('question: $question, ')
           ..write('answer: $answer, ')
+          ..write('topicName: $topicName, ')
           ..write('createdAt: $createdAt, ')
           ..write('exportedAt: $exportedAt')
           ..write(')'))
@@ -5185,6 +5286,7 @@ typedef $$TopicsTableCreateCompanionBuilder = TopicsCompanion Function({
   required String name,
   Value<String> description,
   Value<int?> priority,
+  Value<String?> ankiDeck,
   required DateTime createdAt,
 });
 typedef $$TopicsTableUpdateCompanionBuilder = TopicsCompanion Function({
@@ -5192,6 +5294,7 @@ typedef $$TopicsTableUpdateCompanionBuilder = TopicsCompanion Function({
   Value<String> name,
   Value<String> description,
   Value<int?> priority,
+  Value<String?> ankiDeck,
   Value<DateTime> createdAt,
 });
 
@@ -5244,6 +5347,11 @@ class $$TopicsTableFilterComposer
 
   ColumnFilters<int> get priority => $composableBuilder(
     column: $table.priority,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ankiDeck => $composableBuilder(
+    column: $table.ankiDeck,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5307,6 +5415,11 @@ class $$TopicsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get ankiDeck => $composableBuilder(
+    column: $table.ankiDeck,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -5335,6 +5448,9 @@ class $$TopicsTableAnnotationComposer
 
   GeneratedColumn<int> get priority =>
       $composableBuilder(column: $table.priority, builder: (column) => column);
+
+  GeneratedColumn<String> get ankiDeck =>
+      $composableBuilder(column: $table.ankiDeck, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -5397,12 +5513,14 @@ class $$TopicsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> description = const Value.absent(),
                 Value<int?> priority = const Value.absent(),
+                Value<String?> ankiDeck = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
               }) => TopicsCompanion(
                 id: id,
                 name: name,
                 description: description,
                 priority: priority,
+                ankiDeck: ankiDeck,
                 createdAt: createdAt,
               ),
           createCompanionCallback:
@@ -5411,12 +5529,14 @@ class $$TopicsTableTableManager
                 required String name,
                 Value<String> description = const Value.absent(),
                 Value<int?> priority = const Value.absent(),
+                Value<String?> ankiDeck = const Value.absent(),
                 required DateTime createdAt,
               }) => TopicsCompanion.insert(
                 id: id,
                 name: name,
                 description: description,
                 priority: priority,
+                ankiDeck: ankiDeck,
                 createdAt: createdAt,
               ),
           withReferenceMapper: (p0) => p0
@@ -9619,6 +9739,7 @@ typedef $$ManualCardsTableCreateCompanionBuilder =
       Value<int?> sessionId,
       required String question,
       required String answer,
+      Value<String> topicName,
       required DateTime createdAt,
       Value<DateTime?> exportedAt,
     });
@@ -9628,6 +9749,7 @@ typedef $$ManualCardsTableUpdateCompanionBuilder =
       Value<int?> sessionId,
       Value<String> question,
       Value<String> answer,
+      Value<String> topicName,
       Value<DateTime> createdAt,
       Value<DateTime?> exportedAt,
     });
@@ -9675,6 +9797,11 @@ class $$ManualCardsTableFilterComposer
 
   ColumnFilters<String> get answer => $composableBuilder(
     column: $table.answer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get topicName => $composableBuilder(
+    column: $table.topicName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9736,6 +9863,11 @@ class $$ManualCardsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get topicName => $composableBuilder(
+    column: $table.topicName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -9787,6 +9919,9 @@ class $$ManualCardsTableAnnotationComposer
 
   GeneratedColumn<String> get answer =>
       $composableBuilder(column: $table.answer, builder: (column) => column);
+
+  GeneratedColumn<String> get topicName =>
+      $composableBuilder(column: $table.topicName, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -9852,6 +9987,7 @@ class $$ManualCardsTableTableManager
                 Value<int?> sessionId = const Value.absent(),
                 Value<String> question = const Value.absent(),
                 Value<String> answer = const Value.absent(),
+                Value<String> topicName = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> exportedAt = const Value.absent(),
               }) => ManualCardsCompanion(
@@ -9859,6 +9995,7 @@ class $$ManualCardsTableTableManager
                 sessionId: sessionId,
                 question: question,
                 answer: answer,
+                topicName: topicName,
                 createdAt: createdAt,
                 exportedAt: exportedAt,
               ),
@@ -9868,6 +10005,7 @@ class $$ManualCardsTableTableManager
                 Value<int?> sessionId = const Value.absent(),
                 required String question,
                 required String answer,
+                Value<String> topicName = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> exportedAt = const Value.absent(),
               }) => ManualCardsCompanion.insert(
@@ -9875,6 +10013,7 @@ class $$ManualCardsTableTableManager
                 sessionId: sessionId,
                 question: question,
                 answer: answer,
+                topicName: topicName,
                 createdAt: createdAt,
                 exportedAt: exportedAt,
               ),

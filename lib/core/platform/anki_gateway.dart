@@ -55,11 +55,13 @@ class AnkiNote {
   const AnkiNote({
     required this.model,
     required this.fields,
+    required this.deckName,
     this.tags = const [],
   });
 
   final AnkiModel model;
   final List<String> fields;
+  final String deckName;
   final List<String> tags;
 }
 
@@ -82,10 +84,9 @@ abstract class AnkiGateway {
 
   Future<AnkiStatus> requestPermission();
 
-  Future<AnkiImportResult> importNotes({
-    required String deckName,
-    required List<AnkiNote> notes,
-  });
+  Future<AnkiImportResult> importNotes({required List<AnkiNote> notes});
+
+  Future<List<String>> deckNames();
 
   Future<void> triggerSync();
 
@@ -130,20 +131,17 @@ class MethodChannelAnkiGateway implements AnkiGateway {
   }
 
   @override
-  Future<AnkiImportResult> importNotes({
-    required String deckName,
-    required List<AnkiNote> notes,
-  }) async {
+  Future<AnkiImportResult> importNotes({required List<AnkiNote> notes}) async {
     try {
       final map = await _channel.invokeMethod<Map<Object?, Object?>>(
         'importNotes',
         {
-          'deckName': deckName,
           'notes': [
             for (final note in notes)
               {
                 'model': note.model.name,
                 'fields': note.fields,
+                'deckName': note.deckName,
                 'tags': note.tags,
               },
           ],
@@ -173,6 +171,21 @@ class MethodChannelAnkiGateway implements AnkiGateway {
         failed: notes.length,
         message: 'AnkiDroid integration is not available on this build.',
       );
+    }
+  }
+
+  @override
+  Future<List<String>> deckNames() async {
+    try {
+      final names = await _channel.invokeMethod<List<Object?>>('deckNames');
+      return [
+        for (final name in names ?? const <Object?>[])
+          if (name is String) name,
+      ];
+    } on PlatformException {
+      return const [];
+    } on MissingPluginException {
+      return const [];
     }
   }
 
@@ -216,11 +229,13 @@ class FakeAnkiGateway implements AnkiGateway {
       message: 'Fake import',
     ),
     this.permissionStatus,
+    this.availableDecks = const ['Question Practice'],
   });
 
   AnkiStatus currentStatus;
   AnkiStatus? permissionStatus;
   AnkiImportResult importResult;
+  List<String> availableDecks;
   final List<AnkiNote> importedNotes = [];
   int syncCount = 0;
   int permissionRequests = 0;
@@ -236,10 +251,7 @@ class FakeAnkiGateway implements AnkiGateway {
   }
 
   @override
-  Future<AnkiImportResult> importNotes({
-    required String deckName,
-    required List<AnkiNote> notes,
-  }) async {
+  Future<AnkiImportResult> importNotes({required List<AnkiNote> notes}) async {
     importedNotes.addAll(notes);
     final added = importResult.added == 0 && importResult.failed == 0
         ? notes.length
@@ -250,6 +262,9 @@ class FakeAnkiGateway implements AnkiGateway {
       message: importResult.message,
     );
   }
+
+  @override
+  Future<List<String>> deckNames() async => availableDecks;
 
   @override
   Future<void> triggerSync() async {

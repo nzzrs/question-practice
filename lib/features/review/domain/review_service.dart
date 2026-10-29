@@ -154,11 +154,13 @@ class ReviewService {
     required int? sessionId,
     required String question,
     required String answer,
+    required String topicName,
   }) {
     return _cards.createManualCard(
       sessionId: sessionId,
       question: question.trim(),
       answer: answer.trim(),
+      topicName: topicName,
       createdAt: _clock.now().toUtc(),
     );
   }

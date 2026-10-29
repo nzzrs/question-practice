@@ -57,17 +57,31 @@ class AnkiNoteBuilder {
         .replaceAll('\n', '<br>');
   }
 
-  List<AnkiNote> notes(ExportSelection selection) {
+  List<AnkiNote> notes(
+    ExportSelection selection, {
+    String defaultDeck = 'Question Practice',
+    Map<String, String> deckByTopic = const {},
+  }) {
+    String deckFor(String topicName) {
+      final configured = deckByTopic[topicName.trim()];
+      if (configured != null && configured.trim().isNotEmpty) {
+        return configured.trim();
+      }
+      return defaultDeck;
+    }
+
     return [
       for (final concept in selection.concepts)
         AnkiNote(
           model: AnkiModel.concept,
+          deckName: deckFor(concept.topicName),
           fields: [conceptCloze(concept.term, concept.definition)],
           tags: _tags(concept.topicName),
         ),
       for (final card in selection.errorCards)
         AnkiNote(
           model: AnkiModel.error,
+          deckName: deckFor(card.topicName),
           fields: [
             html(card.question),
             html(card.wrongAnswer),
@@ -80,6 +94,7 @@ class AnkiNoteBuilder {
       for (final card in selection.manualCards)
         AnkiNote(
           model: AnkiModel.basic,
+          deckName: deckFor(card.topicName),
           fields: [html(card.question), html(card.answer)],
         ),
     ];

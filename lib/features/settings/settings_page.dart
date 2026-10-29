@@ -207,8 +207,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           M3ETextField(
             controller: _deck,
             label: 'Deck name',
-            supportingText:
-                'Cards are added here; the deck is created if needed.',
+            supportingText: 'Default for topics without their own deck. Created if missing.',
           ),
           const SizedBox(height: 8),
           M3EButton.tonal(

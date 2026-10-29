@@ -21,6 +21,7 @@ class Topic {
     required this.name,
     required this.description,
     required this.priority,
+    required this.ankiDeck,
     required this.createdAt,
   });
 
@@ -28,19 +29,23 @@ class Topic {
   final String name;
   final String description;
   final int? priority;
+  final String? ankiDeck;
   final DateTime createdAt;
 
   Topic copyWith({
     String? name,
     String? description,
     int? priority,
+    String? ankiDeck,
     bool clearPriority = false,
+    bool clearAnkiDeck = false,
   }) {
     return Topic(
       id: id,
       name: name ?? this.name,
       description: description ?? this.description,
       priority: clearPriority ? null : (priority ?? this.priority),
+      ankiDeck: clearAnkiDeck ? null : (ankiDeck ?? this.ankiDeck),
       createdAt: createdAt,
     );
   }
@@ -337,6 +342,7 @@ class ManualCard {
     required this.sessionId,
     required this.question,
     required this.answer,
+    required this.topicName,
     required this.createdAt,
     required this.exportedAt,
   });
@@ -345,6 +351,7 @@ class ManualCard {
   final int? sessionId;
   final String question;
   final String answer;
+  final String topicName;
   final DateTime createdAt;
   final DateTime? exportedAt;
 }

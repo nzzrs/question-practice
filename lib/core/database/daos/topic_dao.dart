@@ -107,6 +107,7 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     required String name,
     required String description,
     required int? priority,
+    String? ankiDeck,
     required DateTime createdAt,
   }) {
     return into(topics).insert(
@@ -114,6 +115,7 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
         name: name,
         description: Value(description),
         priority: Value(priority),
+        ankiDeck: Value(ankiDeck),
         createdAt: createdAt,
       ),
     );
@@ -146,12 +148,14 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     required String name,
     required String description,
     required int? priority,
+    required String? ankiDeck,
   }) {
     return (update(topics)..where((t) => t.id.equals(id))).write(
       TopicsCompanion(
         name: Value(name),
         description: Value(description),
         priority: Value(priority),
+        ankiDeck: Value(ankiDeck),
       ),
     );
   }

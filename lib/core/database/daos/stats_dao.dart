@@ -60,6 +60,7 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         t.name AS topic_name,
         t.description AS topic_description,
         t.priority AS topic_priority,
+        t.anki_deck AS topic_anki_deck,
         t.created_at AS topic_created_at,
         (SELECT COUNT(*) FROM practices p WHERE p.topic_id = t.id) AS practice_count,
         (
@@ -190,6 +191,7 @@ class TopicSummaryRow {
     required this.topicName,
     required this.topicDescription,
     required this.topicPriority,
+    required this.topicAnkiDeck,
     required this.topicCreatedAt,
     required this.practiceCount,
     required this.questionCount,
@@ -208,6 +210,7 @@ class TopicSummaryRow {
       topicName: row.read<String>('topic_name'),
       topicDescription: row.read<String>('topic_description'),
       topicPriority: row.read<int?>('topic_priority'),
+      topicAnkiDeck: row.read<String?>('topic_anki_deck'),
       topicCreatedAt: row.read<DateTime>('topic_created_at').toUtc(),
       practiceCount: row.read<int>('practice_count'),
       questionCount: row.read<int>('question_count'),
@@ -225,6 +228,7 @@ class TopicSummaryRow {
   final String topicName;
   final String topicDescription;
   final int? topicPriority;
+  final String? topicAnkiDeck;
   final DateTime topicCreatedAt;
   final int practiceCount;
   final int questionCount;

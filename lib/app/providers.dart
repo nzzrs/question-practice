@@ -178,6 +178,7 @@ final exportServiceProvider = Provider<ExportService>(
   (ref) => ExportService(
     gateway: ref.watch(ankiGatewayProvider),
     cards: ref.watch(cardRepositoryProvider),
+    practices: ref.watch(topicRepositoryProvider),
     clock: ref.watch(clockProvider),
   ),
 );

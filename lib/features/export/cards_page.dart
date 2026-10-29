@@ -131,25 +131,22 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 ],
               ),
               const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: M3EButton.filled(
-                      onPressed: _busy || selection.total == 0
-                          ? null
-                          : () => _export(selection),
-                      icon: const Icon(Icons.upload_outlined),
-                      label: Text(_busy ? 'Exporting…' : 'Export to AnkiDroid'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  M3EButton.tonal(
-                    onPressed: _busy || selection.total == 0
-                        ? null
-                        : () => _share(selection),
-                    child: const Text('Share files'),
-                  ),
-                ],
+              SizedBox(
+                width: double.infinity,
+                child: M3EButton.filled(
+                  onPressed: _busy || selection.total == 0
+                      ? null
+                      : () => _export(selection),
+                  icon: const Icon(Icons.upload_outlined),
+                  label: Text(_busy ? 'Exporting…' : 'Export to AnkiDroid'),
+                ),
+              ),
+              const SizedBox(height: 2),
+              M3EButton.text(
+                onPressed: _busy || selection.total == 0
+                    ? null
+                    : () => _share(selection),
+                child: const Text('Share as files'),
               ),
             ],
           ),

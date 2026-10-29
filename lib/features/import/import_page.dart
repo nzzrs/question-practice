@@ -62,12 +62,18 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                     style: theme.typography.emphasized.titleSmall,
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    '{"formatVersion": 1, "topics": [{"name": "Cloud", '
-                    '"practices": [{"name": "Core", "questions": [{"prompt": "…", '
-                    '"alternatives": ["…", "…"], "correctIndex": 0, '
-                    '"explanation": "…", "alternativeExplanations": ["…", "…"]}]}]}]}',
-                    style: TextStyle(fontFamily: 'monospace', height: 1.4),
+                  SizedBox(
+                    width: double.infinity,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: const Text(
+                        '{"formatVersion": 1, "topics": [{"name": "Cloud", '
+                        '"practices": [{"name": "Core", "questions": [{"prompt": "…", '
+                        '"alternatives": ["…", "…"], "correctIndex": 0, '
+                        '"explanation": "…", "alternativeExplanations": ["…", "…"]}]}]}]}',
+                        style: TextStyle(fontFamily: 'monospace', height: 1.4),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(

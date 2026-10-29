@@ -73,7 +73,7 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
           INNER JOIN sessions s ON s.id = a.session_id
           INNER JOIN questions q ON q.id = a.question_id
           INNER JOIN practices p ON p.id = q.practice_id
-          WHERE p.topic_id = t.id AND s.status = 'completed' AND a.selected_index IS NOT NULL
+          WHERE p.topic_id = t.id AND s.status = 'completed' AND a.selected_indexes_json != '[]'
         ) AS answered_count,
         (
           SELECT COUNT(*) FROM attempts a

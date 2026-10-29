@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
@@ -154,14 +156,14 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
 
   Future<void> touchWrongError({
     required int id,
-    required int wrongIndex,
+    required List<int> wrongIndexes,
     required String reasoning,
     required DateTime wrongAt,
     required DateTime dueAt,
   }) {
     return (update(errorCards)..where((e) => e.id.equals(id))).write(
       ErrorCardsCompanion(
-        wrongIndex: Value(wrongIndex),
+        wrongIndexesJson: Value(jsonEncode(wrongIndexes)),
         reasoning: Value(reasoning),
         lastWrongAt: Value(wrongAt),
         dueAt: Value(dueAt),

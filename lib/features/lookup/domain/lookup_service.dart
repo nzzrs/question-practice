@@ -165,6 +165,76 @@ class LookupService {
     );
   }
 
+  Future<List<String>> listModels({
+    required AiProvider provider,
+    required String baseUrl,
+    required String apiKey,
+  }) async {
+    final key = apiKey.trim();
+    if (key.isEmpty) {
+      throw const LookupException('Add an API key first.');
+    }
+    final base = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    if (base.isEmpty) {
+      throw const LookupException('Add a base URL first.');
+    }
+    try {
+      if (provider == AiProvider.gemini) {
+        final uri = Uri.parse('$base/models')
+            .replace(queryParameters: {'key': key});
+        final response = await _client
+            .get(uri)
+            .timeout(const Duration(seconds: 20));
+        _ensureModelResponse(response);
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final models = decoded['models'] as List<dynamic>? ?? const [];
+        return [
+          for (final item in models)
+            if (item is Map<String, dynamic>)
+              if (!_geminiModelExcluded(item))
+                (item['name'] as String? ?? '').replaceFirst('models/', ''),
+        ].where((name) => name.isNotEmpty).toList()..sort();
+      }
+
+      final response = await _client
+          .get(
+            Uri.parse('$base/models'),
+            headers: {'Authorization': 'Bearer $key'},
+          )
+          .timeout(const Duration(seconds: 20));
+      _ensureModelResponse(response);
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final models = decoded['data'] as List<dynamic>? ?? const [];
+      return [
+        for (final item in models)
+          if (item is Map<String, dynamic>) item['id'] as String? ?? '',
+      ].where((name) => name.isNotEmpty).toList()..sort();
+    } on TimeoutException {
+      throw const LookupException('The provider took too long to list models.');
+    } on LookupException {
+      rethrow;
+    } on Object {
+      throw const LookupException('Could not read the provider model list.');
+    }
+  }
+
+  void _ensureModelResponse(http.Response response) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      throw const LookupException('The API key was rejected.');
+    }
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw LookupException(
+        'The provider returned HTTP ${response.statusCode} when listing models.',
+      );
+    }
+  }
+
+  bool _geminiModelExcluded(Map<String, dynamic> model) {
+    final methods = model['supportedGenerationMethods'];
+    if (methods is! List) return false;
+    return !methods.contains('generateContent');
+  }
+
   Future<int> _saveConcept({
     required String term,
     required String definition,
@@ -216,7 +286,12 @@ class LookupService {
         canUseWeb: true,
       );
     }
-    final uri = Uri.tryParse('$base/chat/completions');
+    final isGemini = settings.aiProvider == AiProvider.gemini;
+    final geminiModel = model.replaceFirst(RegExp(r'^models/'), '');
+    final uri = isGemini
+        ? Uri.tryParse('$base/models/$geminiModel:generateContent')
+              ?.replace(queryParameters: {'key': apiKey})
+        : Uri.tryParse('$base/chat/completions');
     if (uri == null || !uri.isAbsolute) {
       throw const LookupException(
         'The AI endpoint is not a valid URL.',
@@ -224,25 +299,41 @@ class LookupService {
       );
     }
 
-    final body = <String, dynamic>{
-      'model': model,
-      'temperature': 0.2,
-      'response_format': {'type': 'json_object'},
-      'messages': [
-        {
-          'role': 'system',
-          'content':
-              'You define a term for a study app. Use the question context and the given topic. '
-              'Answer with exactly one JSON object: {"definition":"..."}. '
-              'The definition must be at most 20 words, factual, and only define the term. '
-              'Do not add markdown or extra keys.',
-        },
-        {
-          'role': 'user',
-          'content': 'Topic: $topicName\nQuestion: $question\nTerm: $term',
-        },
-      ],
-    };
+    const systemPrompt =
+        'You define a term for a study app. Use the question context and the given topic. '
+        'Answer with exactly one JSON object: {"definition":"..."}. '
+        'The definition must be at most 20 words, factual, and only define the term. '
+        'Do not add markdown or extra keys.';
+    final userPrompt = 'Topic: $topicName\nQuestion: $question\nTerm: $term';
+    final body = isGemini
+        ? <String, dynamic>{
+            'systemInstruction': {
+              'parts': [
+                {'text': systemPrompt},
+              ],
+            },
+            'contents': [
+              {
+                'role': 'user',
+                'parts': [
+                  {'text': userPrompt},
+                ],
+              },
+            ],
+            'generationConfig': {
+              'temperature': 0.2,
+              'responseMimeType': 'application/json',
+            },
+          }
+        : <String, dynamic>{
+            'model': model,
+            'temperature': 0.2,
+            'response_format': {'type': 'json_object'},
+            'messages': [
+              {'role': 'system', 'content': systemPrompt},
+              {'role': 'user', 'content': userPrompt},
+            ],
+          };
 
     Future<http.Response> send(Map<String, dynamic> requestBody) {
       return _client
@@ -250,7 +341,7 @@ class LookupService {
             uri,
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer $apiKey',
+              if (!isGemini) 'Authorization': 'Bearer $apiKey',
             },
             body: jsonEncode(requestBody),
           )
@@ -261,8 +352,15 @@ class LookupService {
     try {
       response = await send(body);
       if (response.statusCode == 400) {
-        final fallback = Map<String, dynamic>.of(body)
-          ..remove('response_format');
+        final fallback = Map<String, dynamic>.of(body);
+        if (isGemini) {
+          final config = Map<String, dynamic>.of(
+            fallback['generationConfig'] as Map<String, dynamic>,
+          )..remove('responseMimeType');
+          fallback['generationConfig'] = config;
+        } else {
+          fallback.remove('response_format');
+        }
         response = await send(fallback);
       }
     } on TimeoutException {
@@ -294,8 +392,10 @@ class LookupService {
     }
 
     try {
-      final decoded = jsonDecode(response.body);
-      final content = decoded['choices'][0]['message']['content'] as String;
+      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+      final content = isGemini
+          ? _geminiContent(decoded)
+          : decoded['choices'][0]['message']['content'] as String;
       final cleaned = content
           .replaceAll(RegExp(r'```(?:json)?', caseSensitive: false), '')
           .trim();
@@ -316,5 +416,15 @@ class LookupService {
         canUseWeb: true,
       );
     }
+  }
+
+  String _geminiContent(Map<String, dynamic> decoded) {
+    final candidates = decoded['candidates'] as List<dynamic>;
+    final content = candidates.first as Map<String, dynamic>;
+    final parts = content['content']['parts'] as List<dynamic>;
+    return [
+      for (final part in parts)
+        if (part is Map<String, dynamic>) part['text'] as String? ?? '',
+    ].join();
   }
 }

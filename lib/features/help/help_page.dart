@@ -45,8 +45,9 @@ class HelpPage extends StatelessWidget {
           _Section(
             title: 'JSON shape',
             body:
-                'The smallest complete question has a prompt, 2–8 alternatives, a zero-based correctIndex, '
-                'an explanation, and exactly one alternative explanation per alternative. Topic and practice descriptions are optional; priority is 1 (highest) to 5.',
+                'The smallest complete question has a prompt, 2–8 alternatives, a zero-based correctIndex '
+                '(or correctIndexes for several correct answers), an explanation, and exactly one alternative explanation per alternative. '
+                'Topic and practice descriptions are optional; priority is 1 (highest) to 5.',
             trailing: M3EButton.tonal(
               onPressed: () async {
                 await Clipboard.setData(
@@ -63,17 +64,20 @@ class HelpPage extends StatelessWidget {
           _Section(
             title: '2. Practice',
             body:
-                'Select an alternative, write your reasoning if it helps, then submit. The answer stays on the same screen: '
+                'Select an alternative, or every correct alternative when there are several, write your reasoning if it helps, then tap Check. The answer stays on the same screen: '
                 'your reasoning locks, the correct answer is marked, and every alternative expands with its explanation. '
-                'Skip if you do not know. Every 5 minutes a small banner appears; there is no countdown.',
+                'Use the arrows beside the question number to move between questions without answering. '
+                'Skip if you do not know. After a wrong answer, check "I was distracted or read too fast" if that is what happened; uncheck it to restore the card. '
+                'The close button offers Save for later, so several paused sessions can wait on Home. '
+                'Every 5 minutes a small banner appears; there is no countdown.',
           ),
           _Section(
             title: '3. Error cards',
             body:
-                'A wrong answer creates an error card with the question, your wrong answer, the correct answer and your reasoning. '
+                'A wrong answer creates an error card with the question, your answer, the correct answer, your reasoning and the explanation. '
                 'The end-of-session review asks for the flawed assumption (bias) and what you need to know to prevent it (vaccine). '
-                'If you were simply distracted, turn that on and no card is created. Skipped questions create no error card; '
-                'the review asks whether a concept or another question was missing.',
+                'Check the distraction box in the feedback when the mistake was reading too fast; uncheck it to bring the card back. Skipped questions create no error card; '
+                'the review asks whether a concept or another question was missing. Cards can be completed later from Cards, where Review all sits at the top and Review selected appears for checked cards.',
           ),
           _Section(
             title: '4. Past errors wait 48 hours',
@@ -84,21 +88,21 @@ class HelpPage extends StatelessWidget {
           _Section(
             title: '5. Define a term',
             body:
-                'Long-press a word or phrase in a question and choose Define. The app saves it as a missing concept. '
-                'With AI selected it asks your configured OpenAI-compatible endpoint for a short definition; '
-                'without AI it opens DuckDuckGo or Wikipedia in a Custom Tab and lets you fill the definition later. '
+                'Long-press a word or phrase in a question, alternative or explanation and choose Define. The app saves it as a missing concept. '
+                'With AI selected, the definition appears in a read-only bubble and is saved automatically; there is no save button. '
+                'OpenAI, Groq and OpenRouter use chat completions; Gemini uses its native API. '
+                'Without AI it opens DuckDuckGo or Wikipedia in a Custom Tab and keeps the editable definition sheet. '
                 'Only the selected term, question and topic are sent, and only when you invoke Define.',
           ),
           _Section(
             title: '6. Export to Anki',
             body:
-                'The Cards screen previews and selects concepts (cloze), error cards (five fields) and basic cards. '
+                'The Cards screen previews and selects concepts (cloze), error cards (six fields) and basic cards. '
                 'Export straight to AnkiDroid through its supported API, or share Anki-compatible text files. '
                 'AnkiDroid must have its API enabled and this app must have database permission. '
-                'Concept cards use the Cloze note type already in AnkiDroid; create a Cloze note type there if it was deleted. '
-                'Each topic can target its own AnkiDroid deck. Open a topic, tap Edit, then Choose AnkiDroid deck. '
-                'A topic with no deck uses the default deck from Settings. The picker reads live deck names from AnkiDroid; '
-                'if the API or permission is unavailable, type the deck name manually.',
+                'The error note type is created automatically if it is missing. Concept cards use the Cloze note type already in AnkiDroid; create a Cloze note type there if it was deleted. '
+                'Each topic can target its own AnkiDroid deck. Open a topic, tap Edit, then Browse decks. '
+                'A topic with no deck uses the default deck from Settings, where Browse decks lists live deck names. ',
           ),
           _Section(
             title: 'Privacy and data',

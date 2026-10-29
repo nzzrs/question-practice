@@ -223,7 +223,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                         setDialogState(() => deck.text = selected);
                       },
                       icon: const Icon(Icons.style_outlined),
-                      label: const Text('Choose AnkiDroid deck'),
+                      label: const Text('Browse decks'),
                     ),
                   ),
                 ],

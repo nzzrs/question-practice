@@ -12,7 +12,7 @@ enum LookupMode { ai, web }
 
 enum WebEngine { duckDuckGo, wikipedia }
 
-enum AiProvider { openai, groq, openRouter, custom }
+enum AiProvider { openai, groq, openRouter, gemini, custom }
 
 @immutable
 class Topic {
@@ -77,7 +77,7 @@ class Question {
     required this.practiceId,
     required this.prompt,
     required this.alternatives,
-    required this.correctIndex,
+    required this.correctIndexes,
     required this.explanation,
     required this.alternativeExplanations,
     required this.position,
@@ -87,12 +87,22 @@ class Question {
   final int practiceId;
   final String prompt;
   final List<String> alternatives;
-  final int correctIndex;
+  final List<int> correctIndexes;
   final String explanation;
   final List<String> alternativeExplanations;
   final int position;
 
-  String get correctAnswer => alternatives[correctIndex];
+  bool get allowsMultiple => correctIndexes.length > 1;
+  int get correctIndex => correctIndexes.isEmpty ? -1 : correctIndexes.first;
+  bool isCorrectSelection(Iterable<int> selected) =>
+      _sameIndexes(correctIndexes, selected);
+
+  List<String> get correctAnswers => [
+    for (final index in correctIndexes)
+      if (index >= 0 && index < alternatives.length) alternatives[index],
+  ];
+
+  String get correctAnswer => correctAnswers.join('; ');
 }
 
 @immutable
@@ -100,14 +110,14 @@ class QuestionDraft {
   const QuestionDraft({
     required this.prompt,
     required this.alternatives,
-    required this.correctIndex,
+    required this.correctIndexes,
     required this.explanation,
     required this.alternativeExplanations,
   });
 
   final String prompt;
   final List<String> alternatives;
-  final int correctIndex;
+  final List<int> correctIndexes;
   final String explanation;
   final List<String> alternativeExplanations;
 }
@@ -148,7 +158,7 @@ class Attempt {
     required this.id,
     required this.sessionId,
     required this.questionId,
-    required this.selectedIndex,
+    required this.selectedIndexes,
     required this.reasoning,
     required this.distracted,
     required this.isCorrect,
@@ -158,13 +168,15 @@ class Attempt {
   final int id;
   final int sessionId;
   final int questionId;
-  final int? selectedIndex;
+  final List<int> selectedIndexes;
   final String reasoning;
   final bool distracted;
   final bool isCorrect;
   final DateTime answeredAt;
 
-  bool get isSkipped => selectedIndex == null;
+  bool get isSkipped => selectedIndexes.isEmpty;
+  int? get selectedIndex =>
+      selectedIndexes.isEmpty ? null : selectedIndexes.first;
 }
 
 @immutable
@@ -285,9 +297,11 @@ class ErrorCard {
     required this.sessionId,
     required this.question,
     required this.alternatives,
-    required this.correctIndex,
-    required this.wrongIndex,
+    required this.correctIndexes,
+    required this.wrongIndexes,
     required this.reasoning,
+    required this.explanation,
+    required this.alternativeExplanations,
     required this.bias,
     required this.vaccine,
     required this.topicName,
@@ -306,9 +320,11 @@ class ErrorCard {
   final int? sessionId;
   final String question;
   final List<String> alternatives;
-  final int correctIndex;
-  final int wrongIndex;
+  final List<int> correctIndexes;
+  final List<int> wrongIndexes;
   final String reasoning;
+  final String explanation;
+  final List<String> alternativeExplanations;
   final String bias;
   final String vaccine;
   final String topicName;
@@ -325,14 +341,20 @@ class ErrorCard {
   bool get needsDetails => detailsCompletedAt == null;
   bool isDueAt(DateTime now) => !isResolved && !now.isBefore(dueAt);
 
-  String get correctAnswer =>
-      correctIndex >= 0 && correctIndex < alternatives.length
-      ? alternatives[correctIndex]
-      : '';
+  int? get correctIndex => correctIndexes.isEmpty ? null : correctIndexes.first;
+  int? get wrongIndex => wrongIndexes.isEmpty ? null : wrongIndexes.first;
 
-  String get wrongAnswer => wrongIndex >= 0 && wrongIndex < alternatives.length
-      ? alternatives[wrongIndex]
-      : '';
+  List<String> get correctAnswers => [
+    for (final index in correctIndexes)
+      if (index >= 0 && index < alternatives.length) alternatives[index],
+  ];
+  List<String> get wrongAnswers => [
+    for (final index in wrongIndexes)
+      if (index >= 0 && index < alternatives.length) alternatives[index],
+  ];
+
+  String get correctAnswer => correctAnswers.join('; ');
+  String get wrongAnswer => wrongAnswers.join('; ');
 }
 
 @immutable
@@ -384,7 +406,7 @@ class AppSettings {
     this.aiBaseUrl = 'https://api.openai.com/v1',
     this.aiModel = '',
     this.shuffleTopics = false,
-    this.dynamicColor = false,
+    this.dynamicColor = true,
     this.ankiDeck = 'Question Practice',
   });
 
@@ -418,4 +440,11 @@ class AppSettings {
       ankiDeck: ankiDeck ?? this.ankiDeck,
     );
   }
+}
+
+bool _sameIndexes(Iterable<int> a, Iterable<int> b) {
+  final left = a.toSet();
+  final right = b.toSet();
+  if (left.length != right.length) return false;
+  return left.containsAll(right);
 }

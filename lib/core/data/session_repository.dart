@@ -48,6 +48,12 @@ class SessionRepository {
     );
   }
 
+  Stream<List<PracticeSession>> watchInProgress() {
+    return _db.sessionDao.watchInProgressSessions().map(
+      (rows) => rows.map(sessionFromRow).toList(),
+    );
+  }
+
   Future<List<Question>> questionsForSession(int sessionId) async {
     final rows = await _db.sessionDao.questionsForSession(sessionId);
     return rows.map(questionFromRow).toList();
@@ -66,7 +72,7 @@ class SessionRepository {
   Future<Attempt> recordAttempt({
     required int sessionId,
     required int questionId,
-    required int? selectedIndex,
+    required List<int> selectedIndexes,
     required String reasoning,
     required bool distracted,
     required bool isCorrect,
@@ -76,7 +82,7 @@ class SessionRepository {
       AttemptsCompanion.insert(
         sessionId: sessionId,
         questionId: questionId,
-        selectedIndex: Value(selectedIndex),
+        selectedIndexesJson: Value(encodeIntList(selectedIndexes)),
         reasoning: Value(reasoning),
         distracted: Value(distracted),
         isCorrect: isCorrect,
@@ -85,6 +91,10 @@ class SessionRepository {
     );
     final row = await _db.sessionDao.attemptForQuestion(sessionId, questionId);
     return attemptFromRow(row!);
+  }
+
+  Future<void> updateAttemptDistracted(int id, bool distracted) {
+    return _db.sessionDao.updateAttemptDistracted(id, distracted);
   }
 
   Future<void> completeSession({

@@ -14,6 +14,16 @@ List<String> decodeStringList(String value) {
 
 String encodeStringList(List<String> values) => jsonEncode(values);
 
+List<int> decodeIntList(String value) {
+  final decoded = jsonDecode(value);
+  if (decoded is! List) {
+    throw const FormatException('Expected a JSON array');
+  }
+  return decoded.map((item) => item as int).toList(growable: false);
+}
+
+String encodeIntList(List<int> values) => jsonEncode(values);
+
 Topic topicFromRow(TopicRow row) {
   return Topic(
     id: row.id,
@@ -42,7 +52,7 @@ Question questionFromRow(QuestionRow row) {
     practiceId: row.practiceId,
     prompt: row.prompt,
     alternatives: decodeStringList(row.alternativesJson),
-    correctIndex: row.correctIndex,
+    correctIndexes: decodeIntList(row.correctIndexesJson),
     explanation: row.explanation,
     alternativeExplanations: decodeStringList(row.alternativeExplanationsJson),
     position: row.position,
@@ -69,7 +79,7 @@ Attempt attemptFromRow(AttemptRow row) {
     id: row.id,
     sessionId: row.sessionId,
     questionId: row.questionId,
-    selectedIndex: row.selectedIndex,
+    selectedIndexes: decodeIntList(row.selectedIndexesJson),
     reasoning: row.reasoning,
     distracted: row.distracted,
     isCorrect: row.isCorrect,
@@ -99,9 +109,11 @@ ErrorCard errorCardFromRow(ErrorCardRow row) {
     sessionId: row.sessionId,
     question: row.question,
     alternatives: decodeStringList(row.alternativesJson),
-    correctIndex: row.correctIndex,
-    wrongIndex: row.wrongIndex,
+    correctIndexes: decodeIntList(row.correctIndexesJson),
+    wrongIndexes: decodeIntList(row.wrongIndexesJson),
     reasoning: row.reasoning,
+    explanation: row.explanation,
+    alternativeExplanations: decodeStringList(row.alternativeExplanationsJson),
     bias: row.bias,
     vaccine: row.vaccine,
     topicName: row.topicName,

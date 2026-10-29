@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -6,6 +9,235 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import 'domain/lookup_service.dart';
+
+/// Shows an AI definition as a read-only bubble anchored near the selection.
+///
+/// The definition is saved by [LookupService.define] before it is shown.
+Future<void> showAiDefinitionBubble(
+  BuildContext context, {
+  required String term,
+  required String question,
+  required String topicName,
+  required String practiceName,
+  required int? sessionId,
+  required int? questionId,
+  Rect? anchor,
+  VoidCallback? onSearchWeb,
+}) {
+  final overlay = Overlay.of(context, rootOverlay: true);
+  final completer = Completer<void>();
+  late final OverlayEntry entry;
+  var closed = false;
+
+  void close() {
+    if (closed) return;
+    closed = true;
+    if (entry.mounted) entry.remove();
+    if (!completer.isCompleted) completer.complete();
+  }
+
+  entry = OverlayEntry(
+    builder: (context) => _AiDefinitionBubble(
+      term: term,
+      question: question,
+      topicName: topicName,
+      practiceName: practiceName,
+      sessionId: sessionId,
+      questionId: questionId,
+      anchor: anchor,
+      onSearchWeb: onSearchWeb,
+      onClose: close,
+    ),
+  );
+  overlay.insert(entry);
+  return completer.future;
+}
+
+class _AiDefinitionBubble extends ConsumerStatefulWidget {
+  const _AiDefinitionBubble({
+    required this.term,
+    required this.question,
+    required this.topicName,
+    required this.practiceName,
+    required this.sessionId,
+    required this.questionId,
+    required this.anchor,
+    required this.onClose,
+    this.onSearchWeb,
+  });
+
+  final String term;
+  final String question;
+  final String topicName;
+  final String practiceName;
+  final int? sessionId;
+  final int? questionId;
+  final Rect? anchor;
+  final VoidCallback onClose;
+  final VoidCallback? onSearchWeb;
+
+  @override
+  ConsumerState<_AiDefinitionBubble> createState() =>
+      _AiDefinitionBubbleState();
+}
+
+class _AiDefinitionBubbleState extends ConsumerState<_AiDefinitionBubble> {
+  LookupResult? _result;
+  LookupException? _error;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  Future<void> _load() async {
+    try {
+      final result = await ref
+          .read(lookupServiceProvider)
+          .define(
+            term: widget.term,
+            question: widget.question,
+            topicName: widget.topicName,
+            practiceName: widget.practiceName,
+            sessionId: widget.sessionId,
+            questionId: widget.questionId,
+          );
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+    } on LookupException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final media = MediaQuery.of(context);
+    final screen = media.size;
+    final anchor = widget.anchor;
+    final bubbleWidth = math.min(360.0, screen.width - 24);
+    final left = anchor == null
+        ? (screen.width - bubbleWidth) / 2
+        : (anchor.center.dx - bubbleWidth / 2).clamp(
+            12.0,
+            screen.width - bubbleWidth - 12,
+          );
+    final top = anchor == null
+        ? math.max(media.padding.top + 80, screen.height * 0.32)
+        : (anchor.bottom + 10).clamp(
+            media.padding.top + 72,
+            screen.height - 240,
+          );
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onClose,
+            child: const SizedBox.expand(),
+          ),
+        ),
+        Positioned(
+          left: left,
+          top: top,
+          width: bubbleWidth,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: math.max(180, screen.height - top - 24),
+              ),
+              padding: const EdgeInsets.fromLTRB(16, 12, 12, 14),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHigh,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(22),
+                  topRight: Radius.circular(22),
+                  bottomLeft: Radius.circular(22),
+                  bottomRight: Radius.circular(6),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.colorScheme.shadow.withValues(alpha: 0.18),
+                    blurRadius: 18,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.term,
+                            style: theme.typography.baseline.labelMedium
+                                .copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                        M3EIconButton(
+                          variant: M3EIconButtonVariant.standard,
+                          icon: const Icon(Icons.close),
+                          tooltip: 'Close definition',
+                          onPressed: widget.onClose,
+                        ),
+                      ],
+                    ),
+                    if (_loading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Center(child: M3ELoadingIndicator()),
+                      )
+                    else if (_error != null) ...[
+                      Text(
+                        _error!.message,
+                        style: theme.typography.baseline.bodyMedium.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                      if (_error!.canUseWeb && widget.onSearchWeb != null) ...[
+                        const SizedBox(height: 10),
+                        M3EButton.tonal(
+                          onPressed: () {
+                            widget.onClose();
+                            widget.onSearchWeb?.call();
+                          },
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text('Search the web instead'),
+                        ),
+                      ],
+                    ] else if (_result != null)
+                      Text(
+                        _result!.definition,
+                        style: theme.typography.baseline.bodyMedium.copyWith(
+                          height: 1.45,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class LookupSheet extends ConsumerStatefulWidget {
   const LookupSheet({
@@ -178,29 +410,42 @@ class _LookupSheetState extends ConsumerState<LookupSheet> {
                     ),
                   ),
                 ),
-              M3ETextField(
-                controller: _definition,
-                label: 'Definition',
-                maxLines: 4,
-                minLines: 2,
-                supportingText: 'Saved as a missing concept for this session.',
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  M3EButton.filled(
-                    onPressed: _saving ? null : _save,
-                    icon: const Icon(Icons.check),
-                    label: Text(_saving ? 'Saving…' : 'Save'),
-                  ),
-                  const SizedBox(width: 8),
-                  if (_result!.source == ConceptSource.web)
-                    M3EButton.text(
-                      onPressed: _webFallback,
-                      child: const Text('Open again'),
+              if (_result!.source == ConceptSource.ai)
+                TonalBox(
+                  child: Text(
+                    _result!.definition,
+                    style: theme.typography.baseline.bodyMedium.copyWith(
+                      height: 1.45,
                     ),
-                ],
-              ),
+                  ),
+                )
+              else
+                M3ETextField(
+                  controller: _definition,
+                  label: 'Definition',
+                  maxLines: 4,
+                  minLines: 2,
+                  supportingText:
+                      'Saved as a missing concept for this session.',
+                ),
+              if (_result!.source != ConceptSource.ai) ...[
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    M3EButton.filled(
+                      onPressed: _saving ? null : _save,
+                      icon: const Icon(Icons.check),
+                      label: Text(_saving ? 'Saving…' : 'Save'),
+                    ),
+                    const SizedBox(width: 8),
+                    if (_result!.source == ConceptSource.web)
+                      M3EButton.text(
+                        onPressed: _webFallback,
+                        child: const Text('Open again'),
+                      ),
+                  ],
+                ),
+              ],
             ],
             const SizedBox(height: 8),
           ],

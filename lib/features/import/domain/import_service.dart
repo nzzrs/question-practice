@@ -225,7 +225,11 @@ class ImportService {
               (rawQuestion['alternativeExplanations'] as List<dynamic>)
                   .map((item) => item as String)
                   .toList(growable: false);
-          final correctIndex = rawQuestion['correctIndex'] as int;
+          final correctIndexes = _readCorrectIndexes(
+            rawQuestion,
+            questionPath,
+            issues,
+          );
           final explanation = (rawQuestion['explanation'] as String).trim();
 
           if (prompt.isEmpty) {
@@ -234,14 +238,16 @@ class ImportService {
           if (explanation.isEmpty) {
             _empty(issues, '$questionPath/explanation', 'Explanation');
           }
-          if (correctIndex < 0 || correctIndex >= alternatives.length) {
-            issues.add(
-              ImportIssue(
-                path: '$questionPath/correctIndex',
-                message:
-                    'correctIndex $correctIndex is outside 0..${alternatives.length - 1}.',
-              ),
-            );
+          for (final index in correctIndexes) {
+            if (index < 0 || index >= alternatives.length) {
+              issues.add(
+                ImportIssue(
+                  path: '$questionPath/correctIndexes',
+                  message:
+                      'Correct index $index is outside 0..${alternatives.length - 1}.',
+                ),
+              );
+            }
           }
           if (explanations.length != alternatives.length) {
             issues.add(
@@ -283,7 +289,7 @@ class ImportService {
             QuestionDraft(
               prompt: prompt,
               alternatives: alternatives,
-              correctIndex: correctIndex,
+              correctIndexes: correctIndexes,
               explanation: explanation,
               alternativeExplanations: explanations,
             ),
@@ -362,6 +368,54 @@ class ImportService {
 
   void _empty(List<ImportIssue> issues, String path, String label) {
     issues.add(ImportIssue(path: path, message: '$label cannot be empty.'));
+  }
+
+  List<int> _readCorrectIndexes(
+    Map<String, dynamic> rawQuestion,
+    String questionPath,
+    List<ImportIssue> issues,
+  ) {
+    final hasSingle = rawQuestion.containsKey('correctIndex');
+    final hasMany = rawQuestion.containsKey('correctIndexes');
+    if (hasSingle == hasMany) {
+      issues.add(
+        ImportIssue(
+          path: '$questionPath/correctIndexes',
+          message: 'Use either "correctIndex" for one answer or "correctIndexes" for several, not both.',
+        ),
+      );
+      return const [];
+    }
+    if (hasSingle) {
+      final value = rawQuestion['correctIndex'];
+      return value is int ? [value] : const [];
+    }
+    final rawValues = rawQuestion['correctIndexes'];
+    if (rawValues is! List) return const [];
+    final indexes = <int>[];
+    for (final value in rawValues) {
+      if (value is int) indexes.add(value);
+    }
+    if (indexes.length != rawValues.length) return const [];
+    if (indexes.isEmpty) {
+      issues.add(
+        ImportIssue(
+          path: '$questionPath/correctIndexes',
+          message: 'correctIndexes cannot be empty.',
+        ),
+      );
+      return const [];
+    }
+    if (indexes.toSet().length != indexes.length) {
+      issues.add(
+        ImportIssue(
+          path: '$questionPath/correctIndexes',
+          message: 'correctIndexes cannot contain the same index twice.',
+        ),
+      );
+      return const [];
+    }
+    return indexes;
   }
 
   List<ImportIssue> _jsonIssues(FormatException error, String text) {

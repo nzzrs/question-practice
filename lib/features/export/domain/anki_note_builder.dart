@@ -84,10 +84,11 @@ class AnkiNoteBuilder {
           deckName: deckFor(card.topicName),
           fields: [
             html(card.question),
-            html(card.wrongAnswer),
-            html(card.correctAnswer),
+            _answers(card.wrongAnswers),
+            _answers(card.correctAnswers),
             html(card.bias),
             html(card.vaccine),
+            _errorExplanation(card),
           ],
           tags: _tags(card.topicName),
         ),
@@ -110,10 +111,11 @@ class AnkiNoteBuilder {
         for (final card in selection.errorCards)
           [
             html(card.question),
-            html(card.wrongAnswer),
-            html(card.correctAnswer),
+            _answers(card.wrongAnswers),
+            _answers(card.correctAnswers),
             html(card.bias),
             html(card.vaccine),
+            _errorExplanation(card),
           ].join('\t'),
       ].join('\n'),
       basic: [
@@ -128,6 +130,24 @@ class AnkiNoteBuilder {
         .replaceAll('{{', '{ {')
         .replaceAll('}}', '} }')
         .replaceAll('::', ': :');
+  }
+
+  String _answers(List<String> answers) {
+    return answers.map(html).join('<br>');
+  }
+
+  String _errorExplanation(ErrorCard card) {
+    final parts = <String>[];
+    if (card.explanation.trim().isNotEmpty) {
+      parts.add(html(card.explanation));
+    }
+    for (final index in card.wrongIndexes) {
+      if (card.correctIndexes.contains(index)) continue;
+      if (index < 0 || index >= card.alternativeExplanations.length) continue;
+      final explanation = card.alternativeExplanations[index].trim();
+      if (explanation.isNotEmpty) parts.add(html(explanation));
+    }
+    return parts.join('<br><br>');
   }
 
   List<String> _tags(String topicName) {

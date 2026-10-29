@@ -20,18 +20,164 @@ class AnkiBridge(
         private const val CHANNEL = "link.nzrs.questionpractice/anki"
         private const val PERMISSION_REQUEST = 4107
         private const val ANKI_PACKAGE = "com.ichi2.anki"
-        private const val ERROR_MODEL = "Question Practice Error"
+        private const val ERROR_MODEL = "Question Practice: Error"
         private const val BASIC_MODEL = "Question Practice Basic"
         private val ERROR_FIELDS = arrayOf(
-            "Question",
-            "Wrong answer",
-            "Correct answer",
-            "Bias",
+            "Problem",
+            "Wrong Solution",
+            "Correct Solution",
+            "Mental Trap",
             "Vaccine",
+            "Explanation",
         )
-        private const val ERROR_CSS =
-            ".card { font-family: sans-serif; font-size: 18px; text-align: left; } " +
-                ".bias { color: #7a4b00; }"
+        private const val ERROR_QUESTION_FORMAT = """
+            <div class="field-container">
+              <div class="field-label">Problem:</div>
+              <div class="field-content">{{Problem}}</div>
+            </div>
+
+            <div class="field-container wrong">
+              <div class="field-label">Wrong answer chosen:</div>
+              <div class="field-content">{{Wrong Solution}}</div>
+            </div>
+
+            <div class="prompt-action">
+              What was the <strong>flawed assumption</strong>?
+            </div>
+        """
+        private const val ERROR_ANSWER_FORMAT = """
+            {{FrontSide}}
+
+            <hr id="answer">
+
+            {{#Mental Trap}}
+            <div class="field-container trap">
+              <div class="field-label">Flawed Assumption (Bias):</div>
+              <div class="field-content">{{Mental Trap}}</div>
+            </div>
+            {{/Mental Trap}}
+
+            <div class="reference-box">
+              {{#Vaccine}}
+              <div class="field-container vaccine">
+                <div class="field-label">Vaccine (Rule / Protocol):</div>
+                <div class="field-content">{{Vaccine}}</div>
+              </div>
+              {{/Vaccine}}
+
+              <div class="field-container correct">
+                <div class="field-label">Correct solution:</div>
+                <div class="field-content">{{Correct Solution}}</div>
+              </div>
+
+              {{#Explanation}}
+              <div class="field-container explanation">
+                <div class="field-label">Distractor analysis / Explanation:</div>
+                <div class="field-content">{{Explanation}}</div>
+              </div>
+              {{/Explanation}}
+            </div>
+        """
+        private const val ERROR_CSS = """
+            .card {
+              font-family: "Cascadia Code", "Consolas", "Segoe UI", monospace, sans-serif;
+              text-align: center;
+              color: #E0E0E0;
+              background-color: #0D1117;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              min-height: 100vh;
+              margin: 0;
+              padding: 30px 15px;
+              box-sizing: border-box;
+            }
+
+            .field-container {
+              margin: 12px auto 0 auto;
+              text-align: left;
+              width: 100%;
+              max-width: 650px;
+              border-radius: 6px;
+              padding: 14px 18px;
+              border: 1px solid #30363d;
+              background-color: #161b22;
+              box-sizing: border-box;
+            }
+
+            .field-label {
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 1px;
+              margin-bottom: 6px;
+              text-transform: uppercase;
+            }
+
+            .field-content {
+              font-size: 16px;
+              line-height: 1.5;
+            }
+
+            .wrong {
+              background-color: #211515;
+              border-left: 4px solid #f85149;
+            }
+            .wrong .field-label { color: #f85149; }
+
+            .trap {
+              background-color: #261c14;
+              border-left: 4px solid #db6d28;
+            }
+            .trap .field-label { color: #db6d28; }
+
+            .reference-box {
+              width: 100%;
+              max-width: 650px;
+              margin-top: 10px;
+              opacity: 0.85;
+            }
+
+            .vaccine {
+              background-color: #1c1427;
+              border-left: 4px solid #ab47bc;
+            }
+            .vaccine .field-label { color: #ab47bc; }
+
+            .correct {
+              background-color: #132316;
+              border-left: 4px solid #3fb950;
+            }
+            .correct .field-label { color: #3fb950; }
+
+            .explanation {
+              background-color: #161b22;
+              border-left: 4px solid #58a6ff;
+            }
+            .explanation .field-label { color: #58a6ff; }
+            .explanation .field-content { font-size: 14px; }
+
+            .prompt-action {
+              color: #8b949e;
+              font-size: 14px;
+              margin: 25px auto 5px auto;
+              text-align: left;
+              width: 100%;
+              max-width: 650px;
+              padding: 0 4px;
+            }
+
+            .prompt-action strong { color: #c9d1d9; }
+
+            #answer {
+              display: block;
+              border: 0;
+              border-top: 1px solid #30363d;
+              width: 100%;
+              max-width: 650px;
+              margin: 25px auto 15px auto;
+            }
+        """
     }
 
     private val channel = MethodChannel(messenger, CHANNEL)
@@ -233,22 +379,13 @@ class AnkiBridge(
     private fun ensureErrorModel(api: AddContentApi): Long? {
         val existing = api.modelList?.entries?.firstOrNull { it.value == ERROR_MODEL }
         if (existing != null) return existing.key
-        val qfmt = "{{Question}}"
-        val afmt = """
-            {{FrontSide}}
-            <hr id=answer>
-            <b>Your answer</b><br>{{Wrong answer}}<br><br>
-            <b>Correct answer</b><br>{{Correct answer}}<br><br>
-            <div class="bias"><b>Bias</b><br>{{Bias}}</div><br>
-            <b>Vaccine</b><br>{{Vaccine}}
-        """.trimIndent()
         return api.addNewCustomModel(
             ERROR_MODEL,
             ERROR_FIELDS,
             arrayOf("Card 1"),
-            arrayOf(qfmt),
-            arrayOf(afmt),
-            ERROR_CSS,
+            arrayOf(ERROR_QUESTION_FORMAT.trimIndent()),
+            arrayOf(ERROR_ANSWER_FORMAT.trimIndent()),
+            ERROR_CSS.trimIndent(),
             null,
             0,
         )

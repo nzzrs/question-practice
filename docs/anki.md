@@ -16,7 +16,7 @@ The manifest declares the database permission and a `<queries>` entry for `com.i
 Every topic can target its own AnkiDroid deck:
 
 1. Open **Settings → AnkiDroid → Deck name** and set the default deck, for example `Question Practice`.
-2. Open a topic → **Edit** → **AnkiDroid deck** → **Choose AnkiDroid deck**.
+2. Open a topic → **Edit** → **AnkiDroid deck** → **Browse decks**.
 3. Pick an existing deck from AnkiDroid, or type a new name. A missing deck is created on export.
 4. Leave the field blank to use the default deck.
 
@@ -35,8 +35,14 @@ If a topic is renamed, cards created before the rename keep the old captured top
 | Model | Fields | Used for |
 |---|---|---|
 | AnkiDroid's Cloze type | existing `Text` field | Concept cards |
-| `Question Practice Error` | Question, Wrong answer, Correct answer, Bias, Vaccine | Error cards |
+| `Question Practice: Error` | Problem, Wrong Solution, Correct Solution, Mental Trap, Vaccine, Explanation | Error cards |
 | `Question Practice Basic` | Front, Back | Skipped-question “another question” cards |
+
+Question Practice checks for `Question Practice: Error` before inserting notes. If the model is missing, it creates it with the six fields, front/back templates and CSS defined in `AnkiBridge.kt`.
+
+The error front shows the problem, the wrong answer chosen and the flawed-assumption prompt. The back shows the mental trap first, then the vaccine, correct solution and explanation in a secondary reference box.
+
+When a question has several correct answers, **Wrong Solution** lists every alternative the user selected and **Correct Solution** lists every correct alternative, separated by `<br>`. **Explanation** contains the overall question explanation followed by the alternative explanation for each failed selected distractor.
 
 Concept note text is exactly:
 
@@ -64,7 +70,7 @@ After a successful import the app broadcasts `com.ichi2.anki.DO_SYNC` so AnkiDro
 **Share files** creates UTF-8, Anki-compatible files:
 
 - `question-practice-concepts-YYYYMMDD-HHmm.txt` — one cloze note per line;
-- `question-practice-errors-YYYYMMDD-HHmm.tsv` — five tab-separated fields;
+- `question-practice-errors-YYYYMMDD-HHmm.tsv` — six tab-separated fields in the model order;
 - `question-practice-basic-YYYYMMDD-HHmm.tsv` — two tab-separated fields.
 
 Import them into Anki desktop or AnkiDroid with the matching note types. Tabs become spaces and newlines become `<br>`; user content is HTML-escaped.
@@ -78,9 +84,11 @@ On a connected Android device with AnkiDroid installed:
 3. Export to AnkiDroid and accept the permission prompt.
 4. Open AnkiDroid, open the Question Practice deck and confirm:
    - concept notes render as cloze cards;
-   - error notes show all five fields;
+   - error notes use `Question Practice: Error` with all six fields;
    - basic notes show front and back.
 5. Set the Cloud topic to a separate deck (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck.
-6. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
-7. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.
-8. Disable the AnkiDroid API and confirm the app reports the problem without losing cards.
+6. Import a multi-answer question and export its error card. Confirm both selected and correct alternatives appear in the respective fields.
+7. Delete `Question Practice: Error` in AnkiDroid, export again, and confirm the app creates it before adding notes.
+8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
+9. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.
+10. Disable the AnkiDroid API and confirm the app reports the problem without losing cards.

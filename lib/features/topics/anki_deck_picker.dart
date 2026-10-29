@@ -11,6 +11,7 @@ Future<String?> showAnkiDeckPicker(
   BuildContext context,
   WidgetRef ref, {
   String? current,
+  bool allowDefault = true,
 }) async {
   final custom = TextEditingController(text: current ?? '');
   final defaultDeck =
@@ -24,6 +25,7 @@ Future<String?> showAnkiDeckPicker(
         current: current,
         defaultDeck: defaultDeck,
         custom: custom,
+        allowDefault: allowDefault,
       ),
       actions: [
         M3EButton.text(
@@ -50,12 +52,14 @@ class _DeckPickerBody extends StatefulWidget {
     required this.current,
     required this.defaultDeck,
     required this.custom,
+    required this.allowDefault,
   });
 
   final AnkiGateway gateway;
   final String? current;
   final String defaultDeck;
   final TextEditingController custom;
+  final bool allowDefault;
 
   @override
   State<_DeckPickerBody> createState() => _DeckPickerBodyState();
@@ -131,12 +135,13 @@ class _DeckPickerBodyState extends State<_DeckPickerBody> {
               ),
             ),
             const SizedBox(height: 12),
-            _DeckOption(
-              title: 'Use default deck',
-              subtitle: widget.defaultDeck,
-              selected: (widget.current ?? '').trim().isEmpty,
-              onPressed: () => Navigator.of(context).pop(''),
-            ),
+            if (widget.allowDefault)
+              _DeckOption(
+                title: 'Use default deck',
+                subtitle: widget.defaultDeck,
+                selected: (widget.current ?? '').trim().isEmpty,
+                onPressed: () => Navigator.of(context).pop(''),
+              ),
             if (_loading)
               const Padding(
                 padding: EdgeInsets.all(20),

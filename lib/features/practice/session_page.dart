@@ -6,10 +6,14 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/platform/web_launcher.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/lookup_sheet.dart';
 import '../practice/domain/session_service.dart';
+import '../practice/selectable_linkified_text.dart';
 import '../practice/summary_page.dart';
+
+enum _ExitChoice { save, discard }
 
 class SessionPage extends ConsumerStatefulWidget {
   const SessionPage({required this.start, super.key});
@@ -25,14 +29,15 @@ class _SessionPageState extends ConsumerState<SessionPage>
   final _reasoning = TextEditingController();
   late SessionStart _start;
   SessionQuestionItem? _item;
-  int? _selected;
+  int _index = 0;
+  final _selectedIndexes = <int>{};
   bool _submitted = false;
   bool _submitting = false;
   bool _distracted = false;
   AnswerOutcome? _outcome;
+  SessionSummary? _summary;
   int _reminderMinutes = 0;
   bool _showReminder = false;
-  String _selectedText = '';
   Timer? _reminderTimer;
   Timer? _hideReminderTimer;
 
@@ -41,7 +46,11 @@ class _SessionPageState extends ConsumerState<SessionPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _start = widget.start;
-    _item = _start.currentItem;
+    _index = _start.items.isEmpty
+        ? 0
+        : _start.currentIndex.clamp(0, _start.items.length - 1).toInt();
+    _item = _start.items.isEmpty ? null : _start.items[_index];
+    _loadQuestionState();
     _startReminder();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_item == null) _finishExisting();
@@ -93,10 +102,36 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
   }
 
+  void _loadQuestionState() {
+    final item = _start.items.isEmpty ? null : _start.items[_index];
+    _item = item;
+    _selectedIndexes.clear();
+    _reasoning.clear();
+    _outcome = null;
+    _submitted = false;
+    _distracted = false;
+    if (item == null) return;
+    final attempt = _start.attempts[item.question.id];
+    if (attempt == null) return;
+    _selectedIndexes.addAll(attempt.selectedIndexes);
+    _reasoning.text = attempt.reasoning;
+    _submitted = true;
+    _distracted = attempt.distracted;
+    _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+  }
+
+  void _goTo(int index) {
+    if (index < 0 || index >= _start.items.length || index == _index) return;
+    setState(() {
+      _index = index;
+      _loadQuestionState();
+    });
+  }
+
   Future<void> _submit({required bool skip}) async {
     final item = _item;
     if (item == null || _submitting) return;
-    if (!skip && _selected == null) {
+    if (!skip && _selectedIndexes.isEmpty) {
       await showSnack(context, 'Choose an alternative, or skip the question.');
       return;
     }
@@ -107,14 +142,15 @@ class _SessionPageState extends ConsumerState<SessionPage>
           .submitAnswer(
             start: _start,
             item: item,
-            selectedIndex: skip ? null : _selected,
+            selectedIndexes: skip ? const [] : _selectedIndexes.toList(),
             reasoning: _reasoning.text,
-            distracted: _distracted,
+            distracted: false,
           );
       if (!mounted) return;
       setState(() {
         _submitted = true;
         _outcome = outcome;
+        if (outcome.summary != null) _summary = outcome.summary;
       });
     } on SessionException catch (error) {
       if (mounted) await showSnack(context, error.message);
@@ -123,25 +159,49 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
   }
 
+  Future<void> _setDistracted(bool value) async {
+    final item = _item;
+    if (item == null || _submitting) return;
+    setState(() => _submitting = true);
+    try {
+      final attempt = await ref
+          .read(sessionServiceProvider)
+          .setDistracted(start: _start, item: item, distracted: value);
+      if (!mounted) return;
+      _start.attempts[item.question.id] = attempt;
+      setState(() {
+        _distracted = attempt.distracted;
+        _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+      });
+      ref.invalidate(dueErrorsProvider);
+    } on SessionException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
   void _next() {
-    final summary = _outcome?.summary;
-    if (summary != null) {
-      _openSummary(summary);
+    if (_summary != null && _index >= _start.items.length - 1) {
+      _openSummary(_summary!);
       return;
     }
-    final next = _start.currentItem;
-    if (next == null) {
-      _finishExisting();
+    if (_index + 1 < _start.items.length) {
+      _goTo(_index + 1);
       return;
     }
-    setState(() {
-      _item = next;
-      _selected = null;
-      _submitted = false;
-      _distracted = false;
-      _outcome = null;
-      _reasoning.clear();
-    });
+    final unanswered = _start.items.indexWhere(
+      (entry) => !_start.attempts.containsKey(entry.question.id),
+    );
+    if (unanswered >= 0) {
+      _goTo(unanswered);
+      return;
+    }
+    if (_summary != null) {
+      _openSummary(_summary!);
+      return;
+    }
+    _finishExisting();
   }
 
   Future<void> _openSummary(SessionSummary summary) async {
@@ -163,23 +223,61 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _requestExit() async {
-    if (_outcome?.summary != null) {
-      _openSummary(_outcome!.summary!);
+    if (_summary != null) {
+      _openSummary(_summary!);
       return;
     }
-    final confirmed = await confirmDialog(
+    final choice = await M3EDialog.show<_ExitChoice>(
       context,
-      title: 'Leave this practice?',
-      message: 'The unfinished session will be discarded. Its answers and error cards will be deleted.',
-      confirmLabel: 'Discard',
-      destructive: true,
+      dialog: M3EDialog(
+        title: 'Leave this practice?',
+        content: const Text(
+          'Save for later to keep your answers and continue from Home. '
+          'Discard deletes this unfinished session and the error cards it created.',
+        ),
+        actions: [
+          M3EButton.text(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          M3EButton.text(
+            onPressed: () => Navigator.of(context).pop(_ExitChoice.discard),
+            child: const Text('Discard'),
+          ),
+          M3EButton.filled(
+            onPressed: () => Navigator.of(context).pop(_ExitChoice.save),
+            child: const Text('Save for later'),
+          ),
+        ],
+      ),
     );
-    if (!confirmed) return;
-    await ref.read(sessionServiceProvider).discard(_start.session.id);
+    if (choice == null || !mounted) return;
+    if (choice == _ExitChoice.discard) {
+      await ref.read(sessionServiceProvider).discard(_start.session.id);
+    }
     if (mounted) Navigator.of(context).pop();
   }
 
-  Future<void> _openLookup(String term) async {
+  Future<void> _openLookup(String term, Rect? anchor) async {
+    final settings = ref.read(settingsProvider).value ?? const AppSettings();
+    if (settings.lookupMode == LookupMode.ai) {
+      await showAiDefinitionBubble(
+        context,
+        term: term,
+        question: _item?.question.prompt ?? '',
+        topicName: _item?.topicName ?? '',
+        practiceName: _item?.practiceName ?? '',
+        sessionId: _start.session.id,
+        questionId: _item?.question.id,
+        anchor: anchor,
+        onSearchWeb: () => _openWebLookup(term),
+      );
+      return;
+    }
+    await _openWebLookup(term);
+  }
+
+  Future<void> _openWebLookup(String term) async {
     final item = _item;
     if (item == null) return;
     await M3EBottomSheet.show<void>(
@@ -196,6 +294,16 @@ class _SessionPageState extends ConsumerState<SessionPage>
     );
   }
 
+  Future<void> _openUrl(String value) async {
+    final uri = Uri.tryParse(value);
+    if (uri == null) return;
+    try {
+      await ref.read(webLauncherProvider).open(uri);
+    } on WebLaunchException {
+      if (mounted) await showSnack(context, 'Could not open that link.');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = _item;
@@ -208,13 +316,11 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
     final theme = M3ETheme.of(context);
     final total = _start.items.length;
-    final position =
-        _start.items.indexWhere(
-          (entry) => entry.question.id == item.question.id,
-        ) +
-        1;
+    final position = _index + 1;
     final answered = _start.attempts.length;
     final progress = answered.clamp(0, total) / total;
+    final atLast = _index >= total - 1;
+    final seesResults = _summary != null && atLast;
     final modeTitle = switch (_start.session.mode) {
       SessionMode.practice => item.practiceName,
       SessionMode.mixed => 'Shuffled practice',
@@ -249,13 +355,31 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   ),
                 ),
                 const Spacer(),
-                if (_start.session.mode == SessionMode.pastErrors)
+                if (_start.session.mode == SessionMode.pastErrors) ...[
                   Text(
                     'Re-test',
                     style: theme.typography.baseline.labelMedium.copyWith(
                       color: theme.colorScheme.primary,
                     ),
                   ),
+                  const SizedBox(width: 4),
+                ],
+                M3EIconButton(
+                  variant: M3EIconButtonVariant.standard,
+                  icon: const Icon(Icons.chevron_left),
+                  tooltip: 'Previous question',
+                  onPressed: _index > 0 && !_submitting
+                      ? () => _goTo(_index - 1)
+                      : null,
+                ),
+                M3EIconButton(
+                  variant: M3EIconButtonVariant.standard,
+                  icon: const Icon(Icons.chevron_right),
+                  tooltip: 'Next question',
+                  onPressed: _index < total - 1 && !_submitting
+                      ? () => _goTo(_index + 1)
+                      : null,
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -275,37 +399,19 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   ),
                 ),
               ),
-            SelectionArea(
-              onSelectionChanged: (content) {
-                _selectedText = content?.plainText.trim() ?? '';
-              },
-              contextMenuBuilder: (context, state) {
-                final selected = _selectedText;
-                return AdaptiveTextSelectionToolbar.buttonItems(
-                  anchors: state.contextMenuAnchors,
-                  buttonItems: [
-                    ...state.contextMenuButtonItems,
-                    if (selected.isNotEmpty)
-                      ContextMenuButtonItem(
-                        label: 'Define',
-                        onPressed: () {
-                          state.hideToolbar();
-                          _openLookup(selected);
-                        },
-                      ),
-                  ],
-                );
-              },
-              child: Text(
-                item.question.prompt,
-                style: theme.typography.baseline.headlineSmall.copyWith(
-                  height: 1.35,
-                ),
+            SelectableLinkifiedText(
+              text: item.question.prompt,
+              style: theme.typography.baseline.headlineSmall.copyWith(
+                height: 1.35,
               ),
+              onDefine: _openLookup,
+              onOpenUrl: _openUrl,
             ),
             const SizedBox(height: 6),
             Text(
-              'Select text to define a term.',
+              item.question.allowsMultiple
+                  ? 'Select every correct alternative. Select text to define a term.'
+                  : 'Select text to define a term.',
               style: theme.typography.baseline.labelSmall.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -321,16 +427,27 @@ class _SessionPageState extends ConsumerState<SessionPage>
                 child: _OptionCard(
                   index: index,
                   text: item.question.alternatives[index],
-                  selected: _selected == index,
+                  selected: _selectedIndexes.contains(index),
                   submitted: _submitted,
-                  isCorrect: index == item.question.correctIndex,
+                  multiSelect: item.question.allowsMultiple,
+                  isCorrect: item.question.correctIndexes.contains(index),
                   explanation:
                       item.question.alternativeExplanations.length > index
                       ? item.question.alternativeExplanations[index]
                       : '',
+                  onDefine: _openLookup,
+                  onOpenUrl: _openUrl,
                   onPressed: _submitted
                       ? null
-                      : () => setState(() => _selected = index),
+                      : () => setState(() {
+                          if (!item.question.allowsMultiple) {
+                            _selectedIndexes
+                              ..clear()
+                              ..add(index);
+                          } else if (!_selectedIndexes.remove(index)) {
+                            _selectedIndexes.add(index);
+                          }
+                        }),
                 ),
               ),
             const SizedBox(height: 12),
@@ -346,18 +463,13 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   : 'Optional, but useful when reviewing an error.',
             ),
             if (!_submitted) ...[
-              const SizedBox(height: 12),
-              _DistractedToggle(
-                value: _distracted,
-                onChanged: (value) => setState(() => _distracted = value),
-              ),
               const SizedBox(height: 16),
               Row(
                 children: [
                   M3EButton.filled(
                     onPressed: _submitting ? null : () => _submit(skip: false),
                     icon: const Icon(Icons.check),
-                    label: Text(_submitting ? 'Checking…' : 'Submit answer'),
+                    label: Text(_submitting ? 'Checking…' : 'Check'),
                   ),
                   const SizedBox(width: 8),
                   M3EButton.text(
@@ -374,20 +486,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
                 pastErrors: _start.session.mode == SessionMode.pastErrors,
               ),
               const SizedBox(height: 16),
-              M3EButton.filled(
-                onPressed: _next,
-                icon: Icon(
-                  _outcome?.summary == null
-                      ? Icons.arrow_forward
-                      : Icons.assessment_outlined,
-                ),
-                label: Text(
-                  _outcome?.summary == null ? 'Next question' : 'See results',
-                ),
-              ),
-            ],
-            if (_submitted) ...[
-              const SizedBox(height: 24),
               TonalBox(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,14 +495,32 @@ class _SessionPageState extends ConsumerState<SessionPage>
                       style: theme.typography.emphasized.titleSmall,
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      item.question.explanation,
+                    SelectableLinkifiedText(
+                      text: item.question.explanation,
                       style: theme.typography.baseline.bodyMedium.copyWith(
                         height: 1.45,
                       ),
+                      onDefine: _openLookup,
+                      onOpenUrl: _openUrl,
                     ),
                   ],
                 ),
+              ),
+              if (_outcome!.attempt.selectedIndexes.isNotEmpty &&
+                  !_outcome!.attempt.isCorrect) ...[
+                const SizedBox(height: 10),
+                _DistractedCheck(
+                  value: _distracted,
+                  onChanged: _submitting ? null : _setDistracted,
+                ),
+              ],
+              const SizedBox(height: 16),
+              M3EButton.filled(
+                onPressed: _next,
+                icon: Icon(
+                  seesResults ? Icons.assessment_outlined : Icons.arrow_forward,
+                ),
+                label: Text(seesResults ? 'See results' : 'Next question'),
               ),
             ],
           ],
@@ -450,38 +566,33 @@ class _ReminderBanner extends StatelessWidget {
   }
 }
 
-class _DistractedToggle extends StatelessWidget {
-  const _DistractedToggle({required this.value, required this.onChanged});
+class _DistractedCheck extends StatelessWidget {
+  const _DistractedCheck({required this.value, required this.onChanged});
 
   final bool value;
-  final ValueChanged<bool> onChanged;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     return TonalBox(
       color: theme.colorScheme.surfaceContainerLow,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
+          M3ECheckbox(
+            value: value,
+            onChanged: onChanged == null
+                ? null
+                : (next) => onChanged!(next ?? false),
+          ),
+          const SizedBox(width: 4),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'I was distracted or read too fast',
-                  style: theme.typography.baseline.bodyMedium,
-                ),
-                Text(
-                  'No error card will be created.',
-                  style: theme.typography.baseline.labelSmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+            child: Text(
+              'I was distracted or read too fast',
+              style: theme.typography.baseline.bodyMedium,
             ),
           ),
-          M3ESwitch(value: value, onChanged: onChanged),
         ],
       ),
     );
@@ -503,7 +614,7 @@ class _FeedbackStatus extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final attempt = outcome.attempt;
-    final skipped = attempt.selectedIndex == null;
+    final skipped = attempt.isSkipped;
     final (color, icon, text) = switch ((
       pastErrors,
       attempt.isCorrect,
@@ -571,8 +682,11 @@ class _OptionCard extends StatelessWidget {
     required this.text,
     required this.selected,
     required this.submitted,
+    required this.multiSelect,
     required this.isCorrect,
     required this.explanation,
+    required this.onDefine,
+    required this.onOpenUrl,
     required this.onPressed,
   });
 
@@ -580,8 +694,11 @@ class _OptionCard extends StatelessWidget {
   final String text;
   final bool selected;
   final bool submitted;
+  final bool multiSelect;
   final bool isCorrect;
   final String explanation;
+  final void Function(String selection, Rect? anchor) onDefine;
+  final ValueChanged<String> onOpenUrl;
   final VoidCallback? onPressed;
 
   @override
@@ -628,7 +745,11 @@ class _OptionCard extends StatelessWidget {
                         : wrongNow
                         ? Icons.cancel
                         : selected
-                        ? Icons.radio_button_checked
+                        ? multiSelect
+                              ? Icons.check_box
+                              : Icons.radio_button_checked
+                        : multiSelect
+                        ? Icons.check_box_outline_blank
                         : Icons.radio_button_off,
                     size: 20,
                     color: foreground,
@@ -638,21 +759,26 @@ class _OptionCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          text,
+                        SelectableLinkifiedText(
+                          text: text,
+                          selectable: submitted,
                           style: theme.typography.baseline.bodyMedium.copyWith(
                             color: foreground,
                             height: 1.35,
                           ),
+                          onDefine: onDefine,
+                          onOpenUrl: onOpenUrl,
                         ),
                         if (submitted && explanation.isNotEmpty) ...[
                           const SizedBox(height: 8),
-                          Text(
-                            explanation,
+                          SelectableLinkifiedText(
+                            text: explanation,
                             style: theme.typography.baseline.bodySmall.copyWith(
                               color: foreground.withValues(alpha: 0.85),
                               height: 1.4,
                             ),
+                            onDefine: onDefine,
+                            onOpenUrl: onOpenUrl,
                           ),
                         ],
                       ],

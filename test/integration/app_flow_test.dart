@@ -47,23 +47,24 @@ void main() {
     await sessions.submitAnswer(
       start: start,
       item: start.items[0],
-      selectedIndex: start.items[0].question.correctIndex,
+      selectedIndexes: [start.items[0].question.correctIndex],
       reasoning: 'Known',
       distracted: false,
     );
     await sessions.submitAnswer(
       start: start,
       item: start.items[1],
-      selectedIndex:
-          (start.items[1].question.correctIndex + 1) %
-          start.items[1].question.alternatives.length,
+      selectedIndexes: [
+        (start.items[1].question.correctIndex + 1) %
+            start.items[1].question.alternatives.length,
+      ],
       reasoning: 'A flawed assumption',
       distracted: false,
     );
     final finalAnswer = await sessions.submitAnswer(
       start: start,
       item: start.items[2],
-      selectedIndex: null,
+      selectedIndexes: const [],
       reasoning: '',
       distracted: false,
     );

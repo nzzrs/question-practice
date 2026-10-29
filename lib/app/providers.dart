@@ -80,6 +80,10 @@ final inProgressSessionProvider = StreamProvider<PracticeSession?>(
   (ref) => ref.watch(sessionRepositoryProvider).watchLatestInProgress(),
 );
 
+final inProgressSessionsProvider = StreamProvider<List<PracticeSession>>(
+  (ref) => ref.watch(sessionRepositoryProvider).watchInProgress(),
+);
+
 final dueErrorsProvider = StreamProvider<List<ErrorCard>>(
   (ref) => ref.watch(cardRepositoryProvider).watchDueErrors(),
 );

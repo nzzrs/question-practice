@@ -69,21 +69,73 @@ void main() {
     expect(find.text('Question 1?'), findsOneWidget);
     expect(find.text('Question 1 of 1'), findsOneWidget);
     expect(find.text('Select text to define a term.'), findsOneWidget);
+    expect(find.text('I was distracted or read too fast'), findsNothing);
 
     await tester.tap(find.text('Wrong 1'));
     await tester.pump();
-    await tester.tap(find.text('Submit answer'));
+    await tester.tap(find.text('Check'));
     await pumpFrames(tester);
 
     expect(
       find.text('Not quite. The error card will ask what went wrong.'),
       findsOneWidget,
     );
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await pumpFrames(tester);
+    expect(find.text('I was distracted or read too fast'), findsOneWidget);
     await tester.drag(find.byType(ListView), const Offset(0, -500));
     await pumpFrames(tester);
     expect(find.text('Why this answer'), findsOneWidget);
     expect(find.text('Because 1 is correct.'), findsOneWidget);
     expect(find.textContaining('Wrong: 1 is a distractor.'), findsOneWidget);
+  });
+
+  testWidgets('session arrows move between questions without answering', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(count: 2);
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await service.startPractice(practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: SessionPage(start: start),
+      harness: harness,
+    );
+    expect(find.text('Question 1 of 2'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    await pumpFrames(tester);
+    expect(find.text('Question 2 of 2'), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.chevron_left));
+    await pumpFrames(tester);
+    expect(find.text('Question 1 of 2'), findsOneWidget);
+  });
+
+  testWidgets('home lists every paused session', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(count: 1);
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    await service.startPractice(practice.practiceId);
+    await service.startPractice(practice.practiceId);
+
+    await pumpTestApp(tester, home: const HomePage(), harness: harness);
+    expect(find.text('Session in progress'), findsNWidgets(2));
+    expect(find.text('Resume'), findsNWidgets(2));
   });
 
   testWidgets('five-minute reminder appears without a countdown', (

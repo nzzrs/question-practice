@@ -45,6 +45,29 @@ One topic, one practice, one question.
 }
 ```
 
+## Several correct answers
+
+A question can have more than one correct alternative. Replace `correctIndex` with `correctIndexes`; the app then shows checkboxes and requires every correct alternative to be selected.
+
+```json
+{
+  "prompt": "Which of these are managed container services?",
+  "alternatives": ["Cloud Run", "Compute Engine", "Cloud Functions", "Cloud SQL"],
+  "correctIndexes": [0, 2],
+  "explanation": "Cloud Run and Cloud Functions run code without a cluster.",
+  "alternativeExplanations": [
+    "Correct. Cloud Run runs container images on managed infrastructure.",
+    "Compute Engine gives you a virtual machine, not a managed container service.",
+    "Correct. Cloud Functions is a managed event-driven compute service.",
+    "Cloud SQL is a managed relational database."
+  ]
+}
+```
+
+Use either `correctIndex` or `correctIndexes` for a question, never both.
+
+The app compares the selected set with the correct set. With `correctIndexes: [0, 2]`, selecting only `0` is wrong, and selecting `0, 2, 3` is also wrong. Alternative explanations remain one per alternative; mark which ones are correct in the explanation text.
+
 ## File shape
 
 ```json
@@ -95,11 +118,12 @@ One topic, one practice, one question.
 | `practices[].questions` | yes | array | At least one question. |
 | `question.prompt` | yes | string | 1–5,000 chars. |
 | `question.alternatives` | yes | string array | 2–8 non-empty alternatives, 2,000 chars each. |
-| `question.correctIndex` | yes | integer | Zero-based index of the correct alternative. Must be inside `alternatives`. |
+| `question.correctIndex` | one of | integer | Zero-based index of the single correct alternative. Must be inside `alternatives`. |
+| `question.correctIndexes` | one of | integer array | 1–8 unique zero-based indexes for a question with several correct answers. |
 | `question.explanation` | yes | string | Non-empty. Overall explanation shown after answering. |
 | `question.alternativeExplanations` | yes | string array | Exactly one non-empty explanation per alternative, in the same order. |
 
-Unknown fields are rejected. This catches typos such as `right_answer` or `correct_index` instead of silently importing a broken question.
+A question needs exactly one of `correctIndex` or `correctIndexes`. Unknown fields are rejected. This catches typos such as `right_answer` or `correct_index` instead of silently importing a broken question.
 
 ## Multiple practices and topics
 
@@ -194,13 +218,14 @@ A topic's `practices` array holds any number of practices. Add more topics to `t
 Two layers run before import:
 
 1. **JSON Schema**: structure, required fields, types, lengths, limits, unknown fields.
-2. **Semantic checks**: unique topic names, unique practice names per topic, `correctIndex` within range, explanation count equal to alternative count, non-empty text after trimming, total question limit.
+2. **Semantic checks**: unique topic names, unique practice names per topic, `correctIndex` or `correctIndexes` within range, no duplicate indexes, explanation count equal to alternative count, non-empty text after trimming, total question limit.
 
 Examples of rejection messages:
 
 ```
 line 7, column 18: Unexpected character
 /topics/0/practices/0/questions/0/correctIndex: maximum exceeded (99 > 7)
+/topics/0/practices/0/questions/0/correctIndexes: correctIndexes cannot contain the same index twice.
 /topics/0/practices/0/questions/0/alternativeExplanations: Expected 4 explanations, found 3.
 ```
 
@@ -230,4 +255,4 @@ Deck selection is app configuration, not file data. Set the default deck in **Se
 
 ## Versioning
 
-`formatVersion` is `1`. Future incompatible changes must use a new version; the app rejects unknown versions rather than guessing.
+`formatVersion` is `1`. `correctIndexes` is an additive field: files written for the original version with `correctIndex` keep working. Future incompatible changes must use a new version; the app rejects unknown versions rather than guessing.

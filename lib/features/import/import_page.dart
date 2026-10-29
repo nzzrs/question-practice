@@ -77,7 +77,7 @@ class _ImportPageState extends ConsumerState<ImportPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Each question needs one explanation per alternative. See the help screen for the full format.',
+                    'Each question has one correct answer (correctIndex) or several (correctIndexes), with one explanation per alternative. See the help screen for the full format.',
                     style: theme.typography.baseline.bodySmall.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

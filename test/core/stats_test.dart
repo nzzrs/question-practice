@@ -27,14 +27,14 @@ void main() {
     await sessions.submitAnswer(
       start: start,
       item: start.items[0],
-      selectedIndex: 0,
+      selectedIndexes: const [0],
       reasoning: '',
       distracted: false,
     );
     await sessions.submitAnswer(
       start: start,
       item: start.items[1],
-      selectedIndex: 1,
+      selectedIndexes: const [1],
       reasoning: '',
       distracted: false,
     );
@@ -65,7 +65,7 @@ void main() {
     await sessions.submitAnswer(
       start: start,
       item: start.items.first,
-      selectedIndex: 0,
+      selectedIndexes: const [0],
       reasoning: '',
       distracted: false,
     );

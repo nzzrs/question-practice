@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -29,7 +30,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     final topics = ref.watch(topicSummariesProvider);
     final stats = ref.watch(homeStatsProvider).value;
     final settings = ref.watch(settingsProvider).value ?? const AppSettings();
-    final inProgress = ref.watch(inProgressSessionProvider).value;
+    final inProgress =
+        ref.watch(inProgressSessionsProvider).value ??
+        const <PracticeSession>[];
 
     return AppScaffold(
       title: 'Question Practice',
@@ -55,13 +58,15 @@ class _HomePageState extends ConsumerState<HomePage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 120),
         children: [
-          if (inProgress != null) ...[
-            _ResumeCard(
-              session: inProgress,
-              onResume: () => _resume(inProgress.id),
-              onDiscard: () => _discard(inProgress.id),
-            ),
-            const SizedBox(height: 12),
+          if (inProgress.isNotEmpty) ...[
+            for (final session in inProgress) ...[
+              _ResumeCard(
+                session: session,
+                onResume: () => _resume(session.id),
+                onDiscard: () => _discard(session.id),
+              ),
+              const SizedBox(height: 12),
+            ],
           ],
           _QuickAction(
             icon: Icons.error_outline,
@@ -251,6 +256,13 @@ class _ResumeCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text('$mode · ${session.total} questions'),
+          const SizedBox(height: 2),
+          Text(
+            'Started ${DateFormat.MMMd().add_Hm().format(session.startedAt.toLocal())}',
+            style: theme.typography.baseline.labelSmall.copyWith(
+              color: theme.colorScheme.onSecondaryContainer,
+            ),
+          ),
           const SizedBox(height: 12),
           Row(
             children: [

@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
+import '../errors/error_cards_review_page.dart';
 import 'domain/anki_note_builder.dart';
 
 enum _Filter { all, concepts, errors, basic }
@@ -106,66 +107,82 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         conceptsAsync.isLoading ||
         errorsAsync.isLoading ||
         manualsAsync.isLoading;
+    final selectedErrorCards = errors
+        .where((card) => _selectedErrors.contains(card.id))
+        .toList();
+    final hasIncompleteSelected = selectedErrorCards.any(
+      (card) => card.needsDetails,
+    );
     final theme = M3ETheme.of(context);
 
     return AppScaffold(
       title: 'Cards',
       showBack: true,
-      actions: [
-        M3EIconButton(
-          variant: M3EIconButtonVariant.standard,
-          icon: Icon(
-            _showExported ? Icons.visibility : Icons.visibility_outlined,
-          ),
-          tooltip: _showExported
-              ? 'Hide exported cards'
-              : 'Show exported cards',
-          isSelected: _showExported,
-          onPressed: () => setState(() => _showExported = !_showExported),
-        ),
-      ],
       bottomNavigationBar: SafeArea(
         top: false,
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
           color: theme.colorScheme.surfaceContainer,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${selection.total} selected',
+          child: hasIncompleteSelected
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      '${selectedErrorCards.length} error card${selectedErrorCards.length == 1 ? '' : 's'} selected. Complete them before export.',
                       style: theme.typography.baseline.labelMedium,
                     ),
-                  ),
-                  M3EButton.text(
-                    onPressed: selection.total == 0 ? null : _deleteSelected,
-                    child: const Text('Delete selected'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                width: double.infinity,
-                child: M3EButton.filled(
-                  onPressed: _busy || selection.total == 0
-                      ? null
-                      : () => _export(selection),
-                  icon: const Icon(Icons.upload_outlined),
-                  label: Text(_busy ? 'Exporting…' : 'Export to AnkiDroid'),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: double.infinity,
+                      child: M3EButton.filled(
+                        onPressed: () => _reviewErrors(selectedErrorCards),
+                        icon: const Icon(Icons.fact_check_outlined),
+                        label: const Text('Review selected'),
+                      ),
+                    ),
+                  ],
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${selection.total} selected',
+                            style: theme.typography.baseline.labelMedium,
+                          ),
+                        ),
+                        M3EButton.text(
+                          onPressed: selection.total == 0
+                              ? null
+                              : _deleteSelected,
+                          child: const Text('Delete selected'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: double.infinity,
+                      child: M3EButton.filled(
+                        onPressed: _busy || selection.total == 0
+                            ? null
+                            : () => _export(selection),
+                        icon: const Icon(Icons.upload_outlined),
+                        label: Text(
+                          _busy ? 'Exporting…' : 'Export to AnkiDroid',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    M3EButton.text(
+                      onPressed: _busy || selection.total == 0
+                          ? null
+                          : () => _share(selection),
+                      child: const Text('Share as files'),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 2),
-              M3EButton.text(
-                onPressed: _busy || selection.total == 0
-                    ? null
-                    : () => _share(selection),
-                child: const Text('Share as files'),
-              ),
-            ],
-          ),
         ),
       ),
       body:
@@ -178,10 +195,23 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
               children: [
                 Text(
-                  'Review what goes to Anki. Concepts become cloze cards, errors have five fields, and skipped-question cards are basic front/back. Each topic uses its own deck; topics without one use the default deck from Settings.',
+                  'Review what goes to Anki. Concepts become cloze cards, errors have six fields, and skipped-question cards are basic front/back. Each topic uses its own deck; topics without one use the default deck from Settings.',
                   style: theme.typography.baseline.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: M3EChip(
+                    type: M3EChipType.filter,
+                    label: _showExported
+                        ? 'Hide exported cards'
+                        : 'Show exported cards',
+                    selected: _showExported,
+                    onPressed: () =>
+                        setState(() => _showExported = !_showExported),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -249,30 +279,44 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 ],
                 if ((_filter == _Filter.all || _filter == _Filter.errors) &&
                     errors.isNotEmpty) ...[
-                  SectionTitle(
-                    'Error cards · ${errors.length}',
-                    trailing: _SelectAllButton(
-                      allSelected: errors
-                          .where(
-                            (item) =>
-                                !item.needsDetails && item.exportedAt == null,
-                          )
-                          .every((item) => _selectedErrors.contains(item.id)),
-                      onPressed: () => setState(() {
-                        final selectable = errors
-                            .where(
-                              (item) =>
-                                  !item.needsDetails && item.exportedAt == null,
-                            )
-                            .map((item) => item.id);
-                        if (selectable.every(_selectedErrors.contains)) {
-                          _selectedErrors.removeAll(selectable);
-                        } else {
-                          _selectedErrors.addAll(selectable);
-                        }
-                      }),
-                    ),
+                  SectionTitle('Error cards · ${errors.length}'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      M3EButton.tonal(
+                        onPressed: errors.isEmpty
+                            ? null
+                            : () => _reviewErrors(errors),
+                        icon: const Icon(Icons.rate_review_outlined),
+                        label: const Text('Review all'),
+                      ),
+                      if (selectedErrorCards.isNotEmpty)
+                        M3EButton.filled(
+                          onPressed: () => _reviewErrors(selectedErrorCards),
+                          icon: const Icon(Icons.fact_check_outlined),
+                          label: Text(
+                            'Review selected (${selectedErrorCards.length})',
+                          ),
+                        ),
+                      _SelectAllButton(
+                        allSelected: errors
+                            .where((item) => item.exportedAt == null)
+                            .every((item) => _selectedErrors.contains(item.id)),
+                        onPressed: () => setState(() {
+                          final selectable = errors
+                              .where((item) => item.exportedAt == null)
+                              .map((item) => item.id);
+                          if (selectable.every(_selectedErrors.contains)) {
+                            _selectedErrors.removeAll(selectable);
+                          } else {
+                            _selectedErrors.addAll(selectable);
+                          }
+                        }),
+                      ),
+                    ],
                   ),
+                  const SizedBox(height: 12),
                   for (final card in errors) ...[
                     _ErrorRow(
                       card: card,
@@ -286,7 +330,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                         }
                       }),
                       onComplete: card.needsDetails
-                          ? () => _editError(card)
+                          ? () => _reviewErrors([card])
                           : null,
                       onPreview: () => _previewError(card),
                     ),
@@ -483,63 +527,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     controller.dispose();
   }
 
-  Future<void> _editError(ErrorCard card) async {
-    final bias = TextEditingController(text: card.bias);
-    final vaccine = TextEditingController(text: card.vaccine);
-    final saved = await M3EDialog.show<bool>(
-      context,
-      dialog: M3EDialog(
-        title: 'Complete error card',
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              M3ETextField(
-                controller: bias,
-                label: 'What was the flawed assumption?',
-                minLines: 2,
-                maxLines: 4,
-              ),
-              const SizedBox(height: 12),
-              M3ETextField(
-                controller: vaccine,
-                label: 'How will you prevent it?',
-                minLines: 2,
-                maxLines: 4,
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          M3EButton.text(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          M3EButton.filled(
-            onPressed: () {
-              if (bias.text.trim().isEmpty || vaccine.text.trim().isEmpty) {
-                return;
-              }
-              Navigator.of(context).pop(true);
-            },
-            child: const Text('Save'),
-          ),
-        ],
+  Future<void> _reviewErrors(List<ErrorCard> cards) async {
+    if (cards.isEmpty) return;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => ErrorCardsReviewPage(cards: cards),
       ),
     );
-    if (saved == true) {
-      await ref
-          .read(cardRepositoryProvider)
-          .updateErrorCardDetails(
-            id: card.id,
-            bias: bias.text,
-            vaccine: vaccine.text,
-            completedAt: ref.read(clockProvider).now().toUtc(),
-          );
-      if (mounted) setState(() => _selectedErrors.add(card.id));
-    }
-    bias.dispose();
-    vaccine.dispose();
   }
 
   Future<void> _previewConcept(Concept concept) {
@@ -568,6 +562,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _PreviewField(
         label: 'Vaccine',
         value: card.vaccine.isEmpty ? '— needs notes —' : card.vaccine,
+      ),
+      _PreviewField(
+        label: 'Explanation',
+        value: card.explanation.isEmpty ? '— none —' : card.explanation,
       ),
     ]);
   }
@@ -760,7 +758,7 @@ class _ErrorRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final disabled = card.needsDetails || card.exportedAt != null;
+    final disabled = card.exportedAt != null;
     return M3ECard(
       variant: M3ECardVariant.outlined,
       padding: const EdgeInsets.fromLTRB(8, 10, 12, 10),

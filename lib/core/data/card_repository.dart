@@ -109,9 +109,11 @@ class CardRepository {
     required int? sessionId,
     required String question,
     required List<String> alternatives,
-    required int correctIndex,
-    required int wrongIndex,
+    required List<int> correctIndexes,
+    required List<int> wrongIndexes,
     required String reasoning,
+    required String explanation,
+    required List<String> alternativeExplanations,
     required String topicName,
     required String practiceName,
     required DateTime lastWrongAt,
@@ -123,9 +125,13 @@ class CardRepository {
         sessionId: Value(sessionId),
         question: question,
         alternativesJson: encodeStringList(alternatives),
-        correctIndex: correctIndex,
-        wrongIndex: wrongIndex,
+        correctIndexesJson: Value(encodeIntList(correctIndexes)),
+        wrongIndexesJson: Value(encodeIntList(wrongIndexes)),
         reasoning: Value(reasoning),
+        explanation: Value(explanation),
+        alternativeExplanationsJson: Value(
+          encodeStringList(alternativeExplanations),
+        ),
         topicName: Value(topicName),
         practiceName: Value(practiceName),
         status: ErrorCardStatus.active.name,
@@ -152,18 +158,22 @@ class CardRepository {
 
   Future<void> touchWrongError({
     required int id,
-    required int wrongIndex,
+    required List<int> wrongIndexes,
     required String reasoning,
     required DateTime wrongAt,
     required Duration dueAfter,
   }) {
     return _db.cardDao.touchWrongError(
       id: id,
-      wrongIndex: wrongIndex,
+      wrongIndexes: wrongIndexes,
       reasoning: reasoning,
       wrongAt: wrongAt,
       dueAt: wrongAt.add(dueAfter),
     );
+  }
+
+  Future<void> deleteErrorCard(int id) {
+    return _db.cardDao.deleteErrorCards([id]);
   }
 
   Future<void> resolveError(int id, DateTime resolvedAt) {

@@ -5,6 +5,7 @@ Question Practice is an offline-first Android study app. This guide walks throug
 ## Home
 
 - **Topics** lists your topics, ordered by priority and name.
+- **Session in progress** cards list every paused session with its mode, question count and start time. Each card has **Resume** and **Discard**.
 - A topic card shows its practices, question count, accuracy and progress.
 - **Review past errors** opens the 48-hour error queue.
 - **Cards** opens concepts, error cards and basic cards waiting for export.
@@ -27,19 +28,21 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - Shows description, priority, Anki deck, accuracy, progress, active errors and completed sessions.
 - **Practices** lists each practice with question count and last score. Tap a practice to start.
 - **Edit** changes name, description, priority and the Anki deck for that topic.
-- **Choose AnkiDroid deck** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
+- **Browse decks** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
 - Blank deck means the default deck from Settings.
 
 ## Practice session
 
 - Each question shows the topic and practice, the prompt and 2–8 alternatives.
-- Select an alternative. The reasoning field is optional. Write what led you to the answer; it appears later in the error review.
-- **I was distracted or read too fast** prevents an error card from being created if the answer is wrong.
-- **Submit answer** stays on the same screen. The reasoning locks, the correct answer is marked, the wrong choice is marked, and every alternative expands with its explanation. The overall explanation appears below.
+- Select one alternative, or every correct alternative when the question has more than one. The reasoning field is optional. Write what led you to the answer; it appears later in the error review.
+- The arrows beside **Question X of Y** move to the previous or next question without answering. Answers already submitted keep their feedback when you return.
+- **Check** stays on the same screen. The reasoning locks, the correct answer is marked, the wrong choice is marked, and every alternative expands with its explanation. The overall explanation appears below.
+- Prompt, alternatives, alternative explanations and the overall explanation are selectable. Select a word or phrase and tap **Define**. http(s) links are tappable.
+- After a wrong answer, check **I was distracted or read too fast** in the feedback to remove the new error card. Uncheck it to restore the card.
 - **Skip** records a skipped question. No error card is created; the end-of-session review asks what was missing.
+- Closing the session offers **Cancel**, **Discard** and **Save for later**. Save keeps the session on Home; several sessions can stay paused at once.
 - A small banner appears after 5, 10, 15… minutes of foreground practice. There is no countdown and no time score.
-- Long-press a word or phrase in the prompt and tap **Define** to save it as a missing concept.
-- Leaving an unfinished session asks for confirmation. An unfinished session can be resumed from Home if the app was closed.
+- Long-press a word or phrase and tap **Define** to save it as a missing concept.
 - The progress bar and “Question X of Y” show position. Score is correct answers / total questions.
 
 ## Results
@@ -58,9 +61,10 @@ The whole file is validated first. A broken file shows the JSON path or line/col
   - **A concept** → term + definition, saved as a cloze concept card.
   - **Another question** → question + answer, saved as a basic card.
 - **Concepts without a definition** (for example after a web lookup) get a definition field.
-- **Skip** leaves the step unfinished. Unfinished error cards can be completed later from Cards.
+- **Skip** leaves the step unfinished. Use the same review view from Cards → **Complete**, **Review all**, or **Review selected**.
 - The completion screen offers **Done** and **View cards**.
 - Review is idempotent: completed error cards disappear from a later review. Skipped questions are shown again if you reopen review before finishing.
+- Cards created here and in the session review share one view: question, your answer, the correct answer, your reasoning, bias and vaccine.
 
 ## Past errors
 
@@ -69,33 +73,36 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - **Review N errors** starts a re-test session.
 - Correct answer → the card is resolved, removed from the active queue, and kept in history/statistics.
 - Wrong answer → the card stays active and its next attempt is scheduled 48 hours later.
-- A distracted wrong answer in this session does not move the due date; the card remains due.
+- Marking a re-test answer as distracted in the feedback does not resolve the card; it stays in the error queue.
 - Resolved cards are never deleted automatically.
 
 ## Cards and export
 
 - Tabs: **All**, **Concepts**, **Errors**, **Basic**.
-- Checkboxes choose what is included. By default all unexported, complete cards are selected.
+- **Show exported cards** is a filter chip below the description. It includes exported cards in the list; exported cards stay unselectable.
+- Checkboxes choose what is included. By default all unexported, complete cards are selected. Incomplete error cards can also be checked.
+- **Review all** sits at the top of the Error cards section. **Review selected** appears for checked error cards.
+- If a checked error card is incomplete, the bottom bar hides export and share and offers **Review selected** instead. Export returns when every checked error card is complete.
 - Each row shows the target deck. Deck comes from the card's topic, or the default deck.
-- **Complete** adds a missing concept definition or error bias/vaccine.
-- **Export to AnkiDroid** creates the deck if needed, ensures note types, bulk-adds notes, marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
+- **Complete** opens the same error-card review view used after a session.
+- **Export to AnkiDroid** creates the deck and note types if needed, bulk-adds notes, marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
 - **Share as files** creates Anki-compatible text files. File export does not encode a deck.
 - **Delete selected** permanently removes cards; deleting an active error card also removes it from the error queue.
-- Use the visibility icon to include exported cards in the list (they are not selectable).
+- Use **Show exported cards** to include exported cards in the list (they are not selectable).
 - Missing bias/vaccine or definitions block export until completed.
 
 ## Lookup
 
 - Long-press text in a question → **Define**.
-- **AI mode**: sends the term, question and topic to an OpenAI-compatible endpoint and saves a short definition. Configure base URL, model and API key in Settings.
-- **Web mode**: opens DuckDuckGo or Wikipedia in a Custom Tab and saves the term with an empty definition. Fill the definition in the sheet, in review, or in Cards.
+- **AI mode**: sends the term, question and topic to the configured provider and saves a short definition. The definition appears in a read-only bubble and is saved automatically; there is no save button. OpenAI, Groq and OpenRouter use their chat-completions endpoint; Gemini uses its native `generateContent` API. Configure the provider, base URL, model and API key in Settings. **Load models** lists the models the provider makes available, and the model field is a searchable dropdown. If a list cannot be loaded, the saved model stays selected.
+- **Web mode**: opens DuckDuckGo or Wikipedia in a Custom Tab and keeps the editable definition sheet with **Save**, so you can fill the definition after reading.
 - Every lookup is saved automatically for the session and counted in Results.
 
 ## Settings
 
-- **Appearance**: use wallpaper colors (Material You). The app follows system light/dark.
-- **Looking up terms**: Web search or AI. Web engine: DuckDuckGo or Wikipedia. AI: provider preset, base URL, model, API key, test connection. The key is stored in Android secure storage and never shown after saving.
-- **AnkiDroid**: status of install/API/permission/Cloze type, permission request, open AnkiDroid, default deck name.
+- **Appearance**: wallpaper colors (Material You) are on by default. Turn them off to use the app seed color. The app follows system light/dark.
+- **Looking up terms**: Web search or AI. Web engine: DuckDuckGo or Wikipedia. AI: provider (OpenAI, Groq, OpenRouter, Gemini or custom), base URL, model, API key, test connection. **Load models** fills the model dropdown from the provider. The key is stored in Android secure storage and never shown after saving.
+- **AnkiDroid**: status of install/API/permission/Cloze type, permission request, open AnkiDroid, default deck name, and **Browse decks** to pick a live deck name.
 - **Data**: erase all practices, sessions, cards, settings and API key. Cannot be undone.
 - **About**: version.
 

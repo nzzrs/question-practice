@@ -36,14 +36,14 @@ void main() {
     await sessions.submitAnswer(
       start: start,
       item: start.items[0],
-      selectedIndex: 1,
+      selectedIndexes: const [1],
       reasoning: 'I assumed the wrong layer.',
       distracted: false,
     );
     await sessions.submitAnswer(
       start: start,
       item: start.items[1],
-      selectedIndex: null,
+      selectedIndexes: const [],
       reasoning: '',
       distracted: false,
     );
@@ -95,7 +95,7 @@ void main() {
     await sessions.submitAnswer(
       start: start,
       item: start.items.single,
-      selectedIndex: 0,
+      selectedIndexes: const [0],
       reasoning: '',
       distracted: false,
     );

@@ -70,6 +70,13 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
         .watchSingleOrNull();
   }
 
+  Stream<List<SessionRow>> watchInProgressSessions() {
+    return (select(sessions)
+          ..where((s) => s.status.equals('inProgress'))
+          ..orderBy([(s) => OrderingTerm.desc(s.startedAt)]))
+        .watch();
+  }
+
   Future<List<QuestionRow>> questionsForSession(int sessionId) {
     final query =
         select(questions).join([
@@ -102,6 +109,12 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
 
   Future<int> insertAttempt(AttemptsCompanion attempt) {
     return into(attempts).insert(attempt);
+  }
+
+  Future<void> updateAttemptDistracted(int id, bool distracted) {
+    return (update(attempts)..where((a) => a.id.equals(id))).write(
+      AttemptsCompanion(distracted: Value(distracted)),
+    );
   }
 
   Future<void> completeSession({

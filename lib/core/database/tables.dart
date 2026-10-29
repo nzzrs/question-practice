@@ -30,7 +30,8 @@ class Questions extends Table {
       integer().references(Practices, #id, onDelete: KeyAction.cascade)();
   TextColumn get prompt => text()();
   TextColumn get alternativesJson => text()();
-  IntColumn get correctIndex => integer()();
+  TextColumn get correctIndexesJson =>
+      text().withDefault(const Constant('[0]'))();
   TextColumn get explanation => text()();
   TextColumn get alternativeExplanationsJson => text()();
   IntColumn get position => integer()();
@@ -77,7 +78,8 @@ class Attempts extends Table {
       integer().references(Sessions, #id, onDelete: KeyAction.cascade)();
   IntColumn get questionId =>
       integer().references(Questions, #id, onDelete: KeyAction.cascade)();
-  IntColumn get selectedIndex => integer().nullable()();
+  TextColumn get selectedIndexesJson =>
+      text().withDefault(const Constant('[]'))();
   TextColumn get reasoning => text().withDefault(const Constant(''))();
   BoolColumn get distracted => boolean().withDefault(const Constant(false))();
   BoolColumn get isCorrect => boolean()();
@@ -128,9 +130,14 @@ class ErrorCards extends Table {
   )();
   TextColumn get question => text()();
   TextColumn get alternativesJson => text()();
-  IntColumn get correctIndex => integer()();
-  IntColumn get wrongIndex => integer()();
+  TextColumn get correctIndexesJson =>
+      text().withDefault(const Constant('[0]'))();
+  TextColumn get wrongIndexesJson =>
+      text().withDefault(const Constant('[0]'))();
   TextColumn get reasoning => text().withDefault(const Constant(''))();
+  TextColumn get explanation => text().withDefault(const Constant(''))();
+  TextColumn get alternativeExplanationsJson =>
+      text().withDefault(const Constant('[]'))();
   TextColumn get bias => text().withDefault(const Constant(''))();
   TextColumn get vaccine => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();

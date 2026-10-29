@@ -30,7 +30,7 @@ void main() {
     final first = await service.submitAnswer(
       start: start,
       item: start.items[0],
-      selectedIndex: 1,
+      selectedIndexes: const [1],
       reasoning: 'I guessed',
       distracted: false,
     );
@@ -40,14 +40,14 @@ void main() {
     await service.submitAnswer(
       start: start,
       item: start.items[1],
-      selectedIndex: 0,
+      selectedIndexes: const [0],
       reasoning: 'I know this',
       distracted: false,
     );
     final third = await service.submitAnswer(
       start: start,
       item: start.items[2],
-      selectedIndex: null,
+      selectedIndexes: const [],
       reasoning: '',
       distracted: false,
     );
@@ -69,7 +69,7 @@ void main() {
       await service.submitAnswer(
         start: start,
         item: start.items.single,
-        selectedIndex: 1,
+        selectedIndexes: const [1],
         reasoning: 'Wrong reasoning',
         distracted: false,
       );
@@ -92,7 +92,7 @@ void main() {
     final outcome = await service.submitAnswer(
       start: start,
       item: start.items.single,
-      selectedIndex: 1,
+      selectedIndexes: const [1],
       reasoning: '',
       distracted: true,
     );
@@ -102,13 +102,102 @@ void main() {
     expect(await harness.cards.watchErrorCards().first, isEmpty);
   });
 
+  test('multiple correct answers require every correct alternative', () async {
+    final topicId = await harness.practices.createTopic(
+      name: 'Multi',
+      description: '',
+      priority: null,
+      createdAt: harness.clock.now().toUtc(),
+    );
+    final practiceId = await harness.practices.createPractice(
+      topicId: topicId,
+      name: 'Multi practice',
+      description: '',
+      contentHash: 'multi-hash',
+      importedAt: harness.clock.now().toUtc(),
+    );
+    await harness.practices.createQuestions(practiceId, const [
+      QuestionDraft(
+        prompt: 'Pick both correct answers',
+        alternatives: ['A', 'B', 'C', 'D'],
+        correctIndexes: [0, 2],
+        explanation: 'A and C are correct.',
+        alternativeExplanations: ['A', 'B', 'C', 'D'],
+      ),
+      QuestionDraft(
+        prompt: 'Pick both again',
+        alternatives: ['A', 'B', 'C', 'D'],
+        correctIndexes: [1, 3],
+        explanation: 'B and D are correct.',
+        alternativeExplanations: ['A', 'B', 'C', 'D'],
+      ),
+    ]);
+    final start = await service.startPractice(practiceId);
+
+    final partial = await service.submitAnswer(
+      start: start,
+      item: start.items[0],
+      selectedIndexes: const [0],
+      reasoning: 'Missed one',
+      distracted: false,
+    );
+    expect(partial.attempt.isCorrect, isFalse);
+    final card = (await harness.cards.watchErrorCards().first).single;
+    expect(card.correctIndexes, [0, 2]);
+    expect(card.wrongIndexes, [0]);
+
+    final complete = await service.submitAnswer(
+      start: start,
+      item: start.items[1],
+      selectedIndexes: const [3, 1],
+      reasoning: 'Both',
+      distracted: false,
+    );
+    expect(complete.attempt.isCorrect, isTrue);
+    expect(complete.summary!.session.correct, 1);
+  });
+
+  test(
+    'distraction can be marked after feedback and removes the card',
+    () async {
+      final practice = await harness.seedPractice(count: 1);
+      final start = await service.startPractice(practice.practiceId);
+      await service.submitAnswer(
+        start: start,
+        item: start.items.single,
+        selectedIndexes: const [1],
+        reasoning: 'Read it too fast',
+        distracted: false,
+      );
+      expect(await harness.cards.watchErrorCards().first, hasLength(1));
+
+      final updated = await service.setDistracted(
+        start: start,
+        item: start.items.single,
+        distracted: true,
+      );
+      expect(updated.distracted, isTrue);
+      expect(await harness.cards.watchErrorCards().first, isEmpty);
+      final session = await harness.sessions.sessionById(start.session.id);
+      expect(session!.distracted, 1);
+
+      final restored = await service.setDistracted(
+        start: start,
+        item: start.items.single,
+        distracted: false,
+      );
+      expect(restored.distracted, isFalse);
+      expect(await harness.cards.watchErrorCards().first, hasLength(1));
+    },
+  );
+
   test('skipped answers create no error card and are counted', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await service.startPractice(practice.practiceId);
     final outcome = await service.submitAnswer(
       start: start,
       item: start.items.single,
-      selectedIndex: null,
+      selectedIndexes: const [],
       reasoning: '',
       distracted: false,
     );
@@ -124,7 +213,7 @@ void main() {
     await service.submitAnswer(
       start: first,
       item: first.items.single,
-      selectedIndex: 1,
+      selectedIndexes: const [1],
       reasoning: 'Wrong',
       distracted: false,
     );
@@ -136,7 +225,7 @@ void main() {
     final outcome = await service.submitAnswer(
       start: past,
       item: past.items.single,
-      selectedIndex: 0,
+      selectedIndexes: const [0],
       reasoning: 'Now I know',
       distracted: false,
     );
@@ -156,7 +245,7 @@ void main() {
       await service.submitAnswer(
         start: first,
         item: first.items.single,
-        selectedIndex: 1,
+        selectedIndexes: const [1],
         reasoning: 'Wrong',
         distracted: false,
       );
@@ -167,7 +256,7 @@ void main() {
       await service.submitAnswer(
         start: past,
         item: past.items.single,
-        selectedIndex: 1,
+        selectedIndexes: const [1],
         reasoning: 'Still wrong',
         distracted: false,
       );
@@ -184,7 +273,7 @@ void main() {
     await service.submitAnswer(
       start: start,
       item: start.items.first,
-      selectedIndex: 0,
+      selectedIndexes: const [0],
       reasoning: '',
       distracted: false,
     );
@@ -195,7 +284,7 @@ void main() {
     await service.submitAnswer(
       start: resumed,
       item: resumed.currentItem!,
-      selectedIndex: 0,
+      selectedIndexes: const [0],
       reasoning: '',
       distracted: false,
     );
@@ -211,7 +300,7 @@ void main() {
     await service.submitAnswer(
       start: start,
       item: start.items.single,
-      selectedIndex: 1,
+      selectedIndexes: const [1],
       reasoning: '',
       distracted: false,
     );
@@ -258,7 +347,7 @@ void main() {
     final outcome = await service.submitAnswer(
       start: start,
       item: start.items.single,
-      selectedIndex: 0,
+      selectedIndexes: const [0],
       reasoning: '',
       distracted: false,
     );

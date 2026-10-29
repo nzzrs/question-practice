@@ -58,6 +58,14 @@ class ExportService {
         message: 'Select at least one card.',
       );
     }
+    if (selection.errorCards.any((card) => card.needsDetails)) {
+      return const ExportOutcome(
+        success: false,
+        added: 0,
+        failed: 0,
+        message: 'Complete the selected error cards before export.',
+      );
+    }
     final status = await _gateway.status();
     if (!status.installed) {
       return const ExportOutcome(

@@ -877,17 +877,18 @@ class $QuestionsTable extends Questions
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _correctIndexMeta = const VerificationMeta(
-    'correctIndex',
-  );
+  static const VerificationMeta _correctIndexesJsonMeta =
+      const VerificationMeta('correctIndexesJson');
   @override
-  late final GeneratedColumn<int> correctIndex = GeneratedColumn<int>(
-    'correct_index',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
+  late final GeneratedColumn<String> correctIndexesJson =
+      GeneratedColumn<String>(
+        'correct_indexes_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[0]'),
+      );
   static const VerificationMeta _explanationMeta = const VerificationMeta(
     'explanation',
   );
@@ -927,7 +928,7 @@ class $QuestionsTable extends Questions
     practiceId,
     prompt,
     alternativesJson,
-    correctIndex,
+    correctIndexesJson,
     explanation,
     alternativeExplanationsJson,
     position,
@@ -974,16 +975,14 @@ class $QuestionsTable extends Questions
     } else if (isInserting) {
       context.missing(_alternativesJsonMeta);
     }
-    if (data.containsKey('correct_index')) {
+    if (data.containsKey('correct_indexes_json')) {
       context.handle(
-        _correctIndexMeta,
-        correctIndex.isAcceptableOrUnknown(
-          data['correct_index']!,
-          _correctIndexMeta,
+        _correctIndexesJsonMeta,
+        correctIndexesJson.isAcceptableOrUnknown(
+          data['correct_indexes_json']!,
+          _correctIndexesJsonMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_correctIndexMeta);
     }
     if (data.containsKey('explanation')) {
       context.handle(
@@ -1040,9 +1039,9 @@ class $QuestionsTable extends Questions
         DriftSqlType.string,
         data['${effectivePrefix}alternatives_json'],
       )!,
-      correctIndex: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}correct_index'],
+      correctIndexesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}correct_indexes_json'],
       )!,
       explanation: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -1070,7 +1069,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
   final int practiceId;
   final String prompt;
   final String alternativesJson;
-  final int correctIndex;
+  final String correctIndexesJson;
   final String explanation;
   final String alternativeExplanationsJson;
   final int position;
@@ -1079,7 +1078,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     required this.practiceId,
     required this.prompt,
     required this.alternativesJson,
-    required this.correctIndex,
+    required this.correctIndexesJson,
     required this.explanation,
     required this.alternativeExplanationsJson,
     required this.position,
@@ -1091,7 +1090,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     map['practice_id'] = Variable<int>(practiceId);
     map['prompt'] = Variable<String>(prompt);
     map['alternatives_json'] = Variable<String>(alternativesJson);
-    map['correct_index'] = Variable<int>(correctIndex);
+    map['correct_indexes_json'] = Variable<String>(correctIndexesJson);
     map['explanation'] = Variable<String>(explanation);
     map['alternative_explanations_json'] = Variable<String>(
       alternativeExplanationsJson,
@@ -1106,7 +1105,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
       practiceId: Value(practiceId),
       prompt: Value(prompt),
       alternativesJson: Value(alternativesJson),
-      correctIndex: Value(correctIndex),
+      correctIndexesJson: Value(correctIndexesJson),
       explanation: Value(explanation),
       alternativeExplanationsJson: Value(alternativeExplanationsJson),
       position: Value(position),
@@ -1123,7 +1122,9 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
       practiceId: serializer.fromJson<int>(json['practiceId']),
       prompt: serializer.fromJson<String>(json['prompt']),
       alternativesJson: serializer.fromJson<String>(json['alternativesJson']),
-      correctIndex: serializer.fromJson<int>(json['correctIndex']),
+      correctIndexesJson: serializer.fromJson<String>(
+        json['correctIndexesJson'],
+      ),
       explanation: serializer.fromJson<String>(json['explanation']),
       alternativeExplanationsJson: serializer.fromJson<String>(
         json['alternativeExplanationsJson'],
@@ -1139,7 +1140,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
       'practiceId': serializer.toJson<int>(practiceId),
       'prompt': serializer.toJson<String>(prompt),
       'alternativesJson': serializer.toJson<String>(alternativesJson),
-      'correctIndex': serializer.toJson<int>(correctIndex),
+      'correctIndexesJson': serializer.toJson<String>(correctIndexesJson),
       'explanation': serializer.toJson<String>(explanation),
       'alternativeExplanationsJson': serializer.toJson<String>(
         alternativeExplanationsJson,
@@ -1153,7 +1154,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     int? practiceId,
     String? prompt,
     String? alternativesJson,
-    int? correctIndex,
+    String? correctIndexesJson,
     String? explanation,
     String? alternativeExplanationsJson,
     int? position,
@@ -1162,7 +1163,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     practiceId: practiceId ?? this.practiceId,
     prompt: prompt ?? this.prompt,
     alternativesJson: alternativesJson ?? this.alternativesJson,
-    correctIndex: correctIndex ?? this.correctIndex,
+    correctIndexesJson: correctIndexesJson ?? this.correctIndexesJson,
     explanation: explanation ?? this.explanation,
     alternativeExplanationsJson:
         alternativeExplanationsJson ?? this.alternativeExplanationsJson,
@@ -1178,9 +1179,9 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
       alternativesJson: data.alternativesJson.present
           ? data.alternativesJson.value
           : this.alternativesJson,
-      correctIndex: data.correctIndex.present
-          ? data.correctIndex.value
-          : this.correctIndex,
+      correctIndexesJson: data.correctIndexesJson.present
+          ? data.correctIndexesJson.value
+          : this.correctIndexesJson,
       explanation: data.explanation.present
           ? data.explanation.value
           : this.explanation,
@@ -1198,7 +1199,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
           ..write('practiceId: $practiceId, ')
           ..write('prompt: $prompt, ')
           ..write('alternativesJson: $alternativesJson, ')
-          ..write('correctIndex: $correctIndex, ')
+          ..write('correctIndexesJson: $correctIndexesJson, ')
           ..write('explanation: $explanation, ')
           ..write('alternativeExplanationsJson: $alternativeExplanationsJson, ')
           ..write('position: $position')
@@ -1212,7 +1213,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     practiceId,
     prompt,
     alternativesJson,
-    correctIndex,
+    correctIndexesJson,
     explanation,
     alternativeExplanationsJson,
     position,
@@ -1225,7 +1226,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
           other.practiceId == this.practiceId &&
           other.prompt == this.prompt &&
           other.alternativesJson == this.alternativesJson &&
-          other.correctIndex == this.correctIndex &&
+          other.correctIndexesJson == this.correctIndexesJson &&
           other.explanation == this.explanation &&
           other.alternativeExplanationsJson ==
               this.alternativeExplanationsJson &&
@@ -1237,7 +1238,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
   final Value<int> practiceId;
   final Value<String> prompt;
   final Value<String> alternativesJson;
-  final Value<int> correctIndex;
+  final Value<String> correctIndexesJson;
   final Value<String> explanation;
   final Value<String> alternativeExplanationsJson;
   final Value<int> position;
@@ -1246,7 +1247,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     this.practiceId = const Value.absent(),
     this.prompt = const Value.absent(),
     this.alternativesJson = const Value.absent(),
-    this.correctIndex = const Value.absent(),
+    this.correctIndexesJson = const Value.absent(),
     this.explanation = const Value.absent(),
     this.alternativeExplanationsJson = const Value.absent(),
     this.position = const Value.absent(),
@@ -1256,14 +1257,13 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     required int practiceId,
     required String prompt,
     required String alternativesJson,
-    required int correctIndex,
+    this.correctIndexesJson = const Value.absent(),
     required String explanation,
     required String alternativeExplanationsJson,
     required int position,
   }) : practiceId = Value(practiceId),
        prompt = Value(prompt),
        alternativesJson = Value(alternativesJson),
-       correctIndex = Value(correctIndex),
        explanation = Value(explanation),
        alternativeExplanationsJson = Value(alternativeExplanationsJson),
        position = Value(position);
@@ -1272,7 +1272,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     Expression<int>? practiceId,
     Expression<String>? prompt,
     Expression<String>? alternativesJson,
-    Expression<int>? correctIndex,
+    Expression<String>? correctIndexesJson,
     Expression<String>? explanation,
     Expression<String>? alternativeExplanationsJson,
     Expression<int>? position,
@@ -1282,7 +1282,8 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
       if (practiceId != null) 'practice_id': practiceId,
       if (prompt != null) 'prompt': prompt,
       if (alternativesJson != null) 'alternatives_json': alternativesJson,
-      if (correctIndex != null) 'correct_index': correctIndex,
+      if (correctIndexesJson != null)
+        'correct_indexes_json': correctIndexesJson,
       if (explanation != null) 'explanation': explanation,
       if (alternativeExplanationsJson != null)
         'alternative_explanations_json': alternativeExplanationsJson,
@@ -1295,7 +1296,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     Value<int>? practiceId,
     Value<String>? prompt,
     Value<String>? alternativesJson,
-    Value<int>? correctIndex,
+    Value<String>? correctIndexesJson,
     Value<String>? explanation,
     Value<String>? alternativeExplanationsJson,
     Value<int>? position,
@@ -1305,7 +1306,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
       practiceId: practiceId ?? this.practiceId,
       prompt: prompt ?? this.prompt,
       alternativesJson: alternativesJson ?? this.alternativesJson,
-      correctIndex: correctIndex ?? this.correctIndex,
+      correctIndexesJson: correctIndexesJson ?? this.correctIndexesJson,
       explanation: explanation ?? this.explanation,
       alternativeExplanationsJson:
           alternativeExplanationsJson ?? this.alternativeExplanationsJson,
@@ -1328,8 +1329,8 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     if (alternativesJson.present) {
       map['alternatives_json'] = Variable<String>(alternativesJson.value);
     }
-    if (correctIndex.present) {
-      map['correct_index'] = Variable<int>(correctIndex.value);
+    if (correctIndexesJson.present) {
+      map['correct_indexes_json'] = Variable<String>(correctIndexesJson.value);
     }
     if (explanation.present) {
       map['explanation'] = Variable<String>(explanation.value);
@@ -1352,7 +1353,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
           ..write('practiceId: $practiceId, ')
           ..write('prompt: $prompt, ')
           ..write('alternativesJson: $alternativesJson, ')
-          ..write('correctIndex: $correctIndex, ')
+          ..write('correctIndexesJson: $correctIndexesJson, ')
           ..write('explanation: $explanation, ')
           ..write('alternativeExplanationsJson: $alternativeExplanationsJson, ')
           ..write('position: $position')
@@ -2283,17 +2284,18 @@ class $AttemptsTable extends Attempts
       'REFERENCES questions (id) ON DELETE CASCADE',
     ),
   );
-  static const VerificationMeta _selectedIndexMeta = const VerificationMeta(
-    'selectedIndex',
-  );
+  static const VerificationMeta _selectedIndexesJsonMeta =
+      const VerificationMeta('selectedIndexesJson');
   @override
-  late final GeneratedColumn<int> selectedIndex = GeneratedColumn<int>(
-    'selected_index',
-    aliasedName,
-    true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-  );
+  late final GeneratedColumn<String> selectedIndexesJson =
+      GeneratedColumn<String>(
+        'selected_indexes_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
   static const VerificationMeta _reasoningMeta = const VerificationMeta(
     'reasoning',
   );
@@ -2351,7 +2353,7 @@ class $AttemptsTable extends Attempts
     id,
     sessionId,
     questionId,
-    selectedIndex,
+    selectedIndexesJson,
     reasoning,
     distracted,
     isCorrect,
@@ -2388,12 +2390,12 @@ class $AttemptsTable extends Attempts
     } else if (isInserting) {
       context.missing(_questionIdMeta);
     }
-    if (data.containsKey('selected_index')) {
+    if (data.containsKey('selected_indexes_json')) {
       context.handle(
-        _selectedIndexMeta,
-        selectedIndex.isAcceptableOrUnknown(
-          data['selected_index']!,
-          _selectedIndexMeta,
+        _selectedIndexesJsonMeta,
+        selectedIndexesJson.isAcceptableOrUnknown(
+          data['selected_indexes_json']!,
+          _selectedIndexesJsonMeta,
         ),
       );
     }
@@ -2450,10 +2452,10 @@ class $AttemptsTable extends Attempts
         DriftSqlType.int,
         data['${effectivePrefix}question_id'],
       )!,
-      selectedIndex: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}selected_index'],
-      ),
+      selectedIndexesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}selected_indexes_json'],
+      )!,
       reasoning: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}reasoning'],
@@ -2483,7 +2485,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
   final int id;
   final int sessionId;
   final int questionId;
-  final int? selectedIndex;
+  final String selectedIndexesJson;
   final String reasoning;
   final bool distracted;
   final bool isCorrect;
@@ -2492,7 +2494,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     required this.id,
     required this.sessionId,
     required this.questionId,
-    this.selectedIndex,
+    required this.selectedIndexesJson,
     required this.reasoning,
     required this.distracted,
     required this.isCorrect,
@@ -2504,9 +2506,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     map['id'] = Variable<int>(id);
     map['session_id'] = Variable<int>(sessionId);
     map['question_id'] = Variable<int>(questionId);
-    if (!nullToAbsent || selectedIndex != null) {
-      map['selected_index'] = Variable<int>(selectedIndex);
-    }
+    map['selected_indexes_json'] = Variable<String>(selectedIndexesJson);
     map['reasoning'] = Variable<String>(reasoning);
     map['distracted'] = Variable<bool>(distracted);
     map['is_correct'] = Variable<bool>(isCorrect);
@@ -2519,9 +2519,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       id: Value(id),
       sessionId: Value(sessionId),
       questionId: Value(questionId),
-      selectedIndex: selectedIndex == null && nullToAbsent
-          ? const Value.absent()
-          : Value(selectedIndex),
+      selectedIndexesJson: Value(selectedIndexesJson),
       reasoning: Value(reasoning),
       distracted: Value(distracted),
       isCorrect: Value(isCorrect),
@@ -2538,7 +2536,9 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       id: serializer.fromJson<int>(json['id']),
       sessionId: serializer.fromJson<int>(json['sessionId']),
       questionId: serializer.fromJson<int>(json['questionId']),
-      selectedIndex: serializer.fromJson<int?>(json['selectedIndex']),
+      selectedIndexesJson: serializer.fromJson<String>(
+        json['selectedIndexesJson'],
+      ),
       reasoning: serializer.fromJson<String>(json['reasoning']),
       distracted: serializer.fromJson<bool>(json['distracted']),
       isCorrect: serializer.fromJson<bool>(json['isCorrect']),
@@ -2552,7 +2552,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       'id': serializer.toJson<int>(id),
       'sessionId': serializer.toJson<int>(sessionId),
       'questionId': serializer.toJson<int>(questionId),
-      'selectedIndex': serializer.toJson<int?>(selectedIndex),
+      'selectedIndexesJson': serializer.toJson<String>(selectedIndexesJson),
       'reasoning': serializer.toJson<String>(reasoning),
       'distracted': serializer.toJson<bool>(distracted),
       'isCorrect': serializer.toJson<bool>(isCorrect),
@@ -2564,7 +2564,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     int? id,
     int? sessionId,
     int? questionId,
-    Value<int?> selectedIndex = const Value.absent(),
+    String? selectedIndexesJson,
     String? reasoning,
     bool? distracted,
     bool? isCorrect,
@@ -2573,9 +2573,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     id: id ?? this.id,
     sessionId: sessionId ?? this.sessionId,
     questionId: questionId ?? this.questionId,
-    selectedIndex: selectedIndex.present
-        ? selectedIndex.value
-        : this.selectedIndex,
+    selectedIndexesJson: selectedIndexesJson ?? this.selectedIndexesJson,
     reasoning: reasoning ?? this.reasoning,
     distracted: distracted ?? this.distracted,
     isCorrect: isCorrect ?? this.isCorrect,
@@ -2588,9 +2586,9 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       questionId: data.questionId.present
           ? data.questionId.value
           : this.questionId,
-      selectedIndex: data.selectedIndex.present
-          ? data.selectedIndex.value
-          : this.selectedIndex,
+      selectedIndexesJson: data.selectedIndexesJson.present
+          ? data.selectedIndexesJson.value
+          : this.selectedIndexesJson,
       reasoning: data.reasoning.present ? data.reasoning.value : this.reasoning,
       distracted: data.distracted.present
           ? data.distracted.value
@@ -2608,7 +2606,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
           ..write('id: $id, ')
           ..write('sessionId: $sessionId, ')
           ..write('questionId: $questionId, ')
-          ..write('selectedIndex: $selectedIndex, ')
+          ..write('selectedIndexesJson: $selectedIndexesJson, ')
           ..write('reasoning: $reasoning, ')
           ..write('distracted: $distracted, ')
           ..write('isCorrect: $isCorrect, ')
@@ -2622,7 +2620,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     id,
     sessionId,
     questionId,
-    selectedIndex,
+    selectedIndexesJson,
     reasoning,
     distracted,
     isCorrect,
@@ -2635,7 +2633,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
           other.id == this.id &&
           other.sessionId == this.sessionId &&
           other.questionId == this.questionId &&
-          other.selectedIndex == this.selectedIndex &&
+          other.selectedIndexesJson == this.selectedIndexesJson &&
           other.reasoning == this.reasoning &&
           other.distracted == this.distracted &&
           other.isCorrect == this.isCorrect &&
@@ -2646,7 +2644,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
   final Value<int> id;
   final Value<int> sessionId;
   final Value<int> questionId;
-  final Value<int?> selectedIndex;
+  final Value<String> selectedIndexesJson;
   final Value<String> reasoning;
   final Value<bool> distracted;
   final Value<bool> isCorrect;
@@ -2655,7 +2653,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
     this.questionId = const Value.absent(),
-    this.selectedIndex = const Value.absent(),
+    this.selectedIndexesJson = const Value.absent(),
     this.reasoning = const Value.absent(),
     this.distracted = const Value.absent(),
     this.isCorrect = const Value.absent(),
@@ -2665,7 +2663,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     this.id = const Value.absent(),
     required int sessionId,
     required int questionId,
-    this.selectedIndex = const Value.absent(),
+    this.selectedIndexesJson = const Value.absent(),
     this.reasoning = const Value.absent(),
     this.distracted = const Value.absent(),
     required bool isCorrect,
@@ -2678,7 +2676,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     Expression<int>? id,
     Expression<int>? sessionId,
     Expression<int>? questionId,
-    Expression<int>? selectedIndex,
+    Expression<String>? selectedIndexesJson,
     Expression<String>? reasoning,
     Expression<bool>? distracted,
     Expression<bool>? isCorrect,
@@ -2688,7 +2686,8 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
       if (id != null) 'id': id,
       if (sessionId != null) 'session_id': sessionId,
       if (questionId != null) 'question_id': questionId,
-      if (selectedIndex != null) 'selected_index': selectedIndex,
+      if (selectedIndexesJson != null)
+        'selected_indexes_json': selectedIndexesJson,
       if (reasoning != null) 'reasoning': reasoning,
       if (distracted != null) 'distracted': distracted,
       if (isCorrect != null) 'is_correct': isCorrect,
@@ -2700,7 +2699,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     Value<int>? id,
     Value<int>? sessionId,
     Value<int>? questionId,
-    Value<int?>? selectedIndex,
+    Value<String>? selectedIndexesJson,
     Value<String>? reasoning,
     Value<bool>? distracted,
     Value<bool>? isCorrect,
@@ -2710,7 +2709,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
       id: id ?? this.id,
       sessionId: sessionId ?? this.sessionId,
       questionId: questionId ?? this.questionId,
-      selectedIndex: selectedIndex ?? this.selectedIndex,
+      selectedIndexesJson: selectedIndexesJson ?? this.selectedIndexesJson,
       reasoning: reasoning ?? this.reasoning,
       distracted: distracted ?? this.distracted,
       isCorrect: isCorrect ?? this.isCorrect,
@@ -2730,8 +2729,10 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     if (questionId.present) {
       map['question_id'] = Variable<int>(questionId.value);
     }
-    if (selectedIndex.present) {
-      map['selected_index'] = Variable<int>(selectedIndex.value);
+    if (selectedIndexesJson.present) {
+      map['selected_indexes_json'] = Variable<String>(
+        selectedIndexesJson.value,
+      );
     }
     if (reasoning.present) {
       map['reasoning'] = Variable<String>(reasoning.value);
@@ -2754,7 +2755,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
           ..write('id: $id, ')
           ..write('sessionId: $sessionId, ')
           ..write('questionId: $questionId, ')
-          ..write('selectedIndex: $selectedIndex, ')
+          ..write('selectedIndexesJson: $selectedIndexesJson, ')
           ..write('reasoning: $reasoning, ')
           ..write('distracted: $distracted, ')
           ..write('isCorrect: $isCorrect, ')
@@ -3436,27 +3437,29 @@ class $ErrorCardsTable extends ErrorCards
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _correctIndexMeta = const VerificationMeta(
-    'correctIndex',
+  static const VerificationMeta _correctIndexesJsonMeta =
+      const VerificationMeta('correctIndexesJson');
+  @override
+  late final GeneratedColumn<String> correctIndexesJson =
+      GeneratedColumn<String>(
+        'correct_indexes_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[0]'),
+      );
+  static const VerificationMeta _wrongIndexesJsonMeta = const VerificationMeta(
+    'wrongIndexesJson',
   );
   @override
-  late final GeneratedColumn<int> correctIndex = GeneratedColumn<int>(
-    'correct_index',
+  late final GeneratedColumn<String> wrongIndexesJson = GeneratedColumn<String>(
+    'wrong_indexes_json',
     aliasedName,
     false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
-  static const VerificationMeta _wrongIndexMeta = const VerificationMeta(
-    'wrongIndex',
-  );
-  @override
-  late final GeneratedColumn<int> wrongIndex = GeneratedColumn<int>(
-    'wrong_index',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[0]'),
   );
   static const VerificationMeta _reasoningMeta = const VerificationMeta(
     'reasoning',
@@ -3470,6 +3473,30 @@ class $ErrorCardsTable extends ErrorCards
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _explanationMeta = const VerificationMeta(
+    'explanation',
+  );
+  @override
+  late final GeneratedColumn<String> explanation = GeneratedColumn<String>(
+    'explanation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _alternativeExplanationsJsonMeta =
+      const VerificationMeta('alternativeExplanationsJson');
+  @override
+  late final GeneratedColumn<String> alternativeExplanationsJson =
+      GeneratedColumn<String>(
+        'alternative_explanations_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
   static const VerificationMeta _biasMeta = const VerificationMeta('bias');
   @override
   late final GeneratedColumn<String> bias = GeneratedColumn<String>(
@@ -3596,9 +3623,11 @@ class $ErrorCardsTable extends ErrorCards
     sessionId,
     question,
     alternativesJson,
-    correctIndex,
-    wrongIndex,
+    correctIndexesJson,
+    wrongIndexesJson,
     reasoning,
+    explanation,
+    alternativeExplanationsJson,
     bias,
     vaccine,
     topicName,
@@ -3659,29 +3688,46 @@ class $ErrorCardsTable extends ErrorCards
     } else if (isInserting) {
       context.missing(_alternativesJsonMeta);
     }
-    if (data.containsKey('correct_index')) {
+    if (data.containsKey('correct_indexes_json')) {
       context.handle(
-        _correctIndexMeta,
-        correctIndex.isAcceptableOrUnknown(
-          data['correct_index']!,
-          _correctIndexMeta,
+        _correctIndexesJsonMeta,
+        correctIndexesJson.isAcceptableOrUnknown(
+          data['correct_indexes_json']!,
+          _correctIndexesJsonMeta,
         ),
       );
-    } else if (isInserting) {
-      context.missing(_correctIndexMeta);
     }
-    if (data.containsKey('wrong_index')) {
+    if (data.containsKey('wrong_indexes_json')) {
       context.handle(
-        _wrongIndexMeta,
-        wrongIndex.isAcceptableOrUnknown(data['wrong_index']!, _wrongIndexMeta),
+        _wrongIndexesJsonMeta,
+        wrongIndexesJson.isAcceptableOrUnknown(
+          data['wrong_indexes_json']!,
+          _wrongIndexesJsonMeta,
+        ),
       );
-    } else if (isInserting) {
-      context.missing(_wrongIndexMeta);
     }
     if (data.containsKey('reasoning')) {
       context.handle(
         _reasoningMeta,
         reasoning.isAcceptableOrUnknown(data['reasoning']!, _reasoningMeta),
+      );
+    }
+    if (data.containsKey('explanation')) {
+      context.handle(
+        _explanationMeta,
+        explanation.isAcceptableOrUnknown(
+          data['explanation']!,
+          _explanationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('alternative_explanations_json')) {
+      context.handle(
+        _alternativeExplanationsJsonMeta,
+        alternativeExplanationsJson.isAcceptableOrUnknown(
+          data['alternative_explanations_json']!,
+          _alternativeExplanationsJsonMeta,
+        ),
       );
     }
     if (data.containsKey('bias')) {
@@ -3796,17 +3842,25 @@ class $ErrorCardsTable extends ErrorCards
         DriftSqlType.string,
         data['${effectivePrefix}alternatives_json'],
       )!,
-      correctIndex: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}correct_index'],
+      correctIndexesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}correct_indexes_json'],
       )!,
-      wrongIndex: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}wrong_index'],
+      wrongIndexesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}wrong_indexes_json'],
       )!,
       reasoning: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}reasoning'],
+      )!,
+      explanation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}explanation'],
+      )!,
+      alternativeExplanationsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}alternative_explanations_json'],
       )!,
       bias: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -3867,9 +3921,11 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
   final int? sessionId;
   final String question;
   final String alternativesJson;
-  final int correctIndex;
-  final int wrongIndex;
+  final String correctIndexesJson;
+  final String wrongIndexesJson;
   final String reasoning;
+  final String explanation;
+  final String alternativeExplanationsJson;
   final String bias;
   final String vaccine;
   final String topicName;
@@ -3887,9 +3943,11 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     this.sessionId,
     required this.question,
     required this.alternativesJson,
-    required this.correctIndex,
-    required this.wrongIndex,
+    required this.correctIndexesJson,
+    required this.wrongIndexesJson,
     required this.reasoning,
+    required this.explanation,
+    required this.alternativeExplanationsJson,
     required this.bias,
     required this.vaccine,
     required this.topicName,
@@ -3912,9 +3970,13 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     }
     map['question'] = Variable<String>(question);
     map['alternatives_json'] = Variable<String>(alternativesJson);
-    map['correct_index'] = Variable<int>(correctIndex);
-    map['wrong_index'] = Variable<int>(wrongIndex);
+    map['correct_indexes_json'] = Variable<String>(correctIndexesJson);
+    map['wrong_indexes_json'] = Variable<String>(wrongIndexesJson);
     map['reasoning'] = Variable<String>(reasoning);
+    map['explanation'] = Variable<String>(explanation);
+    map['alternative_explanations_json'] = Variable<String>(
+      alternativeExplanationsJson,
+    );
     map['bias'] = Variable<String>(bias);
     map['vaccine'] = Variable<String>(vaccine);
     map['topic_name'] = Variable<String>(topicName);
@@ -3944,9 +4006,11 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
           : Value(sessionId),
       question: Value(question),
       alternativesJson: Value(alternativesJson),
-      correctIndex: Value(correctIndex),
-      wrongIndex: Value(wrongIndex),
+      correctIndexesJson: Value(correctIndexesJson),
+      wrongIndexesJson: Value(wrongIndexesJson),
       reasoning: Value(reasoning),
+      explanation: Value(explanation),
+      alternativeExplanationsJson: Value(alternativeExplanationsJson),
       bias: Value(bias),
       vaccine: Value(vaccine),
       topicName: Value(topicName),
@@ -3978,9 +4042,15 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       sessionId: serializer.fromJson<int?>(json['sessionId']),
       question: serializer.fromJson<String>(json['question']),
       alternativesJson: serializer.fromJson<String>(json['alternativesJson']),
-      correctIndex: serializer.fromJson<int>(json['correctIndex']),
-      wrongIndex: serializer.fromJson<int>(json['wrongIndex']),
+      correctIndexesJson: serializer.fromJson<String>(
+        json['correctIndexesJson'],
+      ),
+      wrongIndexesJson: serializer.fromJson<String>(json['wrongIndexesJson']),
       reasoning: serializer.fromJson<String>(json['reasoning']),
+      explanation: serializer.fromJson<String>(json['explanation']),
+      alternativeExplanationsJson: serializer.fromJson<String>(
+        json['alternativeExplanationsJson'],
+      ),
       bias: serializer.fromJson<String>(json['bias']),
       vaccine: serializer.fromJson<String>(json['vaccine']),
       topicName: serializer.fromJson<String>(json['topicName']),
@@ -4005,9 +4075,13 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       'sessionId': serializer.toJson<int?>(sessionId),
       'question': serializer.toJson<String>(question),
       'alternativesJson': serializer.toJson<String>(alternativesJson),
-      'correctIndex': serializer.toJson<int>(correctIndex),
-      'wrongIndex': serializer.toJson<int>(wrongIndex),
+      'correctIndexesJson': serializer.toJson<String>(correctIndexesJson),
+      'wrongIndexesJson': serializer.toJson<String>(wrongIndexesJson),
       'reasoning': serializer.toJson<String>(reasoning),
+      'explanation': serializer.toJson<String>(explanation),
+      'alternativeExplanationsJson': serializer.toJson<String>(
+        alternativeExplanationsJson,
+      ),
       'bias': serializer.toJson<String>(bias),
       'vaccine': serializer.toJson<String>(vaccine),
       'topicName': serializer.toJson<String>(topicName),
@@ -4028,9 +4102,11 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     Value<int?> sessionId = const Value.absent(),
     String? question,
     String? alternativesJson,
-    int? correctIndex,
-    int? wrongIndex,
+    String? correctIndexesJson,
+    String? wrongIndexesJson,
     String? reasoning,
+    String? explanation,
+    String? alternativeExplanationsJson,
     String? bias,
     String? vaccine,
     String? topicName,
@@ -4048,9 +4124,12 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     sessionId: sessionId.present ? sessionId.value : this.sessionId,
     question: question ?? this.question,
     alternativesJson: alternativesJson ?? this.alternativesJson,
-    correctIndex: correctIndex ?? this.correctIndex,
-    wrongIndex: wrongIndex ?? this.wrongIndex,
+    correctIndexesJson: correctIndexesJson ?? this.correctIndexesJson,
+    wrongIndexesJson: wrongIndexesJson ?? this.wrongIndexesJson,
     reasoning: reasoning ?? this.reasoning,
+    explanation: explanation ?? this.explanation,
+    alternativeExplanationsJson:
+        alternativeExplanationsJson ?? this.alternativeExplanationsJson,
     bias: bias ?? this.bias,
     vaccine: vaccine ?? this.vaccine,
     topicName: topicName ?? this.topicName,
@@ -4076,13 +4155,19 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       alternativesJson: data.alternativesJson.present
           ? data.alternativesJson.value
           : this.alternativesJson,
-      correctIndex: data.correctIndex.present
-          ? data.correctIndex.value
-          : this.correctIndex,
-      wrongIndex: data.wrongIndex.present
-          ? data.wrongIndex.value
-          : this.wrongIndex,
+      correctIndexesJson: data.correctIndexesJson.present
+          ? data.correctIndexesJson.value
+          : this.correctIndexesJson,
+      wrongIndexesJson: data.wrongIndexesJson.present
+          ? data.wrongIndexesJson.value
+          : this.wrongIndexesJson,
       reasoning: data.reasoning.present ? data.reasoning.value : this.reasoning,
+      explanation: data.explanation.present
+          ? data.explanation.value
+          : this.explanation,
+      alternativeExplanationsJson: data.alternativeExplanationsJson.present
+          ? data.alternativeExplanationsJson.value
+          : this.alternativeExplanationsJson,
       bias: data.bias.present ? data.bias.value : this.bias,
       vaccine: data.vaccine.present ? data.vaccine.value : this.vaccine,
       topicName: data.topicName.present ? data.topicName.value : this.topicName,
@@ -4115,9 +4200,11 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
           ..write('sessionId: $sessionId, ')
           ..write('question: $question, ')
           ..write('alternativesJson: $alternativesJson, ')
-          ..write('correctIndex: $correctIndex, ')
-          ..write('wrongIndex: $wrongIndex, ')
+          ..write('correctIndexesJson: $correctIndexesJson, ')
+          ..write('wrongIndexesJson: $wrongIndexesJson, ')
           ..write('reasoning: $reasoning, ')
+          ..write('explanation: $explanation, ')
+          ..write('alternativeExplanationsJson: $alternativeExplanationsJson, ')
           ..write('bias: $bias, ')
           ..write('vaccine: $vaccine, ')
           ..write('topicName: $topicName, ')
@@ -4134,15 +4221,17 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     questionId,
     sessionId,
     question,
     alternativesJson,
-    correctIndex,
-    wrongIndex,
+    correctIndexesJson,
+    wrongIndexesJson,
     reasoning,
+    explanation,
+    alternativeExplanationsJson,
     bias,
     vaccine,
     topicName,
@@ -4154,7 +4243,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     detailsCompletedAt,
     resolvedAt,
     exportedAt,
-  );
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -4164,9 +4253,12 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
           other.sessionId == this.sessionId &&
           other.question == this.question &&
           other.alternativesJson == this.alternativesJson &&
-          other.correctIndex == this.correctIndex &&
-          other.wrongIndex == this.wrongIndex &&
+          other.correctIndexesJson == this.correctIndexesJson &&
+          other.wrongIndexesJson == this.wrongIndexesJson &&
           other.reasoning == this.reasoning &&
+          other.explanation == this.explanation &&
+          other.alternativeExplanationsJson ==
+              this.alternativeExplanationsJson &&
           other.bias == this.bias &&
           other.vaccine == this.vaccine &&
           other.topicName == this.topicName &&
@@ -4186,9 +4278,11 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
   final Value<int?> sessionId;
   final Value<String> question;
   final Value<String> alternativesJson;
-  final Value<int> correctIndex;
-  final Value<int> wrongIndex;
+  final Value<String> correctIndexesJson;
+  final Value<String> wrongIndexesJson;
   final Value<String> reasoning;
+  final Value<String> explanation;
+  final Value<String> alternativeExplanationsJson;
   final Value<String> bias;
   final Value<String> vaccine;
   final Value<String> topicName;
@@ -4206,9 +4300,11 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     this.sessionId = const Value.absent(),
     this.question = const Value.absent(),
     this.alternativesJson = const Value.absent(),
-    this.correctIndex = const Value.absent(),
-    this.wrongIndex = const Value.absent(),
+    this.correctIndexesJson = const Value.absent(),
+    this.wrongIndexesJson = const Value.absent(),
     this.reasoning = const Value.absent(),
+    this.explanation = const Value.absent(),
+    this.alternativeExplanationsJson = const Value.absent(),
     this.bias = const Value.absent(),
     this.vaccine = const Value.absent(),
     this.topicName = const Value.absent(),
@@ -4227,9 +4323,11 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     this.sessionId = const Value.absent(),
     required String question,
     required String alternativesJson,
-    required int correctIndex,
-    required int wrongIndex,
+    this.correctIndexesJson = const Value.absent(),
+    this.wrongIndexesJson = const Value.absent(),
     this.reasoning = const Value.absent(),
+    this.explanation = const Value.absent(),
+    this.alternativeExplanationsJson = const Value.absent(),
     this.bias = const Value.absent(),
     this.vaccine = const Value.absent(),
     this.topicName = const Value.absent(),
@@ -4244,8 +4342,6 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
   }) : questionId = Value(questionId),
        question = Value(question),
        alternativesJson = Value(alternativesJson),
-       correctIndex = Value(correctIndex),
-       wrongIndex = Value(wrongIndex),
        status = Value(status),
        createdAt = Value(createdAt),
        lastWrongAt = Value(lastWrongAt),
@@ -4256,9 +4352,11 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     Expression<int>? sessionId,
     Expression<String>? question,
     Expression<String>? alternativesJson,
-    Expression<int>? correctIndex,
-    Expression<int>? wrongIndex,
+    Expression<String>? correctIndexesJson,
+    Expression<String>? wrongIndexesJson,
     Expression<String>? reasoning,
+    Expression<String>? explanation,
+    Expression<String>? alternativeExplanationsJson,
     Expression<String>? bias,
     Expression<String>? vaccine,
     Expression<String>? topicName,
@@ -4277,9 +4375,13 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
       if (sessionId != null) 'session_id': sessionId,
       if (question != null) 'question': question,
       if (alternativesJson != null) 'alternatives_json': alternativesJson,
-      if (correctIndex != null) 'correct_index': correctIndex,
-      if (wrongIndex != null) 'wrong_index': wrongIndex,
+      if (correctIndexesJson != null)
+        'correct_indexes_json': correctIndexesJson,
+      if (wrongIndexesJson != null) 'wrong_indexes_json': wrongIndexesJson,
       if (reasoning != null) 'reasoning': reasoning,
+      if (explanation != null) 'explanation': explanation,
+      if (alternativeExplanationsJson != null)
+        'alternative_explanations_json': alternativeExplanationsJson,
       if (bias != null) 'bias': bias,
       if (vaccine != null) 'vaccine': vaccine,
       if (topicName != null) 'topic_name': topicName,
@@ -4301,9 +4403,11 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     Value<int?>? sessionId,
     Value<String>? question,
     Value<String>? alternativesJson,
-    Value<int>? correctIndex,
-    Value<int>? wrongIndex,
+    Value<String>? correctIndexesJson,
+    Value<String>? wrongIndexesJson,
     Value<String>? reasoning,
+    Value<String>? explanation,
+    Value<String>? alternativeExplanationsJson,
     Value<String>? bias,
     Value<String>? vaccine,
     Value<String>? topicName,
@@ -4322,9 +4426,12 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
       sessionId: sessionId ?? this.sessionId,
       question: question ?? this.question,
       alternativesJson: alternativesJson ?? this.alternativesJson,
-      correctIndex: correctIndex ?? this.correctIndex,
-      wrongIndex: wrongIndex ?? this.wrongIndex,
+      correctIndexesJson: correctIndexesJson ?? this.correctIndexesJson,
+      wrongIndexesJson: wrongIndexesJson ?? this.wrongIndexesJson,
       reasoning: reasoning ?? this.reasoning,
+      explanation: explanation ?? this.explanation,
+      alternativeExplanationsJson:
+          alternativeExplanationsJson ?? this.alternativeExplanationsJson,
       bias: bias ?? this.bias,
       vaccine: vaccine ?? this.vaccine,
       topicName: topicName ?? this.topicName,
@@ -4357,14 +4464,22 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     if (alternativesJson.present) {
       map['alternatives_json'] = Variable<String>(alternativesJson.value);
     }
-    if (correctIndex.present) {
-      map['correct_index'] = Variable<int>(correctIndex.value);
+    if (correctIndexesJson.present) {
+      map['correct_indexes_json'] = Variable<String>(correctIndexesJson.value);
     }
-    if (wrongIndex.present) {
-      map['wrong_index'] = Variable<int>(wrongIndex.value);
+    if (wrongIndexesJson.present) {
+      map['wrong_indexes_json'] = Variable<String>(wrongIndexesJson.value);
     }
     if (reasoning.present) {
       map['reasoning'] = Variable<String>(reasoning.value);
+    }
+    if (explanation.present) {
+      map['explanation'] = Variable<String>(explanation.value);
+    }
+    if (alternativeExplanationsJson.present) {
+      map['alternative_explanations_json'] = Variable<String>(
+        alternativeExplanationsJson.value,
+      );
     }
     if (bias.present) {
       map['bias'] = Variable<String>(bias.value);
@@ -4412,9 +4527,11 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
           ..write('sessionId: $sessionId, ')
           ..write('question: $question, ')
           ..write('alternativesJson: $alternativesJson, ')
-          ..write('correctIndex: $correctIndex, ')
-          ..write('wrongIndex: $wrongIndex, ')
+          ..write('correctIndexesJson: $correctIndexesJson, ')
+          ..write('wrongIndexesJson: $wrongIndexesJson, ')
           ..write('reasoning: $reasoning, ')
+          ..write('explanation: $explanation, ')
+          ..write('alternativeExplanationsJson: $alternativeExplanationsJson, ')
           ..write('bias: $bias, ')
           ..write('vaccine: $vaccine, ')
           ..write('topicName: $topicName, ')
@@ -6118,7 +6235,7 @@ typedef $$QuestionsTableCreateCompanionBuilder = QuestionsCompanion Function({
   required int practiceId,
   required String prompt,
   required String alternativesJson,
-  required int correctIndex,
+  Value<String> correctIndexesJson,
   required String explanation,
   required String alternativeExplanationsJson,
   required int position,
@@ -6128,7 +6245,7 @@ typedef $$QuestionsTableUpdateCompanionBuilder = QuestionsCompanion Function({
   Value<int> practiceId,
   Value<String> prompt,
   Value<String> alternativesJson,
-  Value<int> correctIndex,
+  Value<String> correctIndexesJson,
   Value<String> explanation,
   Value<String> alternativeExplanationsJson,
   Value<int> position,
@@ -6254,8 +6371,8 @@ class $$QuestionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get correctIndex => $composableBuilder(
-    column: $table.correctIndex,
+  ColumnFilters<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6422,8 +6539,8 @@ class $$QuestionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get correctIndex => $composableBuilder(
-    column: $table.correctIndex,
+  ColumnOrderings<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -6486,8 +6603,8 @@ class $$QuestionsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get correctIndex => $composableBuilder(
-    column: $table.correctIndex,
+  GeneratedColumn<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
     builder: (column) => column,
   );
 
@@ -6666,7 +6783,7 @@ class $$QuestionsTableTableManager
                 Value<int> practiceId = const Value.absent(),
                 Value<String> prompt = const Value.absent(),
                 Value<String> alternativesJson = const Value.absent(),
-                Value<int> correctIndex = const Value.absent(),
+                Value<String> correctIndexesJson = const Value.absent(),
                 Value<String> explanation = const Value.absent(),
                 Value<String> alternativeExplanationsJson =
                     const Value.absent(),
@@ -6676,7 +6793,7 @@ class $$QuestionsTableTableManager
                 practiceId: practiceId,
                 prompt: prompt,
                 alternativesJson: alternativesJson,
-                correctIndex: correctIndex,
+                correctIndexesJson: correctIndexesJson,
                 explanation: explanation,
                 alternativeExplanationsJson: alternativeExplanationsJson,
                 position: position,
@@ -6687,7 +6804,7 @@ class $$QuestionsTableTableManager
                 required int practiceId,
                 required String prompt,
                 required String alternativesJson,
-                required int correctIndex,
+                Value<String> correctIndexesJson = const Value.absent(),
                 required String explanation,
                 required String alternativeExplanationsJson,
                 required int position,
@@ -6696,7 +6813,7 @@ class $$QuestionsTableTableManager
                 practiceId: practiceId,
                 prompt: prompt,
                 alternativesJson: alternativesJson,
-                correctIndex: correctIndex,
+                correctIndexesJson: correctIndexesJson,
                 explanation: explanation,
                 alternativeExplanationsJson: alternativeExplanationsJson,
                 position: position,
@@ -8120,7 +8237,7 @@ typedef $$AttemptsTableCreateCompanionBuilder = AttemptsCompanion Function({
   Value<int> id,
   required int sessionId,
   required int questionId,
-  Value<int?> selectedIndex,
+  Value<String> selectedIndexesJson,
   Value<String> reasoning,
   Value<bool> distracted,
   required bool isCorrect,
@@ -8130,7 +8247,7 @@ typedef $$AttemptsTableUpdateCompanionBuilder = AttemptsCompanion Function({
   Value<int> id,
   Value<int> sessionId,
   Value<int> questionId,
-  Value<int?> selectedIndex,
+  Value<String> selectedIndexesJson,
   Value<String> reasoning,
   Value<bool> distracted,
   Value<bool> isCorrect,
@@ -8190,8 +8307,8 @@ class $$AttemptsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get selectedIndex => $composableBuilder(
-    column: $table.selectedIndex,
+  ColumnFilters<String> get selectedIndexesJson => $composableBuilder(
+    column: $table.selectedIndexesJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8276,8 +8393,8 @@ class $$AttemptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get selectedIndex => $composableBuilder(
-    column: $table.selectedIndex,
+  ColumnOrderings<String> get selectedIndexesJson => $composableBuilder(
+    column: $table.selectedIndexesJson,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -8360,8 +8477,8 @@ class $$AttemptsTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<int> get selectedIndex => $composableBuilder(
-    column: $table.selectedIndex,
+  GeneratedColumn<String> get selectedIndexesJson => $composableBuilder(
+    column: $table.selectedIndexesJson,
     builder: (column) => column,
   );
 
@@ -8459,7 +8576,7 @@ class $$AttemptsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> sessionId = const Value.absent(),
                 Value<int> questionId = const Value.absent(),
-                Value<int?> selectedIndex = const Value.absent(),
+                Value<String> selectedIndexesJson = const Value.absent(),
                 Value<String> reasoning = const Value.absent(),
                 Value<bool> distracted = const Value.absent(),
                 Value<bool> isCorrect = const Value.absent(),
@@ -8468,7 +8585,7 @@ class $$AttemptsTableTableManager
                 id: id,
                 sessionId: sessionId,
                 questionId: questionId,
-                selectedIndex: selectedIndex,
+                selectedIndexesJson: selectedIndexesJson,
                 reasoning: reasoning,
                 distracted: distracted,
                 isCorrect: isCorrect,
@@ -8479,7 +8596,7 @@ class $$AttemptsTableTableManager
                 Value<int> id = const Value.absent(),
                 required int sessionId,
                 required int questionId,
-                Value<int?> selectedIndex = const Value.absent(),
+                Value<String> selectedIndexesJson = const Value.absent(),
                 Value<String> reasoning = const Value.absent(),
                 Value<bool> distracted = const Value.absent(),
                 required bool isCorrect,
@@ -8488,7 +8605,7 @@ class $$AttemptsTableTableManager
                 id: id,
                 sessionId: sessionId,
                 questionId: questionId,
-                selectedIndex: selectedIndex,
+                selectedIndexesJson: selectedIndexesJson,
                 reasoning: reasoning,
                 distracted: distracted,
                 isCorrect: isCorrect,
@@ -9066,9 +9183,11 @@ typedef $$ErrorCardsTableCreateCompanionBuilder = ErrorCardsCompanion Function({
   Value<int?> sessionId,
   required String question,
   required String alternativesJson,
-  required int correctIndex,
-  required int wrongIndex,
+  Value<String> correctIndexesJson,
+  Value<String> wrongIndexesJson,
   Value<String> reasoning,
+  Value<String> explanation,
+  Value<String> alternativeExplanationsJson,
   Value<String> bias,
   Value<String> vaccine,
   Value<String> topicName,
@@ -9087,9 +9206,11 @@ typedef $$ErrorCardsTableUpdateCompanionBuilder = ErrorCardsCompanion Function({
   Value<int?> sessionId,
   Value<String> question,
   Value<String> alternativesJson,
-  Value<int> correctIndex,
-  Value<int> wrongIndex,
+  Value<String> correctIndexesJson,
+  Value<String> wrongIndexesJson,
   Value<String> reasoning,
+  Value<String> explanation,
+  Value<String> alternativeExplanationsJson,
   Value<String> bias,
   Value<String> vaccine,
   Value<String> topicName,
@@ -9166,18 +9287,28 @@ class $$ErrorCardsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get correctIndex => $composableBuilder(
-    column: $table.correctIndex,
+  ColumnFilters<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get wrongIndex => $composableBuilder(
-    column: $table.wrongIndex,
+  ColumnFilters<String> get wrongIndexesJson => $composableBuilder(
+    column: $table.wrongIndexesJson,
     builder: (column) => ColumnFilters(column),
   );
 
   ColumnFilters<String> get reasoning => $composableBuilder(
     column: $table.reasoning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get explanation => $composableBuilder(
+    column: $table.explanation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get alternativeExplanationsJson => $composableBuilder(
+    column: $table.alternativeExplanationsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9307,18 +9438,28 @@ class $$ErrorCardsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get correctIndex => $composableBuilder(
-    column: $table.correctIndex,
+  ColumnOrderings<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get wrongIndex => $composableBuilder(
-    column: $table.wrongIndex,
+  ColumnOrderings<String> get wrongIndexesJson => $composableBuilder(
+    column: $table.wrongIndexesJson,
     builder: (column) => ColumnOrderings(column),
   );
 
   ColumnOrderings<String> get reasoning => $composableBuilder(
     column: $table.reasoning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get explanation => $composableBuilder(
+    column: $table.explanation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get alternativeExplanationsJson => $composableBuilder(
+    column: $table.alternativeExplanationsJson,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -9444,18 +9585,28 @@ class $$ErrorCardsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get correctIndex => $composableBuilder(
-    column: $table.correctIndex,
+  GeneratedColumn<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get wrongIndex => $composableBuilder(
-    column: $table.wrongIndex,
+  GeneratedColumn<String> get wrongIndexesJson => $composableBuilder(
+    column: $table.wrongIndexesJson,
     builder: (column) => column,
   );
 
   GeneratedColumn<String> get reasoning =>
       $composableBuilder(column: $table.reasoning, builder: (column) => column);
+
+  GeneratedColumn<String> get explanation => $composableBuilder(
+    column: $table.explanation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get alternativeExplanationsJson => $composableBuilder(
+    column: $table.alternativeExplanationsJson,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get bias =>
       $composableBuilder(column: $table.bias, builder: (column) => column);
@@ -9580,9 +9731,12 @@ class $$ErrorCardsTableTableManager
                 Value<int?> sessionId = const Value.absent(),
                 Value<String> question = const Value.absent(),
                 Value<String> alternativesJson = const Value.absent(),
-                Value<int> correctIndex = const Value.absent(),
-                Value<int> wrongIndex = const Value.absent(),
+                Value<String> correctIndexesJson = const Value.absent(),
+                Value<String> wrongIndexesJson = const Value.absent(),
                 Value<String> reasoning = const Value.absent(),
+                Value<String> explanation = const Value.absent(),
+                Value<String> alternativeExplanationsJson =
+                    const Value.absent(),
                 Value<String> bias = const Value.absent(),
                 Value<String> vaccine = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
@@ -9600,9 +9754,11 @@ class $$ErrorCardsTableTableManager
                 sessionId: sessionId,
                 question: question,
                 alternativesJson: alternativesJson,
-                correctIndex: correctIndex,
-                wrongIndex: wrongIndex,
+                correctIndexesJson: correctIndexesJson,
+                wrongIndexesJson: wrongIndexesJson,
                 reasoning: reasoning,
+                explanation: explanation,
+                alternativeExplanationsJson: alternativeExplanationsJson,
                 bias: bias,
                 vaccine: vaccine,
                 topicName: topicName,
@@ -9622,9 +9778,12 @@ class $$ErrorCardsTableTableManager
                 Value<int?> sessionId = const Value.absent(),
                 required String question,
                 required String alternativesJson,
-                required int correctIndex,
-                required int wrongIndex,
+                Value<String> correctIndexesJson = const Value.absent(),
+                Value<String> wrongIndexesJson = const Value.absent(),
                 Value<String> reasoning = const Value.absent(),
+                Value<String> explanation = const Value.absent(),
+                Value<String> alternativeExplanationsJson =
+                    const Value.absent(),
                 Value<String> bias = const Value.absent(),
                 Value<String> vaccine = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
@@ -9642,9 +9801,11 @@ class $$ErrorCardsTableTableManager
                 sessionId: sessionId,
                 question: question,
                 alternativesJson: alternativesJson,
-                correctIndex: correctIndex,
-                wrongIndex: wrongIndex,
+                correctIndexesJson: correctIndexesJson,
+                wrongIndexesJson: wrongIndexesJson,
                 reasoning: reasoning,
+                explanation: explanation,
+                alternativeExplanationsJson: alternativeExplanationsJson,
                 bias: bias,
                 vaccine: vaccine,
                 topicName: topicName,

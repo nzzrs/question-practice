@@ -81,7 +81,7 @@ class ReviewService {
 
     final steps = <ReviewStep>[];
     for (final attempt in attempts) {
-      if (attempt.selectedIndex == null) {
+      if (attempt.isSkipped) {
         final question = questionsById[attempt.questionId];
         if (question == null) continue;
         final practice = practiceById[question.practiceId];

@@ -18,7 +18,7 @@ void main() {
     expect(text, 'Definition of {{c1::A: :B}}: {{c2::x} } y}}');
   });
 
-  test('error cards keep the five-field order', () {
+  test('error cards keep the six-field order', () {
     final card = _errorCard();
     final notes = builder.notes(ExportSelection(errorCards: [card]));
     expect(notes, hasLength(1));
@@ -30,6 +30,7 @@ void main() {
       'Correct answer',
       'Bias line',
       'Vaccine line',
+      'Overall explanation<br><br>Wrong &amp; explanation',
     ]);
   });
 
@@ -109,9 +110,14 @@ ErrorCard _errorCard() {
     sessionId: 1,
     question: 'Question <one>?',
     alternatives: ['Wrong & answer', 'Correct answer'],
-    correctIndex: 1,
-    wrongIndex: 0,
+    correctIndexes: const [1],
+    wrongIndexes: const [0],
     reasoning: 'Reason',
+    explanation: 'Overall explanation',
+    alternativeExplanations: const [
+      'Wrong & explanation',
+      'Correct explanation',
+    ],
     bias: 'Bias line',
     vaccine: 'Vaccine line',
     topicName: 'Networking basics',

@@ -102,6 +102,57 @@ void main() {
     );
   });
 
+  test('imports a question with several correct answers', () async {
+    final payload = jsonDecode(sample) as Map<String, dynamic>;
+    final topics = payload['topics'] as List<dynamic>;
+    final practice =
+        ((topics.first as Map<String, dynamic>)['practices'] as List<dynamic>)
+                .first
+            as Map<String, dynamic>;
+    final question =
+        (practice['questions'] as List<dynamic>).first as Map<String, dynamic>;
+    question.remove('correctIndex');
+    question['correctIndexes'] = [0, 2];
+
+    final preview = await service.previewText(
+      jsonEncode(payload),
+      fileName: 'multi.json',
+    );
+    await service.import(preview);
+
+    final importedPractice = (await harness.practices.allPractices()).first;
+    final questions = await harness.practices.questionsForPractice(
+      importedPractice.id,
+    );
+    final multi = questions.firstWhere(
+      (item) => item.prompt == (question['prompt'] as String),
+    );
+    expect(multi.correctIndexes, [0, 2]);
+    expect(multi.allowsMultiple, isTrue);
+    expect(multi.correctAnswer, 'Compute Engine; Google Kubernetes Engine');
+  });
+
+  test(
+    'rejects a question that mixes correctIndex and correctIndexes',
+    () async {
+      final payload = jsonDecode(sample) as Map<String, dynamic>;
+      final topics = payload['topics'] as List<dynamic>;
+      final practice =
+          ((topics.first as Map<String, dynamic>)['practices'] as List<dynamic>)
+                  .first
+              as Map<String, dynamic>;
+      final question =
+          (practice['questions'] as List<dynamic>).first
+              as Map<String, dynamic>;
+      question['correctIndexes'] = [0, 2];
+
+      await expectLater(
+        service.previewText(jsonEncode(payload), fileName: 'bad.json'),
+        throwsA(isA<ImportException>()),
+      );
+    },
+  );
+
   test('rejects a correctIndex outside the alternatives', () async {
     final payload = jsonDecode(sample) as Map<String, dynamic>;
     final topics = payload['topics'] as List<dynamic>;

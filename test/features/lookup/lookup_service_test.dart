@@ -181,6 +181,111 @@ void main() {
     expect(concepts.single.needsDefinition, isTrue);
   });
 
+  test('Gemini lookup uses generateContent and parses candidates', () async {
+    await harness.settings.save(
+      const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiProvider: AiProvider.gemini,
+        aiBaseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        aiModel: 'gemini-test',
+      ),
+    );
+    await harness.keyStore.writeApiKey('gemini-key');
+    final client = MockClient((request) async {
+      expect(request.url.path, '/v1beta/models/gemini-test:generateContent');
+      expect(request.url.queryParameters['key'], 'gemini-key');
+      expect(request.headers['Authorization'], isNull);
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      expect(body['generationConfig'], isA<Map<String, dynamic>>());
+      expect(body['contents'], isA<List<dynamic>>());
+      return http.Response(
+        jsonEncode({
+          'candidates': [
+            {
+              'content': {
+                'parts': [
+                  {'text': '{"definition":"Managed container platform"}'},
+                ],
+              },
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    final result = await serviceWith(client).define(
+      term: 'Cloud Run',
+      question: 'Which service?',
+      topicName: 'Cloud',
+      practiceName: 'Core',
+      sessionId: null,
+      questionId: null,
+    );
+
+    expect(result.definition, 'Managed container platform');
+    expect(result.source, ConceptSource.ai);
+  });
+
+  test('lists Gemini models that support generateContent', () async {
+    final client = MockClient((request) async {
+      expect(request.method, 'GET');
+      expect(request.url.path, '/v1beta/models');
+      expect(request.url.queryParameters['key'], 'gemini-key');
+      return http.Response(
+        jsonEncode({
+          'models': [
+            {
+              'name': 'models/gemini-z',
+              'supportedGenerationMethods': ['generateContent'],
+            },
+            {
+              'name': 'models/text-embedding',
+              'supportedGenerationMethods': ['embedContent'],
+            },
+            {
+              'name': 'models/gemini-a',
+              'supportedGenerationMethods': ['generateContent', 'countTokens'],
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    final models = await serviceWith(client).listModels(
+      provider: AiProvider.gemini,
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
+      apiKey: 'gemini-key',
+    );
+
+    expect(models, ['gemini-a', 'gemini-z']);
+  });
+
+  test('lists OpenAI-compatible models from data ids', () async {
+    final client = MockClient((request) async {
+      expect(request.url.path, '/v1/models');
+      expect(request.headers['Authorization'], 'Bearer secret-key');
+      return http.Response(
+        jsonEncode({
+          'data': [
+            {'id': 'b-model'},
+            {'id': 'a-model'},
+          ],
+        }),
+        200,
+      );
+    });
+
+    final models = await serviceWith(client).listModels(
+      provider: AiProvider.openai,
+      baseUrl: 'https://example.test/v1',
+      apiKey: 'secret-key',
+    );
+
+    expect(models, ['a-model', 'b-model']);
+  });
+
   test('missing AI model is reported clearly', () async {
     await harness.settings.save(
       const AppSettings(lookupMode: LookupMode.ai, aiModel: ''),

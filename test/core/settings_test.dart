@@ -14,12 +14,12 @@ void main() {
     await harness.close();
   });
 
-  test('defaults prefer web lookup and no dynamic color', () async {
+  test('defaults prefer web lookup and wallpaper colors', () async {
     final settings = await harness.settings.load();
     expect(settings.lookupMode, LookupMode.web);
     expect(settings.webEngine, WebEngine.duckDuckGo);
     expect(settings.shuffleTopics, isFalse);
-    expect(settings.dynamicColor, isFalse);
+    expect(settings.dynamicColor, isTrue);
     expect(settings.ankiDeck, 'Question Practice');
   });
 

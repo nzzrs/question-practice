@@ -28,7 +28,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -43,6 +43,32 @@ class AppDatabase extends _$AppDatabase {
       if (from < 2) {
         await migrator.addColumn(topics, topics.ankiDeck);
         await migrator.addColumn(manualCards, manualCards.topicName);
+      }
+      if (from < 3) {
+        await migrator.addColumn(questions, questions.correctIndexesJson);
+        await migrator.addColumn(attempts, attempts.selectedIndexesJson);
+        await migrator.addColumn(errorCards, errorCards.correctIndexesJson);
+        await migrator.addColumn(errorCards, errorCards.wrongIndexesJson);
+        await customStatement(
+          "UPDATE questions SET correct_indexes_json = '[' || correct_index || ']'",
+        );
+        await customStatement(
+          "UPDATE attempts SET selected_indexes_json = "
+          "CASE WHEN selected_index IS NULL THEN '[]' "
+          "ELSE '[' || selected_index || ']' END",
+        );
+        await customStatement(
+          "UPDATE error_cards SET "
+          "correct_indexes_json = '[' || correct_index || ']', "
+          "wrong_indexes_json = '[' || wrong_index || ']'",
+        );
+      }
+      if (from < 4) {
+        await migrator.addColumn(errorCards, errorCards.explanation);
+        await migrator.addColumn(
+          errorCards,
+          errorCards.alternativeExplanationsJson,
+        );
       }
     },
     beforeOpen: (details) async {

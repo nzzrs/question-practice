@@ -86,7 +86,7 @@ class TestHarness {
         QuestionDraft(
           prompt: 'Question ${index + 1}?',
           alternatives: ['Correct ${index + 1}', 'Wrong ${index + 1}'],
-          correctIndex: 0,
+          correctIndexes: const [0],
           explanation: 'Because ${index + 1} is correct.',
           alternativeExplanations: [
             'Correct: ${index + 1} is the right answer.',

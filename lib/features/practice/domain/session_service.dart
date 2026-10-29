@@ -231,7 +231,7 @@ class SessionService {
   Future<AnswerOutcome> submitAnswer({
     required SessionStart start,
     required SessionQuestionItem item,
-    required int? selectedIndex,
+    required List<int> selectedIndexes,
     required String reasoning,
     required bool distracted,
   }) async {
@@ -239,19 +239,20 @@ class SessionService {
     if (start.attempts.containsKey(item.question.id)) {
       throw const SessionException('This question was already answered.');
     }
-    if (selectedIndex != null &&
-        (selectedIndex < 0 ||
-            selectedIndex >= item.question.alternatives.length)) {
-      throw const SessionException('That alternative does not exist.');
+    final selected = selectedIndexes.toSet().toList()..sort();
+    for (final index in selected) {
+      if (index < 0 || index >= item.question.alternatives.length) {
+        throw const SessionException('That alternative does not exist.');
+      }
     }
     final now = _clock.now().toUtc();
-    final isCorrect = selectedIndex == item.question.correctIndex;
-    final wasDistracted = distracted && !isCorrect;
+    final isCorrect = item.question.isCorrectSelection(selected);
+    final wasDistracted = distracted && !isCorrect && selected.isNotEmpty;
 
     final attempt = await _sessions.recordAttempt(
       sessionId: session.id,
       questionId: item.question.id,
-      selectedIndex: selectedIndex,
+      selectedIndexes: selected,
       reasoning: reasoning.trim(),
       distracted: wasDistracted,
       isCorrect: isCorrect,
@@ -265,17 +266,17 @@ class SessionService {
       if (card != null) {
         if (isCorrect) {
           await _cards.resolveError(card.id, now);
-        } else if (!wasDistracted && selectedIndex != null) {
+        } else if (!wasDistracted && selected.isNotEmpty) {
           await _cards.touchWrongError(
             id: card.id,
-            wrongIndex: selectedIndex,
+            wrongIndexes: selected,
             reasoning: reasoning.trim(),
             wrongAt: now,
             dueAfter: errorReviewDelay,
           );
         }
       }
-    } else if (!isCorrect && !wasDistracted && selectedIndex != null) {
+    } else if (!isCorrect && !wasDistracted && selected.isNotEmpty) {
       final active = await _cards.activeErrorForQuestion(item.question.id);
       if (active == null) {
         await _cards.createErrorCard(
@@ -283,9 +284,11 @@ class SessionService {
           sessionId: session.id,
           question: item.question.prompt,
           alternatives: item.question.alternatives,
-          correctIndex: item.question.correctIndex,
-          wrongIndex: selectedIndex,
+          correctIndexes: item.question.correctIndexes,
+          wrongIndexes: selected,
           reasoning: reasoning.trim(),
+          explanation: item.question.explanation,
+          alternativeExplanations: item.question.alternativeExplanations,
           topicName: item.topicName,
           practiceName: item.practiceName,
           lastWrongAt: now,
@@ -294,7 +297,7 @@ class SessionService {
       } else {
         await _cards.touchWrongError(
           id: active.id,
-          wrongIndex: selectedIndex,
+          wrongIndexes: selected,
           reasoning: reasoning.trim(),
           wrongAt: now,
           dueAfter: errorReviewDelay,
@@ -307,6 +310,77 @@ class SessionService {
     return AnswerOutcome(attempt: attempt, summary: summary);
   }
 
+  Future<Attempt> setDistracted({
+    required SessionStart start,
+    required SessionQuestionItem item,
+    required bool distracted,
+  }) async {
+    final session = start.session;
+    final attempt = await _sessions.attemptForQuestion(
+      session.id,
+      item.question.id,
+    );
+    if (attempt == null) {
+      throw const SessionException('This question has no answer to update.');
+    }
+    final effective = distracted && !attempt.isCorrect && !attempt.isSkipped;
+    if (effective == attempt.distracted) return attempt;
+
+    await _sessions.updateAttemptDistracted(attempt.id, effective);
+    final card = await _cards.activeErrorForQuestion(item.question.id);
+    if (effective) {
+      if (card != null && card.sessionId == session.id) {
+        await _cards.deleteErrorCard(card.id);
+      }
+    } else if (!attempt.isCorrect && !attempt.isSkipped) {
+      final now = _clock.now().toUtc();
+      if (card == null) {
+        await _cards.createErrorCard(
+          questionId: item.question.id,
+          sessionId: session.id,
+          question: item.question.prompt,
+          alternatives: item.question.alternatives,
+          correctIndexes: item.question.correctIndexes,
+          wrongIndexes: attempt.selectedIndexes,
+          reasoning: attempt.reasoning,
+          explanation: item.question.explanation,
+          alternativeExplanations: item.question.alternativeExplanations,
+          topicName: item.topicName,
+          practiceName: item.practiceName,
+          lastWrongAt: now,
+          dueAfter: errorReviewDelay,
+        );
+      } else {
+        await _cards.touchWrongError(
+          id: card.id,
+          wrongIndexes: attempt.selectedIndexes,
+          reasoning: attempt.reasoning,
+          wrongAt: now,
+          dueAfter: errorReviewDelay,
+        );
+      }
+    }
+    await _refreshCompletedCounts(session.id);
+    final updated = await _sessions.attemptForQuestion(
+      session.id,
+      item.question.id,
+    );
+    return updated ?? attempt;
+  }
+
+  Future<void> _refreshCompletedCounts(int sessionId) async {
+    final session = await _sessions.sessionById(sessionId);
+    if (session == null || session.status != SessionStatus.completed) return;
+    final attempts = await _sessions.attemptsForSession(sessionId);
+    await _sessions.completeSession(
+      id: sessionId,
+      correct: attempts.where((attempt) => attempt.isCorrect).length,
+      skipped: attempts.where((attempt) => attempt.isSkipped).length,
+      distracted: attempts.where((attempt) => attempt.distracted).length,
+      finishedAt: session.finishedAt ?? _clock.now().toUtc(),
+    );
+  }
+
   Future<SessionSummary?> completeIfReady(int sessionId) async {
     final session = await _sessions.sessionById(sessionId);
     if (session == null || session.status != SessionStatus.inProgress) {
@@ -317,9 +391,7 @@ class SessionService {
 
     final now = _clock.now().toUtc();
     final correct = attempts.where((attempt) => attempt.isCorrect).length;
-    final skipped = attempts
-        .where((attempt) => attempt.selectedIndex == null)
-        .length;
+    final skipped = attempts.where((attempt) => attempt.isSkipped).length;
     final distracted = attempts.where((attempt) => attempt.distracted).length;
     await _sessions.completeSession(
       id: sessionId,

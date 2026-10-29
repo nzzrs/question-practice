@@ -8,6 +8,7 @@ import '../../core/platform/anki_gateway.dart';
 import '../../core/ui/widgets.dart';
 import '../help/help_page.dart';
 import '../lookup/domain/lookup_service.dart';
+import '../topics/anki_deck_picker.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -22,6 +23,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _deck = TextEditingController();
   final _apiKey = TextEditingController();
   AiProvider _provider = AiProvider.openai;
+  List<String> _models = const [];
+  bool _loadingModels = false;
   bool _loaded = false;
   bool _busy = false;
 
@@ -117,22 +120,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ] else ...[
             Text('Provider', style: theme.typography.baseline.labelMedium),
             const SizedBox(height: 8),
-            M3ESegmentedButton<AiProvider>(
-              segments: const [
-                M3ESegment(value: AiProvider.openai, label: 'OpenAI'),
-                M3ESegment(value: AiProvider.groq, label: 'Groq'),
-                M3ESegment(value: AiProvider.openRouter, label: 'OpenRouter'),
-                M3ESegment(value: AiProvider.custom, label: 'Custom'),
-              ],
-              selected: {_provider},
-              onSelectionChanged: (values) {
-                if (values.isEmpty) return;
-                final provider = values.first;
-                setState(() {
-                  _provider = provider;
-                  _baseUrl.text = _baseUrlFor(provider, _baseUrl.text);
-                });
-              },
+            M3EChipGroup(
+              groupLabel: 'AI provider',
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final provider in AiProvider.values)
+                    M3EChip(
+                      type: M3EChipType.filter,
+                      label: _providerLabel(provider),
+                      selected: _provider == provider,
+                      onPressed: () {
+                        setState(() {
+                          _provider = provider;
+                          _models = const [];
+                          _baseUrl.text = _baseUrlFor(provider, _baseUrl.text);
+                        });
+                      },
+                    ),
+                ],
+              ),
             ),
             const SizedBox(height: 12),
             M3ETextField(
@@ -142,10 +150,54 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               keyboardType: TextInputType.url,
             ),
             const SizedBox(height: 12),
-            M3ETextField(
-              controller: _model,
-              label: 'Model',
-              placeholder: 'Model name from your provider',
+            Text('Model', style: theme.typography.baseline.labelMedium),
+            const SizedBox(height: 8),
+            M3EDropdownMenu<String>(
+              items: [
+                for (final model in _modelOptions)
+                  M3EDropdownItem(
+                    label: model,
+                    value: model,
+                    selected: model == _model.text.trim(),
+                  ),
+              ],
+              singleSelect: true,
+              searchEnabled: true,
+              fieldStyle: const M3EDropdownFieldStyle(
+                hintText: 'Load available models',
+              ),
+              emptyBuilder: (context) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'No models loaded. Tap Load models.',
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              onSelectionChanged: (selection) {
+                if (selection.isEmpty) return;
+                setState(() => _model.text = selection.first.value);
+              },
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                M3EButton.tonal(
+                  onPressed: _loadingModels ? null : _loadModels,
+                  icon: const Icon(Icons.refresh),
+                  label: Text(_loadingModels ? 'Loading…' : 'Load models'),
+                ),
+                if (_model.text.trim().isNotEmpty)
+                  Text(
+                    _model.text.trim(),
+                    style: theme.typography.baseline.labelSmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             M3ETextField(
@@ -183,7 +235,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'The app sends the selected term, question and topic to the endpoint you choose. It never logs the key. Use an OpenAI-compatible chat-completions endpoint; OpenRouter covers Claude and Gemini models.',
+              'The app sends the selected term, question and topic to the endpoint you choose. It never logs the key. '
+              'OpenAI, Groq and OpenRouter use their chat-completions endpoint; Gemini uses its native generateContent API. '
+              'Load models to pick from the provider list, or type the base URL and load again if the list is unavailable.',
               style: theme.typography.baseline.bodySmall.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -210,18 +264,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             supportingText: 'Default for topics without their own deck. Created if missing.',
           ),
           const SizedBox(height: 8),
-          M3EButton.tonal(
-            onPressed: () async {
-              final name = _deck.text.trim();
-              if (name.isEmpty) {
-                await showSnack(context, 'Deck name cannot be empty.');
-                return;
-              }
-              await _save(settings.copyWith(ankiDeck: name));
-              if (!context.mounted) return;
-              await showSnack(context, 'Deck name saved.');
-            },
-            child: const Text('Save deck name'),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              M3EButton.tonal(
+                onPressed: () async {
+                  final name = _deck.text.trim();
+                  if (name.isEmpty) {
+                    await showSnack(context, 'Deck name cannot be empty.');
+                    return;
+                  }
+                  await _save(settings.copyWith(ankiDeck: name));
+                  if (!context.mounted) return;
+                  await showSnack(context, 'Deck name saved.');
+                },
+                child: const Text('Save deck name'),
+              ),
+              M3EButton.text(
+                onPressed: _busy ? null : _browseDecks,
+                child: const Text('Browse decks'),
+              ),
+            ],
           ),
           const SizedBox(height: 32),
           const SectionTitle('Data'),
@@ -252,6 +316,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _save(AppSettings settings) async {
     await ref.read(settingsRepositoryProvider).save(settings);
+  }
+
+  List<String> get _modelOptions {
+    final current = _model.text.trim();
+    return <String>{if (current.isNotEmpty) current, ..._models}.toList()
+      ..sort();
+  }
+
+  Future<void> _loadModels() async {
+    final rawBaseUrl = _baseUrl.text.trim();
+    final baseUrl = rawBaseUrl.isEmpty
+        ? _baseUrlFor(_provider, rawBaseUrl)
+        : rawBaseUrl;
+    final uri = Uri.tryParse(baseUrl);
+    if (uri == null ||
+        !(uri.isScheme('http') || uri.isScheme('https')) ||
+        uri.host.isEmpty) {
+      await showSnack(context, 'Enter a valid http(s) base URL first.');
+      return;
+    }
+    final key = _apiKey.text.trim().isNotEmpty
+        ? _apiKey.text.trim()
+        : await ref.read(settingsRepositoryProvider).readApiKey();
+    if (!mounted) return;
+    if (key == null || key.trim().isEmpty) {
+      await showSnack(context, 'Save an API key or paste one first.');
+      return;
+    }
+    setState(() => _loadingModels = true);
+    try {
+      final models = await ref
+          .read(lookupServiceProvider)
+          .listModels(provider: _provider, baseUrl: baseUrl, apiKey: key);
+      if (!mounted) return;
+      setState(() {
+        _models = models;
+        if (_model.text.trim().isEmpty && models.isNotEmpty) {
+          _model.text = models.first;
+        }
+      });
+      if (models.isEmpty) {
+        await showSnack(context, 'The provider returned no models.');
+      }
+    } on LookupException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+    } finally {
+      if (mounted) setState(() => _loadingModels = false);
+    }
+  }
+
+  String _providerLabel(AiProvider provider) {
+    return switch (provider) {
+      AiProvider.openai => 'OpenAI',
+      AiProvider.groq => 'Groq',
+      AiProvider.openRouter => 'OpenRouter',
+      AiProvider.gemini => 'Gemini',
+      AiProvider.custom => 'Custom',
+    };
   }
 
   Future<void> _saveAi(AppSettings settings) async {
@@ -355,6 +477,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ref.invalidate(ankiStatusProvider);
   }
 
+  Future<void> _browseDecks() async {
+    final selected = await showAnkiDeckPicker(
+      context,
+      ref,
+      current: _deck.text.trim(),
+      allowDefault: false,
+    );
+    if (selected == null || selected.trim().isEmpty || !mounted) return;
+    setState(() => _deck.text = selected.trim());
+  }
+
   Future<void> _eraseAll() async {
     final confirmed = await confirmDialog(
       context,
@@ -384,6 +517,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       AiProvider.openai => 'https://api.openai.com/v1',
       AiProvider.groq => 'https://api.groq.com/openai/v1',
       AiProvider.openRouter => 'https://openrouter.ai/api/v1',
+      AiProvider.gemini => 'https://generativelanguage.googleapis.com/v1beta',
       AiProvider.custom => current,
     };
   }

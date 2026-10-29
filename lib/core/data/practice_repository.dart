@@ -1,5 +1,6 @@
 import 'package:clock/clock.dart';
 import 'package:collection/collection.dart';
+import 'package:drift/drift.dart' show Value;
 
 import '../database/app_database.dart';
 import '../domain/models.dart';
@@ -124,7 +125,7 @@ class PracticeRepository {
           practiceId: practiceId,
           prompt: questions[i].prompt,
           alternativesJson: encodeStringList(questions[i].alternatives),
-          correctIndex: questions[i].correctIndex,
+          correctIndexesJson: Value(encodeIntList(questions[i].correctIndexes)),
           explanation: questions[i].explanation,
           alternativeExplanationsJson: encodeStringList(
             questions[i].alternativeExplanations,

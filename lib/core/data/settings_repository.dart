@@ -15,6 +15,7 @@ class SettingsRepository {
   static const _aiModelKey = 'ai_model';
   static const _shuffleTopicsKey = 'shuffle_topics';
   static const _dynamicColorKey = 'dynamic_color';
+  static const _soundsEnabledKey = 'sounds_enabled';
   static const _ankiDeckKey = 'anki_deck';
 
   Stream<AppSettings> watch() {
@@ -31,6 +32,7 @@ class SettingsRepository {
     await _dao.setValue(_aiModelKey, settings.aiModel.trim());
     await _dao.setValue(_shuffleTopicsKey, settings.shuffleTopics.toString());
     await _dao.setValue(_dynamicColorKey, settings.dynamicColor.toString());
+    await _dao.setValue(_soundsEnabledKey, settings.soundsEnabled.toString());
     await _dao.setValue(_ankiDeckKey, settings.ankiDeck.trim());
   }
 
@@ -74,6 +76,7 @@ class SettingsRepository {
       aiModel: map[_aiModelKey] ?? defaults.aiModel,
       shuffleTopics: _bool(map[_shuffleTopicsKey], defaults.shuffleTopics),
       dynamicColor: _bool(map[_dynamicColorKey], defaults.dynamicColor),
+      soundsEnabled: _bool(map[_soundsEnabledKey], defaults.soundsEnabled),
       ankiDeck: _nonEmpty(map[_ankiDeckKey], defaults.ankiDeck),
     );
   }

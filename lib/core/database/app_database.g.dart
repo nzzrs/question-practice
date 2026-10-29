@@ -489,6 +489,19 @@ class $PracticesTable extends Practices
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isDoneMeta = const VerificationMeta('isDone');
+  @override
+  late final GeneratedColumn<bool> isDone = GeneratedColumn<bool>(
+    'is_done',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_done" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -497,6 +510,7 @@ class $PracticesTable extends Practices
     description,
     contentHash,
     importedAt,
+    isDone,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -557,6 +571,12 @@ class $PracticesTable extends Practices
     } else if (isInserting) {
       context.missing(_importedAtMeta);
     }
+    if (data.containsKey('is_done')) {
+      context.handle(
+        _isDoneMeta,
+        isDone.isAcceptableOrUnknown(data['is_done']!, _isDoneMeta),
+      );
+    }
     return context;
   }
 
@@ -590,6 +610,10 @@ class $PracticesTable extends Practices
         DriftSqlType.dateTime,
         data['${effectivePrefix}imported_at'],
       )!,
+      isDone: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_done'],
+      )!,
     );
   }
 
@@ -606,6 +630,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
   final String description;
   final String contentHash;
   final DateTime importedAt;
+  final bool isDone;
   const PracticeRow({
     required this.id,
     required this.topicId,
@@ -613,6 +638,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
     required this.description,
     required this.contentHash,
     required this.importedAt,
+    required this.isDone,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -623,6 +649,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
     map['description'] = Variable<String>(description);
     map['content_hash'] = Variable<String>(contentHash);
     map['imported_at'] = Variable<DateTime>(importedAt);
+    map['is_done'] = Variable<bool>(isDone);
     return map;
   }
 
@@ -634,6 +661,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
       description: Value(description),
       contentHash: Value(contentHash),
       importedAt: Value(importedAt),
+      isDone: Value(isDone),
     );
   }
 
@@ -649,6 +677,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
       description: serializer.fromJson<String>(json['description']),
       contentHash: serializer.fromJson<String>(json['contentHash']),
       importedAt: serializer.fromJson<DateTime>(json['importedAt']),
+      isDone: serializer.fromJson<bool>(json['isDone']),
     );
   }
   @override
@@ -661,6 +690,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
       'description': serializer.toJson<String>(description),
       'contentHash': serializer.toJson<String>(contentHash),
       'importedAt': serializer.toJson<DateTime>(importedAt),
+      'isDone': serializer.toJson<bool>(isDone),
     };
   }
 
@@ -671,6 +701,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
     String? description,
     String? contentHash,
     DateTime? importedAt,
+    bool? isDone,
   }) => PracticeRow(
     id: id ?? this.id,
     topicId: topicId ?? this.topicId,
@@ -678,6 +709,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
     description: description ?? this.description,
     contentHash: contentHash ?? this.contentHash,
     importedAt: importedAt ?? this.importedAt,
+    isDone: isDone ?? this.isDone,
   );
   PracticeRow copyWithCompanion(PracticesCompanion data) {
     return PracticeRow(
@@ -693,6 +725,7 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
       importedAt: data.importedAt.present
           ? data.importedAt.value
           : this.importedAt,
+      isDone: data.isDone.present ? data.isDone.value : this.isDone,
     );
   }
 
@@ -704,14 +737,22 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('contentHash: $contentHash, ')
-          ..write('importedAt: $importedAt')
+          ..write('importedAt: $importedAt, ')
+          ..write('isDone: $isDone')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, topicId, name, description, contentHash, importedAt);
+  int get hashCode => Object.hash(
+    id,
+    topicId,
+    name,
+    description,
+    contentHash,
+    importedAt,
+    isDone,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -721,7 +762,8 @@ class PracticeRow extends DataClass implements Insertable<PracticeRow> {
           other.name == this.name &&
           other.description == this.description &&
           other.contentHash == this.contentHash &&
-          other.importedAt == this.importedAt);
+          other.importedAt == this.importedAt &&
+          other.isDone == this.isDone);
 }
 
 class PracticesCompanion extends UpdateCompanion<PracticeRow> {
@@ -731,6 +773,7 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
   final Value<String> description;
   final Value<String> contentHash;
   final Value<DateTime> importedAt;
+  final Value<bool> isDone;
   const PracticesCompanion({
     this.id = const Value.absent(),
     this.topicId = const Value.absent(),
@@ -738,6 +781,7 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
     this.description = const Value.absent(),
     this.contentHash = const Value.absent(),
     this.importedAt = const Value.absent(),
+    this.isDone = const Value.absent(),
   });
   PracticesCompanion.insert({
     this.id = const Value.absent(),
@@ -746,6 +790,7 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
     this.description = const Value.absent(),
     required String contentHash,
     required DateTime importedAt,
+    this.isDone = const Value.absent(),
   }) : topicId = Value(topicId),
        name = Value(name),
        contentHash = Value(contentHash),
@@ -757,6 +802,7 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
     Expression<String>? description,
     Expression<String>? contentHash,
     Expression<DateTime>? importedAt,
+    Expression<bool>? isDone,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -765,6 +811,7 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
       if (description != null) 'description': description,
       if (contentHash != null) 'content_hash': contentHash,
       if (importedAt != null) 'imported_at': importedAt,
+      if (isDone != null) 'is_done': isDone,
     });
   }
 
@@ -775,6 +822,7 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
     Value<String>? description,
     Value<String>? contentHash,
     Value<DateTime>? importedAt,
+    Value<bool>? isDone,
   }) {
     return PracticesCompanion(
       id: id ?? this.id,
@@ -783,6 +831,7 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
       description: description ?? this.description,
       contentHash: contentHash ?? this.contentHash,
       importedAt: importedAt ?? this.importedAt,
+      isDone: isDone ?? this.isDone,
     );
   }
 
@@ -807,6 +856,9 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
     if (importedAt.present) {
       map['imported_at'] = Variable<DateTime>(importedAt.value);
     }
+    if (isDone.present) {
+      map['is_done'] = Variable<bool>(isDone.value);
+    }
     return map;
   }
 
@@ -818,7 +870,8 @@ class PracticesCompanion extends UpdateCompanion<PracticeRow> {
           ..write('name: $name, ')
           ..write('description: $description, ')
           ..write('contentHash: $contentHash, ')
-          ..write('importedAt: $importedAt')
+          ..write('importedAt: $importedAt, ')
+          ..write('isDone: $isDone')
           ..write(')'))
         .toString();
   }
@@ -5716,6 +5769,7 @@ typedef $$PracticesTableCreateCompanionBuilder = PracticesCompanion Function({
   Value<String> description,
   required String contentHash,
   required DateTime importedAt,
+  Value<bool> isDone,
 });
 typedef $$PracticesTableUpdateCompanionBuilder = PracticesCompanion Function({
   Value<int> id,
@@ -5724,6 +5778,7 @@ typedef $$PracticesTableUpdateCompanionBuilder = PracticesCompanion Function({
   Value<String> description,
   Value<String> contentHash,
   Value<DateTime> importedAt,
+  Value<bool> isDone,
 });
 
 final class $$PracticesTableReferences
@@ -5815,6 +5870,11 @@ class $$PracticesTableFilterComposer
 
   ColumnFilters<DateTime> get importedAt => $composableBuilder(
     column: $table.importedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isDone => $composableBuilder(
+    column: $table.isDone,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -5926,6 +5986,11 @@ class $$PracticesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isDone => $composableBuilder(
+    column: $table.isDone,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$TopicsTableOrderingComposer get topicId {
     final $$TopicsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -5979,6 +6044,9 @@ class $$PracticesTableAnnotationComposer
     column: $table.importedAt,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get isDone =>
+      $composableBuilder(column: $table.isDone, builder: (column) => column);
 
   $$TopicsTableAnnotationComposer get topicId {
     final $$TopicsTableAnnotationComposer composer = $composerBuilder(
@@ -6092,6 +6160,7 @@ class $$PracticesTableTableManager
                 Value<String> description = const Value.absent(),
                 Value<String> contentHash = const Value.absent(),
                 Value<DateTime> importedAt = const Value.absent(),
+                Value<bool> isDone = const Value.absent(),
               }) => PracticesCompanion(
                 id: id,
                 topicId: topicId,
@@ -6099,6 +6168,7 @@ class $$PracticesTableTableManager
                 description: description,
                 contentHash: contentHash,
                 importedAt: importedAt,
+                isDone: isDone,
               ),
           createCompanionCallback:
               ({
@@ -6108,6 +6178,7 @@ class $$PracticesTableTableManager
                 Value<String> description = const Value.absent(),
                 required String contentHash,
                 required DateTime importedAt,
+                Value<bool> isDone = const Value.absent(),
               }) => PracticesCompanion.insert(
                 id: id,
                 topicId: topicId,
@@ -6115,6 +6186,7 @@ class $$PracticesTableTableManager
                 description: description,
                 contentHash: contentHash,
                 importedAt: importedAt,
+                isDone: isDone,
               ),
           withReferenceMapper: (p0) => p0
               .map(

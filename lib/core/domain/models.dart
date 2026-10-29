@@ -60,6 +60,7 @@ class Practice {
     required this.description,
     required this.contentHash,
     required this.importedAt,
+    this.isDone = false,
   });
 
   final int id;
@@ -68,6 +69,7 @@ class Practice {
   final String description;
   final String contentHash;
   final DateTime importedAt;
+  final bool isDone;
 }
 
 @immutable
@@ -221,6 +223,25 @@ class PracticeSummary {
   final Practice practice;
   final int questionCount;
   final double? lastScore;
+}
+
+@immutable
+class TopicProgressPoint {
+  const TopicProgressPoint({
+    required this.sessionId,
+    required this.finishedAt,
+    required this.practiceName,
+    required this.correct,
+    required this.total,
+  });
+
+  final int sessionId;
+  final DateTime finishedAt;
+  final String practiceName;
+  final int correct;
+  final int total;
+
+  double get score => total == 0 ? 0 : correct / total;
 }
 
 @immutable
@@ -407,6 +428,7 @@ class AppSettings {
     this.aiModel = '',
     this.shuffleTopics = false,
     this.dynamicColor = true,
+    this.soundsEnabled = true,
     this.ankiDeck = 'Question Practice',
   });
 
@@ -417,6 +439,7 @@ class AppSettings {
   final String aiModel;
   final bool shuffleTopics;
   final bool dynamicColor;
+  final bool soundsEnabled;
   final String ankiDeck;
 
   AppSettings copyWith({
@@ -427,6 +450,7 @@ class AppSettings {
     String? aiModel,
     bool? shuffleTopics,
     bool? dynamicColor,
+    bool? soundsEnabled,
     String? ankiDeck,
   }) {
     return AppSettings(
@@ -437,6 +461,7 @@ class AppSettings {
       aiModel: aiModel ?? this.aiModel,
       shuffleTopics: shuffleTopics ?? this.shuffleTopics,
       dynamicColor: dynamicColor ?? this.dynamicColor,
+      soundsEnabled: soundsEnabled ?? this.soundsEnabled,
       ankiDeck: ankiDeck ?? this.ankiDeck,
     );
   }

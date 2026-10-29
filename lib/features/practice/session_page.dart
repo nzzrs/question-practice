@@ -6,14 +6,16 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
-import '../../core/platform/web_launcher.dart';
+import '../../core/platform/practice_sound_player.dart';
 import '../../core/ui/widgets.dart';
-import '../lookup/lookup_sheet.dart';
+import '../lookup/lookup_actions.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/selectable_linkified_text.dart';
 import '../practice/summary_page.dart';
 
 enum _ExitChoice { save, discard }
+
+enum _FinishChoice { leaveUnanswered, markSkipped }
 
 class SessionPage extends ConsumerStatefulWidget {
   const SessionPage({required this.start, super.key});
@@ -34,6 +36,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   bool _submitted = false;
   bool _submitting = false;
   bool _distracted = false;
+  bool _reasoningOpen = false;
   AnswerOutcome? _outcome;
   SessionSummary? _summary;
   int _reminderMinutes = 0;
@@ -110,6 +113,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _outcome = null;
     _submitted = false;
     _distracted = false;
+    _reasoningOpen = false;
     if (item == null) return;
     final attempt = _start.attempts[item.question.id];
     if (attempt == null) return;
@@ -117,6 +121,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _reasoning.text = attempt.reasoning;
     _submitted = true;
     _distracted = attempt.distracted;
+    _reasoningOpen = attempt.reasoning.trim().isNotEmpty;
     _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
   }
 
@@ -150,13 +155,27 @@ class _SessionPageState extends ConsumerState<SessionPage>
       setState(() {
         _submitted = true;
         _outcome = outcome;
+        _reasoningOpen = _reasoning.text.trim().isNotEmpty;
         if (outcome.summary != null) _summary = outcome.summary;
       });
+      unawaited(_playAnswerSound(outcome.attempt));
     } on SessionException catch (error) {
       if (mounted) await showSnack(context, error.message);
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<void> _playAnswerSound(Attempt attempt) async {
+    if (attempt.isSkipped) return;
+    final current = ref.read(settingsProvider).value;
+    final enabled =
+        current?.soundsEnabled ??
+        (await ref.read(settingsRepositoryProvider).load()).soundsEnabled;
+    if (!enabled) return;
+    await ref
+        .read(practiceSoundPlayerProvider)
+        .play(attempt.isCorrect ? PracticeSound.correct : PracticeSound.wrong);
   }
 
   Future<void> _setDistracted(bool value) async {
@@ -202,6 +221,62 @@ class _SessionPageState extends ConsumerState<SessionPage>
       return;
     }
     _finishExisting();
+  }
+
+  Future<void> _finishEarly() async {
+    if (_submitting) return;
+    final unanswered = _start.items.length - _start.attempts.length;
+    if (unanswered <= 0) {
+      final summary =
+          _summary ??
+          await ref
+              .read(sessionServiceProvider)
+              .completeIfReady(_start.session.id);
+      if (summary != null && mounted) await _openSummary(summary);
+      return;
+    }
+    final choice = await M3EDialog.show<_FinishChoice>(
+      context,
+      dialog: M3EDialog(
+        title: 'Finish practice?',
+        content: Text(
+          '$unanswered question${unanswered == 1 ? '' : 's'} are unanswered. '
+          'Leave them out of the score, or mark them skipped?',
+        ),
+        actions: [
+          M3EButton.text(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          M3EButton.text(
+            onPressed: () =>
+                Navigator.of(context).pop(_FinishChoice.leaveUnanswered),
+            child: const Text('Leave unanswered'),
+          ),
+          M3EButton.filled(
+            onPressed: () =>
+                Navigator.of(context).pop(_FinishChoice.markSkipped),
+            child: const Text('Mark skipped'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    setState(() => _submitting = true);
+    try {
+      final summary = await ref
+          .read(sessionServiceProvider)
+          .finishEarly(
+            start: _start,
+            markSkipped: choice == _FinishChoice.markSkipped,
+          );
+      if (!mounted) return;
+      await _openSummary(summary);
+    } on SessionException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   Future<void> _openSummary(SessionSummary summary) async {
@@ -259,68 +334,49 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _openLookup(String term, Rect? anchor) async {
-    final settings = ref.read(settingsProvider).value ?? const AppSettings();
-    if (settings.lookupMode == LookupMode.ai) {
-      await showAiDefinitionBubble(
-        context,
-        term: term,
-        question: _item?.question.prompt ?? '',
-        topicName: _item?.topicName ?? '',
-        practiceName: _item?.practiceName ?? '',
-        sessionId: _start.session.id,
-        questionId: _item?.question.id,
-        anchor: anchor,
-        onSearchWeb: () => _openWebLookup(term),
-      );
-      return;
-    }
-    await _openWebLookup(term);
-  }
-
-  Future<void> _openWebLookup(String term) async {
     final item = _item;
     if (item == null) return;
-    await M3EBottomSheet.show<void>(
+    await openTermLookup(
       context,
-      initialValue: M3EBottomSheetValue.expanded,
-      builder: (context) => LookupSheet(
-        term: term,
-        question: item.question.prompt,
-        topicName: item.topicName,
-        practiceName: item.practiceName,
-        sessionId: _start.session.id,
-        questionId: item.question.id,
-      ),
+      ref,
+      term: term,
+      question: item.question.prompt,
+      topicName: item.topicName,
+      practiceName: item.practiceName,
+      sessionId: _start.session.id,
+      questionId: item.question.id,
+      anchor: anchor,
     );
   }
 
-  Future<void> _openUrl(String value) async {
-    final uri = Uri.tryParse(value);
-    if (uri == null) return;
-    try {
-      await ref.read(webLauncherProvider).open(uri);
-    } on WebLaunchException {
-      if (mounted) await showSnack(context, 'Could not open that link.');
-    }
+  Future<void> _openUrl(String value) {
+    return openStudyUrl(context, ref, value);
   }
 
   @override
   Widget build(BuildContext context) {
     final item = _item;
     if (item == null) {
-      return const AppScaffold(
+      return AppPage(
         title: 'Practice',
         showBack: true,
-        body: Center(child: M3ELoadingIndicator()),
+        variant: M3EAppBarVariant.small,
+        children: const [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 64),
+            child: Center(child: M3ELoadingIndicator()),
+          ),
+        ],
       );
     }
     final theme = M3ETheme.of(context);
     final total = _start.items.length;
     final position = _index + 1;
     final answered = _start.attempts.length;
+    final unanswered = total - answered;
     final progress = answered.clamp(0, total) / total;
     final atLast = _index >= total - 1;
-    final seesResults = _summary != null && atLast;
+    final seesResults = unanswered == 0 && _summary != null && atLast;
     final modeTitle = switch (_start.session.mode) {
       SessionMode.practice => item.practiceName,
       SessionMode.mixed => 'Shuffled practice',
@@ -332,200 +388,290 @@ class _SessionPageState extends ConsumerState<SessionPage>
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) _requestExit();
       },
-      child: AppScaffold(
-        title: modeTitle.isEmpty ? 'Practice' : modeTitle,
-        showBack: false,
-        actions: [
-          M3EIconButton(
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.close),
-            tooltip: 'Leave practice',
-            onPressed: _requestExit,
-          ),
-        ],
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-          children: [
-            Row(
+      child: Scaffold(
+        backgroundColor: theme.colorScheme.surface,
+        appBar: M3EAppBar.top(
+          titleText: modeTitle.isEmpty ? 'Practice' : modeTitle,
+          actions: [
+            M3EIconButton(
+              variant: M3EIconButtonVariant.standard,
+              icon: const Icon(Icons.flag_outlined),
+              tooltip: 'Finish practice',
+              onPressed: _submitting ? null : _finishEarly,
+            ),
+            M3EIconButton(
+              variant: M3EIconButtonVariant.standard,
+              icon: const Icon(Icons.close),
+              tooltip: 'Leave practice',
+              onPressed: _requestExit,
+            ),
+          ],
+        ),
+        body: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
               children: [
-                Text(
-                  'Question $position of $total',
-                  style: theme.typography.baseline.labelMedium.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                _QuestionNavigator(
+                  position: position,
+                  total: total,
+                  progress: progress,
+                  pastErrors: _start.session.mode == SessionMode.pastErrors,
+                  previousEnabled: _index > 0 && !_submitting,
+                  nextEnabled: _index < total - 1 && !_submitting,
+                  onPrevious: () => _goTo(_index - 1),
+                  onNext: () => _goTo(_index + 1),
                 ),
-                const Spacer(),
-                if (_start.session.mode == SessionMode.pastErrors) ...[
+                if (_showReminder) ...[
+                  const SizedBox(height: 14),
+                  _ReminderBanner(minutes: _reminderMinutes),
+                ],
+                const SizedBox(height: 22),
+                if (item.topicName.isNotEmpty)
                   Text(
-                    'Re-test',
-                    style: theme.typography.baseline.labelMedium.copyWith(
+                    item.topicName.toUpperCase(),
+                    style: theme.typography.baseline.labelSmall.copyWith(
                       color: theme.colorScheme.primary,
+                      letterSpacing: 0.8,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(width: 4),
-                ],
-                M3EIconButton(
-                  variant: M3EIconButtonVariant.standard,
-                  icon: const Icon(Icons.chevron_left),
-                  tooltip: 'Previous question',
-                  onPressed: _index > 0 && !_submitting
-                      ? () => _goTo(_index - 1)
-                      : null,
-                ),
-                M3EIconButton(
-                  variant: M3EIconButtonVariant.standard,
-                  icon: const Icon(Icons.chevron_right),
-                  tooltip: 'Next question',
-                  onPressed: _index < total - 1 && !_submitting
-                      ? () => _goTo(_index + 1)
-                      : null,
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            LinearScore(value: progress),
-            if (_showReminder) ...[
-              const SizedBox(height: 16),
-              _ReminderBanner(minutes: _reminderMinutes),
-            ],
-            const SizedBox(height: 24),
-            if (item.topicName.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  item.topicName,
-                  style: theme.typography.baseline.labelSmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: 6),
+                SelectableLinkifiedText(
+                  text: item.question.prompt,
+                  style: theme.typography.baseline.headlineSmall.copyWith(
+                    height: 1.3,
                   ),
-                ),
-              ),
-            SelectableLinkifiedText(
-              text: item.question.prompt,
-              style: theme.typography.baseline.headlineSmall.copyWith(
-                height: 1.35,
-              ),
-              onDefine: _openLookup,
-              onOpenUrl: _openUrl,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              item.question.allowsMultiple
-                  ? 'Select every correct alternative. Select text to define a term.'
-                  : 'Select text to define a term.',
-              style: theme.typography.baseline.labelSmall.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 20),
-            for (
-              var index = 0;
-              index < item.question.alternatives.length;
-              index++
-            )
-              Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _OptionCard(
-                  index: index,
-                  text: item.question.alternatives[index],
-                  selected: _selectedIndexes.contains(index),
-                  submitted: _submitted,
-                  multiSelect: item.question.allowsMultiple,
-                  isCorrect: item.question.correctIndexes.contains(index),
-                  explanation:
-                      item.question.alternativeExplanations.length > index
-                      ? item.question.alternativeExplanations[index]
-                      : '',
                   onDefine: _openLookup,
                   onOpenUrl: _openUrl,
-                  onPressed: _submitted
-                      ? null
-                      : () => setState(() {
-                          if (!item.question.allowsMultiple) {
-                            _selectedIndexes
-                              ..clear()
-                              ..add(index);
-                          } else if (!_selectedIndexes.remove(index)) {
-                            _selectedIndexes.add(index);
-                          }
-                        }),
                 ),
-              ),
-            const SizedBox(height: 12),
-            M3ETextField(
-              controller: _reasoning,
-              label: 'Your reasoning',
-              placeholder: 'Optional. What led you to this answer?',
-              minLines: 3,
-              maxLines: 6,
-              readOnly: _submitted,
-              supportingText: _submitted
-                  ? 'Reasoning locked after submitting.'
-                  : 'Optional, but useful when reviewing an error.',
-            ),
-            if (!_submitted) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  M3EButton.filled(
-                    onPressed: _submitting ? null : () => _submit(skip: false),
-                    icon: const Icon(Icons.check),
-                    label: Text(_submitting ? 'Checking…' : 'Check'),
-                  ),
-                  const SizedBox(width: 8),
-                  M3EButton.text(
-                    onPressed: _submitting ? null : () => _submit(skip: true),
-                    child: const Text('Skip'),
-                  ),
-                ],
-              ),
-            ] else ...[
-              const SizedBox(height: 16),
-              _FeedbackStatus(
-                outcome: _outcome!,
-                distracted: _distracted,
-                pastErrors: _start.session.mode == SessionMode.pastErrors,
-              ),
-              const SizedBox(height: 16),
-              TonalBox(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(height: 8),
+                Row(
                   children: [
-                    Text(
-                      'Why this answer',
-                      style: theme.typography.emphasized.titleSmall,
+                    Icon(
+                      Icons.text_fields,
+                      size: 14,
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                    const SizedBox(height: 6),
-                    SelectableLinkifiedText(
-                      text: item.question.explanation,
-                      style: theme.typography.baseline.bodyMedium.copyWith(
-                        height: 1.45,
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        item.question.allowsMultiple
+                            ? 'Select every correct alternative. Select text to define a term.'
+                            : 'Select text to define a term.',
+                        style: theme.typography.baseline.labelSmall.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                      onDefine: _openLookup,
-                      onOpenUrl: _openUrl,
                     ),
                   ],
                 ),
-              ),
-              if (_outcome!.attempt.selectedIndexes.isNotEmpty &&
-                  !_outcome!.attempt.isCorrect) ...[
-                const SizedBox(height: 10),
-                _DistractedCheck(
-                  value: _distracted,
-                  onChanged: _submitting ? null : _setDistracted,
-                ),
+                const SizedBox(height: 18),
+                for (
+                  var index = 0;
+                  index < item.question.alternatives.length;
+                  index++
+                )
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _OptionCard(
+                      index: index,
+                      text: item.question.alternatives[index],
+                      selected: _selectedIndexes.contains(index),
+                      submitted: _submitted,
+                      multiSelect: item.question.allowsMultiple,
+                      isCorrect: item.question.correctIndexes.contains(index),
+                      explanation:
+                          item.question.alternativeExplanations.length > index
+                          ? item.question.alternativeExplanations[index]
+                          : '',
+                      onDefine: _openLookup,
+                      onOpenUrl: _openUrl,
+                      onPressed: _submitted
+                          ? null
+                          : () => setState(() {
+                              if (!item.question.allowsMultiple) {
+                                _selectedIndexes
+                                  ..clear()
+                                  ..add(index);
+                              } else if (!_selectedIndexes.remove(index)) {
+                                _selectedIndexes.add(index);
+                              }
+                            }),
+                    ),
+                  ),
+                const SizedBox(height: 6),
+                if (!_submitted)
+                  _ReasoningSection(
+                    open: _reasoningOpen,
+                    controller: _reasoning,
+                    onToggle: () =>
+                        setState(() => _reasoningOpen = !_reasoningOpen),
+                  )
+                else if (_reasoning.text.trim().isNotEmpty)
+                  TonalBox(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Your reasoning',
+                          style: theme.typography.baseline.labelSmall.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _reasoning.text,
+                          style: theme.typography.baseline.bodyMedium,
+                        ),
+                      ],
+                    ),
+                  ),
+                if (_submitted) ...[
+                  const SizedBox(height: 16),
+                  _FeedbackStatus(
+                    outcome: _outcome!,
+                    distracted: _distracted,
+                    pastErrors: _start.session.mode == SessionMode.pastErrors,
+                  ),
+                  const SizedBox(height: 12),
+                  TonalBox(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Why this answer',
+                          style: theme.typography.emphasized.titleSmall,
+                        ),
+                        const SizedBox(height: 6),
+                        SelectableLinkifiedText(
+                          text: item.question.explanation,
+                          style: theme.typography.baseline.bodyMedium.copyWith(
+                            height: 1.45,
+                          ),
+                          onDefine: _openLookup,
+                          onOpenUrl: _openUrl,
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (_outcome!.attempt.selectedIndexes.isNotEmpty &&
+                      !_outcome!.attempt.isCorrect) ...[
+                    const SizedBox(height: 10),
+                    _DistractedCheck(
+                      value: _distracted,
+                      onChanged: _submitting ? null : _setDistracted,
+                    ),
+                  ],
+                ],
               ],
-              const SizedBox(height: 16),
-              M3EButton.filled(
-                onPressed: _next,
-                icon: Icon(
-                  seesResults ? Icons.assessment_outlined : Icons.arrow_forward,
+            ),
+          ),
+        ),
+        bottomNavigationBar: AppActionDock(
+          child: _submitted
+              ? AppPrimaryButton(
+                  onPressed: _submitting
+                      ? null
+                      : seesResults
+                      ? _next
+                      : atLast && unanswered > 0
+                      ? _finishEarly
+                      : _next,
+                  label: seesResults
+                      ? 'See results'
+                      : atLast && unanswered > 0
+                      ? 'Finish practice'
+                      : 'Next question',
+                  icon: seesResults
+                      ? Icons.assessment_outlined
+                      : atLast && unanswered > 0
+                      ? Icons.flag_outlined
+                      : Icons.arrow_forward,
+                )
+              : Row(
+                  children: [
+                    Expanded(
+                      child: AppPrimaryButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => _submit(skip: false),
+                        label: _submitting ? 'Checking…' : 'Check',
+                        icon: Icons.check,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    M3EButton.text(
+                      onPressed: _submitting ? null : () => _submit(skip: true),
+                      child: const Text('Skip'),
+                    ),
+                  ],
                 ),
-                label: Text(seesResults ? 'See results' : 'Next question'),
-              ),
-            ],
-          ],
         ),
       ),
+    );
+  }
+}
+
+class _QuestionNavigator extends StatelessWidget {
+  const _QuestionNavigator({
+    required this.position,
+    required this.total,
+    required this.progress,
+    required this.pastErrors,
+    required this.previousEnabled,
+    required this.nextEnabled,
+    required this.onPrevious,
+    required this.onNext,
+  });
+
+  final int position;
+  final int total;
+  final double progress;
+  final bool pastErrors;
+  final bool previousEnabled;
+  final bool nextEnabled;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Column(
+      children: [
+        Row(
+          children: [
+            Text(
+              'Question $position of $total',
+              style: theme.typography.baseline.labelMedium.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (pastErrors) ...[
+              const SizedBox(width: 8),
+              const Pill('Re-test', tone: PillTone.primary),
+            ],
+            const Spacer(),
+            M3EIconButton(
+              variant: M3EIconButtonVariant.standard,
+              icon: const Icon(Icons.chevron_left),
+              tooltip: 'Previous question',
+              onPressed: previousEnabled ? onPrevious : null,
+            ),
+            M3EIconButton(
+              variant: M3EIconButtonVariant.standard,
+              icon: const Icon(Icons.chevron_right),
+              tooltip: 'Next question',
+              onPressed: nextEnabled ? onNext : null,
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        LinearScore(value: progress, semanticsLabel: 'Practice progress'),
+      ],
     );
   }
 }
@@ -562,6 +708,70 @@ class _ReminderBanner extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ReasoningSection extends StatelessWidget {
+  const _ReasoningSection({
+    required this.open,
+    required this.controller,
+    required this.onToggle,
+  });
+
+  final bool open;
+  final TextEditingController controller;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Material(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(20),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.edit_note,
+                    size: 20,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Add reasoning (optional)',
+                      style: theme.typography.baseline.bodyMedium,
+                    ),
+                  ),
+                  Icon(
+                    open ? Icons.expand_less : Icons.expand_more,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (open) ...[
+          const SizedBox(height: 10),
+          M3ETextField(
+            controller: controller,
+            label: 'Your reasoning',
+            placeholder: 'What led you to this answer?',
+            minLines: 2,
+            maxLines: 5,
+            supportingText: 'Useful when reviewing an error later.',
+          ),
+        ],
+      ],
     );
   }
 }
@@ -622,7 +832,7 @@ class _FeedbackStatus extends StatelessWidget {
       distracted,
     )) {
       (true, true, _, _) => (
-        theme.colorScheme.primaryContainer,
+        AppSuccess.container(context),
         Icons.check_circle_outline,
         'Error resolved. It stays in your history.',
       ),
@@ -637,7 +847,7 @@ class _FeedbackStatus extends StatelessWidget {
         'Still in the error queue. Next attempt in 48 hours.',
       ),
       (false, true, _, _) => (
-        theme.colorScheme.primaryContainer,
+        AppSuccess.container(context),
         Icons.check_circle_outline,
         'Correct.',
       ),
@@ -707,85 +917,100 @@ class _OptionCard extends StatelessWidget {
     final correctNow = submitted && isCorrect;
     final wrongNow = submitted && selected && !isCorrect;
     final background = correctNow
-        ? theme.colorScheme.primaryContainer
+        ? AppSuccess.container(context)
         : wrongNow
         ? theme.colorScheme.errorContainer
         : selected
         ? theme.colorScheme.secondaryContainer
         : theme.colorScheme.surfaceContainerLow;
     final foreground = correctNow
-        ? theme.colorScheme.onPrimaryContainer
+        ? AppSuccess.onContainer(context)
         : wrongNow
         ? theme.colorScheme.onErrorContainer
         : selected
         ? theme.colorScheme.onSecondaryContainer
         : theme.colorScheme.onSurface;
+    final badgeBackground = correctNow
+        ? AppSuccess.foreground(context)
+        : wrongNow
+        ? theme.colorScheme.error
+        : selected
+        ? theme.colorScheme.secondary
+        : theme.colorScheme.surfaceContainerHighest;
+    final badgeForeground = correctNow
+        ? theme.colorScheme.surface
+        : wrongNow
+        ? theme.colorScheme.onError
+        : selected
+        ? theme.colorScheme.onSecondary
+        : theme.colorScheme.onSurfaceVariant;
+    final letter = String.fromCharCode(65 + index);
     return Semantics(
       button: !submitted,
       selected: selected,
-      label: 'Alternative ${String.fromCharCode(65 + index)}: $text',
-      child: Container(
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: onPressed,
-            borderRadius: BorderRadius.circular(18),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    correctNow
-                        ? Icons.check_circle
-                        : wrongNow
-                        ? Icons.cancel
-                        : selected
-                        ? multiSelect
-                              ? Icons.check_box
-                              : Icons.radio_button_checked
-                        : multiSelect
-                        ? Icons.check_box_outline_blank
-                        : Icons.radio_button_off,
-                    size: 20,
-                    color: foreground,
+      label: 'Alternative $letter: $text',
+      child: Material(
+        color: background,
+        borderRadius: BorderRadius.circular(22),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: badgeBackground,
+                    borderRadius: BorderRadius.circular(multiSelect ? 9 : 15),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  child: correctNow
+                      ? Icon(Icons.check, size: 18, color: badgeForeground)
+                      : wrongNow
+                      ? Icon(Icons.close, size: 18, color: badgeForeground)
+                      : Text(
+                          letter,
+                          style: theme.typography.baseline.labelMedium.copyWith(
+                            color: badgeForeground,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SelectableLinkifiedText(
+                        text: text,
+                        selectable: submitted,
+                        style: theme.typography.baseline.bodyMedium.copyWith(
+                          color: foreground,
+                          height: 1.4,
+                        ),
+                        onDefine: onDefine,
+                        onOpenUrl: onOpenUrl,
+                      ),
+                      if (submitted && explanation.isNotEmpty) ...[
+                        const SizedBox(height: 8),
                         SelectableLinkifiedText(
-                          text: text,
-                          selectable: submitted,
-                          style: theme.typography.baseline.bodyMedium.copyWith(
-                            color: foreground,
-                            height: 1.35,
+                          text: explanation,
+                          style: theme.typography.baseline.bodySmall.copyWith(
+                            color: foreground.withValues(alpha: 0.82),
+                            height: 1.4,
                           ),
                           onDefine: onDefine,
                           onOpenUrl: onOpenUrl,
                         ),
-                        if (submitted && explanation.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          SelectableLinkifiedText(
-                            text: explanation,
-                            style: theme.typography.baseline.bodySmall.copyWith(
-                              color: foreground.withValues(alpha: 0.85),
-                              height: 1.4,
-                            ),
-                            onDefine: onDefine,
-                            onOpenUrl: onOpenUrl,
-                          ),
-                        ],
                       ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),

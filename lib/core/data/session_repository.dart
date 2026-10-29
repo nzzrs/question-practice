@@ -99,6 +99,7 @@ class SessionRepository {
 
   Future<void> completeSession({
     required int id,
+    required int total,
     required int correct,
     required int skipped,
     required int distracted,
@@ -106,6 +107,7 @@ class SessionRepository {
   }) {
     return _db.sessionDao.completeSession(
       id: id,
+      total: total,
       correct: correct,
       skipped: skipped,
       distracted: distracted,

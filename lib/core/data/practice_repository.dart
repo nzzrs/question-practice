@@ -36,6 +36,23 @@ class PracticeRepository {
         .map((rows) => rows.map(practiceSummaryFromRow).toList());
   }
 
+  Stream<List<TopicProgressPoint>> watchTopicProgress(int topicId) {
+    return _db.statsDao
+        .watchTopicProgress(topicId)
+        .map(
+          (rows) => [
+            for (final row in rows)
+              TopicProgressPoint(
+                sessionId: row.sessionId,
+                finishedAt: row.finishedAt,
+                practiceName: row.practiceName,
+                correct: row.correct,
+                total: row.total,
+              ),
+          ],
+        );
+  }
+
   Future<List<Question>> questionsForPractice(int practiceId) async {
     final rows = await _db.topicDao.questionsForPractice(practiceId);
     return rows.map(questionFromRow).toList();
@@ -133,6 +150,14 @@ class PracticeRepository {
           position: i,
         ),
     ]);
+  }
+
+  Future<void> setPracticeDone(int id, bool isDone) {
+    return _db.topicDao.setPracticeDone(id, isDone);
+  }
+
+  Future<void> deletePractice(int id) {
+    return _db.topicDao.deletePractice(id);
   }
 
   Future<void> updateTopic({

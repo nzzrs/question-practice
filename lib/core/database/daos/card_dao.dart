@@ -131,7 +131,7 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
 
   Future<int> countErrorCardsNeedingDetailsForSession(int sessionId) async {
     final query = customSelect(
-      "SELECT COUNT(*) AS amount FROM error_cards WHERE session_id = ? AND status = 'active' AND details_completed_at IS NULL",
+      "SELECT COUNT(*) AS amount FROM error_cards WHERE session_id = ? AND status = 'active' AND details_completed_at IS NULL AND exported_at IS NULL",
       variables: [Variable.withInt(sessionId)],
       readsFrom: {errorCards},
     );

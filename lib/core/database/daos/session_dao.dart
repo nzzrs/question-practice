@@ -119,6 +119,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
 
   Future<void> completeSession({
     required int id,
+    required int total,
     required int correct,
     required int skipped,
     required int distracted,
@@ -127,6 +128,7 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     return (update(sessions)..where((s) => s.id.equals(id))).write(
       SessionsCompanion(
         status: const Value('completed'),
+        total: Value(total),
         correct: Value(correct),
         skipped: Value(skipped),
         distracted: Value(distracted),

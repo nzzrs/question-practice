@@ -16,7 +16,7 @@ void main() {
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
 
-    expect(find.text('Question Practice'), findsOneWidget);
+    expect(find.text('question practice'), findsOneWidget);
     expect(find.text('No practices yet'), findsOneWidget);
     expect(find.text('Review past errors'), findsOneWidget);
     expect(find.byIcon(Icons.info_outline), findsOneWidget);

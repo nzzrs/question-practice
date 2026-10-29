@@ -192,64 +192,70 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     if (_error != null) {
-      return AppScaffold(
+      return AppPage(
         title: 'Review',
         showBack: true,
-        body: EmptyState(
-          icon: Icons.warning_amber_outlined,
-          title: 'Could not load the review',
-          message: '$_error',
-          action: M3EButton.filled(
-            onPressed: _load,
-            child: const Text('Try again'),
+        variant: M3EAppBarVariant.small,
+        children: [
+          EmptyState(
+            icon: Icons.warning_amber_outlined,
+            title: 'Could not load the review',
+            message: '$_error',
+            action: M3EButton.filled(
+              onPressed: _load,
+              child: const Text('Try again'),
+            ),
           ),
-        ),
+        ],
       );
     }
     final data = _data;
     if (data == null) {
-      return const AppScaffold(
+      return AppPage(
         title: 'Review',
         showBack: true,
-        body: Center(child: M3ELoadingIndicator()),
+        variant: M3EAppBarVariant.small,
+        children: const [
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 64),
+            child: Center(child: M3ELoadingIndicator()),
+          ),
+        ],
       );
     }
     if (_finished || data.steps.isEmpty) {
-      return AppScaffold(
+      return AppPage(
         title: 'Review complete',
-        showBack: false,
-        body: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const SizedBox(height: 40),
-            Icon(
-              Icons.check_circle_outline,
-              size: 56,
-              color: theme.colorScheme.primary,
+        variant: M3EAppBarVariant.small,
+        children: [
+          const SizedBox(height: 32),
+          Center(child: IconBadge(Icons.check_circle_outline, size: 72)),
+          const SizedBox(height: 16),
+          Text(
+            _created == 0 ? 'Review closed' : 'Review complete',
+            textAlign: TextAlign.center,
+            style: theme.typography.emphasized.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _created == 0
+                ? 'No card details were saved.'
+                : '$_created card${_created == 1 ? '' : 's'} completed or created. You can finish missing details later in Cards.',
+            textAlign: TextAlign.center,
+            style: theme.typography.baseline.bodyMedium.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 16),
-            Text(
-              _created == 0 ? 'Review closed' : 'Review complete',
-              textAlign: TextAlign.center,
-              style: theme.typography.emphasized.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _created == 0
-                  ? 'No card details were saved.'
-                  : '$_created card${_created == 1 ? '' : 's'} completed or created. You can finish missing details later in Cards.',
-              textAlign: TextAlign.center,
-              style: theme.typography.baseline.bodyMedium.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            M3EButton.filled(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Done'),
-            ),
-            const SizedBox(height: 8),
-            M3EButton.tonal(
+          ),
+          const SizedBox(height: 24),
+          AppPrimaryButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            label: 'Done',
+            icon: Icons.check,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: M3EButton.tonal(
               onPressed: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (context) => const CardsPage(),
@@ -258,8 +264,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               icon: const Icon(Icons.style_outlined),
               label: const Text('View cards'),
             ),
-          ],
-        ),
+          ),
+        ],
       );
     }
 
@@ -269,47 +275,15 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       SkippedReviewStep() => 'What was missing?',
       ConceptDefinitionStep() => 'Complete the concept',
     };
-    return AppScaffold(
+    return AppPage(
       title: 'Review',
       showBack: true,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-        children: [
-          Text(
-            'Step ${_index + 1} of ${data.steps.length}',
-            style: theme.typography.baseline.labelMedium.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          LinearScore(value: (_index + 1) / data.steps.length),
-          const SizedBox(height: 24),
-          Text(heading, style: theme.typography.emphasized.headlineSmall),
-          const SizedBox(height: 16),
-          switch (step) {
-            ErrorReviewStep(:final card) => ErrorCardReviewView(
-              card: card,
-              bias: _bias,
-              vaccine: _vaccine,
-            ),
-            SkippedReviewStep(:final question) => _SkippedStep(
-              question: question,
-              missing: _missing,
-              onMissingChanged: (value) => setState(() => _missing = value),
-              term: _term,
-              definition: _definition,
-              newQuestion: _newQuestion,
-              newAnswer: _newAnswer,
-            ),
-            ConceptDefinitionStep(:final concept) => _ConceptStep(
-              concept: concept,
-              definition: _definition,
-            ),
-          },
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              M3EButton.filled(
+      variant: M3EAppBarVariant.small,
+      bottomBar: AppActionDock(
+        child: Row(
+          children: [
+            Expanded(
+              child: AppPrimaryButton(
                 onPressed: _busy
                     ? null
                     : () {
@@ -322,18 +296,51 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                             _saveConceptDefinition(step);
                         }
                       },
-                icon: const Icon(Icons.check),
-                label: Text(_busy ? 'Saving…' : 'Save'),
+                label: _busy ? 'Saving…' : 'Save',
+                icon: Icons.check,
               ),
-              const SizedBox(width: 8),
-              M3EButton.text(
-                onPressed: _busy ? null : _advance,
-                child: const Text('Skip'),
-              ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(width: 8),
+            M3EButton.text(
+              onPressed: _busy ? null : _advance,
+              child: const Text('Skip'),
+            ),
+          ],
+        ),
       ),
+      children: [
+        Text(
+          'Step ${_index + 1} of ${data.steps.length}',
+          style: theme.typography.baseline.labelMedium.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        LinearScore(value: (_index + 1) / data.steps.length),
+        const SizedBox(height: 22),
+        Text(heading, style: theme.typography.emphasized.headlineSmall),
+        const SizedBox(height: 16),
+        switch (step) {
+          ErrorReviewStep(:final card) => ErrorCardReviewView(
+            card: card,
+            bias: _bias,
+            vaccine: _vaccine,
+          ),
+          SkippedReviewStep(:final question) => _SkippedStep(
+            question: question,
+            missing: _missing,
+            onMissingChanged: (value) => setState(() => _missing = value),
+            term: _term,
+            definition: _definition,
+            newQuestion: _newQuestion,
+            newAnswer: _newAnswer,
+          ),
+          ConceptDefinitionStep(:final concept) => _ConceptStep(
+            concept: concept,
+            definition: _definition,
+          ),
+        },
+      ],
     );
   }
 }
@@ -371,22 +378,36 @@ class _SkippedStep extends StatelessWidget {
                 question.prompt,
                 style: theme.typography.baseline.titleSmall,
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Answer: ${question.correctAnswer}',
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  color: theme.colorScheme.primary,
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  'Answer: ${question.correctAnswer}',
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: theme.colorScheme.onPrimaryContainer,
+                    height: 1.4,
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               Text(
                 question.explanation,
-                style: theme.typography.baseline.bodySmall,
+                style: theme.typography.baseline.bodySmall.copyWith(
+                  height: 1.4,
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 20),
         Text(
           'What was missing here?',
           style: theme.typography.emphasized.titleSmall,

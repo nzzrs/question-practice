@@ -143,6 +143,16 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     await batch((batch) => batch.insertAll(questions, rows));
   }
 
+  Future<void> setPracticeDone(int id, bool isDone) {
+    return (update(practices)..where((p) => p.id.equals(id))).write(
+      PracticesCompanion(isDone: Value(isDone)),
+    );
+  }
+
+  Future<void> deletePractice(int id) async {
+    await (delete(practices)..where((p) => p.id.equals(id))).go();
+  }
+
   Future<void> updateTopic({
     required int id,
     required String name,

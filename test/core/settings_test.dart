@@ -20,6 +20,7 @@ void main() {
     expect(settings.webEngine, WebEngine.duckDuckGo);
     expect(settings.shuffleTopics, isFalse);
     expect(settings.dynamicColor, isTrue);
+    expect(settings.soundsEnabled, isTrue);
     expect(settings.ankiDeck, 'Question Practice');
   });
 
@@ -32,6 +33,7 @@ void main() {
         aiModel: 'model',
         shuffleTopics: true,
         dynamicColor: true,
+        soundsEnabled: false,
         ankiDeck: 'My deck',
       ),
     );
@@ -43,6 +45,7 @@ void main() {
     expect(loaded.aiModel, 'model');
     expect(loaded.shuffleTopics, isTrue);
     expect(loaded.dynamicColor, isTrue);
+    expect(loaded.soundsEnabled, isFalse);
     expect(loaded.ankiDeck, 'My deck');
     expect(await harness.settings.hasApiKey(), isTrue);
 

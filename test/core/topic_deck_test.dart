@@ -32,4 +32,24 @@ void main() {
     expect(summary.topic.ankiDeck, isNull);
     expect(summary.topic.description, 'Updated');
   });
+
+  test('practice can be marked done and deleted', () async {
+    final seeded = await harness.seedPractice(topicName: 'Cloud');
+    var practices = await harness.practices
+        .watchPracticeSummaries(seeded.topicId)
+        .first;
+    expect(practices.single.practice.isDone, isFalse);
+
+    await harness.practices.setPracticeDone(seeded.practiceId, true);
+    practices = await harness.practices
+        .watchPracticeSummaries(seeded.topicId)
+        .first;
+    expect(practices.single.practice.isDone, isTrue);
+
+    await harness.practices.deletePractice(seeded.practiceId);
+    practices = await harness.practices
+        .watchPracticeSummaries(seeded.topicId)
+        .first;
+    expect(practices, isEmpty);
+  });
 }

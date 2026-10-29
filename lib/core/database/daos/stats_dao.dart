@@ -126,6 +126,29 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
     );
   }
 
+  Stream<List<TopicProgressRow>> watchTopicProgress(int topicId) {
+    final query = customSelect(
+      '''
+      SELECT
+        s.id AS session_id,
+        s.finished_at AS finished_at,
+        s.correct AS correct,
+        s.total AS total,
+        p.name AS practice_name
+      FROM sessions s
+      INNER JOIN practices p ON p.id = s.practice_id
+      WHERE p.topic_id = ? AND s.status = 'completed'
+        AND s.total > 0 AND s.finished_at IS NOT NULL
+      ORDER BY s.finished_at ASC, s.id ASC
+      ''',
+      variables: [Variable.withInt(topicId)],
+      readsFrom: {sessions, practices},
+    );
+    return query.watch().map(
+      (rows) => rows.map(TopicProgressRow.fromRow).toList(),
+    );
+  }
+
   Stream<List<PracticeSummaryRow>> watchPracticeSummaries(
     int topicId,
     DateTime now,
@@ -139,6 +162,7 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         p.description AS practice_description,
         p.content_hash AS practice_content_hash,
         p.imported_at AS practice_imported_at,
+        p.is_done AS practice_is_done,
         COUNT(q.id) AS question_count,
         (
           SELECT s.correct FROM sessions s
@@ -241,6 +265,32 @@ class TopicSummaryRow {
   final DateTime? lastPracticedAt;
 }
 
+class TopicProgressRow {
+  const TopicProgressRow({
+    required this.sessionId,
+    required this.finishedAt,
+    required this.practiceName,
+    required this.correct,
+    required this.total,
+  });
+
+  factory TopicProgressRow.fromRow(QueryRow row) {
+    return TopicProgressRow(
+      sessionId: row.read<int>('session_id'),
+      finishedAt: row.read<DateTime>('finished_at').toUtc(),
+      practiceName: row.read<String>('practice_name'),
+      correct: row.read<int>('correct'),
+      total: row.read<int>('total'),
+    );
+  }
+
+  final int sessionId;
+  final DateTime finishedAt;
+  final String practiceName;
+  final int correct;
+  final int total;
+}
+
 class PracticeSummaryRow {
   const PracticeSummaryRow({
     required this.practiceId,
@@ -249,6 +299,7 @@ class PracticeSummaryRow {
     required this.description,
     required this.contentHash,
     required this.importedAt,
+    required this.isDone,
     required this.questionCount,
     required this.lastCorrect,
     required this.lastTotal,
@@ -262,6 +313,7 @@ class PracticeSummaryRow {
       description: row.read<String>('practice_description'),
       contentHash: row.read<String>('practice_content_hash'),
       importedAt: row.read<DateTime>('practice_imported_at').toUtc(),
+      isDone: row.read<bool>('practice_is_done'),
       questionCount: row.read<int>('question_count'),
       lastCorrect: row.read<int?>('last_correct'),
       lastTotal: row.read<int?>('last_total'),
@@ -274,6 +326,7 @@ class PracticeSummaryRow {
   final String description;
   final String contentHash;
   final DateTime importedAt;
+  final bool isDone;
   final int questionCount;
   final int? lastCorrect;
   final int? lastTotal;

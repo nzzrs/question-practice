@@ -14,7 +14,7 @@ class QuestionPracticeApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider).value ?? const AppSettings();
     return M3EMaterialApp(
-      title: 'Question Practice',
+      title: 'question practice',
       debugShowCheckedModeBanner: false,
       data: appThemeData(),
       autoTheming: true,

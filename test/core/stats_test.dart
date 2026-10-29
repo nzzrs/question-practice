@@ -59,6 +59,58 @@ void main() {
     expect(home.unexportedCards, 0);
   });
 
+  test('topic progress records completed session history', () async {
+    final practice = await harness.seedPractice(
+      topicName: 'Cloud',
+      practiceName: 'Core',
+      count: 2,
+    );
+    var start = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[0],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[1],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    harness.clock.advance(const Duration(hours: 1));
+
+    start = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[0],
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[1],
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: false,
+    );
+
+    final progress = await harness.practices
+        .watchTopicProgress(practice.topicId)
+        .first;
+    expect(progress, hasLength(2));
+    expect(progress.first.practiceName, 'Core');
+    expect(progress.first.score, 1);
+    expect(progress.last.score, 0);
+    expect(
+      progress.first.finishedAt.isBefore(progress.last.finishedAt),
+      isTrue,
+    );
+  });
+
   test('unfinished sessions do not affect stats', () async {
     final practice = await harness.seedPractice(count: 2);
     final start = await sessions.startPractice(practice.practiceId);

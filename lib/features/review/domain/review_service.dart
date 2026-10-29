@@ -97,7 +97,9 @@ class ReviewService {
         );
       } else if (!attempt.isCorrect && !attempt.distracted) {
         final card = await _cards.activeErrorForQuestion(attempt.questionId);
-        if (card != null && card.needsDetails) steps.add(ErrorReviewStep(card));
+        if (card != null && card.needsDetails && card.exportedAt == null) {
+          steps.add(ErrorReviewStep(card));
+        }
       }
     }
 

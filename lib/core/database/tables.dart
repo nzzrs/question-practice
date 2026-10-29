@@ -20,6 +20,7 @@ class Practices extends Table {
   TextColumn get description => text().withDefault(const Constant(''))();
   TextColumn get contentHash => text()();
   DateTimeColumn get importedAt => dateTime()();
+  BoolColumn get isDone => boolean().withDefault(const Constant(false))();
 }
 
 @DataClassName('QuestionRow')

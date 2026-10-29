@@ -17,83 +17,79 @@ class ImportPage extends ConsumerStatefulWidget {
 
 class _ImportPageState extends ConsumerState<ImportPage> {
   bool _busy = false;
+  bool _showFormat = false;
   ImportPreview? _preview;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    return AppScaffold(
-      title: 'Import practice',
-      showBack: true,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-        children: [
-          Text(
-            'Choose a .json file, or a .txt file that contains JSON.',
-            style: theme.typography.baseline.bodyLarge,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'The whole file is checked before anything is saved. Existing topics are reused; exact duplicate practices are skipped.',
-            style: theme.typography.baseline.bodySmall.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+    final preview = _preview;
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      appBar: M3EAppBar.top(
+        titleText: 'Import practice',
+        leading: M3EIconButton(
+          variant: M3EIconButtonVariant.standard,
+          icon: const Icon(M3EIcons.arrow_back),
+          tooltip: 'Back',
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
+      ),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: EdgeInsets.fromLTRB(
+              20,
+              4,
+              20,
+              preview == null ? 32 + MediaQuery.paddingOf(context).bottom : 24,
             ),
+            children: [
+              _FilePanel(
+                busy: _busy,
+                onChoose: _pickFile,
+                onSample: _loadSample,
+              ),
+              const SizedBox(height: 18),
+              if (preview == null) ...[
+                _FormatHelp(
+                  open: _showFormat,
+                  onToggle: () => setState(() => _showFormat = !_showFormat),
+                ),
+              ] else
+                _Preview(
+                  preview: preview,
+                  busy: _busy,
+                  onCancel: () => setState(() => _preview = null),
+                ),
+            ],
           ),
-          const SizedBox(height: 24),
-          M3EButton.filled(
-            onPressed: _busy ? null : _pickFile,
-            icon: const Icon(Icons.file_open_outlined),
-            label: Text(_busy ? 'Reading…' : 'Choose file'),
-          ),
-          const SizedBox(height: 8),
-          M3EButton.tonal(
-            onPressed: _busy ? null : _loadSample,
-            icon: const Icon(Icons.science_outlined),
-            label: const Text('Load sample'),
-          ),
-          const SizedBox(height: 28),
-          if (_preview == null) ...[
-            TonalBox(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+      ),
+      bottomNavigationBar: preview == null
+          ? null
+          : AppActionDock(
+              child: Row(
                 children: [
-                  Text(
-                    'Expected shape',
-                    style: theme.typography.emphasized.titleSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: const Text(
-                        '{"formatVersion": 1, "topics": [{"name": "Cloud", '
-                        '"practices": [{"name": "Core", "questions": [{"prompt": "…", '
-                        '"alternatives": ["…", "…"], "correctIndex": 0, '
-                        '"explanation": "…", "alternativeExplanations": ["…", "…"]}]}]}]}',
-                        style: TextStyle(fontFamily: 'monospace', height: 1.4),
-                      ),
+                  Expanded(
+                    child: AppPrimaryButton(
+                      onPressed: _busy ? null : _import,
+                      label: _busy ? 'Importing…' : 'Import',
+                      icon: Icons.check,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Each question has one correct answer (correctIndex) or several (correctIndexes), with one explanation per alternative. See the help screen for the full format.',
-                    style: theme.typography.baseline.bodySmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                  const SizedBox(width: 8),
+                  M3EButton.text(
+                    onPressed: _busy
+                        ? null
+                        : () => setState(() => _preview = null),
+                    child: const Text('Cancel'),
                   ),
                 ],
               ),
             ),
-          ] else
-            _Preview(
-              preview: _preview!,
-              busy: _busy,
-              onImport: _import,
-              onCancel: () => setState(() => _preview = null),
-            ),
-        ],
-      ),
     );
   }
 
@@ -218,17 +214,158 @@ class _ImportPageState extends ConsumerState<ImportPage> {
   }
 }
 
+class _FilePanel extends StatelessWidget {
+  const _FilePanel({
+    required this.busy,
+    required this.onChoose,
+    required this.onSample,
+  });
+
+  final bool busy;
+  final VoidCallback onChoose;
+  final VoidCallback onSample;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconBadge(Icons.upload_file_outlined, size: 52),
+          const SizedBox(height: 14),
+          Text(
+            'Bring in a practice',
+            style: theme.typography.emphasized.titleLarge,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Choose a .json file, or a .txt file that contains JSON. The whole file is checked before anything is saved.',
+            style: theme.typography.baseline.bodySmall.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          AppPrimaryButton(
+            onPressed: busy ? null : onChoose,
+            label: busy ? 'Reading…' : 'Choose file',
+            icon: Icons.file_open_outlined,
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: M3EButton.tonal(
+              onPressed: busy ? null : onSample,
+              icon: const Icon(Icons.science_outlined),
+              label: const Text('Load sample'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FormatHelp extends StatelessWidget {
+  const _FormatHelp({required this.open, required this.onToggle});
+
+  final bool open;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onToggle,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.data_object,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Expected shape',
+                        style: theme.typography.baseline.titleSmall,
+                      ),
+                    ),
+                    Icon(
+                      open ? Icons.expand_less : Icons.expand_more,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (open)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Text(
+                        '{"formatVersion": 1, "topics": [{"name": "Cloud", '
+                        '"practices": [{"name": "Core", "questions": [{"prompt": "…", '
+                        '"alternatives": ["…", "…"], "correctIndex": 0, '
+                        '"explanation": "…", "alternativeExplanations": ["…", "…"]}]}]}]}',
+                        style: const TextStyle(
+                          fontFamily: 'monospace',
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Each question has one correct answer (correctIndex) or several (correctIndexes), with one explanation per alternative. See the help screen for the full format.',
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Preview extends StatelessWidget {
   const _Preview({
     required this.preview,
     required this.busy,
-    required this.onImport,
     required this.onCancel,
   });
 
   final ImportPreview preview;
   final bool busy;
-  final VoidCallback onImport;
   final VoidCallback onCancel;
 
   @override
@@ -237,21 +374,54 @@ class _Preview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TonalBox(
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer,
+            borderRadius: BorderRadius.circular(26),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Ready to import',
-                style: theme.typography.emphasized.titleMedium,
+              Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ready to import',
+                      style: theme.typography.emphasized.titleMedium.copyWith(
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+                  M3EIconButton(
+                    variant: M3EIconButtonVariant.standard,
+                    icon: const Icon(Icons.close),
+                    tooltip: 'Clear preview',
+                    onPressed: busy ? null : onCancel,
+                  ),
+                ],
               ),
-              const SizedBox(height: 4),
-              Text(preview.fileName),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+              Text(
+                preview.fileName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.typography.baseline.bodyMedium.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(height: 6),
               Text(
                 '${preview.topicCount} topics · ${preview.practiceCount} practices · ${preview.questionCount} questions',
                 style: theme.typography.baseline.bodySmall.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                  color: theme.colorScheme.onPrimaryContainer.withValues(
+                    alpha: 0.85,
+                  ),
                 ),
               ),
             ],
@@ -259,52 +429,70 @@ class _Preview extends StatelessWidget {
         ),
         if (preview.notes.isNotEmpty) ...[
           const SizedBox(height: 16),
-          Text('Duplicates', style: theme.typography.emphasized.titleSmall),
-          const SizedBox(height: 4),
-          for (final note in preview.notes)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                '• $note',
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+          SectionTitle('Duplicates', count: preview.notes.length),
+          AppGroup(
+            children: [
+              for (final note in preview.notes)
+                Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 18,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          note,
+                          style: theme.typography.baseline.bodySmall.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
+        const SizedBox(height: 20),
+        const SectionTitle('Contents'),
+        AppGroup(
+          children: [
+            for (final topic in preview.topics.take(5))
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      topic.name,
+                      style: theme.typography.baseline.titleSmall,
+                    ),
+                    const SizedBox(height: 2),
+                    for (final practice in topic.practices)
+                      Text(
+                        '${practice.name} · ${practice.questions.length} questions',
+                        style: theme.typography.baseline.bodySmall.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-        ],
-        const SizedBox(height: 20),
-        for (final topic in preview.topics.take(5)) ...[
-          Text(topic.name, style: theme.typography.emphasized.titleSmall),
-          for (final practice in topic.practices)
-            Padding(
-              padding: const EdgeInsets.only(left: 8, top: 2),
-              child: Text(
-                '${practice.name} · ${practice.questions.length} questions',
-                style: theme.typography.baseline.bodySmall,
-              ),
-            ),
-          const SizedBox(height: 8),
-        ],
-        if (preview.topics.length > 5)
-          Text(
-            '…and ${preview.topics.length - 5} more topics.',
-            style: theme.typography.baseline.bodySmall,
-          ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            M3EButton.filled(
-              onPressed: busy ? null : onImport,
-              icon: const Icon(Icons.check),
-              label: Text(busy ? 'Importing…' : 'Import'),
-            ),
-            const SizedBox(width: 8),
-            M3EButton.text(
-              onPressed: busy ? null : onCancel,
-              child: const Text('Cancel'),
-            ),
           ],
         ),
+        if (preview.topics.length > 5) ...[
+          const SizedBox(height: 8),
+          Text(
+            '…and ${preview.topics.length - 5} more topics.',
+            style: theme.typography.baseline.bodySmall.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
       ],
     );
   }

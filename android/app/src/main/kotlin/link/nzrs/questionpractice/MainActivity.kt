@@ -5,10 +5,12 @@ import io.flutter.embedding.engine.FlutterEngine
 
 class MainActivity : FlutterActivity() {
     private var ankiBridge: AnkiBridge? = null
+    private var soundBridge: SoundBridge? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         ankiBridge = AnkiBridge(this, flutterEngine.dartExecutor.binaryMessenger)
+        soundBridge = SoundBridge(this, flutterEngine.dartExecutor.binaryMessenger)
     }
 
     override fun onRequestPermissionsResult(
@@ -23,6 +25,8 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         ankiBridge?.dispose()
         ankiBridge = null
+        soundBridge?.dispose()
+        soundBridge = null
         super.onDestroy()
     }
 }

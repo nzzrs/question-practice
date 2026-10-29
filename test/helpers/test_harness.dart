@@ -13,6 +13,7 @@ import 'package:question_practice/core/data/settings_repository.dart';
 import 'package:question_practice/core/database/app_database.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/platform/anki_gateway.dart';
+import 'package:question_practice/core/platform/practice_sound_player.dart';
 import 'package:question_practice/core/platform/secure_key_store.dart';
 import 'package:question_practice/core/platform/web_launcher.dart';
 
@@ -35,11 +36,13 @@ class TestHarness {
     SecureKeyStore? keyStore,
     WebLauncher? webLauncher,
     AnkiGateway? anki,
+    PracticeSoundPlayer? soundPlayer,
   }) : clock = TestClock(now ?? DateTime.utc(2026, 1, 1, 12)),
        database = AppDatabase(NativeDatabase.memory()),
        keyStore = keyStore ?? InMemorySecureKeyStore(),
        webLauncher = webLauncher ?? RecordingWebLauncher(),
-       anki = anki ?? FakeAnkiGateway() {
+       anki = anki ?? FakeAnkiGateway(),
+       soundPlayer = soundPlayer ?? const SilentPracticeSoundPlayer() {
     practices = PracticeRepository(database, clock);
     sessions = SessionRepository(database);
     cards = CardRepository(database, clock);
@@ -51,6 +54,7 @@ class TestHarness {
   final SecureKeyStore keyStore;
   final WebLauncher webLauncher;
   final AnkiGateway anki;
+  final PracticeSoundPlayer soundPlayer;
   late final PracticeRepository practices;
   late final SessionRepository sessions;
   late final CardRepository cards;
@@ -107,6 +111,7 @@ class TestHarness {
         secureKeyStoreProvider.overrideWithValue(keyStore),
         webLauncherProvider.overrideWithValue(webLauncher),
         ankiGatewayProvider.overrideWithValue(anki),
+        practiceSoundPlayerProvider.overrideWithValue(soundPlayer),
       ],
     );
   }
@@ -135,6 +140,7 @@ TestAppBundle testAppBundle({required Widget home, TestHarness? harness}) {
       secureKeyStoreProvider.overrideWithValue(suite.keyStore),
       webLauncherProvider.overrideWithValue(suite.webLauncher),
       ankiGatewayProvider.overrideWithValue(suite.anki),
+      practiceSoundPlayerProvider.overrideWithValue(suite.soundPlayer),
     ],
   );
   return TestAppBundle(
@@ -172,4 +178,13 @@ Future<void> pumpTestApp(
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1));
   });
+}
+
+class RecordingPracticeSoundPlayer implements PracticeSoundPlayer {
+  final List<PracticeSound> played = [];
+
+  @override
+  Future<void> play(PracticeSound sound) async {
+    played.add(sound);
+  }
 }

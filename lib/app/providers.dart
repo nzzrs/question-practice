@@ -10,6 +10,7 @@ import '../core/data/settings_repository.dart';
 import '../core/database/app_database.dart';
 import '../core/domain/models.dart';
 import '../core/platform/anki_gateway.dart';
+import '../core/platform/practice_sound_player.dart';
 import '../core/platform/secure_key_store.dart';
 import '../core/platform/web_launcher.dart';
 import '../features/export/domain/export_service.dart';
@@ -74,6 +75,12 @@ final practiceSummariesProvider =
     StreamProvider.family<List<PracticeSummary>, int>(
       (ref, topicId) =>
           ref.watch(topicRepositoryProvider).watchPracticeSummaries(topicId),
+    );
+
+final topicProgressProvider =
+    StreamProvider.family<List<TopicProgressPoint>, int>(
+      (ref, topicId) =>
+          ref.watch(topicRepositoryProvider).watchTopicProgress(topicId),
     );
 
 final inProgressSessionProvider = StreamProvider<PracticeSession?>(
@@ -172,6 +179,10 @@ final lookupServiceProvider = Provider<LookupService>(
 
 final ankiGatewayProvider = Provider<AnkiGateway>(
   (ref) => MethodChannelAnkiGateway(),
+);
+
+final practiceSoundPlayerProvider = Provider<PracticeSoundPlayer>(
+  (ref) => MethodChannelPracticeSoundPlayer(),
 );
 
 final ankiStatusProvider = FutureProvider<AnkiStatus>(

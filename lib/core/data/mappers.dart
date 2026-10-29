@@ -43,6 +43,7 @@ Practice practiceFromRow(PracticeRow row) {
     description: row.description,
     contentHash: row.contentHash,
     importedAt: row.importedAt.toUtc(),
+    isDone: row.isDone,
   );
 }
 
@@ -171,6 +172,7 @@ PracticeSummary practiceSummaryFromRow(PracticeSummaryRow row) {
       description: row.description,
       contentHash: row.contentHash,
       importedAt: row.importedAt.toUtc(),
+      isDone: row.isDone,
     ),
     questionCount: row.questionCount,
     lastScore: row.lastScore,

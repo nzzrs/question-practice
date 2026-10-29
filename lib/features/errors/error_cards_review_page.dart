@@ -94,96 +94,94 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     if (widget.cards.isEmpty) {
-      return AppScaffold(
+      return AppPage(
         title: widget.title,
         showBack: true,
-        body: const EmptyState(
-          icon: Icons.style_outlined,
-          title: 'No error cards',
-          message: 'Wrong answers create error cards for review.',
-        ),
+        variant: M3EAppBarVariant.small,
+        children: const [
+          EmptyState(
+            icon: Icons.style_outlined,
+            title: 'No error cards',
+            message: 'Wrong answers create error cards for review.',
+          ),
+        ],
       );
     }
     if (_finished) {
-      return AppScaffold(
+      return AppPage(
         title: 'Review complete',
-        showBack: false,
-        body: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            const SizedBox(height: 40),
-            Icon(
-              Icons.check_circle_outline,
-              size: 56,
-              color: theme.colorScheme.primary,
+        variant: M3EAppBarVariant.small,
+        children: [
+          const SizedBox(height: 32),
+          Center(child: IconBadge(Icons.check_circle_outline, size: 72)),
+          const SizedBox(height: 16),
+          Text(
+            _saved == 0 ? 'No cards changed' : 'Review complete',
+            textAlign: TextAlign.center,
+            style: theme.typography.emphasized.headlineSmall,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _saved == 0
+                ? 'No card details were saved.'
+                : '$_saved card${_saved == 1 ? '' : 's'} updated.',
+            textAlign: TextAlign.center,
+            style: theme.typography.baseline.bodyMedium.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            const SizedBox(height: 16),
-            Text(
-              _saved == 0 ? 'No cards changed' : 'Review complete',
-              textAlign: TextAlign.center,
-              style: theme.typography.emphasized.headlineSmall,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _saved == 0
-                  ? 'No card details were saved.'
-                  : '$_saved card${_saved == 1 ? '' : 's'} updated.',
-              textAlign: TextAlign.center,
-              style: theme.typography.baseline.bodyMedium.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 24),
-            M3EButton.filled(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Done'),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 24),
+          AppPrimaryButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            label: 'Done',
+            icon: Icons.check,
+          ),
+        ],
       );
     }
 
     final card = _card!;
-    return AppScaffold(
+    return AppPage(
       title: widget.title,
       showBack: true,
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-        children: [
-          Text(
-            'Card ${_index + 1} of ${widget.cards.length}',
-            style: theme.typography.baseline.labelMedium.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          LinearScore(value: (_index + 1) / widget.cards.length),
-          const SizedBox(height: 24),
-          Text(
-            card.needsDetails
-                ? 'Complete the error card'
-                : 'Check the error card',
-            style: theme.typography.emphasized.headlineSmall,
-          ),
-          const SizedBox(height: 16),
-          ErrorCardReviewView(card: card, bias: _bias, vaccine: _vaccine),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              M3EButton.filled(
+      variant: M3EAppBarVariant.small,
+      bottomBar: AppActionDock(
+        child: Row(
+          children: [
+            Expanded(
+              child: AppPrimaryButton(
                 onPressed: _busy ? null : _save,
-                icon: const Icon(Icons.check),
-                label: Text(_busy ? 'Saving…' : 'Save'),
+                label: _busy ? 'Saving…' : 'Save',
+                icon: Icons.check,
               ),
-              const SizedBox(width: 8),
-              M3EButton.text(
-                onPressed: _busy ? null : _advance,
-                child: const Text('Skip'),
-              ),
-            ],
-          ),
-        ],
+            ),
+            const SizedBox(width: 8),
+            M3EButton.text(
+              onPressed: _busy ? null : _advance,
+              child: const Text('Skip'),
+            ),
+          ],
+        ),
       ),
+      children: [
+        Text(
+          'Card ${_index + 1} of ${widget.cards.length}',
+          style: theme.typography.baseline.labelMedium.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        LinearScore(value: (_index + 1) / widget.cards.length),
+        const SizedBox(height: 22),
+        Text(
+          card.needsDetails
+              ? 'Complete the error card'
+              : 'Check the error card',
+          style: theme.typography.emphasized.headlineSmall,
+        ),
+        const SizedBox(height: 16),
+        ErrorCardReviewView(card: card, bias: _bias, vaccine: _vaccine),
+      ],
     );
   }
 }

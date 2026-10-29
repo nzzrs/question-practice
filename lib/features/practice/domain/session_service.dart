@@ -374,6 +374,7 @@ class SessionService {
     final attempts = await _sessions.attemptsForSession(sessionId);
     await _sessions.completeSession(
       id: sessionId,
+      total: attempts.length,
       correct: attempts.where((attempt) => attempt.isCorrect).length,
       skipped: attempts.where((attempt) => attempt.isSkipped).length,
       distracted: attempts.where((attempt) => attempt.distracted).length,
@@ -395,12 +396,57 @@ class SessionService {
     final distracted = attempts.where((attempt) => attempt.distracted).length;
     await _sessions.completeSession(
       id: sessionId,
+      total: attempts.length,
       correct: correct,
       skipped: skipped,
       distracted: distracted,
       finishedAt: now,
     );
     return summaryFor(sessionId);
+  }
+
+  /// Completes a session before every question was answered.
+  ///
+  /// Unanswered questions are left out of the session when [markSkipped] is
+  /// false, so they do not affect the score or the statistics. When it is true,
+  /// each unanswered question is recorded as a skipped attempt.
+  Future<SessionSummary> finishEarly({
+    required SessionStart start,
+    required bool markSkipped,
+  }) async {
+    final session = start.session;
+    if (session.status != SessionStatus.inProgress) {
+      return summaryFor(session.id);
+    }
+    final unanswered = [
+      for (final item in start.items)
+        if (!start.attempts.containsKey(item.question.id)) item,
+    ];
+    final now = _clock.now().toUtc();
+    if (markSkipped) {
+      for (final item in unanswered) {
+        final attempt = await _sessions.recordAttempt(
+          sessionId: session.id,
+          questionId: item.question.id,
+          selectedIndexes: const [],
+          reasoning: '',
+          distracted: false,
+          isCorrect: false,
+          answeredAt: now,
+        );
+        start.attempts[item.question.id] = attempt;
+      }
+    }
+    final attempts = await _sessions.attemptsForSession(session.id);
+    await _sessions.completeSession(
+      id: session.id,
+      total: attempts.length,
+      correct: attempts.where((attempt) => attempt.isCorrect).length,
+      skipped: attempts.where((attempt) => attempt.isSkipped).length,
+      distracted: attempts.where((attempt) => attempt.distracted).length,
+      finishedAt: now,
+    );
+    return summaryFor(session.id);
   }
 
   Future<SessionSummary> summaryFor(int sessionId) async {

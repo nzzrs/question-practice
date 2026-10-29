@@ -183,7 +183,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              'The app sends the selected term, question and topic to the endpoint you choose. It never logs the key. Use an endpoint that supports chat completions and JSON output.',
+              'The app sends the selected term, question and topic to the endpoint you choose. It never logs the key. Use an OpenAI-compatible chat-completions endpoint; OpenRouter covers Claude and Gemini models.',
               style: theme.typography.baseline.bodySmall.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),

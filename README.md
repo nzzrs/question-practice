@@ -14,7 +14,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
   - concept cards such as `Definition of {{c1::GCP}}: {{c2::Google Cloud Platform}}`;
   - basic question/answer cards for skipped questions.
 - Re-test errors after 48 hours. A correct answer resolves the card but keeps the history.
-- Look up a selected term with an optional OpenAI-compatible endpoint, or in DuckDuckGo/Wikipedia through a Custom Tab.
+- Look up a selected term with an optional OpenAI-compatible endpoint (Claude and Gemini are available through OpenRouter), or in DuckDuckGo/Wikipedia through a Custom Tab.
 - Export selected cards directly to AnkiDroid or share Anki-compatible files.
 - See per-topic accuracy and progress, and a mixed shuffled session across all topics.
 - A subtle reminder every five minutes. There is no timer.

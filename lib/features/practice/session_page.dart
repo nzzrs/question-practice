@@ -146,9 +146,18 @@ class _SessionPageState extends ConsumerState<SessionPage>
 
   Future<void> _openSummary(SessionSummary summary) async {
     if (!mounted) return;
+    SessionSummary latest;
+    try {
+      latest = await ref
+          .read(sessionServiceProvider)
+          .summaryFor(summary.session.id);
+    } on SessionException {
+      latest = summary;
+    }
+    if (!mounted) return;
     await Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (context) => SummaryPage(summary: summary),
+        builder: (context) => SummaryPage(summary: latest),
       ),
     );
   }

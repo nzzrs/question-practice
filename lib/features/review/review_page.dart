@@ -243,7 +243,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             ),
             const SizedBox(height: 24),
             M3EButton.filled(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(context).pop(true),
               child: const Text('Done'),
             ),
             const SizedBox(height: 8),

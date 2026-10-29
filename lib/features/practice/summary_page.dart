@@ -185,15 +185,13 @@ class _SummaryPageState extends ConsumerState<SummaryPage> {
   }
 
   Future<void> _openReview(SessionSummary summary) async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
+    final completed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
         builder: (context) => ReviewPage(sessionId: summary.session.id),
       ),
     );
-    if (!mounted) return;
+    if (!mounted || completed != true) return;
     setState(() => _reviewed = true);
-    if (_reviewed) {
-      ref.invalidate(homeStatsProvider);
-    }
+    ref.invalidate(homeStatsProvider);
   }
 }

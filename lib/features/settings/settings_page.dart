@@ -342,7 +342,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 14),
         _SettingsSection(
           title: 'About',
-          supporting: 'question practice 0.9.0\nLocal-first practice with error cards and Anki export.',
+          supporting: 'question practice 0.9.1\nLocal-first practice with error cards and Anki export.',
           child: const SizedBox.shrink(),
         ),
       ],

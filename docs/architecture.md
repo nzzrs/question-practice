@@ -46,7 +46,8 @@ A session is created at start and remains `inProgress` until every question has 
 - Navigation is Navigator 1.0 with `MaterialPageRoute`, because `M3EMaterialApp` does not expose `routerConfig`.
 - Home is a topics list with quick actions for due errors and cards. An info icon opens the help screen.
 - The practice screen keeps everything in place after submission: locked reasoning, marked alternatives, per-alternative explanations and the overall explanation. A wrong answer offers the distraction checkbox in the feedback; checking it updates the attempt and removes the new error card, and unchecking restores it.
-- Questions with several correct answers use checkboxes. Selection is compared as a set, so every correct alternative is required and an extra wrong alternative fails the question.
+- Alternatives are shown in a per-session shuffled order. Circular badges hide the original letters until feedback or the eye toggle, which reveals them without reordering the alternatives.
+- Questions with several correct answers let you select every correct alternative. Selection is compared as a set, so every correct alternative is required and an extra wrong alternative fails the question.
 - Prompt, alternatives and explanations use `SelectableLinkifiedText` for Define and tappable http(s) links.
 - AI definitions render in an overlay bubble anchored to the selection and save before display. Web definitions keep the editable bottom sheet.
 - The 5-minute reminder is a `Timer.periodic` paused while the app is in the background.

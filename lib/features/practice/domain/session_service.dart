@@ -23,11 +23,20 @@ class SessionQuestionItem {
     required this.question,
     required this.topicName,
     required this.practiceName,
+    required this.alternativeOrder,
   });
 
   final Question question;
   final String topicName;
   final String practiceName;
+
+  /// Original alternative indexes in display order.
+  final List<int> alternativeOrder;
+
+  /// Falls back to the source order for items built without a shuffle.
+  List<int> get displayOrder => alternativeOrder.isEmpty
+      ? List<int>.generate(question.alternatives.length, (index) => index)
+      : alternativeOrder;
 }
 
 class SessionStart {
@@ -88,6 +97,23 @@ class SessionService {
   final Clock _clock;
   final Random _random;
 
+  SessionQuestionItem _itemFor(
+    Question question, {
+    required String topicName,
+    required String practiceName,
+  }) {
+    final order = List<int>.generate(
+      question.alternatives.length,
+      (index) => index,
+    )..shuffle(_random);
+    return SessionQuestionItem(
+      question: question,
+      topicName: topicName,
+      practiceName: practiceName,
+      alternativeOrder: List<int>.unmodifiable(order),
+    );
+  }
+
   Future<SessionStart> startPractice(int practiceId) async {
     final practice = await _practices.practiceById(practiceId);
     if (practice == null) {
@@ -108,8 +134,8 @@ class SessionService {
       session: session,
       items: [
         for (final question in questions)
-          SessionQuestionItem(
-            question: question,
+          _itemFor(
+            question,
             topicName: topic?.name ?? '',
             practiceName: practice.name,
           ),
@@ -141,8 +167,8 @@ class SessionService {
       session: session,
       items: [
         for (final question in shuffled)
-          SessionQuestionItem(
-            question: question,
+          _itemFor(
+            question,
             topicName:
                 topicNames[practiceById[question.practiceId]?.topicId] ?? '',
             practiceName: practiceById[question.practiceId]?.name ?? '',
@@ -164,8 +190,8 @@ class SessionService {
       final question = await _practices.questionById(card.questionId);
       if (question == null) continue;
       questions.add(
-        SessionQuestionItem(
-          question: question,
+        _itemFor(
+          question,
           topicName: card.topicName,
           practiceName: card.practiceName,
         ),
@@ -216,8 +242,8 @@ class SessionService {
       session: session,
       items: [
         for (final question in questions)
-          SessionQuestionItem(
-            question: question,
+          _itemFor(
+            question,
             topicName:
                 topicNames[practiceById[question.practiceId]?.topicId] ?? '',
             practiceName: practiceById[question.practiceId]?.name ?? '',

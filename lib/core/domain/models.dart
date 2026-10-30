@@ -187,6 +187,7 @@ class TopicSummary {
     required this.topic,
     required this.practiceCount,
     required this.questionCount,
+    required this.attemptedQuestionCount,
     required this.answeredCount,
     required this.correctCount,
     required this.correctQuestionCount,
@@ -199,6 +200,7 @@ class TopicSummary {
   final Topic topic;
   final int practiceCount;
   final int questionCount;
+  final int attemptedQuestionCount;
   final int answeredCount;
   final int correctCount;
   final int correctQuestionCount;
@@ -208,8 +210,9 @@ class TopicSummary {
   final DateTime? lastPracticedAt;
 
   double get accuracy => answeredCount == 0 ? 0 : correctCount / answeredCount;
-  double get progress =>
-      questionCount == 0 ? 0 : correctQuestionCount / questionCount;
+  double get progress => attemptedQuestionCount == 0
+      ? 0
+      : correctQuestionCount / attemptedQuestionCount;
 }
 
 @immutable

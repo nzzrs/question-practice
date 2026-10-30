@@ -6,7 +6,7 @@ Question Practice is an offline-first Android study app. This guide walks throug
 
 - **Topics** lists your topics, ordered by priority and name.
 - **Session in progress** cards list every paused session with its mode, question count and start time. Each card has **Resume** and **Discard**.
-- A topic card shows its practices, question count, accuracy and progress.
+- A topic card shows its practices, the number of distinct questions answered at least once, accuracy and progress.
 - **Review past errors** opens the 48-hour error queue.
 - **Cards** opens concepts, error cards and basic cards waiting for export.
 - The **shuffle** button turns on **Start shuffled practice**. That session mixes questions from every topic in random order. The setting is remembered.
@@ -34,6 +34,7 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 ## Practice session
 
 - Each question shows the topic and practice, the prompt and 2–8 alternatives.
+- Alternatives are shuffled for every session and keep that order while the question is open. Before answering, badges are plain circles and hide the original letters. Tap the eye beside the flag to reveal each alternative's original letter without changing the order. After **Check**, the original letters appear automatically so explanations that refer to “A”, “B” or “C” stay unambiguous.
 - Select one alternative, or every correct alternative when the question has more than one. The reasoning field is optional. Write what led you to the answer; it appears later in the error review.
 - The arrows beside **Question X of Y** move to the previous or next question without answering. Answers already submitted keep their feedback when you return.
 - **Check** stays on the same screen. The reasoning locks, the correct answer is marked, the wrong choice is marked, and every alternative expands with its explanation. The overall explanation appears below.

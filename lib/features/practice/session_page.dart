@@ -37,6 +37,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   bool _submitting = false;
   bool _distracted = false;
   bool _reasoningOpen = false;
+  bool _showOriginalLetters = false;
   AnswerOutcome? _outcome;
   SessionSummary? _summary;
   int _reminderMinutes = 0;
@@ -395,6 +396,19 @@ class _SessionPageState extends ConsumerState<SessionPage>
           actions: [
             M3EIconButton(
               variant: M3EIconButtonVariant.standard,
+              icon: Icon(
+                _showOriginalLetters
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined,
+              ),
+              tooltip: _showOriginalLetters
+                  ? 'Hide original letters'
+                  : 'Show original letters',
+              onPressed: () =>
+                  setState(() => _showOriginalLetters = !_showOriginalLetters),
+            ),
+            M3EIconButton(
+              variant: M3EIconButtonVariant.standard,
               icon: const Icon(Icons.flag_outlined),
               tooltip: 'Finish practice',
               onPressed: _submitting ? null : _finishEarly,
@@ -469,20 +483,16 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   ],
                 ),
                 const SizedBox(height: 18),
-                for (
-                  var index = 0;
-                  index < item.question.alternatives.length;
-                  index++
-                )
+                for (final index in item.displayOrder)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _OptionCard(
-                      index: index,
+                      originalIndex: index,
                       text: item.question.alternatives[index],
                       selected: _selectedIndexes.contains(index),
                       submitted: _submitted,
-                      multiSelect: item.question.allowsMultiple,
                       isCorrect: item.question.correctIndexes.contains(index),
+                      showLetter: _submitted || _showOriginalLetters,
                       explanation:
                           item.question.alternativeExplanations.length > index
                           ? item.question.alternativeExplanations[index]
@@ -888,24 +898,24 @@ class _FeedbackStatus extends StatelessWidget {
 
 class _OptionCard extends StatelessWidget {
   const _OptionCard({
-    required this.index,
+    required this.originalIndex,
     required this.text,
     required this.selected,
     required this.submitted,
-    required this.multiSelect,
     required this.isCorrect,
+    required this.showLetter,
     required this.explanation,
     required this.onDefine,
     required this.onOpenUrl,
     required this.onPressed,
   });
 
-  final int index;
+  final int originalIndex;
   final String text;
   final bool selected;
   final bool submitted;
-  final bool multiSelect;
   final bool isCorrect;
+  final bool showLetter;
   final String explanation;
   final void Function(String selection, Rect? anchor) onDefine;
   final ValueChanged<String> onOpenUrl;
@@ -944,11 +954,11 @@ class _OptionCard extends StatelessWidget {
         : selected
         ? theme.colorScheme.onSecondary
         : theme.colorScheme.onSurfaceVariant;
-    final letter = String.fromCharCode(65 + index);
+    final letter = String.fromCharCode(65 + originalIndex);
     return Semantics(
       button: !submitted,
       selected: selected,
-      label: 'Alternative $letter: $text',
+      label: showLetter ? 'Alternative $letter: $text' : 'Alternative: $text',
       child: Material(
         color: background,
         borderRadius: BorderRadius.circular(22),
@@ -966,19 +976,21 @@ class _OptionCard extends StatelessWidget {
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     color: badgeBackground,
-                    borderRadius: BorderRadius.circular(multiSelect ? 9 : 15),
+                    shape: BoxShape.circle,
                   ),
-                  child: correctNow
-                      ? Icon(Icons.check, size: 18, color: badgeForeground)
-                      : wrongNow
-                      ? Icon(Icons.close, size: 18, color: badgeForeground)
-                      : Text(
+                  child: showLetter
+                      ? Text(
                           letter,
                           style: theme.typography.baseline.labelMedium.copyWith(
                             color: badgeForeground,
                             fontWeight: FontWeight.w700,
                           ),
-                        ),
+                        )
+                      : correctNow
+                      ? Icon(Icons.check, size: 18, color: badgeForeground)
+                      : wrongNow
+                      ? Icon(Icons.close, size: 18, color: badgeForeground)
+                      : null,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -1010,6 +1022,17 @@ class _OptionCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (correctNow || wrongNow) ...[
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Icon(
+                      correctNow ? Icons.check : Icons.close,
+                      size: 20,
+                      color: foreground,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),

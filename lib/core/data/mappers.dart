@@ -153,6 +153,7 @@ TopicSummary topicSummaryFromRow(TopicSummaryRow row) {
     ),
     practiceCount: row.practiceCount,
     questionCount: row.questionCount,
+    attemptedQuestionCount: row.attemptedQuestionCount,
     answeredCount: row.answeredCount,
     correctCount: row.correctCount,
     correctQuestionCount: row.correctQuestionCount,

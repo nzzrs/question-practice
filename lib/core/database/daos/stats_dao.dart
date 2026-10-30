@@ -76,6 +76,13 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
           WHERE p.topic_id = t.id AND s.status = 'completed' AND a.selected_indexes_json != '[]'
         ) AS answered_count,
         (
+          SELECT COUNT(DISTINCT a.question_id) FROM attempts a
+          INNER JOIN sessions s ON s.id = a.session_id
+          INNER JOIN questions q ON q.id = a.question_id
+          INNER JOIN practices p ON p.id = q.practice_id
+          WHERE p.topic_id = t.id AND s.status = 'completed' AND a.selected_indexes_json != '[]'
+        ) AS attempted_question_count,
+        (
           SELECT COUNT(*) FROM attempts a
           INNER JOIN sessions s ON s.id = a.session_id
           INNER JOIN questions q ON q.id = a.question_id
@@ -219,6 +226,7 @@ class TopicSummaryRow {
     required this.topicCreatedAt,
     required this.practiceCount,
     required this.questionCount,
+    required this.attemptedQuestionCount,
     required this.answeredCount,
     required this.correctCount,
     required this.correctQuestionCount,
@@ -238,6 +246,7 @@ class TopicSummaryRow {
       topicCreatedAt: row.read<DateTime>('topic_created_at').toUtc(),
       practiceCount: row.read<int>('practice_count'),
       questionCount: row.read<int>('question_count'),
+      attemptedQuestionCount: row.read<int>('attempted_question_count'),
       answeredCount: row.read<int>('answered_count'),
       correctCount: row.read<int>('correct_count'),
       correctQuestionCount: row.read<int>('correct_question_count'),
@@ -256,6 +265,7 @@ class TopicSummaryRow {
   final DateTime topicCreatedAt;
   final int practiceCount;
   final int questionCount;
+  final int attemptedQuestionCount;
   final int answeredCount;
   final int correctCount;
   final int correctQuestionCount;

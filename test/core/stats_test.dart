@@ -111,6 +111,28 @@ void main() {
     );
   });
 
+  test(
+    'unanswered questions do not count toward topic question totals',
+    () async {
+      final practice = await harness.seedPractice(count: 3);
+      final start = await sessions.startPractice(practice.practiceId);
+      await sessions.submitAnswer(
+        start: start,
+        item: start.items.first,
+        selectedIndexes: const [0],
+        reasoning: '',
+        distracted: false,
+      );
+      await sessions.finishEarly(start: start, markSkipped: false);
+
+      final summary =
+          (await harness.practices.watchTopicSummaries().first).single;
+      expect(summary.questionCount, 3);
+      expect(summary.attemptedQuestionCount, 1);
+      expect(summary.progress, 1);
+    },
+  );
+
   test('unfinished sessions do not affect stats', () async {
     final practice = await harness.seedPractice(count: 2);
     final start = await sessions.startPractice(practice.practiceId);

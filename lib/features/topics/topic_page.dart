@@ -413,7 +413,7 @@ class _TopicHero extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${summary.correctQuestionCount}/${summary.questionCount} learned',
+                      '${summary.correctQuestionCount}/${summary.attemptedQuestionCount} learned',
                       style: theme.typography.baseline.bodySmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

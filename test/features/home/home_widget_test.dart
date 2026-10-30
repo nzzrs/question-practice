@@ -30,11 +30,27 @@ void main() {
   testWidgets('home shows imported topics and opens a topic', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
-    await harness.seedPractice(
+    final seeded = await harness.seedPractice(
       topicName: 'Cloud',
       practiceName: 'Core',
       count: 3,
     );
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await service.startPractice(seeded.practiceId);
+    for (final item in start.items) {
+      await service.submitAnswer(
+        start: start,
+        item: item,
+        selectedIndexes: const [0],
+        reasoning: '',
+        distracted: false,
+      );
+    }
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
     expect(find.text('Cloud'), findsOneWidget);
@@ -44,6 +60,34 @@ void main() {
     await pumpFrames(tester);
     expect(find.text('Core'), findsOneWidget);
     expect(find.text('3 questions'), findsOneWidget);
+  });
+
+  testWidgets('unanswered questions stay out of topic totals', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Cloud',
+      practiceName: 'Core',
+      count: 3,
+    );
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await service.startPractice(seeded.practiceId);
+    await service.submitAnswer(
+      start: start,
+      item: start.items.first,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await service.finishEarly(start: start, markSkipped: false);
+
+    await pumpTestApp(tester, home: const HomePage(), harness: harness);
+    expect(find.text('1 practices · 1 questions'), findsOneWidget);
   });
 
   testWidgets('session gives in-place feedback, explanation and score', (

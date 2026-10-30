@@ -7,7 +7,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 ## What it does
 
 - Import practices from JSON or a `.txt` file containing JSON. One file can contain many topics and practices.
-- Answer with an optional written reasoning. Questions can have one correct alternative or several; feedback appears in place, with an explanation under every alternative. Answers and explanations are selectable, and http(s) links open in the browser.
+- Answer with an optional written reasoning. Questions can have one correct alternative or several; feedback appears in place, with an explanation under every alternative. Alternatives are shuffled per session, original letters stay hidden until feedback or the eye toggle, and answers and explanations are selectable with http(s) links opening in the browser.
 - Move between questions with the arrows beside the question number. Closing a session offers **Save for later**, and Home lists every paused session.
 - Check **I was distracted or read too fast** in the feedback to remove a new error card; uncheck it to restore the card.
 - Get a score and the number of terms looked up at the end of a session.

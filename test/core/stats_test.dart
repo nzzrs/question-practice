@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 
 import '../helpers/test_harness.dart';
@@ -45,7 +46,7 @@ void main() {
     expect(summary.correctCount, 1);
     expect(summary.correctQuestionCount, 1);
     expect(summary.accuracy, 0.5);
-    expect(summary.progress, 0.5);
+    expect(summary.progress, 1);
     expect(summary.activeErrorCount, 1);
     expect(summary.dueErrorCount, 0);
 
@@ -112,14 +113,37 @@ void main() {
   });
 
   test(
-    'unanswered questions do not count toward topic question totals',
+    'progress counts answered questions over total minus unanswered',
     () async {
       final practice = await harness.seedPractice(count: 3);
+      final extraPracticeId = await harness.practices.createPractice(
+        topicId: practice.topicId,
+        name: 'Untouched',
+        description: '',
+        contentHash: 'untouched-hash',
+        importedAt: harness.clock.now().toUtc(),
+      );
+      await harness.practices.createQuestions(extraPracticeId, const [
+        QuestionDraft(
+          prompt: 'Never seen 1?',
+          alternatives: ['Correct', 'Wrong'],
+          correctIndexes: [0],
+          explanation: 'Because it is correct.',
+          alternativeExplanations: ['Correct.', 'Wrong.'],
+        ),
+        QuestionDraft(
+          prompt: 'Never seen 2?',
+          alternatives: ['Correct', 'Wrong'],
+          correctIndexes: [0],
+          explanation: 'Because it is correct.',
+          alternativeExplanations: ['Correct.', 'Wrong.'],
+        ),
+      ]);
       final start = await sessions.startPractice(practice.practiceId);
       await sessions.submitAnswer(
         start: start,
         item: start.items.first,
-        selectedIndexes: const [0],
+        selectedIndexes: const [1],
         reasoning: '',
         distracted: false,
       );
@@ -127,9 +151,14 @@ void main() {
 
       final summary =
           (await harness.practices.watchTopicSummaries().first).single;
-      expect(summary.questionCount, 3);
+      expect(summary.questionCount, 5);
       expect(summary.attemptedQuestionCount, 1);
-      expect(summary.progress, 1);
+      expect(summary.unansweredQuestionCount, 2);
+      expect(summary.relevantQuestionCount, 3);
+      expect(summary.answeredCount, 1);
+      expect(summary.correctCount, 0);
+      expect(summary.accuracy, 0);
+      expect(summary.progress, closeTo(1 / 3, 0.0001));
     },
   );
 

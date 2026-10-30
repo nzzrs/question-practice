@@ -11,6 +11,7 @@ part 'stats_dao.g.dart';
     Practices,
     Questions,
     Sessions,
+    SessionQuestions,
     Attempts,
     ErrorCards,
     Concepts,
@@ -83,6 +84,21 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
           WHERE p.topic_id = t.id AND s.status = 'completed' AND a.selected_indexes_json != '[]'
         ) AS attempted_question_count,
         (
+          SELECT COUNT(DISTINCT sq.question_id)
+          FROM session_questions sq
+          INNER JOIN sessions s ON s.id = sq.session_id
+          INNER JOIN questions q ON q.id = sq.question_id
+          INNER JOIN practices p ON p.id = q.practice_id
+          WHERE p.topic_id = t.id AND s.status = 'completed'
+            AND NOT EXISTS (
+              SELECT 1 FROM attempts a
+              INNER JOIN sessions answered_session ON answered_session.id = a.session_id
+              WHERE a.question_id = sq.question_id
+                AND answered_session.status = 'completed'
+                AND a.selected_indexes_json != '[]'
+            )
+        ) AS unanswered_question_count,
+        (
           SELECT COUNT(*) FROM attempts a
           INNER JOIN sessions s ON s.id = a.session_id
           INNER JOIN questions q ON q.id = a.question_id
@@ -126,7 +142,15 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
       ORDER BY (t.priority IS NULL) ASC, t.priority ASC, t.name COLLATE NOCASE ASC
       ''',
       variables: [Variable.withDateTime(now)],
-      readsFrom: {topics, practices, questions, sessions, attempts, errorCards},
+      readsFrom: {
+        topics,
+        practices,
+        questions,
+        sessions,
+        sessionQuestions,
+        attempts,
+        errorCards,
+      },
     );
     return query.watch().map(
       (rows) => rows.map(TopicSummaryRow.fromRow).toList(),
@@ -227,6 +251,7 @@ class TopicSummaryRow {
     required this.practiceCount,
     required this.questionCount,
     required this.attemptedQuestionCount,
+    required this.unansweredQuestionCount,
     required this.answeredCount,
     required this.correctCount,
     required this.correctQuestionCount,
@@ -247,6 +272,7 @@ class TopicSummaryRow {
       practiceCount: row.read<int>('practice_count'),
       questionCount: row.read<int>('question_count'),
       attemptedQuestionCount: row.read<int>('attempted_question_count'),
+      unansweredQuestionCount: row.read<int>('unanswered_question_count'),
       answeredCount: row.read<int>('answered_count'),
       correctCount: row.read<int>('correct_count'),
       correctQuestionCount: row.read<int>('correct_question_count'),
@@ -266,6 +292,7 @@ class TopicSummaryRow {
   final int practiceCount;
   final int questionCount;
   final int attemptedQuestionCount;
+  final int unansweredQuestionCount;
   final int answeredCount;
   final int correctCount;
   final int correctQuestionCount;

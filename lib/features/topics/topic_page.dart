@@ -413,7 +413,7 @@ class _TopicHero extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${summary.correctQuestionCount}/${summary.attemptedQuestionCount} learned',
+                      '${summary.attemptedQuestionCount}/${summary.relevantQuestionCount} learned',
                       style: theme.typography.baseline.bodySmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -442,7 +442,7 @@ class _TopicHero extends StatelessWidget {
               const SizedBox(width: 10),
               Expanded(
                 child: MetricTile(
-                  label: 'Answers',
+                  label: 'Correct answers',
                   value: '${summary.correctCount}/${summary.answeredCount}',
                   icon: Icons.check_circle_outline,
                   caption: '${summary.sessionCount} sessions',

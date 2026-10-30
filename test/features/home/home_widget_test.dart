@@ -228,6 +228,7 @@ void main() {
     expect(find.text('P1'), findsOneWidget);
     expect(find.text('Anki deck: Cloud deck'), findsOneWidget);
     expect(find.text('Progress'), findsOneWidget);
+    expect(find.text('Correct answers'), findsOneWidget);
     expect(find.text('TCP/IP'), findsOneWidget);
   });
 }

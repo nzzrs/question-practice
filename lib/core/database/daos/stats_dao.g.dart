@@ -8,6 +8,8 @@ mixin _$StatsDaoMixin on DatabaseAccessor<AppDatabase> {
   $PracticesTable get practices => attachedDatabase.practices;
   $QuestionsTable get questions => attachedDatabase.questions;
   $SessionsTable get sessions => attachedDatabase.sessions;
+  $SessionQuestionsTable get sessionQuestions =>
+      attachedDatabase.sessionQuestions;
   $AttemptsTable get attempts => attachedDatabase.attempts;
   $ErrorCardsTable get errorCards => attachedDatabase.errorCards;
   $ConceptsTable get concepts => attachedDatabase.concepts;
@@ -26,6 +28,11 @@ class StatsDaoManager {
       $$QuestionsTableTableManager(_db.attachedDatabase, _db.questions);
   $$SessionsTableTableManager get sessions =>
       $$SessionsTableTableManager(_db.attachedDatabase, _db.sessions);
+  $$SessionQuestionsTableTableManager get sessionQuestions =>
+      $$SessionQuestionsTableTableManager(
+        _db.attachedDatabase,
+        _db.sessionQuestions,
+      );
   $$AttemptsTableTableManager get attempts =>
       $$AttemptsTableTableManager(_db.attachedDatabase, _db.attempts);
   $$ErrorCardsTableTableManager get errorCards =>

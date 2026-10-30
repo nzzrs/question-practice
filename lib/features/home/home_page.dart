@@ -584,7 +584,7 @@ class _TopicRow extends StatelessWidget {
                   ],
                   Expanded(
                     child: Text(
-                      '${summary.practiceCount} practices · ${summary.attemptedQuestionCount} questions',
+                      '${summary.practiceCount} practices · ${summary.relevantQuestionCount} questions',
                       style: theme.typography.baseline.labelSmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

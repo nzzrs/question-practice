@@ -154,6 +154,7 @@ TopicSummary topicSummaryFromRow(TopicSummaryRow row) {
     practiceCount: row.practiceCount,
     questionCount: row.questionCount,
     attemptedQuestionCount: row.attemptedQuestionCount,
+    unansweredQuestionCount: row.unansweredQuestionCount,
     answeredCount: row.answeredCount,
     correctCount: row.correctCount,
     correctQuestionCount: row.correctQuestionCount,

@@ -5,6 +5,40 @@ import 'package:question_practice/features/topics/topic_page.dart';
 import '../../helpers/test_harness.dart';
 
 void main() {
+  testWidgets('long pressing a practice renames it', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 2,
+    );
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: seeded.topicId),
+      harness: harness,
+    );
+
+    await tester.longPress(find.text('TCP/IP'));
+    await pumpFrames(tester);
+    expect(find.text('Rename'), findsOneWidget);
+
+    await tester.tap(find.text('Rename'));
+    await pumpFrames(tester);
+    await tester.enterText(find.byType(EditableText).last, 'TCP/IP basics');
+    await tester.tap(find.text('Save'));
+    await pumpFrames(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('TCP/IP basics'), findsOneWidget);
+    expect(find.text('TCP/IP'), findsNothing);
+  });
+
   testWidgets('long pressing a practice marks it done', (tester) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;

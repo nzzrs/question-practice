@@ -7,6 +7,7 @@ Question Practice is an offline-first Android study app. This guide walks throug
 - **Topics** lists your topics, ordered by priority and name.
 - **Session in progress** cards list every paused session with its mode, question count and start time. Each card has **Resume** and **Discard**.
 - A topic card shows its practices, its question count (questions left unanswered in completed sessions are excluded), accuracy and progress.
+- Long-press a topic card to delete the topic and everything inside it. The confirmation asks first.
 - **Review past errors** opens the 48-hour error queue.
 - **Cards** opens concepts, error cards and basic cards waiting for export.
 - The **shuffle** button turns on **Start shuffled practice**. That session mixes questions from every topic in random order. The setting is remembered.
@@ -28,6 +29,7 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - Shows description, priority, Anki deck, accuracy, progress, correct answers, active errors and completed sessions.
 - **Progress** is answered questions divided by the topic's total questions after removing those left unanswered in completed sessions. It measures coverage; **Accuracy** measures how many answers were correct.
 - **Practices** lists each practice with question count and last score. Tap a practice to start.
+- Long-press a practice to rename it, delete it, or mark it done or active.
 - **Edit** changes name, description, priority and the Anki deck for that topic.
 - **Browse decks** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
 - Blank deck means the default deck from Settings.

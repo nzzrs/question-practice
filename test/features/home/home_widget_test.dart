@@ -62,6 +62,27 @@ void main() {
     expect(find.text('3 questions'), findsOneWidget);
   });
 
+  testWidgets('long pressing a topic deletes it', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(topicName: 'Cloud', count: 2);
+
+    await pumpTestApp(tester, home: const HomePage(), harness: harness);
+    await tester.longPress(find.text('Cloud'));
+    await pumpFrames(tester);
+
+    expect(find.text('Delete topic?'), findsOneWidget);
+    expect(find.textContaining('every practice, question'), findsOneWidget);
+
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Cloud'), findsNothing);
+    expect(find.text('No practices yet'), findsOneWidget);
+    expect(await harness.practices.allTopics(), isEmpty);
+  });
+
   testWidgets('unanswered questions stay out of topic totals', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);

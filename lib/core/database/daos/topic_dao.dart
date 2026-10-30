@@ -143,6 +143,12 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     await batch((batch) => batch.insertAll(questions, rows));
   }
 
+  Future<void> renamePractice(int id, String name) {
+    return (update(practices)..where((p) => p.id.equals(id))).write(
+      PracticesCompanion(name: Value(name)),
+    );
+  }
+
   Future<void> setPracticeDone(int id, bool isDone) {
     return (update(practices)..where((p) => p.id.equals(id))).write(
       PracticesCompanion(isDone: Value(isDone)),
@@ -151,6 +157,10 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
 
   Future<void> deletePractice(int id) async {
     await (delete(practices)..where((p) => p.id.equals(id))).go();
+  }
+
+  Future<void> deleteTopic(int id) async {
+    await (delete(topics)..where((t) => t.id.equals(id))).go();
   }
 
   Future<void> updateTopic({

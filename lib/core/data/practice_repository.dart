@@ -152,12 +152,20 @@ class PracticeRepository {
     ]);
   }
 
+  Future<void> renamePractice(int id, String name) {
+    return _db.topicDao.renamePractice(id, name);
+  }
+
   Future<void> setPracticeDone(int id, bool isDone) {
     return _db.topicDao.setPracticeDone(id, isDone);
   }
 
   Future<void> deletePractice(int id) {
     return _db.topicDao.deletePractice(id);
+  }
+
+  Future<void> deleteTopic(int id) {
+    return _db.topicDao.deleteTopic(id);
   }
 
   Future<void> updateTopic({

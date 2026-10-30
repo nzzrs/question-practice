@@ -134,6 +134,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                     summary: summary,
                     onPressed: () =>
                         _push(TopicPage(topicId: summary.topic.id)),
+                    onLongPress: () => _showTopicActions(summary),
                   ),
               ],
             );
@@ -155,6 +156,32 @@ class _HomePageState extends ConsumerState<HomePage> {
     await ref
         .read(settingsRepositoryProvider)
         .save(settings.copyWith(shuffleTopics: !settings.shuffleTopics));
+  }
+
+  Future<void> _showTopicActions(TopicSummary summary) async {
+    final confirmed = await M3EDialog.show<bool>(
+      context,
+      dialog: M3EDialog(
+        title: 'Delete topic?',
+        content: Text(
+          'Deleting "${summary.topic.name}" removes every practice, question, '
+          'session and card in it. It cannot be undone.',
+        ),
+        actions: [
+          M3EButton.text(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          M3EButton.filled(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ref.read(topicRepositoryProvider).deleteTopic(summary.topic.id);
+    if (mounted) await showSnack(context, 'Topic deleted.');
   }
 
   Future<void> _startMixed() async {
@@ -500,10 +527,15 @@ class _ResumeCard extends StatelessWidget {
 }
 
 class _TopicRow extends StatelessWidget {
-  const _TopicRow({required this.summary, required this.onPressed});
+  const _TopicRow({
+    required this.summary,
+    required this.onPressed,
+    required this.onLongPress,
+  });
 
   final TopicSummary summary;
   final VoidCallback onPressed;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -513,6 +545,7 @@ class _TopicRow extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onPressed,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
           child: Column(

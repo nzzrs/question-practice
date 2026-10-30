@@ -10,7 +10,7 @@ import '../practice/session_page.dart';
 import 'anki_deck_picker.dart';
 import 'topic_stats_page.dart';
 
-enum _PracticeAction { delete, markDone, markActive }
+enum _PracticeAction { rename, delete, markDone, markActive }
 
 class TopicPage extends ConsumerStatefulWidget {
   const TopicPage({required this.topicId, super.key});
@@ -197,13 +197,17 @@ class _TopicPageState extends ConsumerState<TopicPage> {
         title: practice.name,
         content: Text(
           practice.isDone
-              ? 'This practice is marked as done. You can still open it.'
-              : 'Mark this practice as done when you no longer need it in your active list.',
+              ? 'This practice is marked as done. You can still open, rename or delete it.'
+              : 'Rename or delete this practice, or mark it done when you no longer need it in your active list.',
         ),
         actions: [
           M3EButton.text(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Cancel'),
+          ),
+          M3EButton.text(
+            onPressed: () => Navigator.of(context).pop(_PracticeAction.rename),
+            child: const Text('Rename'),
           ),
           M3EButton.text(
             onPressed: () => Navigator.of(context).pop(_PracticeAction.delete),
@@ -222,6 +226,8 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     );
     if (action == null || !mounted) return;
     switch (action) {
+      case _PracticeAction.rename:
+        await _renamePractice(summary);
       case _PracticeAction.delete:
         final confirmed = await confirmDialog(
           context,
@@ -244,6 +250,59 @@ class _TopicPageState extends ConsumerState<TopicPage> {
             .read(topicRepositoryProvider)
             .setPracticeDone(practice.id, false);
         if (mounted) await showSnack(context, 'Practice marked active.');
+    }
+  }
+
+  Future<void> _renamePractice(PracticeSummary summary) async {
+    final practice = summary.practice;
+    final name = TextEditingController(text: practice.name);
+    String? error;
+    final saved = await M3EDialog.show<bool>(
+      context,
+      dialog: StatefulBuilder(
+        builder: (context, setDialogState) {
+          return M3EDialog(
+            title: 'Rename practice',
+            content: M3ETextField(
+              controller: name,
+              label: 'Name',
+              isRequired: true,
+              autofocus: true,
+              errorText: error,
+            ),
+            actions: [
+              M3EButton.text(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              M3EButton.filled(
+                onPressed: () async {
+                  final trimmed = name.text.trim();
+                  if (trimmed.isEmpty) {
+                    setDialogState(() => error = 'Name is required.');
+                    return;
+                  }
+                  if (trimmed.length > 120) {
+                    setDialogState(
+                      () => error = 'Use 120 characters or fewer.',
+                    );
+                    return;
+                  }
+                  await ref
+                      .read(topicRepositoryProvider)
+                      .renamePractice(practice.id, trimmed);
+                  if (context.mounted) Navigator.of(context).pop(true);
+                },
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    name.dispose();
+    if (saved == true && mounted) {
+      await showSnack(context, 'Practice renamed.');
     }
   }
 

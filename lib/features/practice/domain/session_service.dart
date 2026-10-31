@@ -336,6 +336,36 @@ class SessionService {
     return AnswerOutcome(attempt: attempt, summary: summary);
   }
 
+  /// Updates the note left on an answered question.
+  ///
+  /// The error card created from the same answer is kept in sync with the
+  /// attempt, so late notes appear during review too.
+  Future<Attempt> updateReasoning({
+    required SessionStart start,
+    required SessionQuestionItem item,
+    required String reasoning,
+  }) async {
+    final attempt = await _sessions.attemptForQuestion(
+      start.session.id,
+      item.question.id,
+    );
+    if (attempt == null) {
+      throw const SessionException('This question has no answer to update.');
+    }
+    final trimmed = reasoning.trim();
+    if (trimmed == attempt.reasoning) return attempt;
+    await _sessions.updateAttemptReasoning(attempt.id, trimmed);
+    final card = await _cards.activeErrorForQuestion(item.question.id);
+    if (card != null && card.sessionId == start.session.id) {
+      await _cards.updateErrorCardReasoning(card.id, trimmed);
+    }
+    final updated = await _sessions.attemptForQuestion(
+      start.session.id,
+      item.question.id,
+    );
+    return updated ?? attempt;
+  }
+
   Future<Attempt> setDistracted({
     required SessionStart start,
     required SessionQuestionItem item,

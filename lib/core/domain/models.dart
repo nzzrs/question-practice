@@ -451,6 +451,7 @@ class AppSettings {
     this.shuffleTopics = false,
     this.dynamicColor = true,
     this.soundsEnabled = true,
+    this.soundVolume = 0.85,
     this.ankiDeck = 'Question Practice',
   });
 
@@ -462,6 +463,9 @@ class AppSettings {
   final bool shuffleTopics;
   final bool dynamicColor;
   final bool soundsEnabled;
+
+  /// Playback volume from 0 to 1 for practice sound effects.
+  final double soundVolume;
   final String ankiDeck;
 
   AppSettings copyWith({
@@ -473,6 +477,7 @@ class AppSettings {
     bool? shuffleTopics,
     bool? dynamicColor,
     bool? soundsEnabled,
+    double? soundVolume,
     String? ankiDeck,
   }) {
     return AppSettings(
@@ -484,6 +489,7 @@ class AppSettings {
       shuffleTopics: shuffleTopics ?? this.shuffleTopics,
       dynamicColor: dynamicColor ?? this.dynamicColor,
       soundsEnabled: soundsEnabled ?? this.soundsEnabled,
+      soundVolume: soundVolume ?? this.soundVolume,
       ankiDeck: ankiDeck ?? this.ankiDeck,
     );
   }

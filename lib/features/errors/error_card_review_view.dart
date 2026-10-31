@@ -223,7 +223,7 @@ class _ExplanationBox extends StatelessWidget {
   }
 }
 
-class _AlternativeExplanation extends StatelessWidget {
+class _AlternativeExplanation extends StatefulWidget {
   const _AlternativeExplanation({
     required this.index,
     required this.text,
@@ -243,14 +243,30 @@ class _AlternativeExplanation extends StatelessWidget {
   final ValueChanged<String> onOpenUrl;
 
   @override
+  State<_AlternativeExplanation> createState() =>
+      _AlternativeExplanationState();
+}
+
+class _AlternativeExplanationState extends State<_AlternativeExplanation> {
+  late bool _open;
+
+  @override
+  void initState() {
+    super.initState();
+    _open = widget.isCorrect || widget.isWrong;
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final isCorrect = widget.isCorrect;
+    final isWrong = widget.isWrong;
     final tone = isCorrect
         ? theme.colorScheme.primary
         : isWrong
         ? theme.colorScheme.error
         : theme.colorScheme.onSurfaceVariant;
-    final letter = String.fromCharCode(65 + index);
+    final letter = String.fromCharCode(65 + widget.index);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -278,26 +294,48 @@ class _AlternativeExplanation extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SelectableLinkifiedText(
-                  text: text,
+                  text: widget.text,
                   style: theme.typography.baseline.bodySmall.copyWith(
                     color: tone,
                     fontWeight: FontWeight.w600,
                     height: 1.35,
                   ),
-                  onDefine: onDefine,
-                  onOpenUrl: onOpenUrl,
+                  onDefine: widget.onDefine,
+                  onOpenUrl: widget.onOpenUrl,
                 ),
-                const SizedBox(height: 2),
-                SelectableLinkifiedText(
-                  text: explanation,
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.4,
+                if (_open) ...[
+                  const SizedBox(height: 2),
+                  SelectableLinkifiedText(
+                    text: widget.explanation,
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                    onDefine: widget.onDefine,
+                    onOpenUrl: widget.onOpenUrl,
                   ),
-                  onDefine: onDefine,
-                  onOpenUrl: onOpenUrl,
-                ),
+                ],
               ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          Semantics(
+            button: true,
+            label: _open ? 'Hide explanation' : 'Show explanation',
+            child: InkResponse(
+              key: ValueKey(
+                'error-alternative-explanation-${widget.index}-toggle',
+              ),
+              onTap: () => setState(() => _open = !_open),
+              radius: 18,
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  _open ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
             ),
           ),
         ],

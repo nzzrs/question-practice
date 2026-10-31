@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -42,12 +43,18 @@ class _SessionPageState extends ConsumerState<SessionPage>
   SessionSummary? _summary;
   int _questionMinutes = 0;
   Timer? _questionTimer;
+  Timer? _reasoningSaveTimer;
+  Future<void>? _reasoningSaveFuture;
+  String _savedReasoning = '';
   FloatingToastHandle? _toast;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    unawaited(
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+    );
     _start = widget.start;
     _index = _start.items.isEmpty
         ? 0
@@ -63,8 +70,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _questionTimer?.cancel();
+    _reasoningSaveTimer?.cancel();
     _toast?.dismiss();
     _reasoning.dispose();
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     super.dispose();
   }
 
@@ -115,7 +124,9 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final item = _start.items.isEmpty ? null : _start.items[_index];
     _item = item;
     _selectedIndexes.clear();
+    _reasoningSaveTimer?.cancel();
     _reasoning.clear();
+    _savedReasoning = '';
     _outcome = null;
     _submitted = false;
     _distracted = false;
@@ -131,6 +142,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
     _selectedIndexes.addAll(attempt.selectedIndexes);
     _reasoning.text = attempt.reasoning;
+    _savedReasoning = attempt.reasoning.trim();
     _submitted = true;
     _distracted = attempt.distracted;
     _reasoningOpen = attempt.reasoning.trim().isNotEmpty;
@@ -138,8 +150,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _restartQuestionTimer();
   }
 
-  void _goTo(int index) {
+  Future<void> _goTo(int index) async {
     if (index < 0 || index >= _start.items.length || index == _index) return;
+    await _persistReasoning();
+    if (!mounted) return;
     setState(() {
       _index = index;
       _loadQuestionState();
@@ -168,6 +182,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
       setState(() {
         _submitted = true;
         _outcome = outcome;
+        _savedReasoning = _reasoning.text.trim();
         _reasoningOpen = _reasoning.text.trim().isNotEmpty;
         if (outcome.summary != null) _summary = outcome.summary;
       });
@@ -189,9 +204,69 @@ class _SessionPageState extends ConsumerState<SessionPage>
         current?.soundsEnabled ??
         (await ref.read(settingsRepositoryProvider).load()).soundsEnabled;
     if (!enabled) return;
+    final volume =
+        current?.soundVolume ??
+        (await ref.read(settingsRepositoryProvider).load()).soundVolume;
     await ref
         .read(practiceSoundPlayerProvider)
-        .play(attempt.isCorrect ? PracticeSound.correct : PracticeSound.wrong);
+        .play(
+          attempt.isCorrect ? PracticeSound.correct : PracticeSound.wrong,
+          volume: volume,
+        );
+  }
+
+  void _onReasoningChanged(String _) {
+    if (!_submitted) return;
+    _reasoningSaveTimer?.cancel();
+    _reasoningSaveTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) unawaited(_persistReasoning());
+    });
+  }
+
+  /// Saves the reasoning of an answered question, including late notes.
+  Future<void> _persistReasoning() async {
+    _reasoningSaveTimer?.cancel();
+    while (mounted) {
+      final inFlight = _reasoningSaveFuture;
+      if (inFlight != null) {
+        await inFlight;
+        continue;
+      }
+      final item = _item;
+      if (!_submitted || item == null) return;
+      final text = _reasoning.text.trim();
+      if (text == _savedReasoning) return;
+      final save = _saveReasoning(item, text);
+      _reasoningSaveFuture = save;
+      var saved = false;
+      try {
+        saved = await save;
+      } finally {
+        if (identical(_reasoningSaveFuture, save)) {
+          _reasoningSaveFuture = null;
+        }
+      }
+      if (!saved) return;
+    }
+  }
+
+  Future<bool> _saveReasoning(SessionQuestionItem item, String text) async {
+    try {
+      final attempt = await ref
+          .read(sessionServiceProvider)
+          .updateReasoning(start: _start, item: item, reasoning: text);
+      if (!mounted) return false;
+      _start.attempts[item.question.id] = attempt;
+      setState(() {
+        _savedReasoning = attempt.reasoning.trim();
+        _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+      });
+      ref.invalidate(dueErrorsProvider);
+      return true;
+    } on SessionException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+      return false;
+    }
   }
 
   Future<void> _setDistracted(bool value) async {
@@ -216,20 +291,22 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
   }
 
-  void _next() {
+  Future<void> _next() async {
+    await _persistReasoning();
+    if (!mounted) return;
     if (_summary != null && _index >= _start.items.length - 1) {
       _openSummary(_summary!);
       return;
     }
     if (_index + 1 < _start.items.length) {
-      _goTo(_index + 1);
+      await _goTo(_index + 1);
       return;
     }
     final unanswered = _start.items.indexWhere(
       (entry) => !_start.attempts.containsKey(entry.question.id),
     );
     if (unanswered >= 0) {
-      _goTo(unanswered);
+      await _goTo(unanswered);
       return;
     }
     if (_summary != null) {
@@ -241,6 +318,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
 
   Future<void> _finishEarly() async {
     if (_submitting) return;
+    await _persistReasoning();
+    if (!mounted) return;
     final unanswered = _start.items.length - _start.attempts.length;
     if (unanswered <= 0) {
       final summary =
@@ -314,6 +393,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _requestExit() async {
+    await _persistReasoning();
+    if (!mounted) return;
     if (_summary != null) {
       _openSummary(_summary!);
       return;
@@ -498,6 +579,9 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _OptionCard(
+                      key: ValueKey(
+                        'alternative-card-${item.question.id}-$index',
+                      ),
                       originalIndex: index,
                       text: item.question.alternatives[index],
                       selected: _selectedIndexes.contains(index),
@@ -527,29 +611,12 @@ class _SessionPageState extends ConsumerState<SessionPage>
                 if (!_submitted)
                   _ReasoningSection(
                     open: _reasoningOpen,
+                    title: 'Add reasoning (optional)',
+                    supportingText: 'Useful when reviewing an error later.',
+                    placeholder: 'What led you to this answer?',
                     controller: _reasoning,
                     onToggle: () =>
                         setState(() => _reasoningOpen = !_reasoningOpen),
-                  )
-                else if (_reasoning.text.trim().isNotEmpty)
-                  TonalBox(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Your reasoning',
-                          style: theme.typography.baseline.labelSmall.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _reasoning.text,
-                          style: theme.typography.baseline.bodyMedium,
-                        ),
-                      ],
-                    ),
                   ),
                 if (_submitted) ...[
                   const SizedBox(height: 16),
@@ -587,6 +654,19 @@ class _SessionPageState extends ConsumerState<SessionPage>
                       onChanged: _submitting ? null : _setDistracted,
                     ),
                   ],
+                  const SizedBox(height: 12),
+                  _ReasoningSection(
+                    open: _reasoningOpen,
+                    title: 'Your reasoning (optional)',
+                    supportingText: _savedReasoning.isEmpty
+                        ? 'You can still note what led to your answer.'
+                        : 'Saved automatically.',
+                    placeholder: 'What led you to this answer?',
+                    controller: _reasoning,
+                    onChanged: _onReasoningChanged,
+                    onToggle: () =>
+                        setState(() => _reasoningOpen = !_reasoningOpen),
+                  ),
                 ],
               ],
             ),
@@ -700,13 +780,21 @@ class _QuestionNavigator extends StatelessWidget {
 class _ReasoningSection extends StatelessWidget {
   const _ReasoningSection({
     required this.open,
+    required this.title,
+    required this.supportingText,
+    required this.placeholder,
     required this.controller,
     required this.onToggle,
+    this.onChanged,
   });
 
   final bool open;
+  final String title;
+  final String supportingText;
+  final String placeholder;
   final TextEditingController controller;
   final VoidCallback onToggle;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -732,7 +820,7 @@ class _ReasoningSection extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Add reasoning (optional)',
+                      title,
                       style: theme.typography.baseline.bodyMedium,
                     ),
                   ),
@@ -750,10 +838,11 @@ class _ReasoningSection extends StatelessWidget {
           M3ETextField(
             controller: controller,
             label: 'Your reasoning',
-            placeholder: 'What led you to this answer?',
+            placeholder: placeholder,
             minLines: 2,
             maxLines: 5,
-            supportingText: 'Useful when reviewing an error later.',
+            supportingText: supportingText,
+            onChanged: onChanged,
           ),
         ],
       ],
@@ -871,7 +960,7 @@ class _FeedbackStatus extends StatelessWidget {
   }
 }
 
-class _OptionCard extends StatelessWidget {
+class _OptionCard extends StatefulWidget {
   const _OptionCard({
     required this.originalIndex,
     required this.text,
@@ -883,6 +972,7 @@ class _OptionCard extends StatelessWidget {
     required this.onDefine,
     required this.onOpenUrl,
     required this.onPressed,
+    super.key,
   });
 
   final int originalIndex;
@@ -897,118 +987,221 @@ class _OptionCard extends StatelessWidget {
   final VoidCallback? onPressed;
 
   @override
+  State<_OptionCard> createState() => _OptionCardState();
+}
+
+class _OptionCardState extends State<_OptionCard> {
+  late bool _explanationOpen;
+  int? _pointer;
+  Duration? _pointerDownAt;
+  Offset? _pointerDownPosition;
+
+  bool get _shouldOpenExplanation =>
+      widget.submitted && (widget.isCorrect || widget.selected);
+
+  @override
+  void initState() {
+    super.initState();
+    _explanationOpen = _shouldOpenExplanation;
+  }
+
+  void _handlePointerDown(PointerDownEvent event) {
+    if (_pointer != null) return;
+    _pointer = event.pointer;
+    _pointerDownAt = event.timeStamp;
+    _pointerDownPosition = event.position;
+  }
+
+  void _handlePointerUp(PointerUpEvent event) {
+    if (event.pointer != _pointer) return;
+    final elapsed = _pointerDownAt == null
+        ? Duration.zero
+        : event.timeStamp - _pointerDownAt!;
+    final distance = _pointerDownPosition == null
+        ? 0.0
+        : (event.position - _pointerDownPosition!).distance;
+    _pointer = null;
+    _pointerDownAt = null;
+    _pointerDownPosition = null;
+    if (widget.submitted) return;
+    final isTap = elapsed < const Duration(milliseconds: 500) && distance < 12;
+    if (isTap) widget.onPressed?.call();
+  }
+
+  void _handlePointerCancel(PointerCancelEvent event) {
+    if (event.pointer != _pointer) return;
+    _pointer = null;
+    _pointerDownAt = null;
+    _pointerDownPosition = null;
+  }
+
+  @override
+  void didUpdateWidget(_OptionCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.text != widget.text ||
+        oldWidget.originalIndex != widget.originalIndex ||
+        (!oldWidget.submitted && widget.submitted)) {
+      _explanationOpen = _shouldOpenExplanation;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final correctNow = submitted && isCorrect;
-    final wrongNow = submitted && selected && !isCorrect;
+    final correctNow = widget.submitted && widget.isCorrect;
+    final wrongNow = widget.submitted && widget.selected && !widget.isCorrect;
     final background = correctNow
         ? AppSuccess.container(context)
         : wrongNow
         ? theme.colorScheme.errorContainer
-        : selected
+        : widget.selected
         ? theme.colorScheme.secondaryContainer
         : theme.colorScheme.surfaceContainerLow;
     final foreground = correctNow
         ? AppSuccess.onContainer(context)
         : wrongNow
         ? theme.colorScheme.onErrorContainer
-        : selected
+        : widget.selected
         ? theme.colorScheme.onSecondaryContainer
         : theme.colorScheme.onSurface;
     final badgeBackground = correctNow
         ? AppSuccess.foreground(context)
         : wrongNow
         ? theme.colorScheme.error
-        : selected
+        : widget.selected
         ? theme.colorScheme.secondary
         : theme.colorScheme.surfaceContainerHighest;
     final badgeForeground = correctNow
         ? theme.colorScheme.surface
         : wrongNow
         ? theme.colorScheme.onError
-        : selected
+        : widget.selected
         ? theme.colorScheme.onSecondary
         : theme.colorScheme.onSurfaceVariant;
-    final letter = String.fromCharCode(65 + originalIndex);
+    final letter = String.fromCharCode(65 + widget.originalIndex);
     return Semantics(
-      button: !submitted,
-      selected: selected,
-      label: showLetter ? 'Alternative $letter: $text' : 'Alternative: $text',
-      child: Material(
-        color: background,
-        borderRadius: BorderRadius.circular(22),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: badgeBackground,
-                    shape: BoxShape.circle,
+      button: !widget.submitted,
+      selected: widget.selected,
+      label: widget.showLetter
+          ? 'Alternative $letter: ${widget.text}'
+          : 'Alternative: ${widget.text}',
+      child: Listener(
+        onPointerDown: _handlePointerDown,
+        onPointerUp: _handlePointerUp,
+        onPointerCancel: _handlePointerCancel,
+        child: Material(
+          color: background,
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            // Text selection owns touches inside the card. Tapping is resolved
+            // from the pointer stream so selecting text and choosing an
+            // alternative can both work before an answer is submitted.
+            onTap: widget.submitted ? null : () {},
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: badgeBackground,
+                      shape: BoxShape.circle,
+                    ),
+                    child: widget.showLetter
+                        ? Text(
+                            letter,
+                            style: theme.typography.baseline.labelMedium
+                                .copyWith(
+                                  color: badgeForeground,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          )
+                        : correctNow
+                        ? Icon(Icons.check, size: 18, color: badgeForeground)
+                        : wrongNow
+                        ? Icon(Icons.close, size: 18, color: badgeForeground)
+                        : null,
                   ),
-                  child: showLetter
-                      ? Text(
-                          letter,
-                          style: theme.typography.baseline.labelMedium.copyWith(
-                            color: badgeForeground,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        )
-                      : correctNow
-                      ? Icon(Icons.check, size: 18, color: badgeForeground)
-                      : wrongNow
-                      ? Icon(Icons.close, size: 18, color: badgeForeground)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SelectableLinkifiedText(
-                        text: text,
-                        selectable: submitted,
-                        style: theme.typography.baseline.bodyMedium.copyWith(
-                          color: foreground,
-                          height: 1.4,
-                        ),
-                        onDefine: onDefine,
-                        onOpenUrl: onOpenUrl,
-                      ),
-                      if (submitted && explanation.isNotEmpty) ...[
-                        const SizedBox(height: 8),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         SelectableLinkifiedText(
-                          text: explanation,
-                          style: theme.typography.baseline.bodySmall.copyWith(
-                            color: foreground.withValues(alpha: 0.82),
+                          key: ValueKey(
+                            'alternative-${widget.originalIndex}-text',
+                          ),
+                          text: widget.text,
+                          style: theme.typography.baseline.bodyMedium.copyWith(
+                            color: foreground,
                             height: 1.4,
                           ),
-                          onDefine: onDefine,
-                          onOpenUrl: onOpenUrl,
+                          onDefine: widget.onDefine,
+                          onOpenUrl: widget.onOpenUrl,
                         ),
+                        if (widget.submitted &&
+                            widget.explanation.isNotEmpty &&
+                            _explanationOpen) ...[
+                          const SizedBox(height: 6),
+                          SelectableLinkifiedText(
+                            text: widget.explanation,
+                            style: theme.typography.baseline.bodySmall.copyWith(
+                              color: foreground.withValues(alpha: 0.82),
+                              height: 1.4,
+                            ),
+                            onDefine: widget.onDefine,
+                            onOpenUrl: widget.onOpenUrl,
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                ),
-                if (correctNow || wrongNow) ...[
-                  const SizedBox(width: 8),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Icon(
-                      correctNow ? Icons.check : Icons.close,
-                      size: 20,
-                      color: foreground,
                     ),
                   ),
+                  if (widget.submitted && widget.explanation.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    Semantics(
+                      button: true,
+                      label: _explanationOpen
+                          ? 'Hide explanation'
+                          : 'Show explanation',
+                      child: InkResponse(
+                        key: ValueKey(
+                          'alternative-explanation-'
+                          '${widget.originalIndex}-toggle',
+                        ),
+                        onTap: () => setState(
+                          () => _explanationOpen = !_explanationOpen,
+                        ),
+                        radius: 18,
+                        child: Padding(
+                          padding: const EdgeInsets.all(4),
+                          child: Icon(
+                            _explanationOpen
+                                ? Icons.expand_less
+                                : Icons.expand_more,
+                            size: 20,
+                            color: foreground.withValues(alpha: 0.82),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (correctNow || wrongNow) ...[
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Icon(
+                        correctNow ? Icons.check : Icons.close,
+                        size: 20,
+                        color: foreground,
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),

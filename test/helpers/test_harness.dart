@@ -182,9 +182,11 @@ Future<void> pumpTestApp(
 
 class RecordingPracticeSoundPlayer implements PracticeSoundPlayer {
   final List<PracticeSound> played = [];
+  final List<double> volumes = [];
 
   @override
-  Future<void> play(PracticeSound sound) async {
+  Future<void> play(PracticeSound sound, {double volume = 1}) async {
     played.add(sound);
+    volumes.add(volume);
   }
 }

@@ -97,6 +97,10 @@ class SessionRepository {
     return _db.sessionDao.updateAttemptDistracted(id, distracted);
   }
 
+  Future<void> updateAttemptReasoning(int id, String reasoning) {
+    return _db.sessionDao.updateAttemptReasoning(id, reasoning);
+  }
+
   Future<void> completeSession({
     required int id,
     required int total,

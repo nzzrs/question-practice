@@ -34,7 +34,12 @@ class _SummaryPageState extends ConsumerState<SummaryPage> {
         current?.soundsEnabled ??
         (await ref.read(settingsRepositoryProvider).load()).soundsEnabled;
     if (!enabled) return;
-    await ref.read(practiceSoundPlayerProvider).play(PracticeSound.finished);
+    final volume =
+        current?.soundVolume ??
+        (await ref.read(settingsRepositoryProvider).load()).soundVolume;
+    await ref
+        .read(practiceSoundPlayerProvider)
+        .play(PracticeSound.finished, volume: volume);
   }
 
   @override

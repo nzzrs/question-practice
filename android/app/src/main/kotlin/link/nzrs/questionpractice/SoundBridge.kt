@@ -20,8 +20,8 @@ class SoundBridge(
         .setMaxStreams(3)
         .setAudioAttributes(
             AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                 .build(),
         )
         .build()
@@ -46,7 +46,10 @@ class SoundBridge(
             result.success(false)
             return
         }
-        soundPool.play(id, 0.85f, 0.85f, 1, 0, 1f)
+        val volume = (call.argument<Double>("volume") ?: 1.0)
+            .coerceIn(0.0, 1.0)
+            .toFloat()
+        soundPool.play(id, volume, volume, 1, 0, 1f)
         result.success(true)
     }
 

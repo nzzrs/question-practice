@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 enum PracticeSound { correct, wrong, finished }
 
 abstract class PracticeSoundPlayer {
-  Future<void> play(PracticeSound sound);
+  /// Plays [sound] at [volume], where 0 is silent and 1 is the maximum.
+  Future<void> play(PracticeSound sound, {double volume = 1});
 }
 
 /// Plays a short native sound on Android.
@@ -18,9 +19,12 @@ class MethodChannelPracticeSoundPlayer implements PracticeSoundPlayer {
   final MethodChannel _channel;
 
   @override
-  Future<void> play(PracticeSound sound) async {
+  Future<void> play(PracticeSound sound, {double volume = 1}) async {
     try {
-      await _channel.invokeMethod<void>('play', {'sound': sound.name});
+      await _channel.invokeMethod<void>('play', {
+        'sound': sound.name,
+        'volume': volume.clamp(0.0, 1.0),
+      });
     } on PlatformException {
       // Sound is a nicety; playback failures must not block practice.
     } on MissingPluginException {
@@ -33,5 +37,5 @@ class SilentPracticeSoundPlayer implements PracticeSoundPlayer {
   const SilentPracticeSoundPlayer();
 
   @override
-  Future<void> play(PracticeSound sound) async {}
+  Future<void> play(PracticeSound sound, {double volume = 1}) async {}
 }

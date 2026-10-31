@@ -154,6 +154,12 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     );
   }
 
+  Future<void> updateErrorCardReasoning(int id, String reasoning) {
+    return (update(errorCards)..where((e) => e.id.equals(id))).write(
+      ErrorCardsCompanion(reasoning: Value(reasoning)),
+    );
+  }
+
   Future<void> touchWrongError({
     required int id,
     required List<int> wrongIndexes,

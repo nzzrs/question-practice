@@ -38,10 +38,11 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 
 - Each question shows the topic and practice, the prompt and 2–8 alternatives.
 - Alternatives are shuffled for every session and keep that order while the question is open. Before answering, badges are plain circles and hide the original letters. Tap the eye beside the flag to reveal each alternative's original letter without changing the order. After **Check**, the original letters appear automatically so explanations that refer to “A”, “B” or “C” stay unambiguous.
-- Select one alternative, or every correct alternative when the question has more than one. The reasoning field is optional. Write what led you to the answer; it appears later in the error review.
+- Select one alternative, or every correct alternative when the question has more than one. The reasoning field is optional. Write what led you to the answer, before or after **Check**; it saves automatically and appears later in the error review.
 - The arrows beside **Question X of Y** move to the previous or next question without answering. Answers already submitted keep their feedback when you return.
-- **Check** stays on the same screen. The reasoning locks, the correct answer is marked, the wrong choice is marked, and every alternative expands with its explanation. The overall explanation appears below.
-- Prompt, alternatives, alternative explanations and the overall explanation are selectable. Select a word or phrase and tap **Define**. http(s) links are tappable.
+- **Check** stays on the same screen. The correct answer is marked, the wrong choice is marked, and the correct alternatives plus your selection open with their explanation. Every other alternative stays collapsed until you tap its expand icon. The overall explanation appears below.
+- Prompt, alternatives, alternative explanations and the overall explanation are selectable, including before you answer. Select a word or phrase and tap **Define**. http(s) links are tappable.
+- While a practice is open, the app hides the status and navigation bars for fewer distractions. Leaving the session restores them.
 - After a wrong answer, check **I was distracted or read too fast** in the feedback to remove the new error card. Uncheck it to restore the card.
 - **Skip** records a skipped question. No error card is created; the end-of-session review asks what was missing.
 - Closing the session offers **Cancel**, **Discard** and **Save for later**. Save keeps the session on Home; several sessions can stay paused at once.
@@ -104,7 +105,7 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 
 ## Settings
 
-- **Appearance**: wallpaper colors (Material You) are on by default. Turn them off to use the app seed color. The app follows system light/dark.
+- **Appearance**: wallpaper colors (Material You) are on by default. Turn them off to use the app seed color. The app follows system light/dark. **Practice sounds** has a volume slider and a play icon to hear the sample; the slider saves when you release it.
 - **Looking up terms**: Web search or AI. Web engine: DuckDuckGo or Wikipedia. AI: provider (OpenAI, Groq, OpenRouter, Gemini or custom), model, API key and **Test connection**. The base URL is shown only for a custom provider. Opening the model dropdown loads the provider list. Provider, model, base URL and API key save automatically; clear the key field to remove the saved key. The key is stored in Android secure storage and never shown after saving.
 - **AnkiDroid**: status of install/API/permission/Cloze type, permission request, open AnkiDroid, default deck name, and **Browse decks** to pick a live deck name.
 - **Data**: erase all practices, sessions, cards, settings and API key. Cannot be undone.

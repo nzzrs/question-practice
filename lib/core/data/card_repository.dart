@@ -156,6 +156,10 @@ class CardRepository {
     );
   }
 
+  Future<void> updateErrorCardReasoning(int id, String reasoning) {
+    return _db.cardDao.updateErrorCardReasoning(id, reasoning);
+  }
+
   Future<void> touchWrongError({
     required int id,
     required List<int> wrongIndexes,

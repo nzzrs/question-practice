@@ -21,6 +21,7 @@ void main() {
     expect(settings.shuffleTopics, isFalse);
     expect(settings.dynamicColor, isTrue);
     expect(settings.soundsEnabled, isTrue);
+    expect(settings.soundVolume, 0.85);
     expect(settings.ankiDeck, 'Question Practice');
   });
 
@@ -34,6 +35,7 @@ void main() {
         shuffleTopics: true,
         dynamicColor: true,
         soundsEnabled: false,
+        soundVolume: 0.45,
         ankiDeck: 'My deck',
       ),
     );
@@ -46,6 +48,7 @@ void main() {
     expect(loaded.shuffleTopics, isTrue);
     expect(loaded.dynamicColor, isTrue);
     expect(loaded.soundsEnabled, isFalse);
+    expect(loaded.soundVolume, 0.45);
     expect(loaded.ankiDeck, 'My deck');
     expect(await harness.settings.hasApiKey(), isTrue);
 

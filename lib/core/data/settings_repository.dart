@@ -16,6 +16,7 @@ class SettingsRepository {
   static const _shuffleTopicsKey = 'shuffle_topics';
   static const _dynamicColorKey = 'dynamic_color';
   static const _soundsEnabledKey = 'sounds_enabled';
+  static const _soundVolumeKey = 'sound_volume';
   static const _ankiDeckKey = 'anki_deck';
 
   Stream<AppSettings> watch() {
@@ -33,6 +34,10 @@ class SettingsRepository {
     await _dao.setValue(_shuffleTopicsKey, settings.shuffleTopics.toString());
     await _dao.setValue(_dynamicColorKey, settings.dynamicColor.toString());
     await _dao.setValue(_soundsEnabledKey, settings.soundsEnabled.toString());
+    await _dao.setValue(
+      _soundVolumeKey,
+      settings.soundVolume.clamp(0.0, 1.0).toString(),
+    );
     await _dao.setValue(_ankiDeckKey, settings.ankiDeck.trim());
   }
 
@@ -77,6 +82,7 @@ class SettingsRepository {
       shuffleTopics: _bool(map[_shuffleTopicsKey], defaults.shuffleTopics),
       dynamicColor: _bool(map[_dynamicColorKey], defaults.dynamicColor),
       soundsEnabled: _bool(map[_soundsEnabledKey], defaults.soundsEnabled),
+      soundVolume: _volume(map[_soundVolumeKey], defaults.soundVolume),
       ankiDeck: _nonEmpty(map[_ankiDeckKey], defaults.ankiDeck),
     );
   }
@@ -87,6 +93,12 @@ class SettingsRepository {
       if (value.name == name) return value;
     }
     return fallback;
+  }
+
+  double _volume(String? raw, double fallback) {
+    final value = double.tryParse(raw?.trim() ?? '');
+    if (value == null) return fallback;
+    return value.clamp(0.0, 1.0);
   }
 
   bool _bool(String? raw, bool fallback) {

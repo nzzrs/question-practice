@@ -8,6 +8,7 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
 import '../../core/platform/anki_gateway.dart';
+import '../../core/platform/practice_sound_player.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../topics/anki_deck_picker.dart';
@@ -30,6 +31,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _loaded = false;
   bool _busy = false;
   bool _apiKeyEdited = false;
+  double _soundVolume = const AppSettings().soundVolume;
   Timer? _baseUrlSaveTimer;
   Timer? _apiKeySaveTimer;
 
@@ -54,6 +56,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _baseUrl.text = settings.aiBaseUrl;
       _model.text = settings.aiModel;
       _deck.text = settings.ankiDeck;
+      _soundVolume = settings.soundVolume;
     }
     final theme = M3ETheme.of(context);
     final hasKey = ref.watch(hasApiKeyProvider).value ?? false;
@@ -82,6 +85,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 value: settings.soundsEnabled,
                 onChanged: (value) =>
                     _save(settings.copyWith(soundsEnabled: value)),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sound volume',
+                          style: theme.typography.baseline.bodyLarge,
+                        ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.volume_down_outlined,
+                              size: 20,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            Expanded(
+                              child: M3ESlider(
+                                value: _soundVolume,
+                                min: 0.05,
+                                max: 1,
+                                divisions: 19,
+                                semanticLabel: 'Sound volume',
+                                onChanged: settings.soundsEnabled
+                                    ? (value) =>
+                                          setState(() => _soundVolume = value)
+                                    : null,
+                                onChangeEnd: settings.soundsEnabled
+                                    ? (value) {
+                                        setState(() => _soundVolume = value);
+                                        _save(
+                                          settings.copyWith(soundVolume: value),
+                                        );
+                                      }
+                                    : null,
+                              ),
+                            ),
+                            Icon(
+                              Icons.volume_up_outlined,
+                              size: 20,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  M3EIconButton(
+                    variant: M3EIconButtonVariant.standard,
+                    icon: const Icon(Icons.play_arrow),
+                    tooltip: 'Play test sound',
+                    onPressed: settings.soundsEnabled ? _playTestSound : null,
+                  ),
+                ],
               ),
             ],
           ),
@@ -324,7 +385,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 14),
         _SettingsSection(
           title: 'About',
-          supporting: 'Questions 0.9.5\nLocal-first practice with error cards and Anki export.',
+          supporting: 'Questions 0.9.6\nLocal-first practice with error cards and Anki export.',
           child: const SizedBox.shrink(),
         ),
       ],
@@ -333,6 +394,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _save(AppSettings settings) async {
     await ref.read(settingsRepositoryProvider).save(settings);
+  }
+
+  Future<void> _playTestSound() async {
+    final settings = _currentSettings;
+    if (!settings.soundsEnabled) return;
+    await ref
+        .read(practiceSoundPlayerProvider)
+        .play(PracticeSound.correct, volume: _soundVolume);
   }
 
   List<String> get _modelOptions {

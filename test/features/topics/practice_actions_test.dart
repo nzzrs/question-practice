@@ -171,4 +171,36 @@ void main() {
     await apply(sort: 'Recency', order: 'Increasing');
     expect(top('Zeta'), lessThan(top('Alpha')));
   });
+
+  testWidgets('practice names sort numbers by value', (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'Practice 1',
+      count: 1,
+    );
+    for (final name in const ['Practice 12', 'Practice 2']) {
+      await harness.practices.createPractice(
+        topicId: seeded.topicId,
+        name: name,
+        description: '',
+        contentHash: 'hash-$name',
+        importedAt: harness.clock.now().toUtc(),
+      );
+    }
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: seeded.topicId),
+      harness: harness,
+    );
+    double top(String name) => tester.getTopLeft(find.text(name)).dy;
+    expect(top('Practice 1'), lessThan(top('Practice 2')));
+    expect(top('Practice 2'), lessThan(top('Practice 12')));
+  });
 }

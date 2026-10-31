@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/natural_compare.dart';
 import '../../core/ui/widgets.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/session_page.dart';
@@ -196,9 +197,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     final direction = _sortDirection == _SortDirection.increasing ? 1 : -1;
     sorted.sort((a, b) {
       final comparison = switch (_sort) {
-        _PracticeSort.name => a.practice.name.toLowerCase().compareTo(
-          b.practice.name.toLowerCase(),
-        ),
+        _PracticeSort.name => compareNatural(a.practice.name, b.practice.name),
         _PracticeSort.recency => a.practice.importedAt.compareTo(
           b.practice.importedAt,
         ),

@@ -98,14 +98,14 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 ## Lookup
 
 - Long-press text in a question → **Define**.
-- **AI mode**: sends the term, question and topic to the configured provider and saves a short definition. The definition appears in a read-only bubble and is saved automatically; there is no save button. OpenAI, Groq and OpenRouter use their chat-completions endpoint; Gemini uses its native `generateContent` API. Configure the provider, base URL, model and API key in Settings. **Load models** lists the models the provider makes available, and the model field is a searchable dropdown. If a list cannot be loaded, the saved model stays selected.
+- **AI mode**: sends the term, question and topic to the configured provider and saves a short definition. The definition appears in a read-only bubble and is saved automatically; there is no save button. OpenAI, Groq and OpenRouter use their chat-completions endpoint; Gemini uses its native `generateContent` API. Configure the provider, model and API key in Settings; the base URL appears only for a custom provider. Opening the model dropdown loads the models the provider makes available, and the field is searchable. If a list cannot be loaded, the saved model stays selected.
 - **Web mode**: opens DuckDuckGo or Wikipedia in a Custom Tab and keeps the editable definition sheet with **Save**, so you can fill the definition after reading.
 - Every lookup is saved automatically for the session and counted in Results.
 
 ## Settings
 
 - **Appearance**: wallpaper colors (Material You) are on by default. Turn them off to use the app seed color. The app follows system light/dark.
-- **Looking up terms**: Web search or AI. Web engine: DuckDuckGo or Wikipedia. AI: provider (OpenAI, Groq, OpenRouter, Gemini or custom), base URL, model, API key, test connection. **Load models** fills the model dropdown from the provider. The key is stored in Android secure storage and never shown after saving.
+- **Looking up terms**: Web search or AI. Web engine: DuckDuckGo or Wikipedia. AI: provider (OpenAI, Groq, OpenRouter, Gemini or custom), model, API key and **Test connection**. The base URL is shown only for a custom provider. Opening the model dropdown loads the provider list. Provider, model, base URL and API key save automatically; clear the key field to remove the saved key. The key is stored in Android secure storage and never shown after saving.
 - **AnkiDroid**: status of install/API/permission/Cloze type, permission request, open AnkiDroid, default deck name, and **Browse decks** to pick a live deck name.
 - **Data**: erase all practices, sessions, cards, settings and API key. Cannot be undone.
 - **About**: version.

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/natural_compare.dart';
 import '../../core/platform/anki_gateway.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/domain/lookup_service.dart';
@@ -26,9 +29,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _loadingModels = false;
   bool _loaded = false;
   bool _busy = false;
+  bool _apiKeyEdited = false;
+  Timer? _baseUrlSaveTimer;
+  Timer? _apiKeySaveTimer;
 
   @override
   void dispose() {
+    _baseUrlSaveTimer?.cancel();
+    _apiKeySaveTimer?.cancel();
     _baseUrl.dispose();
     _model.dispose();
     _deck.dispose();
@@ -146,68 +154,70 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     setState(() {
                       _provider = selection.first.value;
                       _models = const [];
+                      _model.text = '';
                       _baseUrl.text = _baseUrlFor(_provider, _baseUrl.text);
                     });
+                    unawaited(_persistAiSettings());
                   },
                 ),
-                const SizedBox(height: 12),
-                M3ETextField(
-                  controller: _baseUrl,
-                  label: 'Base URL',
-                  placeholder: 'https://api.openai.com/v1',
-                  keyboardType: TextInputType.url,
-                ),
+                if (_provider == AiProvider.custom) ...[
+                  const SizedBox(height: 12),
+                  M3ETextField(
+                    controller: _baseUrl,
+                    label: 'Base URL',
+                    placeholder: 'https://api.openai.com/v1',
+                    keyboardType: TextInputType.url,
+                    onChanged: (_) {
+                      setState(() => _models = const []);
+                      _scheduleBaseUrlSave();
+                    },
+                  ),
+                ],
                 const SizedBox(height: 12),
                 Text('Model', style: theme.typography.baseline.labelMedium),
                 const SizedBox(height: 8),
-                M3EDropdownMenu<String>(
-                  items: [
-                    for (final model in _modelOptions)
-                      M3EDropdownItem(
-                        label: model,
-                        value: model,
-                        selected: model == _model.text.trim(),
-                      ),
-                  ],
-                  singleSelect: true,
-                  searchEnabled: true,
-                  fieldStyle: const M3EDropdownFieldStyle(
-                    hintText: 'Load available models',
-                  ),
-                  emptyBuilder: (context) => Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text(
-                      'No models loaded. Tap Load models.',
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                Listener(
+                  onPointerDown: (_) => unawaited(_ensureModelsLoaded()),
+                  child: M3EDropdownMenu<String>(
+                    key: const ValueKey('model-menu'),
+                    items: [
+                      for (final model in _modelOptions)
+                        M3EDropdownItem(
+                          label: model,
+                          value: model,
+                          selected: model == _model.text.trim(),
+                        ),
+                    ],
+                    singleSelect: true,
+                    searchEnabled: true,
+                    fieldStyle: const M3EDropdownFieldStyle(
+                      hintText: 'Open to load available models',
                     ),
-                  ),
-                  onSelectionChanged: (selection) {
-                    if (selection.isEmpty) return;
-                    setState(() => _model.text = selection.first.value);
-                  },
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    M3EButton.tonal(
-                      onPressed: _loadingModels ? null : _loadModels,
-                      icon: const Icon(Icons.refresh),
-                      label: Text(_loadingModels ? 'Loading…' : 'Load models'),
-                    ),
-                    if (_model.text.trim().isNotEmpty)
-                      Text(
-                        _model.text.trim(),
-                        style: theme.typography.baseline.labelSmall.copyWith(
+                    emptyBuilder: (context) => Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text(
+                        _loadingModels ? 'Loading models…' : 'Open this menu to load models from the provider.',
+                        style: theme.typography.baseline.bodySmall.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
-                  ],
+                    ),
+                    onSelectionChanged: (selection) {
+                      if (selection.isEmpty) return;
+                      setState(() => _model.text = selection.first.value);
+                      unawaited(_persistAiSettings());
+                    },
+                  ),
                 ),
+                if (_model.text.trim().isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _model.text.trim(),
+                    style: theme.typography.baseline.labelSmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 M3ETextField(
                   controller: _apiKey,
@@ -215,44 +225,27 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   obscureText: true,
                   showPasswordToggle: true,
                   supportingText: hasKey
-                      ? 'A key is saved in Android secure storage.'
-                      : 'Stored in Android secure storage, never in the database.',
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    M3EButton.tonal(
-                      onPressed: _busy ? null : _saveKey,
-                      child: const Text('Save key'),
-                    ),
-                    if (hasKey)
-                      M3EButton.text(
-                        onPressed: _busy ? null : _removeKey,
-                        child: const Text('Remove key'),
-                      ),
-                  ],
+                      ? 'Saved automatically in Android secure storage. Clear this field to remove it.'
+                      : 'Saved automatically in Android secure storage, never in the database.',
+                  onChanged: (_) {
+                    _apiKeyEdited = true;
+                    _scheduleApiKeySave();
+                  },
                 ),
                 const SizedBox(height: 16),
-                AppPrimaryButton(
-                  onPressed: _busy ? null : () => _saveAi(settings),
-                  label: _busy ? 'Saving…' : 'Save AI settings',
-                  icon: Icons.check,
-                ),
-                const SizedBox(height: 4),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: M3EButton.text(
+                SizedBox(
+                  width: double.infinity,
+                  child: M3EButton.tonal(
                     onPressed: _busy ? null : _testConnection,
-                    child: const Text('Test connection'),
+                    icon: const Icon(Icons.wifi_tethering),
+                    label: Text(_busy ? 'Testing…' : 'Test connection'),
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   'The app sends the selected term, question and topic to the endpoint you choose. It never logs the key. '
                   'OpenAI, Groq and OpenRouter use their chat-completions endpoint; Gemini uses its native generateContent API. '
-                  'Load models to pick from the provider list, or type the base URL and load again if the list is unavailable.',
+                  'Open the model menu to load the provider list. Changes save automatically.',
                   style: theme.typography.baseline.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     height: 1.4,
@@ -331,7 +324,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 14),
         _SettingsSection(
           title: 'About',
-          supporting: 'Questions 0.9.4\nLocal-first practice with error cards and Anki export.',
+          supporting: 'Questions 0.9.5\nLocal-first practice with error cards and Anki export.',
           child: const SizedBox.shrink(),
         ),
       ],
@@ -345,7 +338,58 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   List<String> get _modelOptions {
     final current = _model.text.trim();
     return <String>{if (current.isNotEmpty) current, ..._models}.toList()
-      ..sort();
+      ..sort(compareNatural);
+  }
+
+  AppSettings get _currentSettings =>
+      ref.read(settingsProvider).value ?? const AppSettings();
+
+  void _scheduleBaseUrlSave() {
+    _baseUrlSaveTimer?.cancel();
+    _baseUrlSaveTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) unawaited(_persistAiSettings());
+    });
+  }
+
+  void _scheduleApiKeySave() {
+    _apiKeySaveTimer?.cancel();
+    _apiKeySaveTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) unawaited(_persistApiKey());
+    });
+  }
+
+  Future<void> _persistAiSettings() async {
+    final settings = _currentSettings;
+    final baseUrl = _provider == AiProvider.custom
+        ? _baseUrl.text.trim()
+        : _baseUrlFor(_provider, '');
+    await ref
+        .read(settingsRepositoryProvider)
+        .save(
+          settings.copyWith(
+            aiProvider: _provider,
+            aiBaseUrl: baseUrl.isEmpty ? settings.aiBaseUrl : baseUrl,
+            aiModel: _model.text.trim(),
+          ),
+        );
+  }
+
+  Future<void> _persistApiKey() async {
+    if (!_apiKeyEdited) return;
+    final key = _apiKey.text.trim();
+    final repository = ref.read(settingsRepositoryProvider);
+    if (key.isEmpty) {
+      await repository.deleteApiKey();
+    } else {
+      await repository.saveApiKey(key);
+    }
+    _apiKeyEdited = false;
+    ref.invalidate(hasApiKeyProvider);
+  }
+
+  Future<void> _ensureModelsLoaded() async {
+    if (_loadingModels || _models.isNotEmpty) return;
+    await _loadModels();
   }
 
   Future<void> _loadModels() async {
@@ -365,7 +409,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         : await ref.read(settingsRepositoryProvider).readApiKey();
     if (!mounted) return;
     if (key == null || key.trim().isEmpty) {
-      await showSnack(context, 'Save an API key or paste one first.');
+      await showSnack(context, 'Enter an API key first.');
       return;
     }
     setState(() => _loadingModels = true);
@@ -374,12 +418,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           .read(lookupServiceProvider)
           .listModels(provider: _provider, baseUrl: baseUrl, apiKey: key);
       if (!mounted) return;
+      var selectedFirst = false;
       setState(() {
         _models = models;
         if (_model.text.trim().isEmpty && models.isNotEmpty) {
           _model.text = models.first;
+          selectedFirst = true;
         }
       });
+      if (selectedFirst) unawaited(_persistAiSettings());
       if (models.isEmpty) {
         await showSnack(context, 'The provider returned no models.');
       }
@@ -400,66 +447,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     };
   }
 
-  Future<void> _saveAi(AppSettings settings) async {
-    final baseUrl = _baseUrl.text.trim();
-    final uri = Uri.tryParse(baseUrl);
-    if (baseUrl.isNotEmpty &&
-        (uri == null ||
-            !(uri.isScheme('http') || uri.isScheme('https')) ||
-            uri.host.isEmpty)) {
-      await showSnack(context, 'Enter a valid http(s) base URL.');
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await _save(
-        settings.copyWith(
-          aiProvider: _provider,
-          aiBaseUrl: baseUrl.isEmpty ? settings.aiBaseUrl : baseUrl,
-          aiModel: _model.text.trim(),
-        ),
-      );
-      if (!mounted) return;
-      await showSnack(context, 'AI settings saved.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _saveKey() async {
-    final key = _apiKey.text.trim();
-    if (key.isEmpty) {
-      await showSnack(context, 'Paste an API key first.');
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await ref.read(settingsRepositoryProvider).saveApiKey(key);
-      _apiKey.clear();
-      ref.invalidate(hasApiKeyProvider);
-      if (mounted) await showSnack(context, 'API key saved.');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _removeKey() async {
-    final confirmed = await confirmDialog(
-      context,
-      title: 'Remove API key?',
-      message: 'AI lookup will stop working until a new key is saved.',
-      confirmLabel: 'Remove',
-      destructive: true,
-    );
-    if (!confirmed) return;
-    await ref.read(settingsRepositoryProvider).deleteApiKey();
-    ref.invalidate(hasApiKeyProvider);
-    if (mounted) await showSnack(context, 'API key removed.');
-  }
-
   Future<void> _testConnection() async {
+    _baseUrlSaveTimer?.cancel();
+    _apiKeySaveTimer?.cancel();
     setState(() => _busy = true);
     try {
+      await _persistAiSettings();
+      await _persistApiKey();
       final definition = await ref.read(lookupServiceProvider).testConnection();
       if (!mounted) return;
       await M3EDialog.show<void>(

@@ -204,7 +204,12 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
           SELECT s.total FROM sessions s
           WHERE s.practice_id = p.id AND s.status = 'completed'
           ORDER BY s.finished_at DESC LIMIT 1
-        ) AS last_total
+        ) AS last_total,
+        (
+          SELECT s.id FROM sessions s
+          WHERE s.practice_id = p.id AND s.status = 'inProgress'
+          ORDER BY s.started_at DESC LIMIT 1
+        ) AS in_progress_session_id
       FROM practices p
       LEFT JOIN questions q ON q.practice_id = p.id
       WHERE p.topic_id = ?
@@ -340,6 +345,7 @@ class PracticeSummaryRow {
     required this.questionCount,
     required this.lastCorrect,
     required this.lastTotal,
+    required this.inProgressSessionId,
   });
 
   factory PracticeSummaryRow.fromRow(QueryRow row) {
@@ -354,6 +360,7 @@ class PracticeSummaryRow {
       questionCount: row.read<int>('question_count'),
       lastCorrect: row.read<int?>('last_correct'),
       lastTotal: row.read<int?>('last_total'),
+      inProgressSessionId: row.read<int?>('in_progress_session_id'),
     );
   }
 
@@ -367,6 +374,7 @@ class PracticeSummaryRow {
   final int questionCount;
   final int? lastCorrect;
   final int? lastTotal;
+  final int? inProgressSessionId;
 
   double? get lastScore {
     final correct = lastCorrect;

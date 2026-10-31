@@ -40,10 +40,9 @@ class _SessionPageState extends ConsumerState<SessionPage>
   bool _showOriginalLetters = false;
   AnswerOutcome? _outcome;
   SessionSummary? _summary;
-  int _reminderMinutes = 0;
-  bool _showReminder = false;
-  Timer? _reminderTimer;
-  Timer? _hideReminderTimer;
+  int _questionMinutes = 0;
+  Timer? _questionTimer;
+  FloatingToastHandle? _toast;
 
   @override
   void initState() {
@@ -55,7 +54,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
         : _start.currentIndex.clamp(0, _start.items.length - 1).toInt();
     _item = _start.items.isEmpty ? null : _start.items[_index];
     _loadQuestionState();
-    _startReminder();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_item == null) _finishExisting();
     });
@@ -64,8 +62,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _reminderTimer?.cancel();
-    _hideReminderTimer?.cancel();
+    _questionTimer?.cancel();
+    _toast?.dismiss();
     _reasoning.dispose();
     super.dispose();
   }
@@ -73,26 +71,33 @@ class _SessionPageState extends ConsumerState<SessionPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _startReminder();
+      _restartQuestionTimer();
     } else {
-      _reminderTimer?.cancel();
-      _hideReminderTimer?.cancel();
+      _questionTimer?.cancel();
+      _toast?.dismiss();
+      _toast = null;
     }
   }
 
-  void _startReminder() {
-    _reminderTimer?.cancel();
-    if (_start.session.status != SessionStatus.inProgress) return;
-    _reminderTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+  void _restartQuestionTimer() {
+    _questionTimer?.cancel();
+    _toast?.dismiss();
+    _toast = null;
+    _questionMinutes = 0;
+    if (_item == null ||
+        _submitted ||
+        _start.session.status != SessionStatus.inProgress) {
+      return;
+    }
+    _questionTimer = Timer.periodic(const Duration(minutes: 5), (_) {
       if (!mounted) return;
-      setState(() {
-        _reminderMinutes += 5;
-        _showReminder = true;
-      });
-      _hideReminderTimer?.cancel();
-      _hideReminderTimer = Timer(const Duration(seconds: 8), () {
-        if (mounted) setState(() => _showReminder = false);
-      });
+      _questionMinutes += 5;
+      _toast?.dismiss();
+      _toast = showFloatingToast(
+        context,
+        message:
+            '$_questionMinutes minutes on this question. Still with us? Take a breath.',
+      );
     });
   }
 
@@ -115,15 +120,22 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _submitted = false;
     _distracted = false;
     _reasoningOpen = false;
-    if (item == null) return;
+    if (item == null) {
+      _restartQuestionTimer();
+      return;
+    }
     final attempt = _start.attempts[item.question.id];
-    if (attempt == null) return;
+    if (attempt == null) {
+      _restartQuestionTimer();
+      return;
+    }
     _selectedIndexes.addAll(attempt.selectedIndexes);
     _reasoning.text = attempt.reasoning;
     _submitted = true;
     _distracted = attempt.distracted;
     _reasoningOpen = attempt.reasoning.trim().isNotEmpty;
     _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+    _restartQuestionTimer();
   }
 
   void _goTo(int index) {
@@ -159,6 +171,9 @@ class _SessionPageState extends ConsumerState<SessionPage>
         _reasoningOpen = _reasoning.text.trim().isNotEmpty;
         if (outcome.summary != null) _summary = outcome.summary;
       });
+      _questionTimer?.cancel();
+      _toast?.dismiss();
+      _toast = null;
       unawaited(_playAnswerSound(outcome.attempt));
     } on SessionException catch (error) {
       if (mounted) await showSnack(context, error.message);
@@ -438,10 +453,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   onPrevious: () => _goTo(_index - 1),
                   onNext: () => _goTo(_index + 1),
                 ),
-                if (_showReminder) ...[
-                  const SizedBox(height: 14),
-                  _ReminderBanner(minutes: _reminderMinutes),
-                ],
                 const SizedBox(height: 22),
                 if (item.topicName.isNotEmpty)
                   Text(
@@ -682,42 +693,6 @@ class _QuestionNavigator extends StatelessWidget {
         const SizedBox(height: 10),
         LinearScore(value: progress, semanticsLabel: 'Practice progress'),
       ],
-    );
-  }
-}
-
-class _ReminderBanner extends StatelessWidget {
-  const _ReminderBanner({required this.minutes});
-
-  final int minutes;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Semantics(
-      liveRegion: true,
-      child: TonalBox(
-        color: theme.colorScheme.secondaryContainer,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        child: Row(
-          children: [
-            Icon(
-              Icons.schedule,
-              size: 18,
-              color: theme.colorScheme.onSecondaryContainer,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '$minutes minutes. Still with us? Take a breath.',
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  color: theme.colorScheme.onSecondaryContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

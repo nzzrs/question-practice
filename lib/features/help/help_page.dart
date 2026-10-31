@@ -139,11 +139,12 @@ class HelpPage extends StatelessWidget {
           title: 'Shuffle and reminders',
           body:
               'The shuffle button on the home screen turns on a mixed session: questions from all topics, in random order. '
-              'The 5-minute reminder measures only foreground practice time; it pauses when the app is in the background.',
+              'The reminder counts time per question: after five minutes on the same question it floats a short toast, and again every five minutes. '
+              'Moving to another question starts the count again, and it pauses when the app is in the background.',
         ),
         const SizedBox(height: 4),
         Text(
-          'question practice · local-first study',
+          'Questions · local-first study',
           style: theme.typography.baseline.labelSmall.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

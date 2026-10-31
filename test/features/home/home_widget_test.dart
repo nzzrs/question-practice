@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/home/home_page.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/practice/session_page.dart';
@@ -16,7 +17,7 @@ void main() {
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
 
-    expect(find.text('question practice'), findsOneWidget);
+    expect(find.text('Questions'), findsOneWidget);
     expect(find.text('No practices yet'), findsOneWidget);
     expect(find.text('Review past errors'), findsOneWidget);
     expect(find.byIcon(Icons.info_outline), findsOneWidget);
@@ -201,9 +202,11 @@ void main() {
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
     expect(find.text('Session in progress'), findsNWidgets(2));
     expect(find.text('Resume'), findsNWidgets(2));
+    expect(find.text('Practice'), findsNWidgets(2));
+    expect(find.text('Topic · 0/1 answered'), findsNWidgets(2));
   });
 
-  testWidgets('five-minute reminder appears without a countdown', (
+  testWidgets('five-minute reminder is a floating toast, not a countdown', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -224,11 +227,48 @@ void main() {
     );
     await tester.pump(const Duration(minutes: 5));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
     expect(
-      find.text('5 minutes. Still with us? Take a breath.'),
+      find.text('5 minutes on this question. Still with us? Take a breath.'),
       findsOneWidget,
     );
     expect(find.textContaining('countdown'), findsNothing);
+  });
+
+  testWidgets('the reminder counts time per question and resets on change', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(count: 2);
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await service.startPractice(practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: SessionPage(start: start),
+      harness: harness,
+    );
+    await tester.pump(const Duration(minutes: 4, seconds: 59));
+    expect(find.textContaining('minutes on this question'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.chevron_right));
+    await pumpFrames(tester);
+    await tester.pump(const Duration(minutes: 1));
+    expect(find.textContaining('minutes on this question'), findsNothing);
+
+    await tester.pump(const Duration(minutes: 4));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(
+      find.text('5 minutes on this question. Still with us? Take a breath.'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('topic page shows progress stats and priority', (tester) async {
@@ -250,6 +290,51 @@ void main() {
     expect(find.text('Anki deck: Cloud deck'), findsOneWidget);
     expect(find.text('Progress'), findsOneWidget);
     expect(find.text('Correct answers'), findsOneWidget);
+    expect(find.text('0/2 answered'), findsOneWidget);
     expect(find.text('TCP/IP'), findsOneWidget);
+    final tiles = tester.widgetList<MetricTile>(find.byType(MetricTile));
+    expect(tiles.last.tone, MetricTone.success);
+  });
+
+  testWidgets('topic metrics use red for active errors and green for correct', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 2,
+    );
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await service.startPractice(seeded.practiceId);
+    await service.submitAnswer(
+      start: start,
+      item: start.items.first,
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: false,
+    );
+    await service.submitAnswer(
+      start: start,
+      item: start.items.last,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: seeded.topicId),
+      harness: harness,
+    );
+    final tiles = tester.widgetList<MetricTile>(find.byType(MetricTile));
+    expect(tiles.first.tone, MetricTone.error);
+    expect(tiles.last.tone, MetricTone.success);
   });
 }

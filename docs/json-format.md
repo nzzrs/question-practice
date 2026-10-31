@@ -1,6 +1,6 @@
 # Import format
 
-Question Practice imports a practice file from **Import** on the home screen. Accepted files:
+Questions imports a practice file from **Import** on the home screen. Accepted files:
 
 - `.json`
 - `.txt` containing UTF-8 JSON

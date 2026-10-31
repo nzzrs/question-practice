@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/topics/topic_page.dart';
 
 import '../../helpers/test_harness.dart';
@@ -24,6 +25,8 @@ void main() {
       harness: harness,
     );
 
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -240));
+    await pumpFrames(tester);
     await tester.longPress(find.text('TCP/IP'));
     await pumpFrames(tester);
     expect(find.text('Rename'), findsOneWidget);
@@ -59,6 +62,8 @@ void main() {
     );
     expect(tester.takeException(), isNull);
 
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -240));
+    await pumpFrames(tester);
     await tester.longPress(find.text('TCP/IP'));
     await pumpFrames(tester);
     expect(find.text('Mark as done'), findsOneWidget);
@@ -67,5 +72,103 @@ void main() {
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
     expect(find.text('Done'), findsOneWidget);
+  });
+
+  testWidgets('a saved practice is marked in progress and asks to continue', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 2,
+    );
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await service.startPractice(seeded.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: seeded.topicId),
+      harness: harness,
+    );
+    expect(find.text('In progress'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('TCP/IP'));
+    await tester.tap(find.text('TCP/IP'));
+    await pumpFrames(tester);
+    expect(find.text('Continue this practice?'), findsOneWidget);
+    expect(find.text('Discard and start another'), findsOneWidget);
+
+    await tester.tap(find.text('Continue'));
+    await pumpFrames(tester);
+    expect(find.text('Question 1 of 2'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    final sessions = await harness.sessions.latestInProgress();
+    expect(sessions!.id, start.session.id);
+  });
+
+  testWidgets('practices can be sorted by name or recency', (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'Zeta',
+      count: 1,
+    );
+    for (final entry in {
+      'Alpha': const Duration(hours: 1),
+      'Beta': const Duration(hours: 2),
+    }.entries) {
+      await harness.practices.createPractice(
+        topicId: seeded.topicId,
+        name: entry.key,
+        description: '',
+        contentHash: 'hash-${entry.key}',
+        importedAt: harness.clock.now().toUtc().add(entry.value),
+      );
+    }
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: seeded.topicId),
+      harness: harness,
+    );
+    double top(String name) => tester.getTopLeft(find.text(name)).dy;
+    expect(top('Alpha'), lessThan(top('Beta')));
+    expect(top('Beta'), lessThan(top('Zeta')));
+
+    Future<void> apply({required String sort, required String order}) async {
+      await tester.ensureVisible(find.byIcon(Icons.sort));
+      await tester.tap(find.byIcon(Icons.sort));
+      await pumpFrames(tester);
+      await tester.tap(find.text(sort));
+      await tester.tap(find.text(order));
+      await tester.tap(find.text('Apply'));
+      await pumpFrames(tester);
+    }
+
+    await apply(sort: 'Name', order: 'Decreasing');
+    expect(top('Zeta'), lessThan(top('Alpha')));
+
+    await apply(sort: 'Recency', order: 'Decreasing');
+    expect(top('Beta'), lessThan(top('Alpha')));
+
+    await apply(sort: 'Recency', order: 'Increasing');
+    expect(top('Zeta'), lessThan(top('Alpha')));
   });
 }

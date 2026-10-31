@@ -50,7 +50,7 @@ class SessionRepository {
 
   Stream<List<PracticeSession>> watchInProgress() {
     return _db.sessionDao.watchInProgressSessions().map(
-      (rows) => rows.map(sessionFromRow).toList(),
+      (rows) => rows.map(sessionFromInProgressRow).toList(),
     );
   }
 

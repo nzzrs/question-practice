@@ -1,4 +1,4 @@
-# Question Practice documentation
+# Questions documentation
 
 All documentation is in English.
 

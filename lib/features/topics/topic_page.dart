@@ -12,6 +12,12 @@ import 'topic_stats_page.dart';
 
 enum _PracticeAction { rename, delete, markDone, markActive }
 
+enum _PracticeSort { name, recency }
+
+enum _SortDirection { increasing, decreasing }
+
+enum _ResumeChoice { continueSession, discardAndStart }
+
 class TopicPage extends ConsumerStatefulWidget {
   const TopicPage({required this.topicId, super.key});
 
@@ -23,6 +29,8 @@ class TopicPage extends ConsumerStatefulWidget {
 
 class _TopicPageState extends ConsumerState<TopicPage> {
   bool _starting = false;
+  _PracticeSort _sort = _PracticeSort.name;
+  _SortDirection _sortDirection = _SortDirection.increasing;
 
   @override
   Widget build(BuildContext context) {
@@ -125,7 +133,15 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                 const SizedBox(height: 20),
                 _TopicHero(summary: data),
                 const SizedBox(height: 24),
-                const SectionTitle('Practices'),
+                SectionTitle(
+                  'Practices',
+                  trailing: M3EIconButton(
+                    variant: M3EIconButtonVariant.standard,
+                    icon: const Icon(Icons.sort),
+                    tooltip: 'Sort practices',
+                    onPressed: _chooseSort,
+                  ),
+                ),
                 practices.when(
                   loading: () => const Padding(
                     padding: EdgeInsets.all(32),
@@ -140,20 +156,25 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                         message: 'Import a practice file that names this topic to add practices.',
                       );
                     }
+                    final sorted = _sortedPractices(items);
                     return AppGroup(
                       children: [
-                        for (final practice in items)
+                        for (final practice in sorted)
                           AppGroupRow(
                             title: practice.practice.name,
                             titleMaxLines: 2,
                             subtitle: practice.practice.description.isEmpty
                                 ? null
                                 : practice.practice.description,
-                            leading: IconBadge(Icons.play_arrow_outlined),
+                            leading: IconBadge(
+                              practice.hasInProgressSession
+                                  ? Icons.play_circle_outline
+                                  : Icons.play_arrow_outlined,
+                            ),
                             trailing: _PracticeTrailing(summary: practice),
                             onTap: _starting
                                 ? null
-                                : () => _startPractice(practice.practice),
+                                : () => _openPractice(practice),
                             onLongPress: _starting
                                 ? null
                                 : () => _showPracticeActions(practice),
@@ -168,6 +189,166 @@ class _TopicPageState extends ConsumerState<TopicPage> {
         ),
       ],
     );
+  }
+
+  List<PracticeSummary> _sortedPractices(List<PracticeSummary> items) {
+    final sorted = List<PracticeSummary>.of(items);
+    final direction = _sortDirection == _SortDirection.increasing ? 1 : -1;
+    sorted.sort((a, b) {
+      final comparison = switch (_sort) {
+        _PracticeSort.name => a.practice.name.toLowerCase().compareTo(
+          b.practice.name.toLowerCase(),
+        ),
+        _PracticeSort.recency => a.practice.importedAt.compareTo(
+          b.practice.importedAt,
+        ),
+      };
+      final tieBreak = a.practice.id.compareTo(b.practice.id);
+      return (comparison != 0 ? comparison : tieBreak) * direction;
+    });
+    return sorted;
+  }
+
+  Future<void> _chooseSort() async {
+    var sort = _sort;
+    var direction = _sortDirection;
+    final applied = await M3EDialog.show<bool>(
+      context,
+      dialog: StatefulBuilder(
+        builder: (context, setDialogState) {
+          final theme = M3ETheme.of(context);
+          return M3EDialog(
+            title: 'Sort practices',
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Sort by', style: theme.typography.baseline.labelMedium),
+                const SizedBox(height: 8),
+                M3ESegmentedButton<_PracticeSort>(
+                  segments: const [
+                    M3ESegment(value: _PracticeSort.name, label: 'Name'),
+                    M3ESegment(value: _PracticeSort.recency, label: 'Recency'),
+                  ],
+                  selected: {sort},
+                  onSelectionChanged: (values) {
+                    if (values.isEmpty) return;
+                    setDialogState(() => sort = values.first);
+                  },
+                ),
+                const SizedBox(height: 18),
+                Text('Order', style: theme.typography.baseline.labelMedium),
+                const SizedBox(height: 8),
+                M3ESegmentedButton<_SortDirection>(
+                  segments: const [
+                    M3ESegment(
+                      value: _SortDirection.increasing,
+                      label: 'Increasing',
+                    ),
+                    M3ESegment(
+                      value: _SortDirection.decreasing,
+                      label: 'Decreasing',
+                    ),
+                  ],
+                  selected: {direction},
+                  onSelectionChanged: (values) {
+                    if (values.isEmpty) return;
+                    setDialogState(() => direction = values.first);
+                  },
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Increasing: A to Z or oldest first. Decreasing: Z to A or newest first.',
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              M3EButton.text(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              M3EButton.filled(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Apply'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (applied != true || !mounted) return;
+    setState(() {
+      _sort = sort;
+      _sortDirection = direction;
+    });
+  }
+
+  Future<void> _openPractice(PracticeSummary summary) async {
+    final sessionId = summary.inProgressSessionId;
+    if (sessionId == null) {
+      await _startPractice(summary.practice);
+      return;
+    }
+    final choice = await M3EDialog.show<_ResumeChoice>(
+      context,
+      dialog: M3EDialog(
+        title: 'Continue this practice?',
+        content: Text(
+          '"${summary.practice.name}" already has a session in progress. '
+          'Continue where you left off, or discard it and start another.',
+        ),
+        actions: [
+          M3EButton.text(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          M3EButton.text(
+            onPressed: () =>
+                Navigator.of(context).pop(_ResumeChoice.discardAndStart),
+            child: const Text('Discard and start another'),
+          ),
+          M3EButton.filled(
+            onPressed: () =>
+                Navigator.of(context).pop(_ResumeChoice.continueSession),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case _ResumeChoice.continueSession:
+        await _resumePractice(sessionId);
+      case _ResumeChoice.discardAndStart:
+        setState(() => _starting = true);
+        try {
+          await ref.read(sessionServiceProvider).discard(sessionId);
+        } finally {
+          if (mounted) setState(() => _starting = false);
+        }
+        if (mounted) await _startPractice(summary.practice);
+    }
+  }
+
+  Future<void> _resumePractice(int sessionId) async {
+    setState(() => _starting = true);
+    try {
+      final start = await ref.read(sessionServiceProvider).resume(sessionId);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (context) => SessionPage(start: start),
+        ),
+      );
+    } on SessionException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
   }
 
   Future<void> _startPractice(Practice practice) async {
@@ -472,7 +653,7 @@ class _TopicHero extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${summary.attemptedQuestionCount}/${summary.relevantQuestionCount} learned',
+                      '${summary.attemptedQuestionCount}/${summary.relevantQuestionCount} answered',
                       style: theme.typography.baseline.bodySmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -505,6 +686,7 @@ class _TopicHero extends StatelessWidget {
                   value: '${summary.correctCount}/${summary.answeredCount}',
                   icon: Icons.check_circle_outline,
                   caption: '${summary.sessionCount} sessions',
+                  tone: MetricTone.success,
                 ),
               ),
             ],
@@ -528,6 +710,14 @@ class _PracticeTrailing extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (summary.hasInProgressSession) ...[
+          const Pill(
+            'In progress',
+            tone: PillTone.secondary,
+            icon: Icons.play_arrow,
+          ),
+          const SizedBox(height: 4),
+        ],
         Text(
           '${summary.questionCount} questions',
           style: theme.typography.baseline.labelSmall.copyWith(

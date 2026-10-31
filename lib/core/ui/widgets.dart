@@ -5,19 +5,21 @@ export 'app_metrics.dart';
 export 'app_scaffold.dart';
 export 'app_sections.dart';
 export 'app_success.dart';
+export 'app_toast.dart';
 
 Future<void> showSnack(
   BuildContext context,
   String message, {
   String? action,
   VoidCallback? onAction,
+  Duration duration = const Duration(seconds: 4),
 }) async {
   M3ESnackbar.show(
     context,
     message: message,
     actionLabel: action,
     onAction: onAction,
-    showCloseButton: action == null,
+    duration: duration,
   );
 }
 

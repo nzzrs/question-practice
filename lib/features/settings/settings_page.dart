@@ -6,7 +6,6 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/platform/anki_gateway.dart';
 import '../../core/ui/widgets.dart';
-import '../help/help_page.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../topics/anki_deck_picker.dart';
 
@@ -54,16 +53,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return AppPage(
       title: 'Settings',
       showBack: true,
-      actions: [
-        M3EIconButton(
-          variant: M3EIconButtonVariant.standard,
-          icon: const Icon(Icons.help_outline),
-          tooltip: 'How to use it',
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (context) => const HelpPage()),
-          ),
-        ),
-      ],
       children: [
         _SettingsSection(
           title: 'Appearance',
@@ -342,7 +331,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 14),
         _SettingsSection(
           title: 'About',
-          supporting: 'question practice 0.9.3\nLocal-first practice with error cards and Anki export.',
+          supporting: 'Questions 0.9.4\nLocal-first practice with error cards and Anki export.',
           child: const SizedBox.shrink(),
         ),
       ],

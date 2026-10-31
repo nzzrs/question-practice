@@ -1,4 +1,4 @@
-# Question Practice
+# Questions
 
 A quiet, local-first Android app for practising multiple-choice questions, analysing mistakes, and turning them into Anki cards.
 
@@ -21,7 +21,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Give each topic its own AnkiDroid deck; topics without one use the default deck.
 - See per-topic accuracy and progress, and a mixed shuffled session across all topics.
 - Material You wallpaper colors are on by default; they can be turned off in Settings.
-- A subtle reminder every five minutes. There is no timer.
+- A floating reminder after five minutes on the same question, then every five minutes. It resets when you move on.
 
 ## Requirements
 

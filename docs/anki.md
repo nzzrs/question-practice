@@ -6,8 +6,8 @@ Question Practice writes to AnkiDroid through its supported Instant-Add API (`co
 
 1. Install AnkiDroid on the same device.
 2. Open AnkiDroid → Settings → Advanced → enable the AnkiDroid API.
-3. In Question Practice → Settings → AnkiDroid, tap **Grant permission**. Android asks for `com.ichi2.anki.permission.READ_WRITE_DATABASE`.
-4. Make sure AnkiDroid has a **Cloze** note type. AnkiDroid ships with one; if it was deleted, create it again in AnkiDroid's note type manager. Question Practice uses that type for concept cards.
+3. In Questions → Settings → AnkiDroid, tap **Grant permission**. Android asks for `com.ichi2.anki.permission.READ_WRITE_DATABASE`.
+4. Make sure AnkiDroid has a **Cloze** note type. AnkiDroid ships with one; if it was deleted, create it again in AnkiDroid's note type manager. Questions uses that type for concept cards.
 
 The manifest declares the database permission and a `<queries>` entry for `com.ichi2.anki`, required for package visibility on Android 11+.
 
@@ -38,7 +38,7 @@ If a topic is renamed, cards created before the rename keep the old captured top
 | `Question Practice: Error` | Problem, Wrong Solution, Correct Solution, Mental Trap, Vaccine, Explanation | Error cards |
 | `Question Practice Basic` | Front, Back | Skipped-question “another question” cards |
 
-Question Practice checks for `Question Practice: Error` before inserting notes. If the model is missing, it creates it with the six fields, front/back templates and CSS defined in `AnkiBridge.kt`.
+Questions checks for `Question Practice: Error` before inserting notes. If the model is missing, it creates it with the six fields, front/back templates and CSS defined in `AnkiBridge.kt`.
 
 The error front shows the problem, the wrong answer chosen and the flawed-assumption prompt. The back shows the mental trap first, then the vaccine, correct solution and explanation in a secondary reference box.
 

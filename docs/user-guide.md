@@ -1,6 +1,6 @@
 # User guide
 
-Question Practice is an offline-first Android study app. This guide walks through every screen. The interface is English.
+Questions is an offline-first Android study app. This guide walks through every screen. The interface is English.
 
 ## Home
 

@@ -22,6 +22,6 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.text('Import'));
     await pumpFrames(tester);
-    expect(find.text('Practice imported'), findsOneWidget);
+    expect(find.textContaining('Practice imported'), findsOneWidget);
   });
 }

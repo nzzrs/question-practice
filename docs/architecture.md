@@ -50,7 +50,7 @@ A session is created at start and remains `inProgress` until every question has 
 - Questions with several correct answers let you select every correct alternative. Selection is compared as a set, so every correct alternative is required and an extra wrong alternative fails the question.
 - Prompt, alternatives and explanations use `SelectableLinkifiedText` for Define and tappable http(s) links.
 - AI definitions render in an overlay bubble anchored to the selection and save before display. Web definitions keep the editable bottom sheet.
-- The 5-minute reminder is a `Timer.periodic` paused while the app is in the background.
+- The 5-minute reminder is a `Timer.periodic` for the current question, paused while the app is in the background and reset when the question changes.
 - Text selection is a `SelectionArea` with a custom “Define” action.
 - Settings model selection uses `M3EDropdownMenu` and `LookupService.listModels`; Gemini models are filtered to those that support `generateContent`.
 

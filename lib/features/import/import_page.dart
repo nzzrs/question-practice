@@ -145,22 +145,13 @@ class _ImportPageState extends ConsumerState<ImportPage> {
       final result = await ref.read(importServiceProvider).import(preview);
       if (!mounted) return;
       ref.invalidate(homeStatsProvider);
-      await M3EDialog.show<void>(
+      final duplicates = result.practicesSkipped == 0
+          ? ''
+          : ', ${result.practicesSkipped} duplicates skipped';
+      await showSnack(
         context,
-        dialog: M3EDialog(
-          title: 'Practice imported',
-          content: Text(
-            '${result.topicsCreated} topics created, ${result.topicsReused} reused.\n'
-            '${result.practicesImported} practices and ${result.questionsImported} questions imported'
-            '${result.practicesSkipped == 0 ? '.' : '; ${result.practicesSkipped} duplicates skipped.'}',
-          ),
-          actions: [
-            M3EButton.filled(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Done'),
-            ),
-          ],
-        ),
+        'Practice imported: ${result.practicesImported} practices, '
+        '${result.questionsImported} questions$duplicates.',
       );
       if (mounted) Navigator.of(context).pop(true);
     } on ImportException catch (error) {

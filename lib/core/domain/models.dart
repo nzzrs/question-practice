@@ -137,6 +137,9 @@ class PracticeSession {
     required this.correct,
     required this.skipped,
     required this.distracted,
+    this.topicName = '',
+    this.practiceName = '',
+    this.answeredCount = 0,
   });
 
   final int id;
@@ -149,6 +152,11 @@ class PracticeSession {
   final int correct;
   final int skipped;
   final int distracted;
+
+  /// Filled for in-progress sessions so Home can name what is paused.
+  final String topicName;
+  final String practiceName;
+  final int answeredCount;
 
   double get score => total == 0 ? 0 : correct / total;
   int get wrong => total - correct - skipped;
@@ -228,11 +236,15 @@ class PracticeSummary {
     required this.practice,
     required this.questionCount,
     required this.lastScore,
+    this.inProgressSessionId,
   });
 
   final Practice practice;
   final int questionCount;
   final double? lastScore;
+  final int? inProgressSessionId;
+
+  bool get hasInProgressSession => inProgressSessionId != null;
 }
 
 @immutable

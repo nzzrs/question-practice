@@ -70,11 +70,34 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
         .watchSingleOrNull();
   }
 
-  Stream<List<SessionRow>> watchInProgressSessions() {
-    return (select(sessions)
-          ..where((s) => s.status.equals('inProgress'))
-          ..orderBy([(s) => OrderingTerm.desc(s.startedAt)]))
-        .watch();
+  Stream<List<InProgressSessionRow>> watchInProgressSessions() {
+    final query = customSelect(
+      '''
+      SELECT
+        s.id AS session_id,
+        s.practice_id AS session_practice_id,
+        s.mode AS session_mode,
+        s.status AS session_status,
+        s.started_at AS session_started_at,
+        s.finished_at AS session_finished_at,
+        s.total AS session_total,
+        s.correct AS session_correct,
+        s.skipped AS session_skipped,
+        s.distracted AS session_distracted,
+        COALESCE(p.name, '') AS practice_name,
+        COALESCE(t.name, '') AS topic_name,
+        (SELECT COUNT(*) FROM attempts a WHERE a.session_id = s.id) AS answered_count
+      FROM sessions s
+      LEFT JOIN practices p ON p.id = s.practice_id
+      LEFT JOIN topics t ON t.id = p.topic_id
+      WHERE s.status = 'inProgress'
+      ORDER BY s.started_at DESC, s.id DESC
+      ''',
+      readsFrom: {sessions, practices, topics, attempts},
+    );
+    return query.watch().map(
+      (rows) => rows.map(InProgressSessionRow.fromRow).toList(),
+    );
   }
 
   Future<List<QuestionRow>> questionsForSession(int sessionId) {
@@ -177,4 +200,38 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     final row = await query.getSingle();
     return row.read<int>('amount');
   }
+}
+
+class InProgressSessionRow {
+  const InProgressSessionRow({
+    required this.session,
+    required this.topicName,
+    required this.practiceName,
+    required this.answeredCount,
+  });
+
+  factory InProgressSessionRow.fromRow(QueryRow row) {
+    return InProgressSessionRow(
+      session: SessionRow(
+        id: row.read<int>('session_id'),
+        practiceId: row.read<int?>('session_practice_id'),
+        mode: row.read<String>('session_mode'),
+        status: row.read<String>('session_status'),
+        startedAt: row.read<DateTime>('session_started_at').toUtc(),
+        finishedAt: row.read<DateTime?>('session_finished_at')?.toUtc(),
+        total: row.read<int>('session_total'),
+        correct: row.read<int>('session_correct'),
+        skipped: row.read<int>('session_skipped'),
+        distracted: row.read<int>('session_distracted'),
+      ),
+      topicName: row.read<String>('topic_name'),
+      practiceName: row.read<String>('practice_name'),
+      answeredCount: row.read<int>('answered_count'),
+    );
+  }
+
+  final SessionRow session;
+  final String topicName;
+  final String practiceName;
+  final int answeredCount;
 }

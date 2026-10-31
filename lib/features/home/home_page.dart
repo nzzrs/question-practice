@@ -36,13 +36,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     final width = MediaQuery.sizeOf(context).width;
 
     return AppPage(
-      title: 'question practice',
+      title: 'Questions',
       subtitle: inProgress.isEmpty ? null : _pausedLabel(inProgress.length),
       actions: [
         M3EIconButton(
           variant: M3EIconButtonVariant.standard,
           icon: const Icon(Icons.info_outline),
-          tooltip: 'How to use question practice',
+          tooltip: 'How to use Questions',
           onPressed: () => _push(const HelpPage()),
         ),
         M3EIconButton(
@@ -461,6 +461,17 @@ class _ResumeCard extends StatelessWidget {
       SessionMode.pastErrors => 'Past errors',
       SessionMode.practice => 'Practice',
     };
+    final practiceName = session.practiceName.trim();
+    final topicName = session.topicName.trim();
+    final title =
+        session.mode == SessionMode.practice && practiceName.isNotEmpty
+        ? practiceName
+        : mode;
+    final details = [
+      if (session.mode == SessionMode.practice && topicName.isNotEmpty)
+        topicName,
+      '${session.answeredCount}/${session.total} answered',
+    ].join(' · ');
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -490,7 +501,13 @@ class _ResumeCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$mode · ${session.total} questions',
+                      title,
+                      style: theme.typography.baseline.titleSmall.copyWith(
+                        color: theme.colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                    Text(
+                      details,
                       style: theme.typography.baseline.bodySmall.copyWith(
                         color: theme.colorScheme.onSecondaryContainer
                             .withValues(alpha: 0.85),

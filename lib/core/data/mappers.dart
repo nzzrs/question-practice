@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import '../database/app_database.dart';
+import '../database/daos/session_dao.dart';
 import '../database/daos/stats_dao.dart';
 import '../domain/models.dart';
 
@@ -72,6 +73,25 @@ PracticeSession sessionFromRow(SessionRow row) {
     correct: row.correct,
     skipped: row.skipped,
     distracted: row.distracted,
+  );
+}
+
+PracticeSession sessionFromInProgressRow(InProgressSessionRow row) {
+  final session = sessionFromRow(row.session);
+  return PracticeSession(
+    id: session.id,
+    practiceId: session.practiceId,
+    mode: session.mode,
+    status: session.status,
+    startedAt: session.startedAt,
+    finishedAt: session.finishedAt,
+    total: session.total,
+    correct: session.correct,
+    skipped: session.skipped,
+    distracted: session.distracted,
+    topicName: row.topicName,
+    practiceName: row.practiceName,
+    answeredCount: row.answeredCount,
   );
 }
 
@@ -178,6 +198,7 @@ PracticeSummary practiceSummaryFromRow(PracticeSummaryRow row) {
     ),
     questionCount: row.questionCount,
     lastScore: row.lastScore,
+    inProgressSessionId: row.inProgressSessionId,
   );
 }
 

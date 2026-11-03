@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+# Git runs this before every push. The build happens on this laptop, so the
+# pushed commit is never published without a matching debug APK.
+set -eu
+
+repo_root=$(git rev-parse --show-toplevel)
+exec "$repo_root/tool/build_debug_apk.sh"

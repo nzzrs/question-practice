@@ -74,6 +74,50 @@ void main() {
     expect(find.text('Done'), findsOneWidget);
   });
 
+  testWidgets('long pressing a practice splits it into two slices', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 4,
+    );
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: seeded.topicId),
+      harness: harness,
+    );
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -240));
+    await pumpFrames(tester);
+    await tester.longPress(find.text('TCP/IP'));
+    await pumpFrames(tester);
+    expect(find.text('Split into two'), findsOneWidget);
+
+    await tester.tap(find.text('Split into two'));
+    await pumpFrames(tester);
+    expect(find.text('Split practice?'), findsOneWidget);
+    await tester.tap(find.text('Split'));
+    await pumpFrames(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('TCP/IP Slice A'), findsOneWidget);
+    expect(find.text('TCP/IP Slice B'), findsOneWidget);
+    final practices = await harness.practices.allPractices();
+    expect(practices, hasLength(2));
+    final questions = await harness.practices.questionsForPractice(
+      practices.first.id,
+    );
+    expect(questions, hasLength(2));
+  });
+
   testWidgets('a saved practice is marked in progress and asks to continue', (
     tester,
   ) async {

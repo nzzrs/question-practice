@@ -19,6 +19,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Look up a selected term with an optional AI provider: OpenAI-compatible endpoints (OpenAI, Groq, OpenRouter, custom) or Gemini's native API, with a model list loaded from the provider. AI definitions appear in a read-only bubble and save automatically; web lookup keeps the editable sheet. Or use DuckDuckGo/Wikipedia through a Custom Tab.
 - Export selected cards directly to AnkiDroid or share Anki-compatible files. Error cards can be reviewed all at once or by selection from Cards. Incomplete error cards can be selected to review them before export.
 - Give each topic its own AnkiDroid deck; topics without one use the default deck.
+- Export a complete JSON backup of practices, sessions, answers, cards and settings, and restore it on another install. The backup never contains the AI API key.
 - See per-topic accuracy and progress, and a mixed shuffled session across all topics.
 - Material You wallpaper colors are on by default; they can be turned off in Settings.
 - A floating reminder after five minutes on the same question, then every five minutes. It resets when you move on.
@@ -44,6 +45,16 @@ Build a debug APK:
 ```bash
 flutter build apk --debug
 ```
+
+The debug build uses the `link.nzrs.questionpractice.dev` application ID, so it can be installed next to a release build.
+
+A tracked pre-push hook builds the debug APK on this laptop before every push. Install it once:
+
+```bash
+./tool/install_hooks.sh
+```
+
+The APK is written to `build/app/outputs/flutter-apk/app-debug.apk`.
 
 Install it on a connected device:
 
@@ -76,6 +87,7 @@ See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze
 ## Data and privacy
 
 - Practices, answers, cards and statistics are stored in local SQLite through Drift.
+- Settings offers a complete JSON backup and restore. The backup covers practices, sessions, answers, cards and settings; the AI API key stays in Android secure storage and is never included.
 - The AI API key is stored with Android secure storage, never in SQLite and never logged.
 - The app has no analytics and does not record time spent.
 - A term lookup sends only the selected term, its question and the topic name to the configured endpoint, and only when Define is invoked.
@@ -95,6 +107,7 @@ The suite covers the importer and JSON schema (including `correctIndexes`), scor
 ```
 lib/app/                  app shell, providers, theme
 lib/core/                 domain models, Drift database, repositories, platform bridges
+lib/features/backup/      complete JSON backup and restore
 lib/features/import/      schema validation, preview and import
 lib/features/practice/    session flow, reminders, results
 lib/features/review/      end-of-session error and concept cards

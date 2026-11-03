@@ -29,7 +29,8 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - Shows description, priority, Anki deck, accuracy, progress, correct answers, active errors and completed sessions.
 - **Progress** is answered questions divided by the topic's total questions after removing those left unanswered in completed sessions. It measures coverage; **Accuracy** measures how many answers were correct.
 - **Practices** lists each practice with question count and last score. Tap a practice to start.
-- Long-press a practice to rename it, delete it, or mark it done or active.
+- Long-press a practice to open its options: rename, mark it done or active, split it into two slices, or delete it.
+- **Split into two** replaces the practice with "… Slice A" and "… Slice B", each holding half of its questions in random order. It needs an even number of questions and removes the original practice's sessions and cards. Finish or discard an in-progress session first.
 - **Edit** changes name, description, priority and the Anki deck for that topic.
 - **Browse decks** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
 - Blank deck means the default deck from Settings.
@@ -108,7 +109,7 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - **Appearance**: wallpaper colors (Material You) are on by default. Turn them off to use the app seed color. The app follows system light/dark. **Practice sounds** has a volume slider and a play icon to hear the sample; the slider saves when you release it.
 - **Looking up terms**: Web search or AI. Web engine: DuckDuckGo or Wikipedia. AI: provider (OpenAI, Groq, OpenRouter, Gemini or custom), model, API key and **Test connection**. The base URL is shown only for a custom provider. Opening the model dropdown loads the provider list. Provider, model, base URL and API key save automatically; clear the key field to remove the saved key. The key is stored in Android secure storage and never shown after saving.
 - **AnkiDroid**: status of install/API/permission/Cloze type, permission request, open AnkiDroid, default deck name, and **Browse decks** to pick a live deck name.
-- **Data**: erase all practices, sessions, cards, settings and API key. Cannot be undone.
+- **Data**: **Export backup** shares one JSON file with every practice, session, answer, card and setting. **Restore backup** validates the file and then replaces all local data. The AI API key is never part of a backup and is left untouched on the device. **Erase all data** removes practices, sessions, cards, settings and the API key. Restore and erase cannot be undone.
 - **About**: version.
 
 ## Deck routing details

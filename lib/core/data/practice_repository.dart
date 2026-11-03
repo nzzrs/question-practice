@@ -1,10 +1,32 @@
+import 'dart:convert';
+import 'dart:math';
+
 import 'package:clock/clock.dart';
 import 'package:collection/collection.dart';
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart' show Value;
 
 import '../database/app_database.dart';
 import '../domain/models.dart';
 import 'mappers.dart';
+
+/// Raised when a practice cannot be split.
+class PracticeSplitException implements Exception {
+  const PracticeSplitException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// The two practices produced by splitting one practice.
+class SplitPracticeResult {
+  const SplitPracticeResult({required this.sliceA, required this.sliceB});
+
+  final Practice sliceA;
+  final Practice sliceB;
+}
 
 class PracticeRepository {
   PracticeRepository(this._db, this._clock);
@@ -162,6 +184,123 @@ class PracticeRepository {
 
   Future<void> deletePractice(int id) {
     return _db.topicDao.deletePractice(id);
+  }
+
+  Future<SplitPracticeResult> splitPractice(int id, {Random? random}) {
+    return _db.transaction(() async {
+      final practice = await _db.topicDao.practiceById(id);
+      if (practice == null) {
+        throw const PracticeSplitException('This practice no longer exists.');
+      }
+      final questions = await _db.topicDao.questionsForPractice(id);
+      if (questions.length < 2) {
+        throw const PracticeSplitException(
+          'A split needs at least two questions.',
+        );
+      }
+      if (questions.length.isOdd) {
+        throw PracticeSplitException(
+          'A split needs an even number of questions. '
+          'This practice has ${questions.length}.',
+        );
+      }
+
+      final shuffled = List<QuestionRow>.of(questions)
+        ..shuffle(random ?? Random());
+      final half = shuffled.length ~/ 2;
+      final sliceAQuestions = shuffled.sublist(0, half);
+      final sliceBQuestions = shuffled.sublist(half);
+      final nameA = await _uniqueSplitName(
+        practice.topicId,
+        practice.name,
+        'A',
+      );
+      final nameB = await _uniqueSplitName(
+        practice.topicId,
+        practice.name,
+        'B',
+      );
+      final now = _clock.now().toUtc();
+
+      final sliceAId = await _db.topicDao.insertPractice(
+        topicId: practice.topicId,
+        name: nameA,
+        description: practice.description,
+        contentHash: _splitHash(practice.contentHash, 'a', sliceAQuestions),
+        importedAt: now,
+      );
+      await _copyQuestions(sliceAId, sliceAQuestions);
+      final sliceBId = await _db.topicDao.insertPractice(
+        topicId: practice.topicId,
+        name: nameB,
+        description: practice.description,
+        contentHash: _splitHash(practice.contentHash, 'b', sliceBQuestions),
+        importedAt: now,
+      );
+      await _copyQuestions(sliceBId, sliceBQuestions);
+      await _db.topicDao.deletePractice(id);
+
+      final sliceARow = await _db.topicDao.practiceById(sliceAId);
+      final sliceBRow = await _db.topicDao.practiceById(sliceBId);
+      return SplitPracticeResult(
+        sliceA: practiceFromRow(sliceARow!),
+        sliceB: practiceFromRow(sliceBRow!),
+      );
+    });
+  }
+
+  Future<String> _uniqueSplitName(
+    int topicId,
+    String baseName,
+    String slice,
+  ) async {
+    var suffix = 'Slice $slice';
+    var candidate = _withSuffix(baseName, suffix);
+    var copy = 2;
+    while (await _db.topicDao.findPracticeByName(topicId, candidate) != null) {
+      suffix = 'Slice $slice $copy';
+      candidate = _withSuffix(baseName, suffix);
+      copy++;
+    }
+    return candidate;
+  }
+
+  String _withSuffix(String baseName, String suffix) {
+    final tail = ' $suffix';
+    final room = 120 - tail.length;
+    final trimmed = baseName.length > room
+        ? baseName.substring(0, room).trimRight()
+        : baseName;
+    return '$trimmed$tail';
+  }
+
+  String _splitHash(
+    String originalHash,
+    String slice,
+    List<QuestionRow> questions,
+  ) {
+    final source = [
+      originalHash,
+      slice,
+      for (final question in questions) question.id,
+    ].join('|');
+    return sha256.convert(utf8.encode(source)).toString();
+  }
+
+  Future<void> _copyQuestions(int practiceId, List<QuestionRow> questions) {
+    return _db.topicDao.insertQuestions([
+      for (var index = 0; index < questions.length; index++)
+        QuestionsCompanion.insert(
+          practiceId: practiceId,
+          prompt: questions[index].prompt,
+          alternativesJson: questions[index].alternativesJson,
+          correctIndexesJson: Value(questions[index].correctIndexesJson),
+          explanation: questions[index].explanation,
+          alternativeExplanationsJson:
+              questions[index].alternativeExplanationsJson,
+          position: index,
+        ),
+    ]);
   }
 
   Future<void> deleteTopic(int id) {

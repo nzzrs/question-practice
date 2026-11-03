@@ -51,6 +51,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Keep debug installs separate from a release install on the same device.
+            applicationIdSuffix = ".dev"
+        }
         release {
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")

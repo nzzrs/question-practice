@@ -13,6 +13,7 @@ import '../core/platform/anki_gateway.dart';
 import '../core/platform/practice_sound_player.dart';
 import '../core/platform/secure_key_store.dart';
 import '../core/platform/web_launcher.dart';
+import '../features/backup/domain/backup_service.dart';
 import '../features/export/domain/export_service.dart';
 import '../features/import/domain/import_service.dart';
 import '../features/lookup/domain/lookup_service.dart';
@@ -194,6 +195,13 @@ final exportServiceProvider = Provider<ExportService>(
     gateway: ref.watch(ankiGatewayProvider),
     cards: ref.watch(cardRepositoryProvider),
     practices: ref.watch(topicRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final backupServiceProvider = Provider<BackupService>(
+  (ref) => BackupService(
+    database: ref.watch(databaseProvider),
     clock: ref.watch(clockProvider),
   ),
 );

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -10,6 +11,7 @@ import '../../core/domain/natural_compare.dart';
 import '../../core/platform/anki_gateway.dart';
 import '../../core/platform/practice_sound_player.dart';
 import '../../core/ui/widgets.dart';
+import '../backup/domain/backup_service.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../topics/anki_deck_picker.dart';
 
@@ -372,14 +374,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 14),
         _SettingsSection(
           title: 'Data',
-          supporting: 'Practices, sessions, error cards, concepts and settings live only on this device.',
-          child: SizedBox(
-            width: double.infinity,
-            child: M3EButton.outlined(
-              onPressed: _busy ? null : _eraseAll,
-              icon: const Icon(Icons.delete_outline),
-              child: const Text('Erase all data'),
-            ),
+          supporting:
+              'A backup includes practices, sessions, answers, cards and '
+              'settings. It never includes your AI API key.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              M3EButton.tonal(
+                onPressed: _busy ? null : _exportBackup,
+                icon: const Icon(Icons.download_outlined),
+                child: const Text('Export backup'),
+              ),
+              const SizedBox(height: 8),
+              M3EButton.outlined(
+                onPressed: _busy ? null : _restoreBackup,
+                icon: const Icon(Icons.upload_outlined),
+                child: const Text('Restore backup'),
+              ),
+              const SizedBox(height: 16),
+              M3EButton.outlined(
+                onPressed: _busy ? null : _eraseAll,
+                icon: const Icon(Icons.delete_outline),
+                child: const Text('Erase all data'),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 14),
@@ -573,6 +591,76 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     );
     if (selected == null || selected.trim().isEmpty || !mounted) return;
     setState(() => _deck.text = selected.trim());
+  }
+
+  Future<void> _exportBackup() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(backupServiceProvider).shareBackup();
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not export the backup: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _restoreBackup() async {
+    setState(() => _busy = true);
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json'],
+      );
+      if (files.isEmpty) return;
+      final bytes = await files.single.readAsBytes();
+      if (!mounted) return;
+      final service = ref.read(backupServiceProvider);
+      final info = await service.inspectBytes(bytes);
+      if (!mounted) return;
+      final confirmed = await confirmDialog(
+        context,
+        title: 'Restore backup?',
+        message:
+            'This replaces everything on this device with the backup: '
+            '${info.description}.\n\n'
+            'Your AI API key stays on this device and is not changed. '
+            'This cannot be undone.',
+        confirmLabel: 'Restore',
+        destructive: true,
+      );
+      if (!confirmed || !mounted) return;
+      final restored = await service.restoreBytes(bytes);
+      _loaded = false;
+      ref.invalidate(settingsProvider);
+      ref.invalidate(hasApiKeyProvider);
+      ref.invalidate(topicSummariesProvider);
+      ref.invalidate(homeStatsProvider);
+      ref.invalidate(dueErrorsProvider);
+      ref.invalidate(resolvedErrorsProvider);
+      ref.invalidate(errorsNeedingDetailsProvider);
+      ref.invalidate(conceptsProvider);
+      ref.invalidate(allConceptsProvider);
+      ref.invalidate(errorCardsProvider);
+      ref.invalidate(allErrorCardsProvider);
+      ref.invalidate(manualCardsProvider);
+      ref.invalidate(allManualCardsProvider);
+      ref.invalidate(inProgressSessionProvider);
+      ref.invalidate(inProgressSessionsProvider);
+      if (mounted) {
+        setState(() {});
+        await showSnack(context, 'Backup restored: ${restored.description}.');
+      }
+    } on BackupException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not restore the backup: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   Future<void> _eraseAll() async {

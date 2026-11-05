@@ -38,6 +38,20 @@ void main() {
     expect(builder.html('a\nb\tc'), 'a<br>b c');
   });
 
+  test('concept notes place the acronym expansion in the extra field', () {
+    final notes = builder.notes(ExportSelection(concepts: [_concept()]));
+    expect(notes.single.model, AnkiModel.concept);
+    expect(notes.single.fields, [
+      'Definition of {{c1::TCP}}: {{c2::A reliable transport protocol.}}',
+      'Transmission Control Protocol',
+    ]);
+  });
+
+  test('concept files keep the expansion as the second column', () {
+    final files = builder.files(ExportSelection(concepts: [_concept()]));
+    expect(files.concepts, contains('\tTransmission Control Protocol'));
+  });
+
   test('notes follow per-topic deck overrides', () {
     final notes = builder.notes(
       ExportSelection(
@@ -94,7 +108,8 @@ Concept _concept() {
     sessionId: 1,
     questionId: 1,
     term: 'TCP',
-    definition: 'Transmission Control Protocol',
+    definition: 'A reliable transport protocol.',
+    extra: 'Transmission Control Protocol',
     context: 'Context',
     topicName: 'Networking basics',
     source: ConceptSource.ai,

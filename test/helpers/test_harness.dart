@@ -2,6 +2,7 @@ import 'package:clock/clock.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/providers.dart';
@@ -37,12 +38,14 @@ class TestHarness {
     WebLauncher? webLauncher,
     AnkiGateway? anki,
     PracticeSoundPlayer? soundPlayer,
+    http.Client? httpClient,
   }) : clock = TestClock(now ?? DateTime.utc(2026, 1, 1, 12)),
        database = AppDatabase(NativeDatabase.memory()),
        keyStore = keyStore ?? InMemorySecureKeyStore(),
        webLauncher = webLauncher ?? RecordingWebLauncher(),
        anki = anki ?? FakeAnkiGateway(),
-       soundPlayer = soundPlayer ?? const SilentPracticeSoundPlayer() {
+       soundPlayer = soundPlayer ?? const SilentPracticeSoundPlayer(),
+       httpClient = httpClient ?? http.Client() {
     practices = PracticeRepository(database, clock);
     sessions = SessionRepository(database);
     cards = CardRepository(database, clock);
@@ -55,12 +58,16 @@ class TestHarness {
   final WebLauncher webLauncher;
   final AnkiGateway anki;
   final PracticeSoundPlayer soundPlayer;
+  final http.Client httpClient;
   late final PracticeRepository practices;
   late final SessionRepository sessions;
   late final CardRepository cards;
   late final SettingsRepository settings;
 
-  Future<void> close() => database.close();
+  Future<void> close() async {
+    httpClient.close();
+    await database.close();
+  }
 
   /// Seeds a topic, practice and [count] questions with two alternatives.
   Future<SeededPractice> seedPractice({
@@ -112,6 +119,7 @@ class TestHarness {
         webLauncherProvider.overrideWithValue(webLauncher),
         ankiGatewayProvider.overrideWithValue(anki),
         practiceSoundPlayerProvider.overrideWithValue(soundPlayer),
+        httpClientProvider.overrideWithValue(httpClient),
       ],
     );
   }
@@ -141,6 +149,7 @@ TestAppBundle testAppBundle({required Widget home, TestHarness? harness}) {
       webLauncherProvider.overrideWithValue(suite.webLauncher),
       ankiGatewayProvider.overrideWithValue(suite.anki),
       practiceSoundPlayerProvider.overrideWithValue(suite.soundPlayer),
+      httpClientProvider.overrideWithValue(suite.httpClient),
     ],
   );
   return TestAppBundle(

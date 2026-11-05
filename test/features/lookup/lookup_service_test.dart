@@ -54,7 +54,12 @@ void main() {
         jsonEncode({
           'choices': [
             {
-              'message': {'content': '{"definition":"Google Cloud Platform"}'},
+              'message': {
+                'content': jsonEncode({
+                  'definition': 'A managed cloud computing platform.',
+                  'expansion': 'Google Cloud Platform',
+                }),
+              },
             },
           ],
         }),
@@ -71,11 +76,13 @@ void main() {
       questionId: null,
     );
 
-    expect(result.definition, 'Google Cloud Platform');
+    expect(result.definition, 'A managed cloud computing platform.');
+    expect(result.extra, 'Google Cloud Platform');
     expect(result.source, ConceptSource.ai);
     final concepts = await harness.cards.watchConcepts().first;
     expect(concepts.single.term, 'GCP');
-    expect(concepts.single.definition, 'Google Cloud Platform');
+    expect(concepts.single.definition, 'A managed cloud computing platform.');
+    expect(concepts.single.extra, 'Google Cloud Platform');
   });
 
   test('AI lookup tolerates fenced JSON', () async {
@@ -308,6 +315,75 @@ void main() {
           contains('model'),
         ),
       ),
+    );
+  });
+
+  test(
+    'AI review check sends the error notes and parses the verdict',
+    () async {
+      await useAi();
+      String? userPrompt;
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final messages = body['messages'] as List<dynamic>;
+        userPrompt =
+            (messages.last as Map<String, dynamic>)['content'] as String;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({
+                    'consistent': false,
+                    'feedback': 'The prevention note restates the bias instead of naming a check.',
+                  }),
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final result = await serviceWith(client).checkErrorNotes(
+        question: 'Which storage class?',
+        correctAnswer: 'Coldline',
+        bias: 'I assumed all storage classes cost the same.',
+        vaccine: 'Remember that storage classes differ in price.',
+      );
+
+      expect(result.consistent, isFalse);
+      expect(result.feedback, contains('restates the bias'));
+      expect(
+        userPrompt,
+        contains('I assumed all storage classes cost the same.'),
+      );
+      expect(
+        userPrompt,
+        contains('Remember that storage classes differ in price.'),
+      );
+      expect(userPrompt, contains('Coldline'));
+    },
+  );
+
+  test('AI review check needs a saved API key', () async {
+    await harness.settings.save(
+      const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiModel: 'test-model',
+        aiBaseUrl: 'https://example.test/v1',
+      ),
+    );
+
+    await expectLater(
+      serviceWith(MockClient((_) async => http.Response('{}', 200)))
+          .checkErrorNotes(
+            question: 'Question',
+            correctAnswer: 'Answer',
+            bias: 'Bias',
+            vaccine: 'Vaccine',
+          ),
+      throwsA(isA<LookupException>()),
     );
   });
 }

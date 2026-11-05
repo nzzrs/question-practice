@@ -9,14 +9,14 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Import practices from JSON or a `.txt` file containing JSON. One file can contain many topics and practices.
 - Answer with an optional written reasoning. Questions can have one correct alternative or several; feedback appears in place, with the correct and selected alternatives expanded to their explanation and the rest collapsed. Alternatives are shuffled per session, original letters stay hidden until feedback or the eye toggle, and answers and explanations are selectable with http(s) links opening in the browser.
 - Move between questions with the arrows beside the question number. Closing a session offers **Save for later**, and Home lists every paused session.
-- Check **I was distracted or read too fast** in the feedback to remove a new error card; uncheck it to restore the card.
+- Check **I was distracted or read too fast** in the feedback to remove a new error card; uncheck it to restore the card. Check **I didn't know this** instead to count the answer as skipped and have the review ask for the missing concept.
 - Get a score and the number of terms looked up at the end of a session.
 - Review wrong and skipped questions immediately and create:
-  - error cards with question, wrong answer, correct answer, bias and vaccine;
-  - concept cards such as `Definition of {{c1::GCP}}: {{c2::Google Cloud Platform}}`;
+  - error cards with question, wrong answer, correct answer, bias and vaccine, plus a discrete AI check of the written notes;
+  - concept cards such as `Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}`, with an acronym's full form in the Anki extra field;
   - basic question/answer cards for skipped questions.
 - Re-test errors after 48 hours. A correct answer resolves the card but keeps the history.
-- Look up a selected term with an optional AI provider: OpenAI-compatible endpoints (OpenAI, Groq, OpenRouter, custom) or Gemini's native API, with a model list loaded from the provider. AI definitions appear in a read-only bubble and save automatically; web lookup keeps the editable sheet. Or use DuckDuckGo/Wikipedia through a Custom Tab.
+- Look up a selected term with an optional AI provider: OpenAI-compatible endpoints (OpenAI, Groq, OpenRouter, custom) or Gemini's native API, with a model list loaded from the provider. AI definitions appear in a read-only bubble and save automatically; acronyms also show what they stand for. Web lookup keeps the editable sheet. Or use DuckDuckGo/Wikipedia through a Custom Tab.
 - Export selected cards directly to AnkiDroid or share Anki-compatible files. Error cards can be reviewed all at once or by selection from Cards. Incomplete error cards can be selected to review them before export.
 - Give each topic its own AnkiDroid deck; topics without one use the default deck.
 - Export a complete JSON backup of practices, sessions, answers, cards and settings, and restore it on another install. The backup never contains the AI API key.
@@ -82,7 +82,7 @@ A sample with two topics and eight questions lives at [assets/samples/sample_pra
 
 ## Anki export
 
-See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze** note type. Error cards use the six-field **Question Practice: Error** model, created automatically with its HTML and CSS when missing. Basic note types are created automatically the first time. Each topic can target its own deck; the topic editor and Settings load deck names from AnkiDroid. Blank topics use the default deck from Settings.
+See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze** note type. Error cards use the six-field **Question Practice: Error v2** model, created automatically with its HTML and CSS when missing. Basic note types are created automatically the first time. Each topic can target its own deck; the topic editor and Settings load deck names from AnkiDroid. Blank topics use the default deck from Settings.
 
 ## Data and privacy
 
@@ -100,7 +100,7 @@ flutter analyze
 flutter test
 ```
 
-The suite covers the importer and JSON schema (including `correctIndexes`), scoring and the 48-hour rule, multi-answer scoring, distraction checked and unchecked after feedback, session arrows and paused sessions, review cards, the shared error-card review view, Gemini and OpenAI-compatible lookup, provider model lists, six-field Anki error notes, Drift statistics, and the main widget flows. See [docs/testing.md](docs/testing.md) for the manual on-device checklist.
+The suite covers the importer and JSON schema (including `correctIndexes`), scoring and the 48-hour rule, multi-answer scoring, distraction checked and unchecked after feedback, session arrows and paused sessions, review cards, the shared error-card review view, Gemini and OpenAI-compatible lookup, provider model lists, acronym expansion, AI review checks, six-field Anki error notes, Drift statistics, and the main widget flows. See [docs/testing.md](docs/testing.md) for the manual on-device checklist.
 
 ## Project layout
 

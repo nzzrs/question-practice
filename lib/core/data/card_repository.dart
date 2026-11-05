@@ -81,6 +81,7 @@ class CardRepository {
     required int? questionId,
     required String term,
     required String definition,
+    String extra = '',
     required String context,
     required String topicName,
     required ConceptSource source,
@@ -92,6 +93,7 @@ class CardRepository {
         questionId: Value(questionId),
         term: term,
         definition: Value(definition),
+        extra: Value(extra),
         context: Value(context),
         topicName: Value(topicName),
         source: source.name,
@@ -102,6 +104,10 @@ class CardRepository {
 
   Future<void> updateConceptDefinition(int id, String definition) {
     return _db.cardDao.updateConceptDefinition(id, definition);
+  }
+
+  Future<void> updateConceptExtra(int id, String extra) {
+    return _db.cardDao.updateConceptExtra(id, extra);
   }
 
   Future<int> createErrorCard({

@@ -372,14 +372,21 @@ class SessionService {
     required bool distracted,
   }) async {
     final session = start.session;
-    final attempt = await _sessions.attemptForQuestion(
+    var attempt = await _sessions.attemptForQuestion(
       session.id,
       item.question.id,
     );
     if (attempt == null) {
       throw const SessionException('This question has no answer to update.');
     }
-    final effective = distracted && !attempt.isCorrect && !attempt.isSkipped;
+    if (distracted && attempt.unknown) {
+      await _sessions.updateAttemptUnknown(attempt.id, false);
+      attempt =
+          await _sessions.attemptForQuestion(session.id, item.question.id) ??
+          attempt;
+    }
+    final effective =
+        distracted && !attempt.isCorrect && attempt.selectedIndexes.isNotEmpty;
     if (effective == attempt.distracted) return attempt;
 
     await _sessions.updateAttemptDistracted(attempt.id, effective);
@@ -389,6 +396,75 @@ class SessionService {
         await _cards.deleteErrorCard(card.id);
       }
     } else if (!attempt.isCorrect && !attempt.isSkipped) {
+      final now = _clock.now().toUtc();
+      if (card == null) {
+        await _cards.createErrorCard(
+          questionId: item.question.id,
+          sessionId: session.id,
+          question: item.question.prompt,
+          alternatives: item.question.alternatives,
+          correctIndexes: item.question.correctIndexes,
+          wrongIndexes: attempt.selectedIndexes,
+          reasoning: attempt.reasoning,
+          explanation: item.question.explanation,
+          alternativeExplanations: item.question.alternativeExplanations,
+          topicName: item.topicName,
+          practiceName: item.practiceName,
+          lastWrongAt: now,
+          dueAfter: errorReviewDelay,
+        );
+      } else {
+        await _cards.touchWrongError(
+          id: card.id,
+          wrongIndexes: attempt.selectedIndexes,
+          reasoning: attempt.reasoning,
+          wrongAt: now,
+          dueAfter: errorReviewDelay,
+        );
+      }
+    }
+    await _refreshCompletedCounts(session.id);
+    final updated = await _sessions.attemptForQuestion(
+      session.id,
+      item.question.id,
+    );
+    return updated ?? attempt;
+  }
+
+  /// Marks a wrong answer as "I didn't know this".
+  ///
+  /// The answer counts as skipped and its error card is removed, so the review
+  /// asks for the missing concept instead of analysing a flawed assumption.
+  Future<Attempt> setUnknown({
+    required SessionStart start,
+    required SessionQuestionItem item,
+    required bool unknown,
+  }) async {
+    final session = start.session;
+    var attempt = await _sessions.attemptForQuestion(
+      session.id,
+      item.question.id,
+    );
+    if (attempt == null) {
+      throw const SessionException('This question has no answer to update.');
+    }
+    if (unknown && attempt.distracted) {
+      await _sessions.updateAttemptDistracted(attempt.id, false);
+      attempt =
+          await _sessions.attemptForQuestion(session.id, item.question.id) ??
+          attempt;
+    }
+    final effective =
+        unknown && !attempt.isCorrect && attempt.selectedIndexes.isNotEmpty;
+    if (effective == attempt.unknown) return attempt;
+
+    await _sessions.updateAttemptUnknown(attempt.id, effective);
+    final card = await _cards.activeErrorForQuestion(item.question.id);
+    if (effective) {
+      if (card != null && card.sessionId == session.id) {
+        await _cards.deleteErrorCard(card.id);
+      }
+    } else if (!attempt.isCorrect && attempt.selectedIndexes.isNotEmpty) {
       final now = _clock.now().toUtc();
       if (card == null) {
         await _cards.createErrorCard(

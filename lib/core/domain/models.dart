@@ -171,6 +171,7 @@ class Attempt {
     required this.selectedIndexes,
     required this.reasoning,
     required this.distracted,
+    required this.unknown,
     required this.isCorrect,
     required this.answeredAt,
   });
@@ -181,10 +182,15 @@ class Attempt {
   final List<int> selectedIndexes;
   final String reasoning;
   final bool distracted;
+
+  /// The learner marked the wrong answer as "I didn't know this".
+  ///
+  /// Such an answer counts as skipped and creates no error card.
+  final bool unknown;
   final bool isCorrect;
   final DateTime answeredAt;
 
-  bool get isSkipped => selectedIndexes.isEmpty;
+  bool get isSkipped => selectedIndexes.isEmpty || unknown;
   int? get selectedIndex =>
       selectedIndexes.isEmpty ? null : selectedIndexes.first;
 }
@@ -295,6 +301,7 @@ class Concept {
     required this.questionId,
     required this.term,
     required this.definition,
+    required this.extra,
     required this.context,
     required this.topicName,
     required this.source,
@@ -307,6 +314,9 @@ class Concept {
   final int? questionId;
   final String term;
   final String definition;
+
+  /// Acronym expansion shown in the Anki extra field, when the term is one.
+  final String extra;
   final String context;
   final String topicName;
   final ConceptSource source;
@@ -316,13 +326,14 @@ class Concept {
   bool get needsDefinition => definition.trim().isEmpty;
   bool get isExportable => !needsDefinition;
 
-  Concept copyWith({String? definition, DateTime? exportedAt}) {
+  Concept copyWith({String? definition, String? extra, DateTime? exportedAt}) {
     return Concept(
       id: id,
       sessionId: sessionId,
       questionId: questionId,
       term: term,
       definition: definition ?? this.definition,
+      extra: extra ?? this.extra,
       context: context,
       topicName: topicName,
       source: source,

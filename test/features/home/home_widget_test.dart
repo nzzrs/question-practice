@@ -146,14 +146,22 @@ void main() {
       find.text('Not quite. The error card will ask what went wrong.'),
       findsOneWidget,
     );
-    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.scrollUntilVisible(
+      find.textContaining('Wrong: 1 is a distractor.'),
+      120,
+    );
     await pumpFrames(tester);
-    expect(find.text('I was distracted or read too fast'), findsOneWidget);
-    await tester.drag(find.byType(ListView), const Offset(0, -500));
+    expect(find.textContaining('Wrong: 1 is a distractor.'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Why this answer'), 120);
     await pumpFrames(tester);
     expect(find.text('Why this answer'), findsOneWidget);
     expect(find.text('Because 1 is correct.'), findsOneWidget);
-    expect(find.textContaining('Wrong: 1 is a distractor.'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('I was distracted or read too fast'),
+      120,
+    );
+    await pumpFrames(tester);
+    expect(find.text('I was distracted or read too fast'), findsOneWidget);
   });
 
   testWidgets('session arrows move between questions without answering', (

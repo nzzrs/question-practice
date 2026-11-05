@@ -20,7 +20,7 @@ class AnkiBridge(
         private const val CHANNEL = "link.nzrs.questionpractice/anki"
         private const val PERMISSION_REQUEST = 4107
         private const val ANKI_PACKAGE = "com.ichi2.anki"
-        private const val ERROR_MODEL = "Question Practice: Error"
+        private const val ERROR_MODEL = "Question Practice: Error v2"
         private const val BASIC_MODEL = "Question Practice Basic"
         private val ERROR_FIELDS = arrayOf(
             "Problem",
@@ -40,6 +40,13 @@ class AnkiBridge(
               <div class="field-label">Wrong answer chosen:</div>
               <div class="field-content">{{Wrong Solution}}</div>
             </div>
+
+            {{#Correct Solution}}
+            <div class="field-container discarded">
+              <div class="field-label">Right answer discarded:</div>
+              <div class="field-content">{{Correct Solution}}</div>
+            </div>
+            {{/Correct Solution}}
 
             <div class="prompt-action">
               What was the <strong>flawed assumption</strong>?
@@ -65,11 +72,6 @@ class AnkiBridge(
               </div>
               {{/Vaccine}}
 
-              <div class="field-container correct">
-                <div class="field-label">Correct solution:</div>
-                <div class="field-content">{{Correct Solution}}</div>
-              </div>
-
               {{#Explanation}}
               <div class="field-container explanation">
                 <div class="field-label">Distractor analysis / Explanation:</div>
@@ -79,6 +81,18 @@ class AnkiBridge(
             </div>
         """
         private const val ERROR_CSS = """
+            html {
+              height: 100%;
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            p {
+              margin: 0;
+            }
+
             .card {
               font-family: "Cascadia Code", "Consolas", "Segoe UI", monospace, sans-serif;
               text-align: center;
@@ -88,10 +102,9 @@ class AnkiBridge(
               flex-direction: column;
               justify-content: center;
               align-items: center;
-              min-height: 100vh;
+              min-height: 100%;
               margin: 0;
               padding: 30px 15px;
-              box-sizing: border-box;
             }
 
             .field-container {
@@ -103,7 +116,6 @@ class AnkiBridge(
               padding: 14px 18px;
               border: 1px solid #30363d;
               background-color: #161b22;
-              box-sizing: border-box;
             }
 
             .field-label {
@@ -125,18 +137,19 @@ class AnkiBridge(
             }
             .wrong .field-label { color: #f85149; }
 
+            .discarded, .correct {
+              background-color: #132316;
+              border-left: 4px solid #3fb950;
+            }
+            .discarded .field-label, .correct .field-label {
+              color: #3fb950;
+            }
+
             .trap {
               background-color: #261c14;
               border-left: 4px solid #db6d28;
             }
             .trap .field-label { color: #db6d28; }
-
-            .reference-box {
-              width: 100%;
-              max-width: 650px;
-              margin-top: 10px;
-              opacity: 0.85;
-            }
 
             .vaccine {
               background-color: #1c1427;
@@ -144,18 +157,19 @@ class AnkiBridge(
             }
             .vaccine .field-label { color: #ab47bc; }
 
-            .correct {
-              background-color: #132316;
-              border-left: 4px solid #3fb950;
-            }
-            .correct .field-label { color: #3fb950; }
-
             .explanation {
               background-color: #161b22;
               border-left: 4px solid #58a6ff;
             }
             .explanation .field-label { color: #58a6ff; }
             .explanation .field-content { font-size: 14px; }
+
+            .reference-box {
+              width: 100%;
+              max-width: 650px;
+              margin-top: 10px;
+              opacity: 0.85;
+            }
 
             .prompt-action {
               color: #8b949e;

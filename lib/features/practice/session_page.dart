@@ -37,6 +37,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   bool _submitted = false;
   bool _submitting = false;
   bool _distracted = false;
+  bool _unknown = false;
   bool _reasoningOpen = false;
   bool _showOriginalLetters = false;
   AnswerOutcome? _outcome;
@@ -130,6 +131,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _outcome = null;
     _submitted = false;
     _distracted = false;
+    _unknown = false;
     _reasoningOpen = false;
     if (item == null) {
       _restartQuestionTimer();
@@ -145,6 +147,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _savedReasoning = attempt.reasoning.trim();
     _submitted = true;
     _distracted = attempt.distracted;
+    _unknown = attempt.unknown;
     _reasoningOpen = attempt.reasoning.trim().isNotEmpty;
     _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
     _restartQuestionTimer();
@@ -280,6 +283,29 @@ class _SessionPageState extends ConsumerState<SessionPage>
       if (!mounted) return;
       _start.attempts[item.question.id] = attempt;
       setState(() {
+        _distracted = attempt.distracted;
+        _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+      });
+      ref.invalidate(dueErrorsProvider);
+    } on SessionException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  Future<void> _setUnknown(bool value) async {
+    final item = _item;
+    if (item == null || _submitting) return;
+    setState(() => _submitting = true);
+    try {
+      final attempt = await ref
+          .read(sessionServiceProvider)
+          .setUnknown(start: _start, item: item, unknown: value);
+      if (!mounted) return;
+      _start.attempts[item.question.id] = attempt;
+      setState(() {
+        _unknown = attempt.unknown;
         _distracted = attempt.distracted;
         _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
       });
@@ -587,6 +613,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
                       selected: _selectedIndexes.contains(index),
                       submitted: _submitted,
                       isCorrect: item.question.correctIndexes.contains(index),
+                      multiSelect: item.question.allowsMultiple,
                       showLetter: _submitted || _showOriginalLetters,
                       explanation:
                           item.question.alternativeExplanations.length > index
@@ -649,9 +676,11 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   if (_outcome!.attempt.selectedIndexes.isNotEmpty &&
                       !_outcome!.attempt.isCorrect) ...[
                     const SizedBox(height: 10),
-                    _DistractedCheck(
-                      value: _distracted,
-                      onChanged: _submitting ? null : _setDistracted,
+                    _FeedbackChecks(
+                      distracted: _distracted,
+                      unknown: _unknown,
+                      onDistractedChanged: _submitting ? null : _setDistracted,
+                      onUnknownChanged: _submitting ? null : _setUnknown,
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -850,10 +879,56 @@ class _ReasoningSection extends StatelessWidget {
   }
 }
 
-class _DistractedCheck extends StatelessWidget {
-  const _DistractedCheck({required this.value, required this.onChanged});
+class _FeedbackChecks extends StatelessWidget {
+  const _FeedbackChecks({
+    required this.distracted,
+    required this.unknown,
+    required this.onDistractedChanged,
+    required this.onUnknownChanged,
+  });
 
+  final bool distracted;
+  final bool unknown;
+  final ValueChanged<bool>? onDistractedChanged;
+  final ValueChanged<bool>? onUnknownChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _FeedbackCheckRow(
+          controlKey: const ValueKey('distracted-answer-check'),
+          value: distracted,
+          title: 'I was distracted or read too fast',
+          supportingText: 'No error card; it does not count as skipped.',
+          onChanged: onDistractedChanged,
+        ),
+        const SizedBox(height: 8),
+        _FeedbackCheckRow(
+          controlKey: const ValueKey('unknown-answer-check'),
+          value: unknown,
+          title: "I didn't know this",
+          supportingText: 'No error card; counts as skipped and the review asks for the concept.',
+          onChanged: onUnknownChanged,
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedbackCheckRow extends StatelessWidget {
+  const _FeedbackCheckRow({
+    required this.controlKey,
+    required this.value,
+    required this.title,
+    required this.supportingText,
+    required this.onChanged,
+  });
+
+  final Key controlKey;
   final bool value;
+  final String title;
+  final String supportingText;
   final ValueChanged<bool>? onChanged;
 
   @override
@@ -863,8 +938,10 @@ class _DistractedCheck extends StatelessWidget {
       color: theme.colorScheme.surfaceContainerLow,
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           M3ECheckbox(
+            key: controlKey,
             value: value,
             onChanged: onChanged == null
                 ? null
@@ -872,9 +949,21 @@ class _DistractedCheck extends StatelessWidget {
           ),
           const SizedBox(width: 4),
           Expanded(
-            child: Text(
-              'I was distracted or read too fast',
-              style: theme.typography.baseline.bodyMedium,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: theme.typography.baseline.bodyMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    supportingText,
+                    style: theme.typography.baseline.labelSmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -899,48 +988,50 @@ class _FeedbackStatus extends StatelessWidget {
     final theme = M3ETheme.of(context);
     final attempt = outcome.attempt;
     final skipped = attempt.isSkipped;
-    final (color, icon, text) = switch ((
-      pastErrors,
-      attempt.isCorrect,
-      skipped,
-      distracted,
-    )) {
-      (true, true, _, _) => (
-        AppSuccess.container(context),
-        Icons.check_circle_outline,
-        'Error resolved. It stays in your history.',
-      ),
-      (true, false, _, true) => (
-        theme.colorScheme.secondaryContainer,
-        Icons.pause_circle_outline,
-        'Not counted because you were distracted. The card stays due.',
-      ),
-      (true, false, _, false) => (
-        theme.colorScheme.errorContainer,
-        Icons.schedule,
-        'Still in the error queue. Next attempt in 48 hours.',
-      ),
-      (false, true, _, _) => (
-        AppSuccess.container(context),
-        Icons.check_circle_outline,
-        'Correct.',
-      ),
-      (false, false, true, _) => (
-        theme.colorScheme.secondaryContainer,
-        Icons.skip_next_outlined,
-        'Skipped. No error card is created; the review asks what was missing.',
-      ),
-      (false, false, false, true) => (
-        theme.colorScheme.secondaryContainer,
-        Icons.pause_circle_outline,
-        'Marked as distracted. No error card was created.',
-      ),
-      _ => (
-        theme.colorScheme.errorContainer,
-        Icons.error_outline,
-        'Not quite. The error card will ask what went wrong.',
-      ),
-    };
+    final (color, icon, text) = attempt.unknown
+        ? (
+            theme.colorScheme.secondaryContainer,
+            Icons.help_outline,
+            "You didn't know this. No error card was created; the review asks "
+                'which concept was missing.',
+          )
+        : switch ((pastErrors, attempt.isCorrect, skipped, distracted)) {
+            (true, true, _, _) => (
+              AppSuccess.container(context),
+              Icons.check_circle_outline,
+              'Error resolved. It stays in your history.',
+            ),
+            (true, false, _, true) => (
+              theme.colorScheme.secondaryContainer,
+              Icons.pause_circle_outline,
+              'Not counted because you were distracted. The card stays due.',
+            ),
+            (true, false, _, false) => (
+              theme.colorScheme.errorContainer,
+              Icons.schedule,
+              'Still in the error queue. Next attempt in 48 hours.',
+            ),
+            (false, true, _, _) => (
+              AppSuccess.container(context),
+              Icons.check_circle_outline,
+              'Correct.',
+            ),
+            (false, false, true, _) => (
+              theme.colorScheme.secondaryContainer,
+              Icons.skip_next_outlined,
+              'Skipped. No error card is created; the review asks what was missing.',
+            ),
+            (false, false, false, true) => (
+              theme.colorScheme.secondaryContainer,
+              Icons.pause_circle_outline,
+              'Marked as distracted. No error card was created.',
+            ),
+            _ => (
+              theme.colorScheme.errorContainer,
+              Icons.error_outline,
+              'Not quite. The error card will ask what went wrong.',
+            ),
+          };
     return TonalBox(
       color: color,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -967,6 +1058,7 @@ class _OptionCard extends StatefulWidget {
     required this.selected,
     required this.submitted,
     required this.isCorrect,
+    required this.multiSelect,
     required this.showLetter,
     required this.explanation,
     required this.onDefine,
@@ -980,6 +1072,7 @@ class _OptionCard extends StatefulWidget {
   final bool selected;
   final bool submitted;
   final bool isCorrect;
+  final bool multiSelect;
   final bool showLetter;
   final String explanation;
   final void Function(String selection, Rect? anchor) onDefine;
@@ -1104,12 +1197,20 @@ class _OptionCardState extends State<_OptionCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
+                    key: ValueKey(
+                      'alternative-letter-badge-${widget.originalIndex}',
+                    ),
                     width: 30,
                     height: 30,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: badgeBackground,
-                      shape: BoxShape.circle,
+                      shape: widget.multiSelect
+                          ? BoxShape.rectangle
+                          : BoxShape.circle,
+                      borderRadius: widget.multiSelect
+                          ? BorderRadius.circular(8)
+                          : null,
                     ),
                     child: widget.showLetter
                         ? Text(

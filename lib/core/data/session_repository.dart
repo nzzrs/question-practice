@@ -77,6 +77,7 @@ class SessionRepository {
     required bool distracted,
     required bool isCorrect,
     required DateTime answeredAt,
+    bool unknown = false,
   }) async {
     await _db.sessionDao.insertAttempt(
       AttemptsCompanion.insert(
@@ -85,6 +86,7 @@ class SessionRepository {
         selectedIndexesJson: Value(encodeIntList(selectedIndexes)),
         reasoning: Value(reasoning),
         distracted: Value(distracted),
+        unknown: Value(unknown),
         isCorrect: isCorrect,
         answeredAt: answeredAt,
       ),
@@ -95,6 +97,10 @@ class SessionRepository {
 
   Future<void> updateAttemptDistracted(int id, bool distracted) {
     return _db.sessionDao.updateAttemptDistracted(id, distracted);
+  }
+
+  Future<void> updateAttemptUnknown(int id, bool unknown) {
+    return _db.sessionDao.updateAttemptUnknown(id, unknown);
   }
 
   Future<void> updateAttemptReasoning(int id, String reasoning) {

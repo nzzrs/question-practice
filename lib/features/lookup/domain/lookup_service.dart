@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/data/card_repository.dart';
 import '../../../core/data/settings_repository.dart';
+import '../../../core/domain/acronyms.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/platform/secure_key_store.dart';
 import '../../../core/platform/web_launcher.dart';
@@ -25,6 +26,7 @@ class LookupResult {
     required this.conceptId,
     required this.term,
     required this.definition,
+    required this.extra,
     required this.source,
     required this.openedWeb,
   });
@@ -32,8 +34,18 @@ class LookupResult {
   final int conceptId;
   final String term;
   final String definition;
+
+  /// The full form of an acronym, shown in the Anki extra field.
+  final String extra;
   final ConceptSource source;
   final bool openedWeb;
+}
+
+class ReviewCheckResult {
+  const ReviewCheckResult({required this.consistent, required this.feedback});
+
+  final bool consistent;
+  final String feedback;
 }
 
 class LookupService {
@@ -98,7 +110,8 @@ class LookupService {
     );
     final id = await _saveConcept(
       term: cleanedTerm,
-      definition: definition,
+      definition: definition.definition,
+      extra: definition.extra,
       question: question,
       topicName: topicName,
       sessionId: sessionId,
@@ -108,7 +121,8 @@ class LookupService {
     return LookupResult(
       conceptId: id,
       term: cleanedTerm,
-      definition: definition,
+      definition: definition.definition,
+      extra: definition.extra,
       source: ConceptSource.ai,
       openedWeb: false,
     );
@@ -128,6 +142,7 @@ class LookupService {
     final id = await _saveConcept(
       term: cleanedTerm,
       definition: '',
+      extra: '',
       question: question,
       topicName: topicName,
       sessionId: sessionId,
@@ -145,6 +160,7 @@ class LookupService {
       conceptId: id,
       term: cleanedTerm,
       definition: '',
+      extra: '',
       source: ConceptSource.web,
       openedWeb: opened,
     );
@@ -156,13 +172,13 @@ class LookupService {
     if (key == null || key.trim().isEmpty) {
       throw const LookupException('Add an API key first.');
     }
-    return _askAi(
+    return (await _askAi(
       settings: settings,
       apiKey: key,
       term: 'HTTP',
       question: 'What does HTTP mean?',
       topicName: 'Connectivity test',
-    );
+    )).definition;
   }
 
   Future<List<String>> listModels({
@@ -238,6 +254,7 @@ class LookupService {
   Future<int> _saveConcept({
     required String term,
     required String definition,
+    required String extra,
     required String question,
     required String topicName,
     required int? sessionId,
@@ -249,6 +266,7 @@ class LookupService {
       questionId: questionId,
       term: term,
       definition: definition,
+      extra: extra,
       context: question,
       topicName: topicName,
       source: source,
@@ -265,12 +283,108 @@ class LookupService {
     };
   }
 
-  Future<String> _askAi({
+  Future<ReviewCheckResult> checkErrorNotes({
+    required String question,
+    required String correctAnswer,
+    required String bias,
+    required String vaccine,
+  }) async {
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException('No API key saved. Add one in Settings.');
+    }
+    const systemPrompt =
+        "You check a learner's error analysis for a study app. Decide whether "
+        'the flawed assumption explains the wrong answer and whether the '
+        'prevention note is a concrete rule or check. Answer with exactly one '
+        'JSON object: {"consistent":true,"feedback":"..."}. Set consistent to '
+        'false when the notes are vague, merely restate the mistake, or do not '
+        'match the question. Keep feedback under 45 words and do not add '
+        'markdown or extra keys.';
+    final userPrompt =
+        'Question: $question\n'
+        'Correct answer: $correctAnswer\n'
+        'Flawed assumption: $bias\n'
+        'Prevention note: $vaccine';
+    final content = await _requestAi(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+    );
+    try {
+      final payload = _decodeObject(content);
+      final consistent = payload['consistent'];
+      final feedback = (payload['feedback'] as String? ?? '').trim();
+      if (consistent is! bool || feedback.isEmpty) {
+        throw const FormatException('Missing review verdict');
+      }
+      return ReviewCheckResult(consistent: consistent, feedback: feedback);
+    } on Object {
+      throw const LookupException(
+        'The AI returned an invalid review. Try again.',
+      );
+    }
+  }
+
+  Future<_AiDefinition> _askAi({
     required AppSettings settings,
     required String apiKey,
     required String term,
     required String question,
     required String topicName,
+  }) async {
+    final acronym = looksLikeAcronym(term);
+    final systemPrompt = acronym
+        ? 'You define a term for a study app. Use the question context and the '
+              'given topic. The term is an acronym. Answer with exactly one '
+              'JSON object: {"definition":"...","expansion":"..."}. The '
+              'definition must be a dictionary-style meaning in at most 20 '
+              'words. It must never spell out, repeat or expand the acronym '
+              'itself. The expansion must contain only the full form of the '
+              'acronym, without a trailing period. Do not add markdown or '
+              'extra keys.'
+        : 'You define a term for a study app. Use the question context and the '
+              'given topic. Answer with exactly one JSON object: '
+              '{"definition":"...","expansion":""}. The definition must be a '
+              'dictionary-style meaning in at most 20 words, factual, and only '
+              'define the term. Leave expansion empty. Do not add markdown or '
+              'extra keys.';
+    final userPrompt = 'Topic: $topicName\nQuestion: $question\nTerm: $term';
+    final content = await _requestAi(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+    );
+    try {
+      final payload = _decodeObject(content);
+      final definition = (payload['definition'] as String? ?? '').trim();
+      final expansion = acronym
+          ? (payload['expansion'] as String? ?? '').trim()
+          : '';
+      if (definition.isEmpty || (acronym && expansion.isEmpty)) {
+        throw const FormatException('Missing definition');
+      }
+      return _AiDefinition(definition: definition, extra: expansion);
+    } on Object {
+      throw LookupException(
+        acronym
+            ? 'The AI returned an invalid acronym definition. Try again or use '
+                  'web search.'
+            : 'The AI returned an invalid response. Try again or use web '
+                  'search.',
+        canUseWeb: true,
+      );
+    }
+  }
+
+  Future<String> _requestAi({
+    required AppSettings settings,
+    required String apiKey,
+    required String systemPrompt,
+    required String userPrompt,
   }) async {
     final model = settings.aiModel.trim();
     if (model.isEmpty) {
@@ -299,12 +413,6 @@ class LookupService {
       );
     }
 
-    const systemPrompt =
-        'You define a term for a study app. Use the question context and the given topic. '
-        'Answer with exactly one JSON object: {"definition":"..."}. '
-        'The definition must be at most 20 words, factual, and only define the term. '
-        'Do not add markdown or extra keys.';
-    final userPrompt = 'Topic: $topicName\nQuestion: $question\nTerm: $term';
     final body = isGemini
         ? <String, dynamic>{
             'systemInstruction': {
@@ -393,29 +501,31 @@ class LookupService {
 
     try {
       final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      final content = isGemini
+      return isGemini
           ? _geminiContent(decoded)
           : decoded['choices'][0]['message']['content'] as String;
-      final cleaned = content
-          .replaceAll(RegExp(r'```(?:json)?', caseSensitive: false), '')
-          .trim();
-      final start = cleaned.indexOf('{');
-      final end = cleaned.lastIndexOf('}');
-      if (start < 0 || end <= start) {
-        throw const FormatException('No JSON object in response');
-      }
-      final payload = jsonDecode(cleaned.substring(start, end + 1));
-      final definition = (payload['definition'] as String? ?? '').trim();
-      if (definition.isEmpty) {
-        throw const FormatException('Empty definition');
-      }
-      return definition;
     } on Object {
       throw const LookupException(
         'The AI returned an invalid response. Try again or use web search.',
         canUseWeb: true,
       );
     }
+  }
+
+  Map<String, dynamic> _decodeObject(String content) {
+    final cleaned = content
+        .replaceAll(RegExp(r'```(?:json)?', caseSensitive: false), '')
+        .trim();
+    final start = cleaned.indexOf('{');
+    final end = cleaned.lastIndexOf('}');
+    if (start < 0 || end <= start) {
+      throw const FormatException('No JSON object in response');
+    }
+    final payload = jsonDecode(cleaned.substring(start, end + 1));
+    if (payload is! Map<String, dynamic>) {
+      throw const FormatException('Expected a JSON object');
+    }
+    return payload;
   }
 
   String _geminiContent(Map<String, dynamic> decoded) {
@@ -427,4 +537,11 @@ class LookupService {
         if (part is Map<String, dynamic>) part['text'] as String? ?? '',
     ].join();
   }
+}
+
+class _AiDefinition {
+  const _AiDefinition({required this.definition, required this.extra});
+
+  final String definition;
+  final String extra;
 }

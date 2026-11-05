@@ -562,6 +562,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         const AnkiNoteBuilder().conceptCloze(concept.term, concept.definition),
         style: const TextStyle(fontFamily: 'monospace', height: 1.5),
       ),
+      if (concept.extra.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text('Extra: ${concept.extra}'),
+      ],
       const SizedBox(height: 8),
       Text(
         'One cloze note · ${concept.source.name} · ${concept.topicName} · deck: ${_deckForTopic(concept.topicName)}',
@@ -581,13 +585,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         onOpenUrl: openUrl,
       ),
       _PreviewField(
-        label: 'Wrong answer',
+        label: 'Wrong answer chosen',
         value: card.wrongAnswer,
         onDefine: define,
         onOpenUrl: openUrl,
       ),
       _PreviewField(
-        label: 'Correct answer',
+        label: 'Right answer discarded',
         value: card.correctAnswer,
         onDefine: define,
         onOpenUrl: openUrl,
@@ -804,6 +808,17 @@ class _ConceptRow extends StatelessWidget {
                             : theme.colorScheme.error,
                       ),
                     ),
+                    if (concept.extra.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Stands for: ${concept.extra}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.typography.baseline.labelSmall.copyWith(
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6,

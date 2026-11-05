@@ -264,8 +264,17 @@ class BackupService {
         'sessionQuestions',
         (json) => SessionQuestionRow.fromJson(json),
       ),
-      attempts: _rows(tables, 'attempts', (json) => AttemptRow.fromJson(json)),
-      concepts: _rows(tables, 'concepts', (json) => ConceptRow.fromJson(json)),
+      attempts: _rows(
+        tables,
+        'attempts',
+        (json) =>
+            AttemptRow.fromJson({...json, 'unknown': json['unknown'] ?? false}),
+      ),
+      concepts: _rows(
+        tables,
+        'concepts',
+        (json) => ConceptRow.fromJson({...json, 'extra': json['extra'] ?? ''}),
+      ),
       errorCards: _rows(
         tables,
         'errorCards',

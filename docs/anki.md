@@ -34,21 +34,31 @@ If a topic is renamed, cards created before the rename keep the old captured top
 
 | Model | Fields | Used for |
 |---|---|---|
-| AnkiDroid's Cloze type | existing `Text` field | Concept cards |
-| `Question Practice: Error` | Problem, Wrong Solution, Correct Solution, Mental Trap, Vaccine, Explanation | Error cards |
+| AnkiDroid's Cloze type | existing `Text` and `Back Extra` fields | Concept cards |
+| `Question Practice: Error v2` | Problem, Wrong Solution, Correct Solution, Mental Trap, Vaccine, Explanation | Error cards |
 | `Question Practice Basic` | Front, Back | Skipped-question “another question” cards |
 
-Questions checks for `Question Practice: Error` before inserting notes. If the model is missing, it creates it with the six fields, front/back templates and CSS defined in `AnkiBridge.kt`.
+Questions checks for `Question Practice: Error v2` before inserting notes. If the model is missing, it creates it with the six fields, front/back templates and CSS defined in `AnkiBridge.kt`. The versioned name lets an existing AnkiDroid model keep its old cards while new exports use the revised template.
 
-The error front shows the problem, the wrong answer chosen and the flawed-assumption prompt. The back shows the mental trap first, then the vaccine, correct solution and explanation in a secondary reference box.
+The error front shows the problem, the wrong answer chosen and the right answer discarded, then the flawed-assumption prompt. The back shows the mental trap first, then the vaccine and explanation in a secondary reference box.
 
 When a question has several correct answers, **Wrong Solution** lists every alternative the user selected and **Correct Solution** lists every correct alternative, separated by `<br>`. **Explanation** contains the overall question explanation followed by the alternative explanation for each failed selected distractor.
 
 Concept note text is exactly:
 
 ```
-Definition of {{c1::GCP}}: {{c2::Google Cloud Platform}}
+Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}
 ```
+
+When the selected term is an acronym, the AI returns a dictionary-style meaning
+for the cloze and puts only the full form in the note's `Back Extra` field:
+
+```
+Back Extra: Google Cloud Platform
+```
+
+The definition never spells the acronym out. The same expansion appears under
+the definition bubble in the app.
 
 The error and basic note types are created automatically the first time they are needed. AnkiDroid's API cannot create a cloze note type, so the app uses the existing one.
 
@@ -84,11 +94,11 @@ On a connected Android device with AnkiDroid installed:
 3. Export to AnkiDroid and accept the permission prompt.
 4. Open AnkiDroid, open the Question Practice deck and confirm:
    - concept notes render as cloze cards;
-   - error notes use `Question Practice: Error` with all six fields;
+   - error notes use `Question Practice: Error v2` with all six fields;
    - basic notes show front and back.
 5. Set the Cloud topic to a separate deck (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck.
 6. Import a multi-answer question and export its error card. Confirm both selected and correct alternatives appear in the respective fields.
-7. Delete `Question Practice: Error` in AnkiDroid, export again, and confirm the app creates it before adding notes.
+7. Delete `Question Practice: Error v2` in AnkiDroid, export again, and confirm the app creates it before adding notes.
 8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
 9. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.
 10. Disable the AnkiDroid API and confirm the app reports the problem without losing cards.

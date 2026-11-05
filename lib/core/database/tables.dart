@@ -83,6 +83,7 @@ class Attempts extends Table {
       text().withDefault(const Constant('[]'))();
   TextColumn get reasoning => text().withDefault(const Constant(''))();
   BoolColumn get distracted => boolean().withDefault(const Constant(false))();
+  BoolColumn get unknown => boolean().withDefault(const Constant(false))();
   BoolColumn get isCorrect => boolean()();
   DateTimeColumn get answeredAt => dateTime()();
 
@@ -109,6 +110,7 @@ class Concepts extends Table {
   )();
   TextColumn get term => text()();
   TextColumn get definition => text().withDefault(const Constant(''))();
+  TextColumn get extra => text().withDefault(const Constant(''))();
   TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
   TextColumn get source => text()();

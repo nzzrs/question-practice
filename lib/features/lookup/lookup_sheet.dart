@@ -222,11 +222,37 @@ class _AiDefinitionBubbleState extends ConsumerState<_AiDefinitionBubble> {
                         ),
                       ],
                     ] else if (_result != null)
-                      Text(
-                        _result!.definition,
-                        style: theme.typography.baseline.bodyMedium.copyWith(
-                          height: 1.45,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _result!.definition,
+                            style: theme.typography.baseline.bodyMedium
+                                .copyWith(height: 1.45),
+                          ),
+                          if (_result!.extra.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Container(
+                              height: 1,
+                              color: theme.colorScheme.outlineVariant,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Stands for',
+                              style: theme.typography.baseline.labelSmall
+                                  .copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _result!.extra,
+                              key: const ValueKey('lookup-extra'),
+                              style: theme.typography.baseline.bodyMedium
+                                  .copyWith(fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ],
                       ),
                   ],
                 ),
@@ -412,11 +438,25 @@ class _LookupSheetState extends ConsumerState<LookupSheet> {
                 ),
               if (_result!.source == ConceptSource.ai)
                 TonalBox(
-                  child: Text(
-                    _result!.definition,
-                    style: theme.typography.baseline.bodyMedium.copyWith(
-                      height: 1.45,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _result!.definition,
+                        style: theme.typography.baseline.bodyMedium.copyWith(
+                          height: 1.45,
+                        ),
+                      ),
+                      if (_result!.extra.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Stands for: ${_result!.extra}',
+                          style: theme.typography.baseline.bodySmall.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 )
               else

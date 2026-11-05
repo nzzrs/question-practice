@@ -49,6 +49,13 @@ class AnkiNoteBuilder {
     return 'Definition of {{c1::$safeTerm}}: {{c2::$safeDefinition}}';
   }
 
+  List<String> conceptFields(Concept concept) {
+    return [
+      conceptCloze(concept.term, concept.definition),
+      html(concept.extra),
+    ];
+  }
+
   String html(String value) {
     return _html
         .convert(value.trim())
@@ -75,7 +82,7 @@ class AnkiNoteBuilder {
         AnkiNote(
           model: AnkiModel.concept,
           deckName: deckFor(concept.topicName),
-          fields: [conceptCloze(concept.term, concept.definition)],
+          fields: conceptFields(concept),
           tags: _tags(concept.topicName),
         ),
       for (final card in selection.errorCards)
@@ -105,7 +112,7 @@ class AnkiNoteBuilder {
     return ExportFiles(
       concepts: [
         for (final concept in selection.concepts)
-          conceptCloze(concept.term, concept.definition),
+          conceptFields(concept).join('\t'),
       ].join('\n'),
       errors: [
         for (final card in selection.errorCards)

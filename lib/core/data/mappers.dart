@@ -103,6 +103,7 @@ Attempt attemptFromRow(AttemptRow row) {
     selectedIndexes: decodeIntList(row.selectedIndexesJson),
     reasoning: row.reasoning,
     distracted: row.distracted,
+    unknown: row.unknown,
     isCorrect: row.isCorrect,
     answeredAt: row.answeredAt.toUtc(),
   );
@@ -115,6 +116,7 @@ Concept conceptFromRow(ConceptRow row) {
     questionId: row.questionId,
     term: row.term,
     definition: row.definition,
+    extra: row.extra,
     context: row.context,
     topicName: row.topicName,
     source: ConceptSource.values.byName(row.source),

@@ -64,6 +64,12 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     );
   }
 
+  Future<void> updateConceptExtra(int id, String extra) {
+    return (update(concepts)..where((c) => c.id.equals(id))).write(
+      ConceptsCompanion(extra: Value(extra)),
+    );
+  }
+
   Future<void> markConceptsExported(List<int> ids, DateTime exportedAt) async {
     if (ids.isEmpty) return;
     await (update(concepts)..where((c) => c.id.isIn(ids))).write(

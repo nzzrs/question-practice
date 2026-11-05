@@ -4,6 +4,8 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
+import '../../app/providers.dart';
+import '../lookup/domain/lookup_service.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
 
@@ -61,7 +63,7 @@ class ErrorCardReviewView extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               _AnswerBox(
-                label: 'Your answer',
+                label: 'Wrong answer chosen',
                 value: card.wrongAnswer,
                 container: theme.colorScheme.errorContainer,
                 foreground: theme.colorScheme.onErrorContainer,
@@ -70,7 +72,7 @@ class ErrorCardReviewView extends ConsumerWidget {
               ),
               const SizedBox(height: 8),
               _AnswerBox(
-                label: 'Correct answer',
+                label: 'Right answer discarded',
                 value: card.correctAnswer,
                 container: AppSuccess.container(context),
                 foreground: AppSuccess.onContainer(context),
@@ -132,17 +134,131 @@ class ErrorCardReviewView extends ConsumerWidget {
         const SizedBox(height: 18),
         _PromptField(
           prompt: 'What was the flawed assumption in your reasoning?',
-          label: 'Flawed assumption',
+          label: 'Flawed assumption (bias)',
           hint: 'The belief that led you to the wrong answer.',
           controller: bias,
         ),
         const SizedBox(height: 14),
         _PromptField(
           prompt: 'What do you need to know to prevent that error?',
-          label: 'Prevention',
+          label: 'Vaccine (rule / protocol)',
           hint: 'The rule or check you will use next time.',
           controller: vaccine,
         ),
+        const SizedBox(height: 10),
+        _ReviewCheck(
+          question: card.question,
+          correctAnswer: card.correctAnswer,
+          bias: bias,
+          vaccine: vaccine,
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewCheck extends ConsumerStatefulWidget {
+  const _ReviewCheck({
+    required this.question,
+    required this.correctAnswer,
+    required this.bias,
+    required this.vaccine,
+  });
+
+  final String question;
+  final String correctAnswer;
+  final TextEditingController bias;
+  final TextEditingController vaccine;
+
+  @override
+  ConsumerState<_ReviewCheck> createState() => _ReviewCheckState();
+}
+
+class _ReviewCheckState extends ConsumerState<_ReviewCheck> {
+  ReviewCheckResult? _result;
+  bool _busy = false;
+
+  Future<void> _check() async {
+    final bias = widget.bias.text.trim();
+    final vaccine = widget.vaccine.text.trim();
+    if (bias.isEmpty || vaccine.isEmpty) {
+      await showSnack(
+        context,
+        'Write both the flawed assumption and the prevention note first.',
+      );
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final result = await ref
+          .read(lookupServiceProvider)
+          .checkErrorNotes(
+            question: widget.question,
+            correctAnswer: widget.correctAnswer,
+            bias: bias,
+            vaccine: vaccine,
+          );
+      if (!mounted) return;
+      setState(() => _result = result);
+    } on LookupException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final result = _result;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: M3EButton.text(
+            key: const ValueKey('error-review-check'),
+            onPressed: _busy ? null : _check,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.fact_check_outlined, size: 18),
+                const SizedBox(width: 8),
+                Text(_busy ? 'Checking…' : 'Check with AI'),
+              ],
+            ),
+          ),
+        ),
+        if (result != null) ...[
+          const SizedBox(height: 8),
+          TonalBox(
+            key: const ValueKey('error-review-check-result'),
+            color: result.consistent
+                ? AppSuccess.container(context)
+                : theme.colorScheme.errorContainer,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  result.consistent
+                      ? Icons.check_circle_outline
+                      : Icons.warning_amber_outlined,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    result.feedback,
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }

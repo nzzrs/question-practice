@@ -2376,6 +2376,21 @@ class $AttemptsTable extends Attempts
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _unknownMeta = const VerificationMeta(
+    'unknown',
+  );
+  @override
+  late final GeneratedColumn<bool> unknown = GeneratedColumn<bool>(
+    'unknown',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("unknown" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _isCorrectMeta = const VerificationMeta(
     'isCorrect',
   );
@@ -2409,6 +2424,7 @@ class $AttemptsTable extends Attempts
     selectedIndexesJson,
     reasoning,
     distracted,
+    unknown,
     isCorrect,
     answeredAt,
   ];
@@ -2464,6 +2480,12 @@ class $AttemptsTable extends Attempts
         distracted.isAcceptableOrUnknown(data['distracted']!, _distractedMeta),
       );
     }
+    if (data.containsKey('unknown')) {
+      context.handle(
+        _unknownMeta,
+        unknown.isAcceptableOrUnknown(data['unknown']!, _unknownMeta),
+      );
+    }
     if (data.containsKey('is_correct')) {
       context.handle(
         _isCorrectMeta,
@@ -2517,6 +2539,10 @@ class $AttemptsTable extends Attempts
         DriftSqlType.bool,
         data['${effectivePrefix}distracted'],
       )!,
+      unknown: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}unknown'],
+      )!,
       isCorrect: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_correct'],
@@ -2541,6 +2567,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
   final String selectedIndexesJson;
   final String reasoning;
   final bool distracted;
+  final bool unknown;
   final bool isCorrect;
   final DateTime answeredAt;
   const AttemptRow({
@@ -2550,6 +2577,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     required this.selectedIndexesJson,
     required this.reasoning,
     required this.distracted,
+    required this.unknown,
     required this.isCorrect,
     required this.answeredAt,
   });
@@ -2562,6 +2590,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     map['selected_indexes_json'] = Variable<String>(selectedIndexesJson);
     map['reasoning'] = Variable<String>(reasoning);
     map['distracted'] = Variable<bool>(distracted);
+    map['unknown'] = Variable<bool>(unknown);
     map['is_correct'] = Variable<bool>(isCorrect);
     map['answered_at'] = Variable<DateTime>(answeredAt);
     return map;
@@ -2575,6 +2604,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       selectedIndexesJson: Value(selectedIndexesJson),
       reasoning: Value(reasoning),
       distracted: Value(distracted),
+      unknown: Value(unknown),
       isCorrect: Value(isCorrect),
       answeredAt: Value(answeredAt),
     );
@@ -2594,6 +2624,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       ),
       reasoning: serializer.fromJson<String>(json['reasoning']),
       distracted: serializer.fromJson<bool>(json['distracted']),
+      unknown: serializer.fromJson<bool>(json['unknown']),
       isCorrect: serializer.fromJson<bool>(json['isCorrect']),
       answeredAt: serializer.fromJson<DateTime>(json['answeredAt']),
     );
@@ -2608,6 +2639,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       'selectedIndexesJson': serializer.toJson<String>(selectedIndexesJson),
       'reasoning': serializer.toJson<String>(reasoning),
       'distracted': serializer.toJson<bool>(distracted),
+      'unknown': serializer.toJson<bool>(unknown),
       'isCorrect': serializer.toJson<bool>(isCorrect),
       'answeredAt': serializer.toJson<DateTime>(answeredAt),
     };
@@ -2620,6 +2652,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     String? selectedIndexesJson,
     String? reasoning,
     bool? distracted,
+    bool? unknown,
     bool? isCorrect,
     DateTime? answeredAt,
   }) => AttemptRow(
@@ -2629,6 +2662,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     selectedIndexesJson: selectedIndexesJson ?? this.selectedIndexesJson,
     reasoning: reasoning ?? this.reasoning,
     distracted: distracted ?? this.distracted,
+    unknown: unknown ?? this.unknown,
     isCorrect: isCorrect ?? this.isCorrect,
     answeredAt: answeredAt ?? this.answeredAt,
   );
@@ -2646,6 +2680,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       distracted: data.distracted.present
           ? data.distracted.value
           : this.distracted,
+      unknown: data.unknown.present ? data.unknown.value : this.unknown,
       isCorrect: data.isCorrect.present ? data.isCorrect.value : this.isCorrect,
       answeredAt: data.answeredAt.present
           ? data.answeredAt.value
@@ -2662,6 +2697,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
           ..write('selectedIndexesJson: $selectedIndexesJson, ')
           ..write('reasoning: $reasoning, ')
           ..write('distracted: $distracted, ')
+          ..write('unknown: $unknown, ')
           ..write('isCorrect: $isCorrect, ')
           ..write('answeredAt: $answeredAt')
           ..write(')'))
@@ -2676,6 +2712,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     selectedIndexesJson,
     reasoning,
     distracted,
+    unknown,
     isCorrect,
     answeredAt,
   );
@@ -2689,6 +2726,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
           other.selectedIndexesJson == this.selectedIndexesJson &&
           other.reasoning == this.reasoning &&
           other.distracted == this.distracted &&
+          other.unknown == this.unknown &&
           other.isCorrect == this.isCorrect &&
           other.answeredAt == this.answeredAt);
 }
@@ -2700,6 +2738,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
   final Value<String> selectedIndexesJson;
   final Value<String> reasoning;
   final Value<bool> distracted;
+  final Value<bool> unknown;
   final Value<bool> isCorrect;
   final Value<DateTime> answeredAt;
   const AttemptsCompanion({
@@ -2709,6 +2748,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     this.selectedIndexesJson = const Value.absent(),
     this.reasoning = const Value.absent(),
     this.distracted = const Value.absent(),
+    this.unknown = const Value.absent(),
     this.isCorrect = const Value.absent(),
     this.answeredAt = const Value.absent(),
   });
@@ -2719,6 +2759,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     this.selectedIndexesJson = const Value.absent(),
     this.reasoning = const Value.absent(),
     this.distracted = const Value.absent(),
+    this.unknown = const Value.absent(),
     required bool isCorrect,
     required DateTime answeredAt,
   }) : sessionId = Value(sessionId),
@@ -2732,6 +2773,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     Expression<String>? selectedIndexesJson,
     Expression<String>? reasoning,
     Expression<bool>? distracted,
+    Expression<bool>? unknown,
     Expression<bool>? isCorrect,
     Expression<DateTime>? answeredAt,
   }) {
@@ -2743,6 +2785,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
         'selected_indexes_json': selectedIndexesJson,
       if (reasoning != null) 'reasoning': reasoning,
       if (distracted != null) 'distracted': distracted,
+      if (unknown != null) 'unknown': unknown,
       if (isCorrect != null) 'is_correct': isCorrect,
       if (answeredAt != null) 'answered_at': answeredAt,
     });
@@ -2755,6 +2798,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     Value<String>? selectedIndexesJson,
     Value<String>? reasoning,
     Value<bool>? distracted,
+    Value<bool>? unknown,
     Value<bool>? isCorrect,
     Value<DateTime>? answeredAt,
   }) {
@@ -2765,6 +2809,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
       selectedIndexesJson: selectedIndexesJson ?? this.selectedIndexesJson,
       reasoning: reasoning ?? this.reasoning,
       distracted: distracted ?? this.distracted,
+      unknown: unknown ?? this.unknown,
       isCorrect: isCorrect ?? this.isCorrect,
       answeredAt: answeredAt ?? this.answeredAt,
     );
@@ -2793,6 +2838,9 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     if (distracted.present) {
       map['distracted'] = Variable<bool>(distracted.value);
     }
+    if (unknown.present) {
+      map['unknown'] = Variable<bool>(unknown.value);
+    }
     if (isCorrect.present) {
       map['is_correct'] = Variable<bool>(isCorrect.value);
     }
@@ -2811,6 +2859,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
           ..write('selectedIndexesJson: $selectedIndexesJson, ')
           ..write('reasoning: $reasoning, ')
           ..write('distracted: $distracted, ')
+          ..write('unknown: $unknown, ')
           ..write('isCorrect: $isCorrect, ')
           ..write('answeredAt: $answeredAt')
           ..write(')'))
@@ -2886,6 +2935,16 @@ class $ConceptsTable extends Concepts
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _extraMeta = const VerificationMeta('extra');
+  @override
+  late final GeneratedColumn<String> extra = GeneratedColumn<String>(
+    'extra',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _contextMeta = const VerificationMeta(
     'context',
   );
@@ -2948,6 +3007,7 @@ class $ConceptsTable extends Concepts
     questionId,
     term,
     definition,
+    extra,
     context,
     topicName,
     source,
@@ -2993,6 +3053,12 @@ class $ConceptsTable extends Concepts
       context.handle(
         _definitionMeta,
         definition.isAcceptableOrUnknown(data['definition']!, _definitionMeta),
+      );
+    }
+    if (data.containsKey('extra')) {
+      context.handle(
+        _extraMeta,
+        extra.isAcceptableOrUnknown(data['extra']!, _extraMeta),
       );
     }
     if (data.containsKey('context')) {
@@ -3058,6 +3124,10 @@ class $ConceptsTable extends Concepts
         DriftSqlType.string,
         data['${effectivePrefix}definition'],
       )!,
+      extra: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}extra'],
+      )!,
       context: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}context'],
@@ -3093,6 +3163,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
   final int? questionId;
   final String term;
   final String definition;
+  final String extra;
   final String context;
   final String topicName;
   final String source;
@@ -3104,6 +3175,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     this.questionId,
     required this.term,
     required this.definition,
+    required this.extra,
     required this.context,
     required this.topicName,
     required this.source,
@@ -3122,6 +3194,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     }
     map['term'] = Variable<String>(term);
     map['definition'] = Variable<String>(definition);
+    map['extra'] = Variable<String>(extra);
     map['context'] = Variable<String>(context);
     map['topic_name'] = Variable<String>(topicName);
     map['source'] = Variable<String>(source);
@@ -3143,6 +3216,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
           : Value(questionId),
       term: Value(term),
       definition: Value(definition),
+      extra: Value(extra),
       context: Value(context),
       topicName: Value(topicName),
       source: Value(source),
@@ -3164,6 +3238,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
       questionId: serializer.fromJson<int?>(json['questionId']),
       term: serializer.fromJson<String>(json['term']),
       definition: serializer.fromJson<String>(json['definition']),
+      extra: serializer.fromJson<String>(json['extra']),
       context: serializer.fromJson<String>(json['context']),
       topicName: serializer.fromJson<String>(json['topicName']),
       source: serializer.fromJson<String>(json['source']),
@@ -3180,6 +3255,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
       'questionId': serializer.toJson<int?>(questionId),
       'term': serializer.toJson<String>(term),
       'definition': serializer.toJson<String>(definition),
+      'extra': serializer.toJson<String>(extra),
       'context': serializer.toJson<String>(context),
       'topicName': serializer.toJson<String>(topicName),
       'source': serializer.toJson<String>(source),
@@ -3194,6 +3270,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     Value<int?> questionId = const Value.absent(),
     String? term,
     String? definition,
+    String? extra,
     String? context,
     String? topicName,
     String? source,
@@ -3205,6 +3282,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     questionId: questionId.present ? questionId.value : this.questionId,
     term: term ?? this.term,
     definition: definition ?? this.definition,
+    extra: extra ?? this.extra,
     context: context ?? this.context,
     topicName: topicName ?? this.topicName,
     source: source ?? this.source,
@@ -3222,6 +3300,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
       definition: data.definition.present
           ? data.definition.value
           : this.definition,
+      extra: data.extra.present ? data.extra.value : this.extra,
       context: data.context.present ? data.context.value : this.context,
       topicName: data.topicName.present ? data.topicName.value : this.topicName,
       source: data.source.present ? data.source.value : this.source,
@@ -3240,6 +3319,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
           ..write('questionId: $questionId, ')
           ..write('term: $term, ')
           ..write('definition: $definition, ')
+          ..write('extra: $extra, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
           ..write('source: $source, ')
@@ -3256,6 +3336,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     questionId,
     term,
     definition,
+    extra,
     context,
     topicName,
     source,
@@ -3271,6 +3352,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
           other.questionId == this.questionId &&
           other.term == this.term &&
           other.definition == this.definition &&
+          other.extra == this.extra &&
           other.context == this.context &&
           other.topicName == this.topicName &&
           other.source == this.source &&
@@ -3284,6 +3366,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
   final Value<int?> questionId;
   final Value<String> term;
   final Value<String> definition;
+  final Value<String> extra;
   final Value<String> context;
   final Value<String> topicName;
   final Value<String> source;
@@ -3295,6 +3378,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     this.questionId = const Value.absent(),
     this.term = const Value.absent(),
     this.definition = const Value.absent(),
+    this.extra = const Value.absent(),
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
     this.source = const Value.absent(),
@@ -3307,6 +3391,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     this.questionId = const Value.absent(),
     required String term,
     this.definition = const Value.absent(),
+    this.extra = const Value.absent(),
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
     required String source,
@@ -3321,6 +3406,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     Expression<int>? questionId,
     Expression<String>? term,
     Expression<String>? definition,
+    Expression<String>? extra,
     Expression<String>? context,
     Expression<String>? topicName,
     Expression<String>? source,
@@ -3333,6 +3419,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
       if (questionId != null) 'question_id': questionId,
       if (term != null) 'term': term,
       if (definition != null) 'definition': definition,
+      if (extra != null) 'extra': extra,
       if (context != null) 'context': context,
       if (topicName != null) 'topic_name': topicName,
       if (source != null) 'source': source,
@@ -3347,6 +3434,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     Value<int?>? questionId,
     Value<String>? term,
     Value<String>? definition,
+    Value<String>? extra,
     Value<String>? context,
     Value<String>? topicName,
     Value<String>? source,
@@ -3359,6 +3447,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
       questionId: questionId ?? this.questionId,
       term: term ?? this.term,
       definition: definition ?? this.definition,
+      extra: extra ?? this.extra,
       context: context ?? this.context,
       topicName: topicName ?? this.topicName,
       source: source ?? this.source,
@@ -3384,6 +3473,9 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     }
     if (definition.present) {
       map['definition'] = Variable<String>(definition.value);
+    }
+    if (extra.present) {
+      map['extra'] = Variable<String>(extra.value);
     }
     if (context.present) {
       map['context'] = Variable<String>(context.value);
@@ -3411,6 +3503,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
           ..write('questionId: $questionId, ')
           ..write('term: $term, ')
           ..write('definition: $definition, ')
+          ..write('extra: $extra, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
           ..write('source: $source, ')
@@ -8312,6 +8405,7 @@ typedef $$AttemptsTableCreateCompanionBuilder = AttemptsCompanion Function({
   Value<String> selectedIndexesJson,
   Value<String> reasoning,
   Value<bool> distracted,
+  Value<bool> unknown,
   required bool isCorrect,
   required DateTime answeredAt,
 });
@@ -8322,6 +8416,7 @@ typedef $$AttemptsTableUpdateCompanionBuilder = AttemptsCompanion Function({
   Value<String> selectedIndexesJson,
   Value<String> reasoning,
   Value<bool> distracted,
+  Value<bool> unknown,
   Value<bool> isCorrect,
   Value<DateTime> answeredAt,
 });
@@ -8391,6 +8486,11 @@ class $$AttemptsTableFilterComposer
 
   ColumnFilters<bool> get distracted => $composableBuilder(
     column: $table.distracted,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get unknown => $composableBuilder(
+    column: $table.unknown,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8480,6 +8580,11 @@ class $$AttemptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get unknown => $composableBuilder(
+    column: $table.unknown,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isCorrect => $composableBuilder(
     column: $table.isCorrect,
     builder: (column) => ColumnOrderings(column),
@@ -8561,6 +8666,9 @@ class $$AttemptsTableAnnotationComposer
     column: $table.distracted,
     builder: (column) => column,
   );
+
+  GeneratedColumn<bool> get unknown =>
+      $composableBuilder(column: $table.unknown, builder: (column) => column);
 
   GeneratedColumn<bool> get isCorrect =>
       $composableBuilder(column: $table.isCorrect, builder: (column) => column);
@@ -8651,6 +8759,7 @@ class $$AttemptsTableTableManager
                 Value<String> selectedIndexesJson = const Value.absent(),
                 Value<String> reasoning = const Value.absent(),
                 Value<bool> distracted = const Value.absent(),
+                Value<bool> unknown = const Value.absent(),
                 Value<bool> isCorrect = const Value.absent(),
                 Value<DateTime> answeredAt = const Value.absent(),
               }) => AttemptsCompanion(
@@ -8660,6 +8769,7 @@ class $$AttemptsTableTableManager
                 selectedIndexesJson: selectedIndexesJson,
                 reasoning: reasoning,
                 distracted: distracted,
+                unknown: unknown,
                 isCorrect: isCorrect,
                 answeredAt: answeredAt,
               ),
@@ -8671,6 +8781,7 @@ class $$AttemptsTableTableManager
                 Value<String> selectedIndexesJson = const Value.absent(),
                 Value<String> reasoning = const Value.absent(),
                 Value<bool> distracted = const Value.absent(),
+                Value<bool> unknown = const Value.absent(),
                 required bool isCorrect,
                 required DateTime answeredAt,
               }) => AttemptsCompanion.insert(
@@ -8680,6 +8791,7 @@ class $$AttemptsTableTableManager
                 selectedIndexesJson: selectedIndexesJson,
                 reasoning: reasoning,
                 distracted: distracted,
+                unknown: unknown,
                 isCorrect: isCorrect,
                 answeredAt: answeredAt,
               ),
@@ -8765,6 +8877,7 @@ typedef $$ConceptsTableCreateCompanionBuilder = ConceptsCompanion Function({
   Value<int?> questionId,
   required String term,
   Value<String> definition,
+  Value<String> extra,
   Value<String> context,
   Value<String> topicName,
   required String source,
@@ -8777,6 +8890,7 @@ typedef $$ConceptsTableUpdateCompanionBuilder = ConceptsCompanion Function({
   Value<int?> questionId,
   Value<String> term,
   Value<String> definition,
+  Value<String> extra,
   Value<String> context,
   Value<String> topicName,
   Value<String> source,
@@ -8844,6 +8958,11 @@ class $$ConceptsTableFilterComposer
 
   ColumnFilters<String> get definition => $composableBuilder(
     column: $table.definition,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get extra => $composableBuilder(
+    column: $table.extra,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8943,6 +9062,11 @@ class $$ConceptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get extra => $composableBuilder(
+    column: $table.extra,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get context => $composableBuilder(
     column: $table.context,
     builder: (column) => ColumnOrderings(column),
@@ -9034,6 +9158,9 @@ class $$ConceptsTableAnnotationComposer
     column: $table.definition,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get extra =>
+      $composableBuilder(column: $table.extra, builder: (column) => column);
 
   GeneratedColumn<String> get context =>
       $composableBuilder(column: $table.context, builder: (column) => column);
@@ -9132,6 +9259,7 @@ class $$ConceptsTableTableManager
                 Value<int?> questionId = const Value.absent(),
                 Value<String> term = const Value.absent(),
                 Value<String> definition = const Value.absent(),
+                Value<String> extra = const Value.absent(),
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
                 Value<String> source = const Value.absent(),
@@ -9143,6 +9271,7 @@ class $$ConceptsTableTableManager
                 questionId: questionId,
                 term: term,
                 definition: definition,
+                extra: extra,
                 context: context,
                 topicName: topicName,
                 source: source,
@@ -9156,6 +9285,7 @@ class $$ConceptsTableTableManager
                 Value<int?> questionId = const Value.absent(),
                 required String term,
                 Value<String> definition = const Value.absent(),
+                Value<String> extra = const Value.absent(),
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
                 required String source,
@@ -9167,6 +9297,7 @@ class $$ConceptsTableTableManager
                 questionId: questionId,
                 term: term,
                 definition: definition,
+                extra: extra,
                 context: context,
                 topicName: topicName,
                 source: source,

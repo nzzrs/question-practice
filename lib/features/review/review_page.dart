@@ -326,15 +326,24 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             bias: _bias,
             vaccine: _vaccine,
           ),
-          SkippedReviewStep(:final question) => _SkippedStep(
-            question: question,
-            missing: _missing,
-            onMissingChanged: (value) => setState(() => _missing = value),
-            term: _term,
-            definition: _definition,
-            newQuestion: _newQuestion,
-            newAnswer: _newAnswer,
-          ),
+          SkippedReviewStep(
+            :final question,
+            :final topicName,
+            :final reasoning,
+            :final unknown,
+          ) =>
+            _SkippedStep(
+              question: question,
+              topicName: topicName,
+              reasoning: reasoning,
+              unknown: unknown,
+              missing: _missing,
+              onMissingChanged: (value) => setState(() => _missing = value),
+              term: _term,
+              definition: _definition,
+              newQuestion: _newQuestion,
+              newAnswer: _newAnswer,
+            ),
           ConceptDefinitionStep(:final concept) => _ConceptStep(
             concept: concept,
             definition: _definition,
@@ -348,6 +357,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 class _SkippedStep extends StatelessWidget {
   const _SkippedStep({
     required this.question,
+    required this.topicName,
+    required this.reasoning,
+    required this.unknown,
     required this.missing,
     required this.onMissingChanged,
     required this.term,
@@ -357,6 +369,9 @@ class _SkippedStep extends StatelessWidget {
   });
 
   final Question question;
+  final String topicName;
+  final String reasoning;
+  final bool unknown;
   final _Missing missing;
   final ValueChanged<_Missing> onMissingChanged;
   final TextEditingController term;
@@ -367,43 +382,87 @@ class _SkippedStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final correctAnswer = question.correctAnswers.join('\n');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         TonalBox(
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  Pill(
+                    unknown ? "I didn't know this" : 'Skipped',
+                    tone: unknown ? PillTone.secondary : PillTone.neutral,
+                  ),
+                  if (topicName.trim().isNotEmpty) Pill(topicName),
+                ],
+              ),
+              const SizedBox(height: 12),
               Text(
                 question.prompt,
-                style: theme.typography.baseline.titleSmall,
+                style: theme.typography.baseline.titleMedium.copyWith(
+                  height: 1.35,
+                ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 14),
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(14),
+                  color: AppSuccess.container(context),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                child: Text(
-                  'Answer: ${question.correctAnswer}',
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    height: 1.4,
-                  ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline,
+                      size: 20,
+                      color: AppSuccess.foreground(context),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Correct answer',
+                            style: theme.typography.baseline.labelSmall
+                                .copyWith(
+                                  color: AppSuccess.onContainer(context)
+                                      .withValues(alpha: 0.8),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            correctAnswer,
+                            style: theme.typography.baseline.bodyMedium
+                                .copyWith(
+                                  color: AppSuccess.onContainer(context),
+                                  height: 1.4,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                question.explanation,
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  height: 1.4,
-                ),
-              ),
+              if (reasoning.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _ReviewNote(label: 'Your reasoning', text: reasoning),
+              ],
+              if (question.explanation.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                _ReviewNote(label: 'Why', text: question.explanation),
+              ],
             ],
           ),
         ),
@@ -457,6 +516,43 @@ class _SkippedStep extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _ReviewNote extends StatelessWidget {
+  const _ReviewNote({required this.label, required this.text});
+
+  final String label;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.typography.baseline.labelSmall.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            text,
+            style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -4727,6 +4727,20 @@ class $ManualCardsTable extends ManualCards
       'REFERENCES sessions (id) ON DELETE CASCADE',
     ),
   );
+  static const VerificationMeta _questionIdMeta = const VerificationMeta(
+    'questionId',
+  );
+  @override
+  late final GeneratedColumn<int> questionId = GeneratedColumn<int>(
+    'question_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES questions (id) ON DELETE SET NULL',
+    ),
+  );
   static const VerificationMeta _questionMeta = const VerificationMeta(
     'question',
   );
@@ -4746,6 +4760,18 @@ class $ManualCardsTable extends ManualCards
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contextMeta = const VerificationMeta(
+    'context',
+  );
+  @override
+  late final GeneratedColumn<String> context = GeneratedColumn<String>(
+    'context',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
   );
   static const VerificationMeta _topicNameMeta = const VerificationMeta(
     'topicName',
@@ -4785,8 +4811,10 @@ class $ManualCardsTable extends ManualCards
   List<GeneratedColumn> get $columns => [
     id,
     sessionId,
+    questionId,
     question,
     answer,
+    context,
     topicName,
     createdAt,
     exportedAt,
@@ -4812,6 +4840,12 @@ class $ManualCardsTable extends ManualCards
         sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
       );
     }
+    if (data.containsKey('question_id')) {
+      context.handle(
+        _questionIdMeta,
+        questionId.isAcceptableOrUnknown(data['question_id']!, _questionIdMeta),
+      );
+    }
     if (data.containsKey('question')) {
       context.handle(
         _questionMeta,
@@ -4827,6 +4861,12 @@ class $ManualCardsTable extends ManualCards
       );
     } else if (isInserting) {
       context.missing(_answerMeta);
+    }
+    if (data.containsKey('context')) {
+      context.handle(
+        _contextMeta,
+        this.context.isAcceptableOrUnknown(data['context']!, _contextMeta),
+      );
     }
     if (data.containsKey('topic_name')) {
       context.handle(
@@ -4865,6 +4905,10 @@ class $ManualCardsTable extends ManualCards
         DriftSqlType.int,
         data['${effectivePrefix}session_id'],
       ),
+      questionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}question_id'],
+      ),
       question: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}question'],
@@ -4872,6 +4916,10 @@ class $ManualCardsTable extends ManualCards
       answer: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}answer'],
+      )!,
+      context: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}context'],
       )!,
       topicName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -4897,16 +4945,22 @@ class $ManualCardsTable extends ManualCards
 class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
   final int id;
   final int? sessionId;
+  final int? questionId;
   final String question;
   final String answer;
+
+  /// Optional source passage shown above the question on the card front.
+  final String context;
   final String topicName;
   final DateTime createdAt;
   final DateTime? exportedAt;
   const ManualCardRow({
     required this.id,
     this.sessionId,
+    this.questionId,
     required this.question,
     required this.answer,
+    required this.context,
     required this.topicName,
     required this.createdAt,
     this.exportedAt,
@@ -4918,8 +4972,12 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     if (!nullToAbsent || sessionId != null) {
       map['session_id'] = Variable<int>(sessionId);
     }
+    if (!nullToAbsent || questionId != null) {
+      map['question_id'] = Variable<int>(questionId);
+    }
     map['question'] = Variable<String>(question);
     map['answer'] = Variable<String>(answer);
+    map['context'] = Variable<String>(context);
     map['topic_name'] = Variable<String>(topicName);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || exportedAt != null) {
@@ -4934,8 +4992,12 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       sessionId: sessionId == null && nullToAbsent
           ? const Value.absent()
           : Value(sessionId),
+      questionId: questionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(questionId),
       question: Value(question),
       answer: Value(answer),
+      context: Value(context),
       topicName: Value(topicName),
       createdAt: Value(createdAt),
       exportedAt: exportedAt == null && nullToAbsent
@@ -4952,8 +5014,10 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     return ManualCardRow(
       id: serializer.fromJson<int>(json['id']),
       sessionId: serializer.fromJson<int?>(json['sessionId']),
+      questionId: serializer.fromJson<int?>(json['questionId']),
       question: serializer.fromJson<String>(json['question']),
       answer: serializer.fromJson<String>(json['answer']),
+      context: serializer.fromJson<String>(json['context']),
       topicName: serializer.fromJson<String>(json['topicName']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       exportedAt: serializer.fromJson<DateTime?>(json['exportedAt']),
@@ -4965,8 +5029,10 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'sessionId': serializer.toJson<int?>(sessionId),
+      'questionId': serializer.toJson<int?>(questionId),
       'question': serializer.toJson<String>(question),
       'answer': serializer.toJson<String>(answer),
+      'context': serializer.toJson<String>(context),
       'topicName': serializer.toJson<String>(topicName),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'exportedAt': serializer.toJson<DateTime?>(exportedAt),
@@ -4976,16 +5042,20 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
   ManualCardRow copyWith({
     int? id,
     Value<int?> sessionId = const Value.absent(),
+    Value<int?> questionId = const Value.absent(),
     String? question,
     String? answer,
+    String? context,
     String? topicName,
     DateTime? createdAt,
     Value<DateTime?> exportedAt = const Value.absent(),
   }) => ManualCardRow(
     id: id ?? this.id,
     sessionId: sessionId.present ? sessionId.value : this.sessionId,
+    questionId: questionId.present ? questionId.value : this.questionId,
     question: question ?? this.question,
     answer: answer ?? this.answer,
+    context: context ?? this.context,
     topicName: topicName ?? this.topicName,
     createdAt: createdAt ?? this.createdAt,
     exportedAt: exportedAt.present ? exportedAt.value : this.exportedAt,
@@ -4994,8 +5064,12 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     return ManualCardRow(
       id: data.id.present ? data.id.value : this.id,
       sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      questionId: data.questionId.present
+          ? data.questionId.value
+          : this.questionId,
       question: data.question.present ? data.question.value : this.question,
       answer: data.answer.present ? data.answer.value : this.answer,
+      context: data.context.present ? data.context.value : this.context,
       topicName: data.topicName.present ? data.topicName.value : this.topicName,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       exportedAt: data.exportedAt.present
@@ -5009,8 +5083,10 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     return (StringBuffer('ManualCardRow(')
           ..write('id: $id, ')
           ..write('sessionId: $sessionId, ')
+          ..write('questionId: $questionId, ')
           ..write('question: $question, ')
           ..write('answer: $answer, ')
+          ..write('context: $context, ')
           ..write('topicName: $topicName, ')
           ..write('createdAt: $createdAt, ')
           ..write('exportedAt: $exportedAt')
@@ -5022,8 +5098,10 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
   int get hashCode => Object.hash(
     id,
     sessionId,
+    questionId,
     question,
     answer,
+    context,
     topicName,
     createdAt,
     exportedAt,
@@ -5034,8 +5112,10 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       (other is ManualCardRow &&
           other.id == this.id &&
           other.sessionId == this.sessionId &&
+          other.questionId == this.questionId &&
           other.question == this.question &&
           other.answer == this.answer &&
+          other.context == this.context &&
           other.topicName == this.topicName &&
           other.createdAt == this.createdAt &&
           other.exportedAt == this.exportedAt);
@@ -5044,16 +5124,20 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
 class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
   final Value<int> id;
   final Value<int?> sessionId;
+  final Value<int?> questionId;
   final Value<String> question;
   final Value<String> answer;
+  final Value<String> context;
   final Value<String> topicName;
   final Value<DateTime> createdAt;
   final Value<DateTime?> exportedAt;
   const ManualCardsCompanion({
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
+    this.questionId = const Value.absent(),
     this.question = const Value.absent(),
     this.answer = const Value.absent(),
+    this.context = const Value.absent(),
     this.topicName = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.exportedAt = const Value.absent(),
@@ -5061,8 +5145,10 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
   ManualCardsCompanion.insert({
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
+    this.questionId = const Value.absent(),
     required String question,
     required String answer,
+    this.context = const Value.absent(),
     this.topicName = const Value.absent(),
     required DateTime createdAt,
     this.exportedAt = const Value.absent(),
@@ -5072,8 +5158,10 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
   static Insertable<ManualCardRow> custom({
     Expression<int>? id,
     Expression<int>? sessionId,
+    Expression<int>? questionId,
     Expression<String>? question,
     Expression<String>? answer,
+    Expression<String>? context,
     Expression<String>? topicName,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? exportedAt,
@@ -5081,8 +5169,10 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (sessionId != null) 'session_id': sessionId,
+      if (questionId != null) 'question_id': questionId,
       if (question != null) 'question': question,
       if (answer != null) 'answer': answer,
+      if (context != null) 'context': context,
       if (topicName != null) 'topic_name': topicName,
       if (createdAt != null) 'created_at': createdAt,
       if (exportedAt != null) 'exported_at': exportedAt,
@@ -5092,8 +5182,10 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
   ManualCardsCompanion copyWith({
     Value<int>? id,
     Value<int?>? sessionId,
+    Value<int?>? questionId,
     Value<String>? question,
     Value<String>? answer,
+    Value<String>? context,
     Value<String>? topicName,
     Value<DateTime>? createdAt,
     Value<DateTime?>? exportedAt,
@@ -5101,8 +5193,10 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     return ManualCardsCompanion(
       id: id ?? this.id,
       sessionId: sessionId ?? this.sessionId,
+      questionId: questionId ?? this.questionId,
       question: question ?? this.question,
       answer: answer ?? this.answer,
+      context: context ?? this.context,
       topicName: topicName ?? this.topicName,
       createdAt: createdAt ?? this.createdAt,
       exportedAt: exportedAt ?? this.exportedAt,
@@ -5118,11 +5212,17 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     if (sessionId.present) {
       map['session_id'] = Variable<int>(sessionId.value);
     }
+    if (questionId.present) {
+      map['question_id'] = Variable<int>(questionId.value);
+    }
     if (question.present) {
       map['question'] = Variable<String>(question.value);
     }
     if (answer.present) {
       map['answer'] = Variable<String>(answer.value);
+    }
+    if (context.present) {
+      map['context'] = Variable<String>(context.value);
     }
     if (topicName.present) {
       map['topic_name'] = Variable<String>(topicName.value);
@@ -5141,11 +5241,897 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     return (StringBuffer('ManualCardsCompanion(')
           ..write('id: $id, ')
           ..write('sessionId: $sessionId, ')
+          ..write('questionId: $questionId, ')
           ..write('question: $question, ')
           ..write('answer: $answer, ')
+          ..write('context: $context, ')
           ..write('topicName: $topicName, ')
           ..write('createdAt: $createdAt, ')
           ..write('exportedAt: $exportedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SkippedQuestionsTable extends SkippedQuestions
+    with TableInfo<$SkippedQuestionsTable, SkippedQuestionRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SkippedQuestionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<int> sessionId = GeneratedColumn<int>(
+    'session_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES sessions (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _questionIdMeta = const VerificationMeta(
+    'questionId',
+  );
+  @override
+  late final GeneratedColumn<int> questionId = GeneratedColumn<int>(
+    'question_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES questions (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _questionMeta = const VerificationMeta(
+    'question',
+  );
+  @override
+  late final GeneratedColumn<String> question = GeneratedColumn<String>(
+    'question',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _alternativesJsonMeta = const VerificationMeta(
+    'alternativesJson',
+  );
+  @override
+  late final GeneratedColumn<String> alternativesJson = GeneratedColumn<String>(
+    'alternatives_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _correctIndexesJsonMeta =
+      const VerificationMeta('correctIndexesJson');
+  @override
+  late final GeneratedColumn<String> correctIndexesJson =
+      GeneratedColumn<String>(
+        'correct_indexes_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[0]'),
+      );
+  static const VerificationMeta _explanationMeta = const VerificationMeta(
+    'explanation',
+  );
+  @override
+  late final GeneratedColumn<String> explanation = GeneratedColumn<String>(
+    'explanation',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _alternativeExplanationsJsonMeta =
+      const VerificationMeta('alternativeExplanationsJson');
+  @override
+  late final GeneratedColumn<String> alternativeExplanationsJson =
+      GeneratedColumn<String>(
+        'alternative_explanations_json',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('[]'),
+      );
+  static const VerificationMeta _reasoningMeta = const VerificationMeta(
+    'reasoning',
+  );
+  @override
+  late final GeneratedColumn<String> reasoning = GeneratedColumn<String>(
+    'reasoning',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _topicNameMeta = const VerificationMeta(
+    'topicName',
+  );
+  @override
+  late final GeneratedColumn<String> topicName = GeneratedColumn<String>(
+    'topic_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _practiceNameMeta = const VerificationMeta(
+    'practiceName',
+  );
+  @override
+  late final GeneratedColumn<String> practiceName = GeneratedColumn<String>(
+    'practice_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _unknownMeta = const VerificationMeta(
+    'unknown',
+  );
+  @override
+  late final GeneratedColumn<bool> unknown = GeneratedColumn<bool>(
+    'unknown',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("unknown" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _handledAtMeta = const VerificationMeta(
+    'handledAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> handledAt = GeneratedColumn<DateTime>(
+    'handled_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _handledKindMeta = const VerificationMeta(
+    'handledKind',
+  );
+  @override
+  late final GeneratedColumn<String> handledKind = GeneratedColumn<String>(
+    'handled_kind',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sessionId,
+    questionId,
+    question,
+    alternativesJson,
+    correctIndexesJson,
+    explanation,
+    alternativeExplanationsJson,
+    reasoning,
+    topicName,
+    practiceName,
+    unknown,
+    createdAt,
+    handledAt,
+    handledKind,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'skipped_questions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SkippedQuestionRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    }
+    if (data.containsKey('question_id')) {
+      context.handle(
+        _questionIdMeta,
+        questionId.isAcceptableOrUnknown(data['question_id']!, _questionIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_questionIdMeta);
+    }
+    if (data.containsKey('question')) {
+      context.handle(
+        _questionMeta,
+        question.isAcceptableOrUnknown(data['question']!, _questionMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_questionMeta);
+    }
+    if (data.containsKey('alternatives_json')) {
+      context.handle(
+        _alternativesJsonMeta,
+        alternativesJson.isAcceptableOrUnknown(
+          data['alternatives_json']!,
+          _alternativesJsonMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_alternativesJsonMeta);
+    }
+    if (data.containsKey('correct_indexes_json')) {
+      context.handle(
+        _correctIndexesJsonMeta,
+        correctIndexesJson.isAcceptableOrUnknown(
+          data['correct_indexes_json']!,
+          _correctIndexesJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('explanation')) {
+      context.handle(
+        _explanationMeta,
+        explanation.isAcceptableOrUnknown(
+          data['explanation']!,
+          _explanationMeta,
+        ),
+      );
+    }
+    if (data.containsKey('alternative_explanations_json')) {
+      context.handle(
+        _alternativeExplanationsJsonMeta,
+        alternativeExplanationsJson.isAcceptableOrUnknown(
+          data['alternative_explanations_json']!,
+          _alternativeExplanationsJsonMeta,
+        ),
+      );
+    }
+    if (data.containsKey('reasoning')) {
+      context.handle(
+        _reasoningMeta,
+        reasoning.isAcceptableOrUnknown(data['reasoning']!, _reasoningMeta),
+      );
+    }
+    if (data.containsKey('topic_name')) {
+      context.handle(
+        _topicNameMeta,
+        topicName.isAcceptableOrUnknown(data['topic_name']!, _topicNameMeta),
+      );
+    }
+    if (data.containsKey('practice_name')) {
+      context.handle(
+        _practiceNameMeta,
+        practiceName.isAcceptableOrUnknown(
+          data['practice_name']!,
+          _practiceNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('unknown')) {
+      context.handle(
+        _unknownMeta,
+        unknown.isAcceptableOrUnknown(data['unknown']!, _unknownMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('handled_at')) {
+      context.handle(
+        _handledAtMeta,
+        handledAt.isAcceptableOrUnknown(data['handled_at']!, _handledAtMeta),
+      );
+    }
+    if (data.containsKey('handled_kind')) {
+      context.handle(
+        _handledKindMeta,
+        handledKind.isAcceptableOrUnknown(
+          data['handled_kind']!,
+          _handledKindMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SkippedQuestionRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SkippedQuestionRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}session_id'],
+      ),
+      questionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}question_id'],
+      )!,
+      question: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}question'],
+      )!,
+      alternativesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}alternatives_json'],
+      )!,
+      correctIndexesJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}correct_indexes_json'],
+      )!,
+      explanation: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}explanation'],
+      )!,
+      alternativeExplanationsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}alternative_explanations_json'],
+      )!,
+      reasoning: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}reasoning'],
+      )!,
+      topicName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}topic_name'],
+      )!,
+      practiceName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}practice_name'],
+      )!,
+      unknown: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}unknown'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      handledAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}handled_at'],
+      ),
+      handledKind: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}handled_kind'],
+      ),
+    );
+  }
+
+  @override
+  $SkippedQuestionsTable createAlias(String alias) {
+    return $SkippedQuestionsTable(attachedDatabase, alias);
+  }
+}
+
+class SkippedQuestionRow extends DataClass
+    implements Insertable<SkippedQuestionRow> {
+  final int id;
+  final int? sessionId;
+  final int questionId;
+  final String question;
+  final String alternativesJson;
+  final String correctIndexesJson;
+  final String explanation;
+  final String alternativeExplanationsJson;
+  final String reasoning;
+  final String topicName;
+  final String practiceName;
+  final bool unknown;
+  final DateTime createdAt;
+  final DateTime? handledAt;
+  final String? handledKind;
+  const SkippedQuestionRow({
+    required this.id,
+    this.sessionId,
+    required this.questionId,
+    required this.question,
+    required this.alternativesJson,
+    required this.correctIndexesJson,
+    required this.explanation,
+    required this.alternativeExplanationsJson,
+    required this.reasoning,
+    required this.topicName,
+    required this.practiceName,
+    required this.unknown,
+    required this.createdAt,
+    this.handledAt,
+    this.handledKind,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<int>(sessionId);
+    }
+    map['question_id'] = Variable<int>(questionId);
+    map['question'] = Variable<String>(question);
+    map['alternatives_json'] = Variable<String>(alternativesJson);
+    map['correct_indexes_json'] = Variable<String>(correctIndexesJson);
+    map['explanation'] = Variable<String>(explanation);
+    map['alternative_explanations_json'] = Variable<String>(
+      alternativeExplanationsJson,
+    );
+    map['reasoning'] = Variable<String>(reasoning);
+    map['topic_name'] = Variable<String>(topicName);
+    map['practice_name'] = Variable<String>(practiceName);
+    map['unknown'] = Variable<bool>(unknown);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || handledAt != null) {
+      map['handled_at'] = Variable<DateTime>(handledAt);
+    }
+    if (!nullToAbsent || handledKind != null) {
+      map['handled_kind'] = Variable<String>(handledKind);
+    }
+    return map;
+  }
+
+  SkippedQuestionsCompanion toCompanion(bool nullToAbsent) {
+    return SkippedQuestionsCompanion(
+      id: Value(id),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
+      questionId: Value(questionId),
+      question: Value(question),
+      alternativesJson: Value(alternativesJson),
+      correctIndexesJson: Value(correctIndexesJson),
+      explanation: Value(explanation),
+      alternativeExplanationsJson: Value(alternativeExplanationsJson),
+      reasoning: Value(reasoning),
+      topicName: Value(topicName),
+      practiceName: Value(practiceName),
+      unknown: Value(unknown),
+      createdAt: Value(createdAt),
+      handledAt: handledAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(handledAt),
+      handledKind: handledKind == null && nullToAbsent
+          ? const Value.absent()
+          : Value(handledKind),
+    );
+  }
+
+  factory SkippedQuestionRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SkippedQuestionRow(
+      id: serializer.fromJson<int>(json['id']),
+      sessionId: serializer.fromJson<int?>(json['sessionId']),
+      questionId: serializer.fromJson<int>(json['questionId']),
+      question: serializer.fromJson<String>(json['question']),
+      alternativesJson: serializer.fromJson<String>(json['alternativesJson']),
+      correctIndexesJson: serializer.fromJson<String>(
+        json['correctIndexesJson'],
+      ),
+      explanation: serializer.fromJson<String>(json['explanation']),
+      alternativeExplanationsJson: serializer.fromJson<String>(
+        json['alternativeExplanationsJson'],
+      ),
+      reasoning: serializer.fromJson<String>(json['reasoning']),
+      topicName: serializer.fromJson<String>(json['topicName']),
+      practiceName: serializer.fromJson<String>(json['practiceName']),
+      unknown: serializer.fromJson<bool>(json['unknown']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      handledAt: serializer.fromJson<DateTime?>(json['handledAt']),
+      handledKind: serializer.fromJson<String?>(json['handledKind']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'sessionId': serializer.toJson<int?>(sessionId),
+      'questionId': serializer.toJson<int>(questionId),
+      'question': serializer.toJson<String>(question),
+      'alternativesJson': serializer.toJson<String>(alternativesJson),
+      'correctIndexesJson': serializer.toJson<String>(correctIndexesJson),
+      'explanation': serializer.toJson<String>(explanation),
+      'alternativeExplanationsJson': serializer.toJson<String>(
+        alternativeExplanationsJson,
+      ),
+      'reasoning': serializer.toJson<String>(reasoning),
+      'topicName': serializer.toJson<String>(topicName),
+      'practiceName': serializer.toJson<String>(practiceName),
+      'unknown': serializer.toJson<bool>(unknown),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'handledAt': serializer.toJson<DateTime?>(handledAt),
+      'handledKind': serializer.toJson<String?>(handledKind),
+    };
+  }
+
+  SkippedQuestionRow copyWith({
+    int? id,
+    Value<int?> sessionId = const Value.absent(),
+    int? questionId,
+    String? question,
+    String? alternativesJson,
+    String? correctIndexesJson,
+    String? explanation,
+    String? alternativeExplanationsJson,
+    String? reasoning,
+    String? topicName,
+    String? practiceName,
+    bool? unknown,
+    DateTime? createdAt,
+    Value<DateTime?> handledAt = const Value.absent(),
+    Value<String?> handledKind = const Value.absent(),
+  }) => SkippedQuestionRow(
+    id: id ?? this.id,
+    sessionId: sessionId.present ? sessionId.value : this.sessionId,
+    questionId: questionId ?? this.questionId,
+    question: question ?? this.question,
+    alternativesJson: alternativesJson ?? this.alternativesJson,
+    correctIndexesJson: correctIndexesJson ?? this.correctIndexesJson,
+    explanation: explanation ?? this.explanation,
+    alternativeExplanationsJson:
+        alternativeExplanationsJson ?? this.alternativeExplanationsJson,
+    reasoning: reasoning ?? this.reasoning,
+    topicName: topicName ?? this.topicName,
+    practiceName: practiceName ?? this.practiceName,
+    unknown: unknown ?? this.unknown,
+    createdAt: createdAt ?? this.createdAt,
+    handledAt: handledAt.present ? handledAt.value : this.handledAt,
+    handledKind: handledKind.present ? handledKind.value : this.handledKind,
+  );
+  SkippedQuestionRow copyWithCompanion(SkippedQuestionsCompanion data) {
+    return SkippedQuestionRow(
+      id: data.id.present ? data.id.value : this.id,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      questionId: data.questionId.present
+          ? data.questionId.value
+          : this.questionId,
+      question: data.question.present ? data.question.value : this.question,
+      alternativesJson: data.alternativesJson.present
+          ? data.alternativesJson.value
+          : this.alternativesJson,
+      correctIndexesJson: data.correctIndexesJson.present
+          ? data.correctIndexesJson.value
+          : this.correctIndexesJson,
+      explanation: data.explanation.present
+          ? data.explanation.value
+          : this.explanation,
+      alternativeExplanationsJson: data.alternativeExplanationsJson.present
+          ? data.alternativeExplanationsJson.value
+          : this.alternativeExplanationsJson,
+      reasoning: data.reasoning.present ? data.reasoning.value : this.reasoning,
+      topicName: data.topicName.present ? data.topicName.value : this.topicName,
+      practiceName: data.practiceName.present
+          ? data.practiceName.value
+          : this.practiceName,
+      unknown: data.unknown.present ? data.unknown.value : this.unknown,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      handledAt: data.handledAt.present ? data.handledAt.value : this.handledAt,
+      handledKind: data.handledKind.present
+          ? data.handledKind.value
+          : this.handledKind,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SkippedQuestionRow(')
+          ..write('id: $id, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('questionId: $questionId, ')
+          ..write('question: $question, ')
+          ..write('alternativesJson: $alternativesJson, ')
+          ..write('correctIndexesJson: $correctIndexesJson, ')
+          ..write('explanation: $explanation, ')
+          ..write('alternativeExplanationsJson: $alternativeExplanationsJson, ')
+          ..write('reasoning: $reasoning, ')
+          ..write('topicName: $topicName, ')
+          ..write('practiceName: $practiceName, ')
+          ..write('unknown: $unknown, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('handledAt: $handledAt, ')
+          ..write('handledKind: $handledKind')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    sessionId,
+    questionId,
+    question,
+    alternativesJson,
+    correctIndexesJson,
+    explanation,
+    alternativeExplanationsJson,
+    reasoning,
+    topicName,
+    practiceName,
+    unknown,
+    createdAt,
+    handledAt,
+    handledKind,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SkippedQuestionRow &&
+          other.id == this.id &&
+          other.sessionId == this.sessionId &&
+          other.questionId == this.questionId &&
+          other.question == this.question &&
+          other.alternativesJson == this.alternativesJson &&
+          other.correctIndexesJson == this.correctIndexesJson &&
+          other.explanation == this.explanation &&
+          other.alternativeExplanationsJson ==
+              this.alternativeExplanationsJson &&
+          other.reasoning == this.reasoning &&
+          other.topicName == this.topicName &&
+          other.practiceName == this.practiceName &&
+          other.unknown == this.unknown &&
+          other.createdAt == this.createdAt &&
+          other.handledAt == this.handledAt &&
+          other.handledKind == this.handledKind);
+}
+
+class SkippedQuestionsCompanion extends UpdateCompanion<SkippedQuestionRow> {
+  final Value<int> id;
+  final Value<int?> sessionId;
+  final Value<int> questionId;
+  final Value<String> question;
+  final Value<String> alternativesJson;
+  final Value<String> correctIndexesJson;
+  final Value<String> explanation;
+  final Value<String> alternativeExplanationsJson;
+  final Value<String> reasoning;
+  final Value<String> topicName;
+  final Value<String> practiceName;
+  final Value<bool> unknown;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> handledAt;
+  final Value<String?> handledKind;
+  const SkippedQuestionsCompanion({
+    this.id = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.questionId = const Value.absent(),
+    this.question = const Value.absent(),
+    this.alternativesJson = const Value.absent(),
+    this.correctIndexesJson = const Value.absent(),
+    this.explanation = const Value.absent(),
+    this.alternativeExplanationsJson = const Value.absent(),
+    this.reasoning = const Value.absent(),
+    this.topicName = const Value.absent(),
+    this.practiceName = const Value.absent(),
+    this.unknown = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.handledAt = const Value.absent(),
+    this.handledKind = const Value.absent(),
+  });
+  SkippedQuestionsCompanion.insert({
+    this.id = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    required int questionId,
+    required String question,
+    required String alternativesJson,
+    this.correctIndexesJson = const Value.absent(),
+    this.explanation = const Value.absent(),
+    this.alternativeExplanationsJson = const Value.absent(),
+    this.reasoning = const Value.absent(),
+    this.topicName = const Value.absent(),
+    this.practiceName = const Value.absent(),
+    this.unknown = const Value.absent(),
+    required DateTime createdAt,
+    this.handledAt = const Value.absent(),
+    this.handledKind = const Value.absent(),
+  }) : questionId = Value(questionId),
+       question = Value(question),
+       alternativesJson = Value(alternativesJson),
+       createdAt = Value(createdAt);
+  static Insertable<SkippedQuestionRow> custom({
+    Expression<int>? id,
+    Expression<int>? sessionId,
+    Expression<int>? questionId,
+    Expression<String>? question,
+    Expression<String>? alternativesJson,
+    Expression<String>? correctIndexesJson,
+    Expression<String>? explanation,
+    Expression<String>? alternativeExplanationsJson,
+    Expression<String>? reasoning,
+    Expression<String>? topicName,
+    Expression<String>? practiceName,
+    Expression<bool>? unknown,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? handledAt,
+    Expression<String>? handledKind,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sessionId != null) 'session_id': sessionId,
+      if (questionId != null) 'question_id': questionId,
+      if (question != null) 'question': question,
+      if (alternativesJson != null) 'alternatives_json': alternativesJson,
+      if (correctIndexesJson != null)
+        'correct_indexes_json': correctIndexesJson,
+      if (explanation != null) 'explanation': explanation,
+      if (alternativeExplanationsJson != null)
+        'alternative_explanations_json': alternativeExplanationsJson,
+      if (reasoning != null) 'reasoning': reasoning,
+      if (topicName != null) 'topic_name': topicName,
+      if (practiceName != null) 'practice_name': practiceName,
+      if (unknown != null) 'unknown': unknown,
+      if (createdAt != null) 'created_at': createdAt,
+      if (handledAt != null) 'handled_at': handledAt,
+      if (handledKind != null) 'handled_kind': handledKind,
+    });
+  }
+
+  SkippedQuestionsCompanion copyWith({
+    Value<int>? id,
+    Value<int?>? sessionId,
+    Value<int>? questionId,
+    Value<String>? question,
+    Value<String>? alternativesJson,
+    Value<String>? correctIndexesJson,
+    Value<String>? explanation,
+    Value<String>? alternativeExplanationsJson,
+    Value<String>? reasoning,
+    Value<String>? topicName,
+    Value<String>? practiceName,
+    Value<bool>? unknown,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? handledAt,
+    Value<String?>? handledKind,
+  }) {
+    return SkippedQuestionsCompanion(
+      id: id ?? this.id,
+      sessionId: sessionId ?? this.sessionId,
+      questionId: questionId ?? this.questionId,
+      question: question ?? this.question,
+      alternativesJson: alternativesJson ?? this.alternativesJson,
+      correctIndexesJson: correctIndexesJson ?? this.correctIndexesJson,
+      explanation: explanation ?? this.explanation,
+      alternativeExplanationsJson:
+          alternativeExplanationsJson ?? this.alternativeExplanationsJson,
+      reasoning: reasoning ?? this.reasoning,
+      topicName: topicName ?? this.topicName,
+      practiceName: practiceName ?? this.practiceName,
+      unknown: unknown ?? this.unknown,
+      createdAt: createdAt ?? this.createdAt,
+      handledAt: handledAt ?? this.handledAt,
+      handledKind: handledKind ?? this.handledKind,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<int>(sessionId.value);
+    }
+    if (questionId.present) {
+      map['question_id'] = Variable<int>(questionId.value);
+    }
+    if (question.present) {
+      map['question'] = Variable<String>(question.value);
+    }
+    if (alternativesJson.present) {
+      map['alternatives_json'] = Variable<String>(alternativesJson.value);
+    }
+    if (correctIndexesJson.present) {
+      map['correct_indexes_json'] = Variable<String>(correctIndexesJson.value);
+    }
+    if (explanation.present) {
+      map['explanation'] = Variable<String>(explanation.value);
+    }
+    if (alternativeExplanationsJson.present) {
+      map['alternative_explanations_json'] = Variable<String>(
+        alternativeExplanationsJson.value,
+      );
+    }
+    if (reasoning.present) {
+      map['reasoning'] = Variable<String>(reasoning.value);
+    }
+    if (topicName.present) {
+      map['topic_name'] = Variable<String>(topicName.value);
+    }
+    if (practiceName.present) {
+      map['practice_name'] = Variable<String>(practiceName.value);
+    }
+    if (unknown.present) {
+      map['unknown'] = Variable<bool>(unknown.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (handledAt.present) {
+      map['handled_at'] = Variable<DateTime>(handledAt.value);
+    }
+    if (handledKind.present) {
+      map['handled_kind'] = Variable<String>(handledKind.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SkippedQuestionsCompanion(')
+          ..write('id: $id, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('questionId: $questionId, ')
+          ..write('question: $question, ')
+          ..write('alternativesJson: $alternativesJson, ')
+          ..write('correctIndexesJson: $correctIndexesJson, ')
+          ..write('explanation: $explanation, ')
+          ..write('alternativeExplanationsJson: $alternativeExplanationsJson, ')
+          ..write('reasoning: $reasoning, ')
+          ..write('topicName: $topicName, ')
+          ..write('practiceName: $practiceName, ')
+          ..write('unknown: $unknown, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('handledAt: $handledAt, ')
+          ..write('handledKind: $handledKind')
           ..write(')'))
         .toString();
   }
@@ -5373,6 +6359,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $ConceptsTable concepts = $ConceptsTable(this);
   late final $ErrorCardsTable errorCards = $ErrorCardsTable(this);
   late final $ManualCardsTable manualCards = $ManualCardsTable(this);
+  late final $SkippedQuestionsTable skippedQuestions = $SkippedQuestionsTable(
+    this,
+  );
   late final $SettingsTable settings = $SettingsTable(this);
   late final Index practicesTopic = Index(
     'practices_topic',
@@ -5422,6 +6411,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'manual_cards_exported',
     'CREATE INDEX manual_cards_exported ON manual_cards (exported_at)',
   );
+  late final Index skippedQuestionsHandled = Index(
+    'skipped_questions_handled',
+    'CREATE INDEX skipped_questions_handled ON skipped_questions (handled_at)',
+  );
+  late final Index skippedQuestionsSession = Index(
+    'skipped_questions_session',
+    'CREATE INDEX skipped_questions_session ON skipped_questions (session_id)',
+  );
   late final TopicDao topicDao = TopicDao(this as AppDatabase);
   late final SessionDao sessionDao = SessionDao(this as AppDatabase);
   late final CardDao cardDao = CardDao(this as AppDatabase);
@@ -5441,6 +6438,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     concepts,
     errorCards,
     manualCards,
+    skippedQuestions,
     settings,
     practicesTopic,
     questionsPractice,
@@ -5454,6 +6452,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     errorCardsQuestion,
     errorCardsSession,
     manualCardsExported,
+    skippedQuestionsHandled,
+    skippedQuestionsSession,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -5540,6 +6540,27 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('manual_cards', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'questions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('manual_cards', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'sessions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('skipped_questions', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'questions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('skipped_questions', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -6510,6 +7531,44 @@ final class $$QuestionsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$ManualCardsTable, List<ManualCardRow>>
+  _manualCardsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.manualCards,
+    aliasName: 'questions__id__manual_cards__question_id',
+  );
+
+  $$ManualCardsTableProcessedTableManager get manualCardsRefs {
+    final manager = $$ManualCardsTableTableManager(
+      $_db,
+      $_db.manualCards,
+    ).filter((f) => f.questionId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_manualCardsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$SkippedQuestionsTable, List<SkippedQuestionRow>>
+  _skippedQuestionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.skippedQuestions,
+    aliasName: 'questions__id__skipped_questions__question_id',
+  );
+
+  $$SkippedQuestionsTableProcessedTableManager get skippedQuestionsRefs {
+    final manager = $$SkippedQuestionsTableTableManager(
+      $_db,
+      $_db.skippedQuestions,
+    ).filter((f) => f.questionId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _skippedQuestionsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$QuestionsTableFilterComposer
@@ -6670,6 +7729,56 @@ class $$QuestionsTableFilterComposer
           }) => $$ErrorCardsTableFilterComposer(
             $db: $db,
             $table: $db.errorCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> manualCardsRefs(
+    Expression<bool> Function($$ManualCardsTableFilterComposer f) f,
+  ) {
+    final $$ManualCardsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.manualCards,
+      getReferencedColumn: (t) => t.questionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ManualCardsTableFilterComposer(
+            $db: $db,
+            $table: $db.manualCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> skippedQuestionsRefs(
+    Expression<bool> Function($$SkippedQuestionsTableFilterComposer f) f,
+  ) {
+    final $$SkippedQuestionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.skippedQuestions,
+      getReferencedColumn: (t) => t.questionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SkippedQuestionsTableFilterComposer(
+            $db: $db,
+            $table: $db.skippedQuestions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -6908,6 +8017,56 @@ class $$QuestionsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> manualCardsRefs<T extends Object>(
+    Expression<T> Function($$ManualCardsTableAnnotationComposer a) f,
+  ) {
+    final $$ManualCardsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.manualCards,
+      getReferencedColumn: (t) => t.questionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ManualCardsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.manualCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<T> skippedQuestionsRefs<T extends Object>(
+    Expression<T> Function($$SkippedQuestionsTableAnnotationComposer a) f,
+  ) {
+    final $$SkippedQuestionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.skippedQuestions,
+      getReferencedColumn: (t) => t.questionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SkippedQuestionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.skippedQuestions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$QuestionsTableTableManager
@@ -6929,6 +8088,8 @@ class $$QuestionsTableTableManager
             bool attemptsRefs,
             bool conceptsRefs,
             bool errorCardsRefs,
+            bool manualCardsRefs,
+            bool skippedQuestionsRefs,
           })
         > {
   $$QuestionsTableTableManager(_$AppDatabase db, $QuestionsTable table)
@@ -6998,6 +8159,8 @@ class $$QuestionsTableTableManager
                 attemptsRefs = false,
                 conceptsRefs = false,
                 errorCardsRefs = false,
+                manualCardsRefs = false,
+                skippedQuestionsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -7006,6 +8169,8 @@ class $$QuestionsTableTableManager
                     if (attemptsRefs) db.attempts,
                     if (conceptsRefs) db.concepts,
                     if (errorCardsRefs) db.errorCards,
+                    if (manualCardsRefs) db.manualCards,
+                    if (skippedQuestionsRefs) db.skippedQuestions,
                   ],
                   addJoins:
                       <
@@ -7119,6 +8284,46 @@ class $$QuestionsTableTableManager
                           referencedColumn: 'question_id',
                           typedResults: items,
                         ),
+                      if (manualCardsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          QuestionRow,
+                          $QuestionsTable,
+                          ManualCardRow,
+                          $ManualCardsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$QuestionsTableReferences
+                              ._manualCardsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$QuestionsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).manualCardsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'question_id',
+                          typedResults: items,
+                        ),
+                      if (skippedQuestionsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          QuestionRow,
+                          $QuestionsTable,
+                          SkippedQuestionRow,
+                          $SkippedQuestionsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$QuestionsTableReferences
+                              ._skippedQuestionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$QuestionsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).skippedQuestionsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'question_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -7145,6 +8350,8 @@ typedef $$QuestionsTableProcessedTableManager =
         bool attemptsRefs,
         bool conceptsRefs,
         bool errorCardsRefs,
+        bool manualCardsRefs,
+        bool skippedQuestionsRefs,
       })
     >;
 typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
@@ -7280,6 +8487,26 @@ final class $$SessionsTableReferences
     ).filter((f) => f.sessionId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_manualCardsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$SkippedQuestionsTable, List<SkippedQuestionRow>>
+  _skippedQuestionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.skippedQuestions,
+    aliasName: 'sessions__id__skipped_questions__session_id',
+  );
+
+  $$SkippedQuestionsTableProcessedTableManager get skippedQuestionsRefs {
+    final manager = $$SkippedQuestionsTableTableManager(
+      $_db,
+      $_db.skippedQuestions,
+    ).filter((f) => f.sessionId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _skippedQuestionsRefsTable($_db),
+    );
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -7479,6 +8706,31 @@ class $$SessionsTableFilterComposer
           }) => $$ManualCardsTableFilterComposer(
             $db: $db,
             $table: $db.manualCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> skippedQuestionsRefs(
+    Expression<bool> Function($$SkippedQuestionsTableFilterComposer f) f,
+  ) {
+    final $$SkippedQuestionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.skippedQuestions,
+      getReferencedColumn: (t) => t.sessionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SkippedQuestionsTableFilterComposer(
+            $db: $db,
+            $table: $db.skippedQuestions,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -7754,6 +9006,31 @@ class $$SessionsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> skippedQuestionsRefs<T extends Object>(
+    Expression<T> Function($$SkippedQuestionsTableAnnotationComposer a) f,
+  ) {
+    final $$SkippedQuestionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.skippedQuestions,
+      getReferencedColumn: (t) => t.sessionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SkippedQuestionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.skippedQuestions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$SessionsTableTableManager
@@ -7776,6 +9053,7 @@ class $$SessionsTableTableManager
             bool conceptsRefs,
             bool errorCardsRefs,
             bool manualCardsRefs,
+            bool skippedQuestionsRefs,
           })
         > {
   $$SessionsTableTableManager(_$AppDatabase db, $SessionsTable table)
@@ -7853,6 +9131,7 @@ class $$SessionsTableTableManager
                 conceptsRefs = false,
                 errorCardsRefs = false,
                 manualCardsRefs = false,
+                skippedQuestionsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -7862,6 +9141,7 @@ class $$SessionsTableTableManager
                     if (conceptsRefs) db.concepts,
                     if (errorCardsRefs) db.errorCards,
                     if (manualCardsRefs) db.manualCards,
+                    if (skippedQuestionsRefs) db.skippedQuestions,
                   ],
                   addJoins:
                       <
@@ -7995,6 +9275,26 @@ class $$SessionsTableTableManager
                           referencedColumn: 'session_id',
                           typedResults: items,
                         ),
+                      if (skippedQuestionsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          SessionRow,
+                          $SessionsTable,
+                          SkippedQuestionRow,
+                          $SkippedQuestionsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SessionsTableReferences
+                              ._skippedQuestionsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$SessionsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).skippedQuestionsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'session_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -8022,6 +9322,7 @@ typedef $$SessionsTableProcessedTableManager =
         bool conceptsRefs,
         bool errorCardsRefs,
         bool manualCardsRefs,
+        bool skippedQuestionsRefs,
       })
     >;
 typedef $$SessionQuestionsTableCreateCompanionBuilder =
@@ -10101,8 +11402,10 @@ typedef $$ManualCardsTableCreateCompanionBuilder =
     ManualCardsCompanion Function({
       Value<int> id,
       Value<int?> sessionId,
+      Value<int?> questionId,
       required String question,
       required String answer,
+      Value<String> context,
       Value<String> topicName,
       required DateTime createdAt,
       Value<DateTime?> exportedAt,
@@ -10111,8 +11414,10 @@ typedef $$ManualCardsTableUpdateCompanionBuilder =
     ManualCardsCompanion Function({
       Value<int> id,
       Value<int?> sessionId,
+      Value<int?> questionId,
       Value<String> question,
       Value<String> answer,
+      Value<String> context,
       Value<String> topicName,
       Value<DateTime> createdAt,
       Value<DateTime?> exportedAt,
@@ -10133,6 +11438,23 @@ final class $$ManualCardsTableReferences
       $_db.sessions,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_sessionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $QuestionsTable _questionIdTable(_$AppDatabase db) =>
+      db.questions.createAlias('manual_cards__question_id__questions__id');
+
+  $$QuestionsTableProcessedTableManager? get questionId {
+    final $_column = $_itemColumn<int>('question_id');
+    if ($_column == null) return null;
+    final manager = $$QuestionsTableTableManager(
+      $_db,
+      $_db.questions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_questionIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -10161,6 +11483,11 @@ class $$ManualCardsTableFilterComposer
 
   ColumnFilters<String> get answer => $composableBuilder(
     column: $table.answer,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get context => $composableBuilder(
+    column: $table.context,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10201,6 +11528,29 @@ class $$ManualCardsTableFilterComposer
     );
     return composer;
   }
+
+  $$QuestionsTableFilterComposer get questionId {
+    final $$QuestionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableFilterComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$ManualCardsTableOrderingComposer
@@ -10224,6 +11574,11 @@ class $$ManualCardsTableOrderingComposer
 
   ColumnOrderings<String> get answer => $composableBuilder(
     column: $table.answer,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get context => $composableBuilder(
+    column: $table.context,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -10264,6 +11619,29 @@ class $$ManualCardsTableOrderingComposer
     );
     return composer;
   }
+
+  $$QuestionsTableOrderingComposer get questionId {
+    final $$QuestionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$ManualCardsTableAnnotationComposer
@@ -10283,6 +11661,9 @@ class $$ManualCardsTableAnnotationComposer
 
   GeneratedColumn<String> get answer =>
       $composableBuilder(column: $table.answer, builder: (column) => column);
+
+  GeneratedColumn<String> get context =>
+      $composableBuilder(column: $table.context, builder: (column) => column);
 
   GeneratedColumn<String> get topicName =>
       $composableBuilder(column: $table.topicName, builder: (column) => column);
@@ -10317,6 +11698,29 @@ class $$ManualCardsTableAnnotationComposer
     );
     return composer;
   }
+
+  $$QuestionsTableAnnotationComposer get questionId {
+    final $$QuestionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$ManualCardsTableTableManager
@@ -10332,7 +11736,7 @@ class $$ManualCardsTableTableManager
           $$ManualCardsTableUpdateCompanionBuilder,
           (ManualCardRow, $$ManualCardsTableReferences),
           ManualCardRow,
-          PrefetchHooks Function({bool sessionId})
+          PrefetchHooks Function({bool sessionId, bool questionId})
         > {
   $$ManualCardsTableTableManager(_$AppDatabase db, $ManualCardsTable table)
     : super(
@@ -10349,16 +11753,20 @@ class $$ManualCardsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int?> sessionId = const Value.absent(),
+                Value<int?> questionId = const Value.absent(),
                 Value<String> question = const Value.absent(),
                 Value<String> answer = const Value.absent(),
+                Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> exportedAt = const Value.absent(),
               }) => ManualCardsCompanion(
                 id: id,
                 sessionId: sessionId,
+                questionId: questionId,
                 question: question,
                 answer: answer,
+                context: context,
                 topicName: topicName,
                 createdAt: createdAt,
                 exportedAt: exportedAt,
@@ -10367,16 +11775,20 @@ class $$ManualCardsTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<int?> sessionId = const Value.absent(),
+                Value<int?> questionId = const Value.absent(),
                 required String question,
                 required String answer,
+                Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> exportedAt = const Value.absent(),
               }) => ManualCardsCompanion.insert(
                 id: id,
                 sessionId: sessionId,
+                questionId: questionId,
                 question: question,
                 answer: answer,
+                context: context,
                 topicName: topicName,
                 createdAt: createdAt,
                 exportedAt: exportedAt,
@@ -10389,7 +11801,7 @@ class $$ManualCardsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({sessionId = false}) {
+          prefetchHooksCallback: ({sessionId = false, questionId = false}) {
             return PrefetchHooks(
               db: db,
               explicitlyWatchedTables: [],
@@ -10420,6 +11832,17 @@ class $$ManualCardsTableTableManager
                             .id,
                       ) as T;
                     }
+                    if (questionId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.questionId,
+                        referencedTable: $$ManualCardsTableReferences
+                            ._questionIdTable(db),
+                        referencedColumn: $$ManualCardsTableReferences
+                            ._questionIdTable(db)
+                            .id,
+                      ) as T;
+                    }
 
                     return state;
                   },
@@ -10444,7 +11867,617 @@ typedef $$ManualCardsTableProcessedTableManager =
       $$ManualCardsTableUpdateCompanionBuilder,
       (ManualCardRow, $$ManualCardsTableReferences),
       ManualCardRow,
-      PrefetchHooks Function({bool sessionId})
+      PrefetchHooks Function({bool sessionId, bool questionId})
+    >;
+typedef $$SkippedQuestionsTableCreateCompanionBuilder =
+    SkippedQuestionsCompanion Function({
+      Value<int> id,
+      Value<int?> sessionId,
+      required int questionId,
+      required String question,
+      required String alternativesJson,
+      Value<String> correctIndexesJson,
+      Value<String> explanation,
+      Value<String> alternativeExplanationsJson,
+      Value<String> reasoning,
+      Value<String> topicName,
+      Value<String> practiceName,
+      Value<bool> unknown,
+      required DateTime createdAt,
+      Value<DateTime?> handledAt,
+      Value<String?> handledKind,
+    });
+typedef $$SkippedQuestionsTableUpdateCompanionBuilder =
+    SkippedQuestionsCompanion Function({
+      Value<int> id,
+      Value<int?> sessionId,
+      Value<int> questionId,
+      Value<String> question,
+      Value<String> alternativesJson,
+      Value<String> correctIndexesJson,
+      Value<String> explanation,
+      Value<String> alternativeExplanationsJson,
+      Value<String> reasoning,
+      Value<String> topicName,
+      Value<String> practiceName,
+      Value<bool> unknown,
+      Value<DateTime> createdAt,
+      Value<DateTime?> handledAt,
+      Value<String?> handledKind,
+    });
+
+final class $$SkippedQuestionsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $SkippedQuestionsTable,
+          SkippedQuestionRow
+        > {
+  $$SkippedQuestionsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $SessionsTable _sessionIdTable(_$AppDatabase db) =>
+      db.sessions.createAlias('skipped_questions__session_id__sessions__id');
+
+  $$SessionsTableProcessedTableManager? get sessionId {
+    final $_column = $_itemColumn<int>('session_id');
+    if ($_column == null) return null;
+    final manager = $$SessionsTableTableManager(
+      $_db,
+      $_db.sessions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sessionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $QuestionsTable _questionIdTable(_$AppDatabase db) =>
+      db.questions.createAlias('skipped_questions__question_id__questions__id');
+
+  $$QuestionsTableProcessedTableManager get questionId {
+    final $_column = $_itemColumn<int>('question_id')!;
+
+    final manager = $$QuestionsTableTableManager(
+      $_db,
+      $_db.questions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_questionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$SkippedQuestionsTableFilterComposer
+    extends Composer<_$AppDatabase, $SkippedQuestionsTable> {
+  $$SkippedQuestionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get question => $composableBuilder(
+    column: $table.question,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get alternativesJson => $composableBuilder(
+    column: $table.alternativesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get explanation => $composableBuilder(
+    column: $table.explanation,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get alternativeExplanationsJson => $composableBuilder(
+    column: $table.alternativeExplanationsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get reasoning => $composableBuilder(
+    column: $table.reasoning,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get topicName => $composableBuilder(
+    column: $table.topicName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get practiceName => $composableBuilder(
+    column: $table.practiceName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get unknown => $composableBuilder(
+    column: $table.unknown,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get handledAt => $composableBuilder(
+    column: $table.handledAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get handledKind => $composableBuilder(
+    column: $table.handledKind,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$SessionsTableFilterComposer get sessionId {
+    final $$SessionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableFilterComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$QuestionsTableFilterComposer get questionId {
+    final $$QuestionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableFilterComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SkippedQuestionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $SkippedQuestionsTable> {
+  $$SkippedQuestionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get question => $composableBuilder(
+    column: $table.question,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get alternativesJson => $composableBuilder(
+    column: $table.alternativesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get explanation => $composableBuilder(
+    column: $table.explanation,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get alternativeExplanationsJson => $composableBuilder(
+    column: $table.alternativeExplanationsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get reasoning => $composableBuilder(
+    column: $table.reasoning,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get topicName => $composableBuilder(
+    column: $table.topicName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get practiceName => $composableBuilder(
+    column: $table.practiceName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get unknown => $composableBuilder(
+    column: $table.unknown,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get handledAt => $composableBuilder(
+    column: $table.handledAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get handledKind => $composableBuilder(
+    column: $table.handledKind,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$SessionsTableOrderingComposer get sessionId {
+    final $$SessionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$QuestionsTableOrderingComposer get questionId {
+    final $$QuestionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SkippedQuestionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $SkippedQuestionsTable> {
+  $$SkippedQuestionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get question =>
+      $composableBuilder(column: $table.question, builder: (column) => column);
+
+  GeneratedColumn<String> get alternativesJson => $composableBuilder(
+    column: $table.alternativesJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get correctIndexesJson => $composableBuilder(
+    column: $table.correctIndexesJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get explanation => $composableBuilder(
+    column: $table.explanation,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get alternativeExplanationsJson => $composableBuilder(
+    column: $table.alternativeExplanationsJson,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get reasoning =>
+      $composableBuilder(column: $table.reasoning, builder: (column) => column);
+
+  GeneratedColumn<String> get topicName =>
+      $composableBuilder(column: $table.topicName, builder: (column) => column);
+
+  GeneratedColumn<String> get practiceName => $composableBuilder(
+    column: $table.practiceName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<bool> get unknown =>
+      $composableBuilder(column: $table.unknown, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get handledAt =>
+      $composableBuilder(column: $table.handledAt, builder: (column) => column);
+
+  GeneratedColumn<String> get handledKind => $composableBuilder(
+    column: $table.handledKind,
+    builder: (column) => column,
+  );
+
+  $$SessionsTableAnnotationComposer get sessionId {
+    final $$SessionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$QuestionsTableAnnotationComposer get questionId {
+    final $$QuestionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$SkippedQuestionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $SkippedQuestionsTable,
+          SkippedQuestionRow,
+          $$SkippedQuestionsTableFilterComposer,
+          $$SkippedQuestionsTableOrderingComposer,
+          $$SkippedQuestionsTableAnnotationComposer,
+          $$SkippedQuestionsTableCreateCompanionBuilder,
+          $$SkippedQuestionsTableUpdateCompanionBuilder,
+          (SkippedQuestionRow, $$SkippedQuestionsTableReferences),
+          SkippedQuestionRow,
+          PrefetchHooks Function({bool sessionId, bool questionId})
+        > {
+  $$SkippedQuestionsTableTableManager(
+    _$AppDatabase db,
+    $SkippedQuestionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SkippedQuestionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$SkippedQuestionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$SkippedQuestionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> sessionId = const Value.absent(),
+                Value<int> questionId = const Value.absent(),
+                Value<String> question = const Value.absent(),
+                Value<String> alternativesJson = const Value.absent(),
+                Value<String> correctIndexesJson = const Value.absent(),
+                Value<String> explanation = const Value.absent(),
+                Value<String> alternativeExplanationsJson =
+                    const Value.absent(),
+                Value<String> reasoning = const Value.absent(),
+                Value<String> topicName = const Value.absent(),
+                Value<String> practiceName = const Value.absent(),
+                Value<bool> unknown = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> handledAt = const Value.absent(),
+                Value<String?> handledKind = const Value.absent(),
+              }) => SkippedQuestionsCompanion(
+                id: id,
+                sessionId: sessionId,
+                questionId: questionId,
+                question: question,
+                alternativesJson: alternativesJson,
+                correctIndexesJson: correctIndexesJson,
+                explanation: explanation,
+                alternativeExplanationsJson: alternativeExplanationsJson,
+                reasoning: reasoning,
+                topicName: topicName,
+                practiceName: practiceName,
+                unknown: unknown,
+                createdAt: createdAt,
+                handledAt: handledAt,
+                handledKind: handledKind,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> sessionId = const Value.absent(),
+                required int questionId,
+                required String question,
+                required String alternativesJson,
+                Value<String> correctIndexesJson = const Value.absent(),
+                Value<String> explanation = const Value.absent(),
+                Value<String> alternativeExplanationsJson =
+                    const Value.absent(),
+                Value<String> reasoning = const Value.absent(),
+                Value<String> topicName = const Value.absent(),
+                Value<String> practiceName = const Value.absent(),
+                Value<bool> unknown = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> handledAt = const Value.absent(),
+                Value<String?> handledKind = const Value.absent(),
+              }) => SkippedQuestionsCompanion.insert(
+                id: id,
+                sessionId: sessionId,
+                questionId: questionId,
+                question: question,
+                alternativesJson: alternativesJson,
+                correctIndexesJson: correctIndexesJson,
+                explanation: explanation,
+                alternativeExplanationsJson: alternativeExplanationsJson,
+                reasoning: reasoning,
+                topicName: topicName,
+                practiceName: practiceName,
+                unknown: unknown,
+                createdAt: createdAt,
+                handledAt: handledAt,
+                handledKind: handledKind,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$SkippedQuestionsTable, SkippedQuestionRow>(
+                    table,
+                  ),
+                  $$SkippedQuestionsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({sessionId = false, questionId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (sessionId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.sessionId,
+                        referencedTable: $$SkippedQuestionsTableReferences
+                            ._sessionIdTable(db),
+                        referencedColumn: $$SkippedQuestionsTableReferences
+                            ._sessionIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+                    if (questionId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.questionId,
+                        referencedTable: $$SkippedQuestionsTableReferences
+                            ._questionIdTable(db),
+                        referencedColumn: $$SkippedQuestionsTableReferences
+                            ._questionIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$SkippedQuestionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $SkippedQuestionsTable,
+      SkippedQuestionRow,
+      $$SkippedQuestionsTableFilterComposer,
+      $$SkippedQuestionsTableOrderingComposer,
+      $$SkippedQuestionsTableAnnotationComposer,
+      $$SkippedQuestionsTableCreateCompanionBuilder,
+      $$SkippedQuestionsTableUpdateCompanionBuilder,
+      (SkippedQuestionRow, $$SkippedQuestionsTableReferences),
+      SkippedQuestionRow,
+      PrefetchHooks Function({bool sessionId, bool questionId})
     >;
 typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   required String key,
@@ -10605,6 +12638,8 @@ class $AppDatabaseManager {
       $$ErrorCardsTableTableManager(_db, _db.errorCards);
   $$ManualCardsTableTableManager get manualCards =>
       $$ManualCardsTableTableManager(_db, _db.manualCards);
+  $$SkippedQuestionsTableTableManager get skippedQuestions =>
+      $$SkippedQuestionsTableTableManager(_db, _db.skippedQuestions);
   $$SettingsTableTableManager get settings =>
       $$SettingsTableTableManager(_db, _db.settings);
 }

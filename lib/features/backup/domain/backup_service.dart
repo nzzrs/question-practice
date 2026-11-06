@@ -77,6 +77,7 @@ class BackupService {
     final concepts = await _db.select(_db.concepts).get();
     final errorCards = await _db.select(_db.errorCards).get();
     final manualCards = await _db.select(_db.manualCards).get();
+    final skippedQuestions = await _db.select(_db.skippedQuestions).get();
     final settings = await _db.select(_db.settings).get();
 
     final tables = <String, dynamic>{
@@ -89,6 +90,7 @@ class BackupService {
       'concepts': [for (final row in concepts) row.toJson()],
       'errorCards': [for (final row in errorCards) row.toJson()],
       'manualCards': [for (final row in manualCards) row.toJson()],
+      'skippedQuestions': [for (final row in skippedQuestions) row.toJson()],
       'settings': [for (final row in settings) row.toJson()],
     };
     final payload = <String, dynamic>{
@@ -146,6 +148,9 @@ class BackupService {
         ]);
         batch.insertAll(_db.manualCards, [
           for (final row in backup.manualCards) row.toCompanion(false),
+        ]);
+        batch.insertAll(_db.skippedQuestions, [
+          for (final row in backup.skippedQuestions) row.toCompanion(false),
         ]);
         batch.insertAll(_db.settings, [
           for (final row in backup.settings) row.toCompanion(false),
@@ -283,10 +288,39 @@ class BackupService {
       manualCards: _rows(
         tables,
         'manualCards',
-        (json) => ManualCardRow.fromJson(json),
+        (json) =>
+            ManualCardRow.fromJson({...json, 'context': json['context'] ?? ''}),
+      ),
+      skippedQuestions: _rowsOptional(
+        tables,
+        'skippedQuestions',
+        (json) => SkippedQuestionRow.fromJson(json),
       ),
       settings: _rows(tables, 'settings', (json) => SettingRow.fromJson(json)),
     );
+  }
+
+  /// Reads a table added after the first backup format.
+  ///
+  /// Old backups simply have no such table, so an absent or malformed entry
+  /// restores as empty instead of rejecting the whole file.
+  List<T> _rowsOptional<T>(
+    Map<String, dynamic> tables,
+    String key,
+    T Function(Map<String, dynamic>) parse,
+  ) {
+    final raw = tables[key];
+    if (raw is! List) return <T>[];
+    final rows = <T>[];
+    for (final item in raw) {
+      if (item is! Map) continue;
+      try {
+        rows.add(parse(item.cast<String, dynamic>()));
+      } on Object {
+        continue;
+      }
+    }
+    return rows;
   }
 
   List<T> _rows<T>(
@@ -350,6 +384,7 @@ class _BackupTables {
     required this.concepts,
     required this.errorCards,
     required this.manualCards,
+    required this.skippedQuestions,
     required this.settings,
   });
 
@@ -363,5 +398,6 @@ class _BackupTables {
   final List<ConceptRow> concepts;
   final List<ErrorCardRow> errorCards;
   final List<ManualCardRow> manualCards;
+  final List<SkippedQuestionRow> skippedQuestions;
   final List<SettingRow> settings;
 }

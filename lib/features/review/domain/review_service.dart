@@ -22,6 +22,7 @@ class SkippedReviewStep extends ReviewStep {
     required this.practiceName,
     required this.reasoning,
     this.unknown = false,
+    this.skippedQuestionId,
   });
 
   final Question question;
@@ -31,6 +32,9 @@ class SkippedReviewStep extends ReviewStep {
 
   /// The learner marked the answer as "I didn't know this".
   final bool unknown;
+
+  /// Persistent queue record, when the answer was stored for later.
+  final int? skippedQuestionId;
 }
 
 class ConceptDefinitionStep extends ReviewStep {
@@ -73,6 +77,10 @@ class ReviewService {
     final questions = await _sessions.questionsForSession(sessionId);
     final attempts = await _sessions.attemptsForSession(sessionId);
     final concepts = await _cards.conceptsForSession(sessionId);
+    final skippedRecords = await _cards.skippedQuestionsForSession(sessionId);
+    final skippedByQuestion = {
+      for (final record in skippedRecords) record.questionId: record,
+    };
     final questionsById = {
       for (final question in questions) question.id: question,
     };
@@ -88,6 +96,8 @@ class ReviewService {
       if (attempt.isSkipped) {
         final question = questionsById[attempt.questionId];
         if (question == null) continue;
+        final record = skippedByQuestion[attempt.questionId];
+        if (record != null && record.isHandled) continue;
         final practice = practiceById[question.practiceId];
         steps.add(
           SkippedReviewStep(
@@ -96,8 +106,9 @@ class ReviewService {
                 ? ''
                 : topicNames[practice.topicId] ?? '',
             practiceName: practice?.name ?? '',
-            reasoning: attempt.reasoning,
-            unknown: attempt.unknown,
+            reasoning: record?.reasoning ?? attempt.reasoning,
+            unknown: record?.unknown ?? attempt.unknown,
+            skippedQuestionId: record?.id,
           ),
         );
       } else if (!attempt.isCorrect && !attempt.distracted) {
@@ -145,8 +156,9 @@ class ReviewService {
     required String context,
     required String topicName,
     required ConceptSource source,
-  }) {
-    return _cards.createConcept(
+    int? skippedQuestionId,
+  }) async {
+    final id = await _cards.createConcept(
       sessionId: sessionId,
       questionId: questionId,
       term: term.trim(),
@@ -157,6 +169,14 @@ class ReviewService {
       source: source,
       createdAt: _clock.now().toUtc(),
     );
+    if (skippedQuestionId != null) {
+      await _cards.markSkippedHandled(
+        skippedQuestionId,
+        'concept',
+        _clock.now().toUtc(),
+      );
+    }
+    return id;
   }
 
   Future<int> createBasicCard({
@@ -164,13 +184,26 @@ class ReviewService {
     required String question,
     required String answer,
     required String topicName,
-  }) {
-    return _cards.createManualCard(
+    int? questionId,
+    String context = '',
+    int? skippedQuestionId,
+  }) async {
+    final id = await _cards.createManualCard(
       sessionId: sessionId,
+      questionId: questionId,
       question: question.trim(),
       answer: answer.trim(),
+      context: context.trim(),
       topicName: topicName,
       createdAt: _clock.now().toUtc(),
     );
+    if (skippedQuestionId != null) {
+      await _cards.markSkippedHandled(
+        skippedQuestionId,
+        'basic',
+        _clock.now().toUtc(),
+      );
+    }
+    return id;
   }
 }

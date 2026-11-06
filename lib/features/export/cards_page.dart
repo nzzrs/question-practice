@@ -9,8 +9,9 @@ import '../errors/error_cards_review_page.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
 import 'domain/anki_note_builder.dart';
+import 'new_card_dialog.dart';
 
-enum _Filter { all, concepts, errors, basic }
+enum _Filter { all, concepts, errors, basic, skipped }
 
 class CardsPage extends ConsumerStatefulWidget {
   const CardsPage({super.key});
@@ -51,6 +52,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final conceptsAsync = ref.watch(allConceptsProvider);
     final errorsAsync = ref.watch(allErrorCardsProvider);
     final manualsAsync = ref.watch(allManualCardsProvider);
+    final skippedAsync = ref.watch(skippedQuestionsProvider);
     final topicSummaries = ref.watch(topicSummariesProvider).value ?? const [];
     final defaultDeck =
         ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
@@ -70,6 +72,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final allConcepts = conceptsAsync.value ?? const <Concept>[];
     final allErrors = errorsAsync.value ?? const <ErrorCard>[];
     final allManuals = manualsAsync.value ?? const <ManualCard>[];
+    final skipped = skippedAsync.value ?? const <SkippedQuestion>[];
     final concepts = _showExported
         ? allConcepts
         : allConcepts.where((item) => item.exportedAt == null).toList();
@@ -108,7 +111,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final loading =
         conceptsAsync.isLoading ||
         errorsAsync.isLoading ||
-        manualsAsync.isLoading;
+        manualsAsync.isLoading ||
+        skippedAsync.isLoading;
     final selectedErrorCards = errors
         .where((card) => _selectedErrors.contains(card.id))
         .toList();
@@ -207,12 +211,28 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         if (loading &&
             allConcepts.isEmpty &&
             allErrors.isEmpty &&
-            allManuals.isEmpty)
+            allManuals.isEmpty &&
+            skipped.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 64),
             child: Center(child: M3ELoadingIndicator()),
           )
         else ...[
+          if ((_filter == _Filter.all || _filter == _Filter.skipped) &&
+              skipped.isNotEmpty) ...[
+            SectionTitle('Skipped questions', count: skipped.length),
+            AppGroup(
+              children: [
+                for (final question in skipped)
+                  _SkippedRow(
+                    question: question,
+                    onMakeCard: () => _createCardFromSkipped(question),
+                    onDismiss: () => _dismissSkipped(question),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 28),
+          ],
           if ((_filter == _Filter.all || _filter == _Filter.concepts) &&
               concepts.isNotEmpty) ...[
             SectionTitle(
@@ -365,7 +385,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               ],
             ),
           ],
-          if (!loading && concepts.isEmpty && errors.isEmpty && manuals.isEmpty)
+          if (!loading &&
+              concepts.isEmpty &&
+              errors.isEmpty &&
+              manuals.isEmpty &&
+              skipped.isEmpty)
             const EmptyState(
               icon: Icons.style_outlined,
               title: 'No cards to export',
@@ -388,7 +412,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         title: 'What goes to Anki',
         content: const Text(
           'Concepts become cloze cards, error cards have six fields, and skipped-question cards are basic front/back. '
-          'Each topic uses its own deck; topics without one use the default deck from Settings.',
+          'Skipped questions stay here until you make a card from them. Each topic uses its own deck; topics without one use the default deck from Settings.',
         ),
         actions: [
           M3EButton.filled(
@@ -622,9 +646,58 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     ]);
   }
 
+  Future<void> _createCardFromSkipped(SkippedQuestion question) async {
+    final draft = await showNewCardDialog(
+      context,
+      title: 'Make a card from the skipped question',
+      contextText: question.question,
+      initialQuestion: question.question,
+      initialAnswer: question.correctAnswer,
+    );
+    if (draft == null || !mounted) return;
+    final service = ref.read(reviewServiceProvider);
+    if (draft.kind == NewCardKind.concept) {
+      await service.createConcept(
+        sessionId: question.sessionId,
+        questionId: question.questionId,
+        term: draft.term,
+        definition: draft.definition,
+        context: question.question,
+        topicName: question.topicName,
+        source: ConceptSource.manual,
+        skippedQuestionId: question.id,
+      );
+    } else {
+      await service.createBasicCard(
+        sessionId: question.sessionId,
+        questionId: question.questionId,
+        question: draft.question,
+        answer: draft.answer,
+        context: question.question,
+        topicName: question.topicName,
+        skippedQuestionId: question.id,
+      );
+    }
+    if (!mounted) return;
+    await showSnack(context, 'Card created from the skipped question.');
+  }
+
+  Future<void> _dismissSkipped(SkippedQuestion question) async {
+    await ref
+        .read(cardRepositoryProvider)
+        .markSkippedHandled(
+          question.id,
+          'dismissed',
+          ref.read(clockProvider).now().toUtc(),
+        );
+    if (mounted) await showSnack(context, 'Skipped question removed.');
+  }
+
   Future<void> _previewManual(ManualCard card) {
     return _previewDialog('Basic card preview', [
       _PreviewField(label: 'Deck', value: _deckForTopic(card.topicName)),
+      if (card.context.trim().isNotEmpty)
+        _PreviewField(label: 'Context', value: card.context),
       _PreviewField(label: 'Front', value: card.question),
       _PreviewField(label: 'Back', value: card.answer),
     ]);
@@ -716,6 +789,7 @@ class _FilterBar extends StatelessWidget {
           (_Filter.concepts, 'Concepts'),
           (_Filter.errors, 'Errors'),
           (_Filter.basic, 'Basic'),
+          (_Filter.skipped, 'Skipped'),
         ])
           M3EChip(
             type: M3EChipType.filter,
@@ -1004,6 +1078,93 @@ class _ManualRow extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SkippedRow extends StatelessWidget {
+  const _SkippedRow({
+    required this.question,
+    required this.onMakeCard,
+    required this.onDismiss,
+  });
+
+  final SkippedQuestion question;
+  final VoidCallback onMakeCard;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  question.question,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.typography.baseline.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Correct: ${question.correctAnswer}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: AppSuccess.foreground(context),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (question.reasoning.trim().isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    'Your reasoning: ${question.reasoning}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    Pill(
+                      question.unknown ? "I didn't know this" : 'Skipped',
+                      tone: question.unknown
+                          ? PillTone.secondary
+                          : PillTone.neutral,
+                    ),
+                    if (question.topicName.trim().isNotEmpty)
+                      Pill(question.topicName),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          M3EIconButton(
+            variant: M3EIconButtonVariant.standard,
+            icon: const Icon(Icons.note_add_outlined),
+            tooltip: 'Make a card',
+            onPressed: onMakeCard,
+          ),
+          M3EIconButton(
+            variant: M3EIconButtonVariant.standard,
+            icon: const Icon(Icons.remove_done_outlined),
+            tooltip: 'Remove from skipped questions',
+            onPressed: onDismiss,
           ),
         ],
       ),

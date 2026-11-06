@@ -155,11 +155,33 @@ ManualCard manualCardFromRow(ManualCardRow row) {
   return ManualCard(
     id: row.id,
     sessionId: row.sessionId,
+    questionId: row.questionId,
     question: row.question,
     answer: row.answer,
+    context: row.context,
     topicName: row.topicName,
     createdAt: row.createdAt.toUtc(),
     exportedAt: row.exportedAt?.toUtc(),
+  );
+}
+
+SkippedQuestion skippedQuestionFromRow(SkippedQuestionRow row) {
+  return SkippedQuestion(
+    id: row.id,
+    sessionId: row.sessionId,
+    questionId: row.questionId,
+    question: row.question,
+    alternatives: decodeStringList(row.alternativesJson),
+    correctIndexes: decodeIntList(row.correctIndexesJson),
+    explanation: row.explanation,
+    alternativeExplanations: decodeStringList(row.alternativeExplanationsJson),
+    reasoning: row.reasoning,
+    topicName: row.topicName,
+    practiceName: row.practiceName,
+    unknown: row.unknown,
+    createdAt: row.createdAt.toUtc(),
+    handledAt: row.handledAt?.toUtc(),
+    handledKind: row.handledKind,
   );
 }
 

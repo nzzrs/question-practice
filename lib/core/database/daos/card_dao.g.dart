@@ -11,6 +11,8 @@ mixin _$CardDaoMixin on DatabaseAccessor<AppDatabase> {
   $ConceptsTable get concepts => attachedDatabase.concepts;
   $ErrorCardsTable get errorCards => attachedDatabase.errorCards;
   $ManualCardsTable get manualCards => attachedDatabase.manualCards;
+  $SkippedQuestionsTable get skippedQuestions =>
+      attachedDatabase.skippedQuestions;
   CardDaoManager get managers => CardDaoManager(this);
 }
 
@@ -31,4 +33,9 @@ class CardDaoManager {
       $$ErrorCardsTableTableManager(_db.attachedDatabase, _db.errorCards);
   $$ManualCardsTableTableManager get manualCards =>
       $$ManualCardsTableTableManager(_db.attachedDatabase, _db.manualCards);
+  $$SkippedQuestionsTableTableManager get skippedQuestions =>
+      $$SkippedQuestionsTableTableManager(
+        _db.attachedDatabase,
+        _db.skippedQuestions,
+      );
 }

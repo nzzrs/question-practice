@@ -154,13 +154,17 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           context: step.question.prompt,
           topicName: step.topicName,
           source: ConceptSource.manual,
+          skippedQuestionId: step.skippedQuestionId,
         );
       } else {
         await service.createBasicCard(
           sessionId: widget.sessionId,
+          questionId: step.question.id,
           question: _newQuestion.text,
           answer: _newAnswer.text,
+          context: step.question.prompt,
           topicName: step.topicName,
+          skippedQuestionId: step.skippedQuestionId,
         );
       }
       if (!mounted) return;

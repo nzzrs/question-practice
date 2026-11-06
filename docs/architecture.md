@@ -14,7 +14,7 @@ Domain models in `lib/core/domain/models.dart` are immutable plain Dart. Reposit
 
 ## Database
 
-One `AppDatabase` with tables for topics, practices, questions, sessions, session questions, attempts, concepts, error cards, manual cards and settings. The schema is version 4; version 2 added the topic deck and manual-card topic columns, version 3 stores correct/selected/wrong indexes as JSON arrays, and version 4 adds the overall explanation and alternative explanations to error-card snapshots.
+One `AppDatabase` with tables for topics, practices, questions, sessions, session questions, attempts, concepts, error cards, manual cards, skipped questions, highlights and settings. The schema is version 8; version 2 added the topic deck and manual-card topic columns, version 3 stores correct/selected/wrong indexes as JSON arrays, version 4 adds the overall explanation and alternative explanations to error-card snapshots, version 5 adds the practice done flag, version 6 adds unknown attempts and acronym extras, version 7 adds skipped-question persistence and manual-card context, and version 8 adds highlights.
 
 - Timestamps are UTC; rows are converted back to UTC in mappers.
 - Questions store alternatives, per-alternative explanations, and correct indexes as JSON arrays.
@@ -51,7 +51,8 @@ A session is created at start and remains `inProgress` until every question has 
 - Prompt, alternatives and explanations use `SelectableLinkifiedText` for Define and tappable http(s) links.
 - AI definitions render in an overlay bubble anchored to the selection and save before display. Web definitions keep the editable bottom sheet.
 - The 5-minute reminder is a `Timer.periodic` for the current question, paused while the app is in the background and reset when the question changes.
-- Text selection is a `SelectionArea` with a custom “Define” action.
+- Text selection is a `SelectionArea` with custom Define, Highlight and Ask actions. Ask sends the selected passage, its question and the learner message to the configured AI; its answer can become a basic card whose front places the question context above the learner question. Highlights are stored per session/question, painted in place, and reviewed at the end of the session.
+- Skipped answers are snapshotted into `skipped_questions`. The review marks a record handled when it creates a card, and Cards lists any records still unhandled so they survive the session.
 - Settings model selection uses `M3EDropdownMenu` and `LookupService.listModels`; Gemini models are filtered to those that support `generateContent`.
 
 ## Platform services

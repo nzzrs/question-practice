@@ -309,6 +309,59 @@ class CardRepository {
     await _db.cardDao.deleteSkippedQuestion(existing.id);
   }
 
+  Future<int> createHighlight({
+    required int? sessionId,
+    required int? questionId,
+    required String text,
+    required String context,
+    required String topicName,
+    required String practiceName,
+    required DateTime createdAt,
+  }) {
+    return _db.cardDao.insertHighlight(
+      HighlightsCompanion.insert(
+        sessionId: Value(sessionId),
+        questionId: Value(questionId),
+        phrase: text,
+        context: Value(context),
+        topicName: Value(topicName),
+        practiceName: Value(practiceName),
+        createdAt: createdAt,
+      ),
+    );
+  }
+
+  Stream<List<StudyHighlight>> watchHighlights() {
+    return _db.cardDao.watchHighlights().map(
+      (rows) => rows.map(highlightFromRow).toList(),
+    );
+  }
+
+  Future<List<StudyHighlight>> highlightsForSession(int sessionId) async {
+    final rows = await _db.cardDao.highlightsForSession(sessionId);
+    return rows.map(highlightFromRow).toList();
+  }
+
+  Future<void> keepHighlight(int id, DateTime keptAt) {
+    return _db.cardDao.markHighlightKept(id, keptAt);
+  }
+
+  Future<void> markHighlightConverted(
+    int id, {
+    required DateTime cardCreatedAt,
+    int? manualCardId,
+  }) {
+    return _db.cardDao.markHighlightConverted(
+      id,
+      cardCreatedAt: cardCreatedAt,
+      manualCardId: manualCardId,
+    );
+  }
+
+  Future<void> deleteHighlight(int id) {
+    return _db.cardDao.deleteHighlight(id);
+  }
+
   Future<void> markExported({
     required List<int> conceptIds,
     required List<int> errorCardIds,

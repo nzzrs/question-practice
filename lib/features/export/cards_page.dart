@@ -11,7 +11,7 @@ import '../practice/selectable_linkified_text.dart';
 import 'domain/anki_note_builder.dart';
 import 'new_card_dialog.dart';
 
-enum _Filter { all, concepts, errors, basic, skipped }
+enum _Filter { all, concepts, errors, basic, skipped, highlights }
 
 class CardsPage extends ConsumerStatefulWidget {
   const CardsPage({super.key});
@@ -53,6 +53,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final errorsAsync = ref.watch(allErrorCardsProvider);
     final manualsAsync = ref.watch(allManualCardsProvider);
     final skippedAsync = ref.watch(skippedQuestionsProvider);
+    final highlightsAsync = ref.watch(highlightsProvider);
     final topicSummaries = ref.watch(topicSummariesProvider).value ?? const [];
     final defaultDeck =
         ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
@@ -73,6 +74,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final allErrors = errorsAsync.value ?? const <ErrorCard>[];
     final allManuals = manualsAsync.value ?? const <ManualCard>[];
     final skipped = skippedAsync.value ?? const <SkippedQuestion>[];
+    final highlights = highlightsAsync.value ?? const <StudyHighlight>[];
     final concepts = _showExported
         ? allConcepts
         : allConcepts.where((item) => item.exportedAt == null).toList();
@@ -112,7 +114,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         conceptsAsync.isLoading ||
         errorsAsync.isLoading ||
         manualsAsync.isLoading ||
-        skippedAsync.isLoading;
+        skippedAsync.isLoading ||
+        highlightsAsync.isLoading;
     final selectedErrorCards = errors
         .where((card) => _selectedErrors.contains(card.id))
         .toList();
@@ -212,7 +215,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             allConcepts.isEmpty &&
             allErrors.isEmpty &&
             allManuals.isEmpty &&
-            skipped.isEmpty)
+            skipped.isEmpty &&
+            highlights.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 64),
             child: Center(child: M3ELoadingIndicator()),
@@ -228,6 +232,21 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     question: question,
                     onMakeCard: () => _createCardFromSkipped(question),
                     onDismiss: () => _dismissSkipped(question),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 28),
+          ],
+          if ((_filter == _Filter.all || _filter == _Filter.highlights) &&
+              highlights.isNotEmpty) ...[
+            SectionTitle('Highlights', count: highlights.length),
+            AppGroup(
+              children: [
+                for (final highlight in highlights)
+                  _HighlightRow(
+                    highlight: highlight,
+                    onMakeCard: () => _createCardFromHighlight(highlight),
+                    onDelete: () => _deleteHighlight(highlight),
                   ),
               ],
             ),
@@ -389,7 +408,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               concepts.isEmpty &&
               errors.isEmpty &&
               manuals.isEmpty &&
-              skipped.isEmpty)
+              skipped.isEmpty &&
+              highlights.isEmpty)
             const EmptyState(
               icon: Icons.style_outlined,
               title: 'No cards to export',
@@ -646,6 +666,60 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     ]);
   }
 
+  Future<void> _createCardFromHighlight(StudyHighlight highlight) async {
+    final draft = await showNewCardDialog(
+      context,
+      title: 'Turn the highlight into a card',
+      contextText: highlight.context,
+      initialTerm: highlight.text,
+      initialQuestion: highlight.text,
+      initialKind: NewCardKind.concept,
+    );
+    if (draft == null || !mounted) return;
+    final service = ref.read(reviewServiceProvider);
+    int? manualCardId;
+    if (draft.kind == NewCardKind.concept) {
+      await service.createConcept(
+        sessionId: highlight.sessionId,
+        questionId: highlight.questionId,
+        term: draft.term,
+        definition: draft.definition,
+        context: highlight.context,
+        topicName: highlight.topicName,
+        source: ConceptSource.manual,
+      );
+    } else {
+      manualCardId = await service.createBasicCard(
+        sessionId: highlight.sessionId,
+        questionId: highlight.questionId,
+        question: draft.question,
+        answer: draft.answer,
+        context: highlight.context,
+        topicName: highlight.topicName,
+      );
+    }
+    await service.markHighlightConverted(
+      highlight.id,
+      manualCardId: manualCardId,
+    );
+    if (!mounted) return;
+    await showSnack(context, 'Card created from the highlight.');
+  }
+
+  Future<void> _deleteHighlight(StudyHighlight highlight) async {
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Delete highlight?',
+      message:
+          'The saved phrase "${highlight.text}" is removed. Cards already made from it stay.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (!confirmed) return;
+    await ref.read(cardRepositoryProvider).deleteHighlight(highlight.id);
+    if (mounted) await showSnack(context, 'Highlight deleted.');
+  }
+
   Future<void> _createCardFromSkipped(SkippedQuestion question) async {
     final draft = await showNewCardDialog(
       context,
@@ -790,6 +864,7 @@ class _FilterBar extends StatelessWidget {
           (_Filter.errors, 'Errors'),
           (_Filter.basic, 'Basic'),
           (_Filter.skipped, 'Skipped'),
+          (_Filter.highlights, 'Highlights'),
         ])
           M3EChip(
             type: M3EChipType.filter,
@@ -1078,6 +1153,95 @@ class _ManualRow extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HighlightRow extends StatelessWidget {
+  const _HighlightRow({
+    required this.highlight,
+    required this.onMakeCard,
+    required this.onDelete,
+  });
+
+  final StudyHighlight highlight;
+  final VoidCallback onMakeCard;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    highlight.text,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.baseline.titleSmall.copyWith(
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+                if (highlight.context.trim().isNotEmpty) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    highlight.context,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    const Pill('Highlight', tone: PillTone.primary),
+                    if (highlight.topicName.trim().isNotEmpty)
+                      Pill(highlight.topicName),
+                    if (highlight.isKept)
+                      const Pill('Kept', tone: PillTone.success),
+                    if (highlight.hasCard)
+                      const Pill('Card made', tone: PillTone.success),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          if (!highlight.hasCard)
+            M3EIconButton(
+              variant: M3EIconButtonVariant.standard,
+              icon: const Icon(Icons.note_add_outlined),
+              tooltip: 'Make a card',
+              onPressed: onMakeCard,
+            ),
+          M3EIconButton(
+            variant: M3EIconButtonVariant.standard,
+            icon: const Icon(Icons.delete_outline),
+            tooltip: 'Delete highlight',
+            onPressed: onDelete,
           ),
         ],
       ),

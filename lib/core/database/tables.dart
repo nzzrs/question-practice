@@ -206,6 +206,35 @@ class SkippedQuestions extends Table {
   TextColumn get handledKind => text().nullable()();
 }
 
+@DataClassName('HighlightRow')
+@TableIndex(name: 'highlights_session', columns: {#sessionId})
+@TableIndex(name: 'highlights_question', columns: {#questionId})
+class Highlights extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get sessionId => integer().nullable().references(
+    Sessions,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
+  IntColumn get questionId => integer().nullable().references(
+    Questions,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+  TextColumn get phrase => text()();
+  TextColumn get context => text().withDefault(const Constant(''))();
+  TextColumn get topicName => text().withDefault(const Constant(''))();
+  TextColumn get practiceName => text().withDefault(const Constant(''))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get keptAt => dateTime().nullable()();
+  DateTimeColumn get cardCreatedAt => dateTime().nullable()();
+  IntColumn get manualCardId => integer().nullable().references(
+    ManualCards,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+}
+
 @DataClassName('SettingRow')
 class Settings extends Table {
   @override

@@ -348,6 +348,8 @@ void main() {
       final result = await serviceWith(client).checkErrorNotes(
         question: 'Which storage class?',
         correctAnswer: 'Coldline',
+        wrongAnswer: 'Standard',
+        reasoning: 'All storage classes looked the same to me.',
         bias: 'I assumed all storage classes cost the same.',
         vaccine: 'Remember that storage classes differ in price.',
       );
@@ -366,6 +368,57 @@ void main() {
     },
   );
 
+  test(
+    'AI review check sends the learner reasoning and returns short suggestions',
+    () async {
+      await useAi();
+      String? userPrompt;
+      String? systemPrompt;
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final messages = body['messages'] as List<dynamic>;
+        systemPrompt =
+            (messages.first as Map<String, dynamic>)['content'] as String;
+        userPrompt =
+            (messages.last as Map<String, dynamic>)['content'] as String;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({
+                    'consistent': false,
+                    'feedback': 'The note does not address the mix-up.',
+                    'bias': 'Confused the cold tier with the standard tier.',
+                    'vaccine': 'Check the tier before comparing prices.',
+                  }),
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final result = await serviceWith(client).checkErrorNotes(
+        question: 'Which storage class?',
+        correctAnswer: 'Coldline',
+        wrongAnswer: 'Standard',
+        reasoning: 'I thought the cheapest class was the cold one.',
+        bias: 'I read the price table backwards.',
+        vaccine: 'Read the table again.',
+      );
+
+      expect(result.consistent, isFalse);
+      expect(result.biasSuggestion, contains('cold tier'));
+      expect(result.vaccineSuggestion, contains('tier'));
+      expect(userPrompt, contains('Chosen wrong answer: Standard'));
+      expect(userPrompt, contains('Learner reasoning: I thought the cheapest'));
+      expect(systemPrompt, contains('learner'));
+      expect(systemPrompt, contains('one-phrase'));
+    },
+  );
+
   test('AI review check needs a saved API key', () async {
     await harness.settings.save(
       const AppSettings(
@@ -380,6 +433,8 @@ void main() {
           .checkErrorNotes(
             question: 'Question',
             correctAnswer: 'Answer',
+            wrongAnswer: 'Wrong',
+            reasoning: 'Reason',
             bias: 'Bias',
             vaccine: 'Vaccine',
           ),

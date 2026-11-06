@@ -42,10 +42,19 @@ class LookupResult {
 }
 
 class ReviewCheckResult {
-  const ReviewCheckResult({required this.consistent, required this.feedback});
+  const ReviewCheckResult({
+    required this.consistent,
+    required this.feedback,
+    this.biasSuggestion = '',
+    this.vaccineSuggestion = '',
+  });
 
   final bool consistent;
   final String feedback;
+
+  /// Short one-phrase rewrites the learner can apply to each field.
+  final String biasSuggestion;
+  final String vaccineSuggestion;
 }
 
 class LookupService {
@@ -286,6 +295,8 @@ class LookupService {
   Future<ReviewCheckResult> checkErrorNotes({
     required String question,
     required String correctAnswer,
+    required String wrongAnswer,
+    required String reasoning,
     required String bias,
     required String vaccine,
   }) async {
@@ -295,16 +306,24 @@ class LookupService {
       throw const LookupException('No API key saved. Add one in Settings.');
     }
     const systemPrompt =
-        "You check a learner's error analysis for a study app. Decide whether "
-        'the flawed assumption explains the wrong answer and whether the '
-        'prevention note is a concrete rule or check. Answer with exactly one '
-        'JSON object: {"consistent":true,"feedback":"..."}. Set consistent to '
-        'false when the notes are vague, merely restate the mistake, or do not '
-        'match the question. Keep feedback under 45 words and do not add '
-        'markdown or extra keys.';
+        "You review a learner's error analysis for a study app. Focus on the "
+        "learner's own reasoning and flawed assumption, not on the question's "
+        'explanation: the explanation says why an answer is correct, but the '
+        'learner may have failed for a different reason. Infer how that '
+        'reasoning led to the wrong answer, then judge whether the flawed '
+        'assumption names that error and whether the prevention note is a '
+        'concrete rule or check derived from it. Answer with exactly one JSON '
+        'object: {"consistent":true,"feedback":"...","bias":"...",'
+        '"vaccine":"..."}. The bias and vaccine values are short one-phrase '
+        "suggestions (12 words or fewer) that could replace the learner's "
+        'notes. Set consistent to false when the notes are vague, merely '
+        'restate the mistake, or do not match the learner reasoning. Keep '
+        'feedback under 45 words and do not add markdown or extra keys.';
     final userPrompt =
         'Question: $question\n'
         'Correct answer: $correctAnswer\n'
+        'Chosen wrong answer: $wrongAnswer\n'
+        'Learner reasoning: ${reasoning.trim().isEmpty ? '(not written)' : reasoning}\n'
         'Flawed assumption: $bias\n'
         'Prevention note: $vaccine';
     final content = await _requestAi(
@@ -320,7 +339,12 @@ class LookupService {
       if (consistent is! bool || feedback.isEmpty) {
         throw const FormatException('Missing review verdict');
       }
-      return ReviewCheckResult(consistent: consistent, feedback: feedback);
+      return ReviewCheckResult(
+        consistent: consistent,
+        feedback: feedback,
+        biasSuggestion: (payload['bias'] as String? ?? '').trim(),
+        vaccineSuggestion: (payload['vaccine'] as String? ?? '').trim(),
+      );
     } on Object {
       throw const LookupException(
         'The AI returned an invalid review. Try again.',

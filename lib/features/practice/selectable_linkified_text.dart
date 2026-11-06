@@ -12,6 +12,7 @@ class SelectableLinkifiedText extends StatefulWidget {
     required this.onDefine,
     required this.onOpenUrl,
     this.onHighlight,
+    this.onAsk,
     this.highlights = const [],
     this.selectable = true,
     super.key,
@@ -24,6 +25,9 @@ class SelectableLinkifiedText extends StatefulWidget {
 
   /// Saves the selected phrase as a highlight.
   final Future<void> Function(String selection, Rect? anchor)? onHighlight;
+
+  /// Asks the configured AI about the selected phrase.
+  final Future<void> Function(String selection, Rect? anchor)? onAsk;
 
   /// Phrases painted with a highlight background inside [text].
   final List<String> highlights;
@@ -155,6 +159,24 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
                       state.contextMenuAnchors.primaryAnchor.dy,
                       0,
                       0,
+                    ),
+                  );
+                },
+              ),
+            if (selected.isNotEmpty && widget.onAsk != null)
+              ContextMenuButtonItem(
+                label: 'Ask',
+                onPressed: () {
+                  state.hideToolbar();
+                  unawaited(
+                    widget.onAsk!(
+                      selected,
+                      Rect.fromLTWH(
+                        state.contextMenuAnchors.primaryAnchor.dx,
+                        state.contextMenuAnchors.primaryAnchor.dy,
+                        0,
+                        0,
+                      ),
                     ),
                   );
                 },

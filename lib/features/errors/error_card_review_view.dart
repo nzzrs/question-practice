@@ -6,6 +6,7 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../../app/providers.dart';
 import '../lookup/domain/lookup_service.dart';
+import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
 
@@ -45,6 +46,18 @@ class ErrorCardReviewView extends ConsumerWidget {
 
     void openUrl(String value) => openStudyUrl(context, ref, value);
 
+    Future<void> ask(String selection, Rect? anchor) {
+      return showAskAboutSelection(
+        context,
+        selection: selection,
+        question: card.question,
+        topicName: card.topicName,
+        practiceName: card.practiceName,
+        sessionId: card.sessionId,
+        questionId: card.questionId,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -60,6 +73,7 @@ class ErrorCardReviewView extends ConsumerWidget {
                 ),
                 onDefine: define,
                 onOpenUrl: openUrl,
+                onAsk: ask,
               ),
               const SizedBox(height: 12),
               _AnswerBox(
@@ -69,6 +83,7 @@ class ErrorCardReviewView extends ConsumerWidget {
                 foreground: theme.colorScheme.onErrorContainer,
                 onDefine: define,
                 onOpenUrl: openUrl,
+                onAsk: ask,
               ),
               const SizedBox(height: 8),
               _AnswerBox(
@@ -78,6 +93,7 @@ class ErrorCardReviewView extends ConsumerWidget {
                 foreground: AppSuccess.onContainer(context),
                 onDefine: define,
                 onOpenUrl: openUrl,
+                onAsk: ask,
               ),
               if (card.reasoning.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -95,6 +111,7 @@ class ErrorCardReviewView extends ConsumerWidget {
                   ),
                   onDefine: define,
                   onOpenUrl: openUrl,
+                  onAsk: ask,
                 ),
               ],
               if (card.topicName.isNotEmpty) ...[
@@ -107,7 +124,12 @@ class ErrorCardReviewView extends ConsumerWidget {
         if (card.explanation.isNotEmpty ||
             card.alternativeExplanations.isNotEmpty) ...[
           const SizedBox(height: 12),
-          _ExplanationBox(card: card, onDefine: define, onOpenUrl: openUrl),
+          _ExplanationBox(
+            card: card,
+            onDefine: define,
+            onOpenUrl: openUrl,
+            onAsk: ask,
+          ),
         ],
         const SizedBox(height: 8),
         Padding(
@@ -364,11 +386,13 @@ class _ExplanationBox extends StatelessWidget {
     required this.card,
     required this.onDefine,
     required this.onOpenUrl,
+    required this.onAsk,
   });
 
   final ErrorCard card;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
+  final Future<void> Function(String, Rect?) onAsk;
 
   @override
   Widget build(BuildContext context) {
@@ -402,6 +426,7 @@ class _ExplanationBox extends StatelessWidget {
               style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
               onDefine: onDefine,
               onOpenUrl: onOpenUrl,
+              onAsk: onAsk,
             ),
           ],
           if (hasExplanations) ...[
@@ -426,6 +451,7 @@ class _ExplanationBox extends StatelessWidget {
                   isWrong: card.wrongIndexes.contains(index),
                   onDefine: onDefine,
                   onOpenUrl: onOpenUrl,
+                  onAsk: onAsk,
                 ),
           ],
         ],
@@ -443,6 +469,7 @@ class _AlternativeExplanation extends StatefulWidget {
     required this.isWrong,
     required this.onDefine,
     required this.onOpenUrl,
+    required this.onAsk,
   });
 
   final int index;
@@ -452,6 +479,7 @@ class _AlternativeExplanation extends StatefulWidget {
   final bool isWrong;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
+  final Future<void> Function(String, Rect?) onAsk;
 
   @override
   State<_AlternativeExplanation> createState() =>
@@ -513,6 +541,7 @@ class _AlternativeExplanationState extends State<_AlternativeExplanation> {
                   ),
                   onDefine: widget.onDefine,
                   onOpenUrl: widget.onOpenUrl,
+                  onAsk: widget.onAsk,
                 ),
                 if (_open) ...[
                   const SizedBox(height: 2),
@@ -524,6 +553,7 @@ class _AlternativeExplanationState extends State<_AlternativeExplanation> {
                     ),
                     onDefine: widget.onDefine,
                     onOpenUrl: widget.onOpenUrl,
+                    onAsk: widget.onAsk,
                   ),
                 ],
               ],
@@ -599,6 +629,7 @@ class _AnswerBox extends StatelessWidget {
     required this.foreground,
     required this.onDefine,
     required this.onOpenUrl,
+    required this.onAsk,
   });
 
   final String label;
@@ -607,6 +638,7 @@ class _AnswerBox extends StatelessWidget {
   final Color foreground;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
+  final Future<void> Function(String, Rect?) onAsk;
 
   @override
   Widget build(BuildContext context) {
@@ -636,6 +668,7 @@ class _AnswerBox extends StatelessWidget {
             ),
             onDefine: onDefine,
             onOpenUrl: onOpenUrl,
+            onAsk: onAsk,
           ),
         ],
       ),

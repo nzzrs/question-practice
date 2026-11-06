@@ -21,12 +21,16 @@ class SkippedReviewStep extends ReviewStep {
     required this.topicName,
     required this.practiceName,
     required this.reasoning,
+    this.unknown = false,
   });
 
   final Question question;
   final String topicName;
   final String practiceName;
   final String reasoning;
+
+  /// The learner marked the answer as "I didn't know this".
+  final bool unknown;
 }
 
 class ConceptDefinitionStep extends ReviewStep {
@@ -93,6 +97,7 @@ class ReviewService {
                 : topicNames[practice.topicId] ?? '',
             practiceName: practice?.name ?? '',
             reasoning: attempt.reasoning,
+            unknown: attempt.unknown,
           ),
         );
       } else if (!attempt.isCorrect && !attempt.distracted) {

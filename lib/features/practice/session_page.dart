@@ -10,6 +10,7 @@ import '../../core/domain/models.dart';
 import '../../core/platform/practice_sound_player.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/lookup_actions.dart';
+import '../lookup/ask_sheet.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/selectable_linkified_text.dart';
 import '../practice/summary_page.dart';
@@ -532,6 +533,20 @@ class _SessionPageState extends ConsumerState<SessionPage>
     return openStudyUrl(context, ref, value);
   }
 
+  Future<void> _openAsk(String selection, Rect? anchor) async {
+    final item = _item;
+    if (item == null) return;
+    await showAskAboutSelection(
+      context,
+      selection: selection,
+      question: item.question.prompt,
+      topicName: item.topicName,
+      practiceName: item.practiceName,
+      sessionId: _start.session.id,
+      questionId: item.question.id,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = _item;
@@ -635,6 +650,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   onDefine: _openLookup,
                   onOpenUrl: _openUrl,
                   onHighlight: _addHighlight,
+                  onAsk: _openAsk,
                   highlights:
                       _highlights[item.question.id]?.toList() ?? const [],
                 ),
@@ -681,6 +697,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
                       onDefine: _openLookup,
                       onOpenUrl: _openUrl,
                       onHighlight: _addHighlight,
+                      onAsk: _openAsk,
                       highlights:
                           _highlights[item.question.id]?.toList() ?? const [],
                       onPressed: _submitted
@@ -1126,6 +1143,7 @@ class _OptionCard extends StatefulWidget {
     required this.onDefine,
     required this.onOpenUrl,
     required this.onHighlight,
+    required this.onAsk,
     required this.highlights,
     required this.onPressed,
     super.key,
@@ -1142,6 +1160,7 @@ class _OptionCard extends StatefulWidget {
   final void Function(String selection, Rect? anchor) onDefine;
   final ValueChanged<String> onOpenUrl;
   final Future<void> Function(String selection, Rect? anchor) onHighlight;
+  final Future<void> Function(String selection, Rect? anchor) onAsk;
   final List<String> highlights;
   final VoidCallback? onPressed;
 
@@ -1310,6 +1329,7 @@ class _OptionCardState extends State<_OptionCard> {
                           onDefine: widget.onDefine,
                           onOpenUrl: widget.onOpenUrl,
                           onHighlight: widget.onHighlight,
+                          onAsk: widget.onAsk,
                           highlights: widget.highlights,
                         ),
                         if (widget.submitted &&
@@ -1325,6 +1345,7 @@ class _OptionCardState extends State<_OptionCard> {
                             onDefine: widget.onDefine,
                             onOpenUrl: widget.onOpenUrl,
                             onHighlight: widget.onHighlight,
+                            onAsk: widget.onAsk,
                             highlights: widget.highlights,
                           ),
                         ],

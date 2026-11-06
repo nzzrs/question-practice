@@ -190,6 +190,64 @@ class LookupService {
     )).definition;
   }
 
+  /// Answers a free-form question about [selection] with question context.
+  Future<String> ask({
+    required String selection,
+    required String question,
+    required String topicName,
+    required String userQuestion,
+  }) async {
+    final passage = selection.trim();
+    final ask = userQuestion.trim();
+    if (passage.isEmpty) {
+      throw const LookupException('Select a word or phrase first.');
+    }
+    if (ask.isEmpty) {
+      throw const LookupException('Write a question first.');
+    }
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'Ask needs an AI provider. Add an API key in Settings.',
+      );
+    }
+    const systemPrompt =
+        "You answer a learner's question about a highlighted passage in a "
+        'study app. Use the highlighted passage, the question around it and '
+        'the topic. Be accurate and concise: at most 90 words, plain text, no '
+        'markdown. If the passage does not contain the answer, say so and give '
+        'a short, grounded explanation.';
+    final userPrompt =
+        'Topic: $topicName\n'
+        'Question context: $question\n'
+        'Highlighted passage: $passage\n'
+        'Learner question: $ask';
+    final content = await _requestAi(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      jsonMode: false,
+    );
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) {
+      throw const LookupException('The AI returned an empty answer.');
+    }
+    if (trimmed.startsWith('{')) {
+      try {
+        final payload = _decodeObject(trimmed);
+        final answer = payload['answer'] ?? payload['text'];
+        if (answer is String && answer.trim().isNotEmpty) {
+          return answer.trim();
+        }
+      } on Object {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+
   Future<List<String>> listModels({
     required AiProvider provider,
     required String baseUrl,
@@ -409,6 +467,7 @@ class LookupService {
     required String apiKey,
     required String systemPrompt,
     required String userPrompt,
+    bool jsonMode = true,
   }) async {
     final model = settings.aiModel.trim();
     if (model.isEmpty) {
@@ -454,13 +513,13 @@ class LookupService {
             ],
             'generationConfig': {
               'temperature': 0.2,
-              'responseMimeType': 'application/json',
+              if (jsonMode) 'responseMimeType': 'application/json',
             },
           }
         : <String, dynamic>{
             'model': model,
             'temperature': 0.2,
-            'response_format': {'type': 'json_object'},
+            if (jsonMode) 'response_format': {'type': 'json_object'},
             'messages': [
               {'role': 'system', 'content': systemPrompt},
               {'role': 'user', 'content': userPrompt},

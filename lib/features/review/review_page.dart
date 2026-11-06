@@ -26,6 +26,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   Object? _error;
   int _index = 0;
   int _created = 0;
+  int _kept = 0;
   bool _busy = false;
   bool _finished = false;
 
@@ -198,6 +199,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     setState(() => _busy = true);
     try {
       await ref.read(reviewServiceProvider).keepHighlight(step.highlight.id);
+      _kept++;
       _advance();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -291,15 +293,15 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           Center(child: IconBadge(Icons.check_circle_outline, size: 72)),
           const SizedBox(height: 16),
           Text(
-            _created == 0 ? 'Review closed' : 'Review complete',
+            _created == 0 && _kept == 0 ? 'Review closed' : 'Review complete',
             textAlign: TextAlign.center,
             style: theme.typography.emphasized.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
-            _created == 0
+            _created == 0 && _kept == 0
                 ? 'No card details were saved.'
-                : '$_created card${_created == 1 ? '' : 's'} completed or created. You can finish missing details later in Cards.',
+                : '${[if (_created > 0) '$_created card${_created == 1 ? '' : 's'} completed or created', if (_kept > 0) '$_kept highlight${_kept == 1 ? '' : 's'} kept'].join(' and ')}. You can finish missing details later in Cards.',
             textAlign: TextAlign.center,
             style: theme.typography.baseline.bodyMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,

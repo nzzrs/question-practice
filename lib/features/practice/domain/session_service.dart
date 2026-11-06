@@ -332,8 +332,35 @@ class SessionService {
     }
 
     start.attempts[item.question.id] = attempt;
+    await _trackSkipped(start, item, attempt);
     final summary = await completeIfReady(session.id);
     return AnswerOutcome(attempt: attempt, summary: summary);
+  }
+
+  /// Keeps the persistent skipped-question queue in step with an answer.
+  Future<void> _trackSkipped(
+    SessionStart start,
+    SessionQuestionItem item,
+    Attempt attempt,
+  ) async {
+    if (!attempt.isSkipped) {
+      await _cards.clearSkippedQuestion(start.session.id, item.question.id);
+      return;
+    }
+    await _cards.saveSkippedQuestion(
+      sessionId: start.session.id,
+      questionId: item.question.id,
+      question: item.question.prompt,
+      alternatives: item.question.alternatives,
+      correctIndexes: item.question.correctIndexes,
+      explanation: item.question.explanation,
+      alternativeExplanations: item.question.alternativeExplanations,
+      reasoning: attempt.reasoning,
+      topicName: item.topicName,
+      practiceName: item.practiceName,
+      unknown: attempt.unknown,
+      createdAt: attempt.answeredAt,
+    );
   }
 
   /// Updates the note left on an answered question.
@@ -359,6 +386,11 @@ class SessionService {
     if (card != null && card.sessionId == start.session.id) {
       await _cards.updateErrorCardReasoning(card.id, trimmed);
     }
+    await _cards.updateSkippedReasoning(
+      start.session.id,
+      item.question.id,
+      trimmed,
+    );
     final updated = await _sessions.attemptForQuestion(
       start.session.id,
       item.question.id,
@@ -428,6 +460,7 @@ class SessionService {
       session.id,
       item.question.id,
     );
+    await _trackSkipped(start, item, updated ?? attempt);
     return updated ?? attempt;
   }
 
@@ -497,6 +530,7 @@ class SessionService {
       session.id,
       item.question.id,
     );
+    await _trackSkipped(start, item, updated ?? attempt);
     return updated ?? attempt;
   }
 
@@ -567,6 +601,7 @@ class SessionService {
           answeredAt: now,
         );
         start.attempts[item.question.id] = attempt;
+        await _trackSkipped(start, item, attempt);
       }
     }
     final attempts = await _sessions.attemptsForSession(session.id);

@@ -20,6 +20,7 @@ part 'app_database.g.dart';
     Concepts,
     ErrorCards,
     ManualCards,
+    SkippedQuestions,
     Settings,
   ],
   daos: [TopicDao, SessionDao, CardDao, StatsDao, SettingsDao],
@@ -28,7 +29,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -77,6 +78,11 @@ class AppDatabase extends _$AppDatabase {
         await migrator.addColumn(attempts, attempts.unknown);
         await migrator.addColumn(concepts, concepts.extra);
       }
+      if (from < 7) {
+        await migrator.addColumn(manualCards, manualCards.questionId);
+        await migrator.addColumn(manualCards, manualCards.context);
+        await migrator.createTable(skippedQuestions);
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
@@ -88,6 +94,7 @@ class AppDatabase extends _$AppDatabase {
       await delete(attempts).go();
       await delete(concepts).go();
       await delete(manualCards).go();
+      await delete(skippedQuestions).go();
       await delete(errorCards).go();
       await delete(sessionQuestions).go();
       await delete(sessions).go();

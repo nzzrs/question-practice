@@ -196,16 +196,117 @@ class CardRepository {
     required String answer,
     required String topicName,
     required DateTime createdAt,
+    int? questionId,
+    String context = '',
   }) {
     return _db.cardDao.insertManualCard(
       ManualCardsCompanion.insert(
         sessionId: Value(sessionId),
+        questionId: Value(questionId),
         question: question,
         answer: answer,
+        context: Value(context),
         topicName: Value(topicName),
         createdAt: createdAt,
       ),
     );
+  }
+
+  Stream<List<SkippedQuestion>> watchUnhandledSkippedQuestions() {
+    return _db.cardDao.watchUnhandledSkippedQuestions().map(
+      (rows) => rows.map(skippedQuestionFromRow).toList(),
+    );
+  }
+
+  Future<List<SkippedQuestion>> skippedQuestionsForSession(
+    int sessionId,
+  ) async {
+    final rows = await _db.cardDao.skippedQuestionsForSession(sessionId);
+    return rows.map(skippedQuestionFromRow).toList();
+  }
+
+  /// Stores a skipped or "I didn't know this" answer for later card making.
+  ///
+  /// Re-skipping the same question in the same session reopens the existing
+  /// record, so toggling "I didn't know this" never leaves duplicates.
+  Future<int> saveSkippedQuestion({
+    required int? sessionId,
+    required int questionId,
+    required String question,
+    required List<String> alternatives,
+    required List<int> correctIndexes,
+    required String explanation,
+    required List<String> alternativeExplanations,
+    required String reasoning,
+    required String topicName,
+    required String practiceName,
+    required bool unknown,
+    required DateTime createdAt,
+  }) async {
+    if (sessionId != null) {
+      final existing = await _db.cardDao.skippedQuestionFor(
+        sessionId,
+        questionId,
+      );
+      if (existing != null) {
+        await _db.cardDao.updateSkippedQuestion(
+          existing.id,
+          reasoning: reasoning,
+          unknown: unknown,
+          createdAt: createdAt,
+        );
+        return existing.id;
+      }
+    }
+    return _db.cardDao.insertSkippedQuestion(
+      SkippedQuestionsCompanion.insert(
+        sessionId: Value(sessionId),
+        questionId: questionId,
+        question: question,
+        alternativesJson: encodeStringList(alternatives),
+        correctIndexesJson: Value(encodeIntList(correctIndexes)),
+        explanation: Value(explanation),
+        alternativeExplanationsJson: Value(
+          encodeStringList(alternativeExplanations),
+        ),
+        reasoning: Value(reasoning),
+        topicName: Value(topicName),
+        practiceName: Value(practiceName),
+        unknown: Value(unknown),
+        createdAt: createdAt,
+      ),
+    );
+  }
+
+  Future<void> updateSkippedReasoning(
+    int sessionId,
+    int questionId,
+    String reasoning,
+  ) async {
+    final existing = await _db.cardDao.skippedQuestionFor(
+      sessionId,
+      questionId,
+    );
+    if (existing == null) return;
+    await _db.cardDao.updateSkippedQuestion(
+      existing.id,
+      reasoning: reasoning,
+      unknown: existing.unknown,
+      createdAt: existing.createdAt,
+    );
+  }
+
+  Future<void> markSkippedHandled(int id, String kind, DateTime handledAt) {
+    return _db.cardDao.markSkippedQuestionHandled(id, handledAt, kind);
+  }
+
+  Future<void> clearSkippedQuestion(int sessionId, int questionId) async {
+    final existing = await _db.cardDao.skippedQuestionFor(
+      sessionId,
+      questionId,
+    );
+    if (existing == null) return;
+    await _db.cardDao.deleteSkippedQuestion(existing.id);
   }
 
   Future<void> markExported({

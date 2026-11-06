@@ -7,7 +7,9 @@ import '../tables.dart';
 
 part 'card_dao.g.dart';
 
-@DriftAccessor(tables: [Concepts, ErrorCards, ManualCards, SkippedQuestions])
+@DriftAccessor(
+  tables: [Concepts, ErrorCards, ManualCards, SkippedQuestions, Highlights],
+)
 class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   CardDao(super.db);
 
@@ -275,6 +277,46 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
 
   Future<void> deleteSkippedQuestion(int id) {
     return (delete(skippedQuestions)..where((s) => s.id.equals(id))).go();
+  }
+
+  Future<int> insertHighlight(HighlightsCompanion highlight) {
+    return into(highlights).insert(highlight);
+  }
+
+  Stream<List<HighlightRow>> watchHighlights() {
+    return (select(
+      highlights,
+    )..orderBy([(h) => OrderingTerm.desc(h.createdAt)])).watch();
+  }
+
+  Future<List<HighlightRow>> highlightsForSession(int sessionId) {
+    return (select(highlights)
+          ..where((h) => h.sessionId.equals(sessionId))
+          ..orderBy([(h) => OrderingTerm.asc(h.id)]))
+        .get();
+  }
+
+  Future<void> markHighlightKept(int id, DateTime keptAt) {
+    return (update(highlights)..where((h) => h.id.equals(id))).write(
+      HighlightsCompanion(keptAt: Value(keptAt)),
+    );
+  }
+
+  Future<void> markHighlightConverted(
+    int id, {
+    required DateTime cardCreatedAt,
+    int? manualCardId,
+  }) {
+    return (update(highlights)..where((h) => h.id.equals(id))).write(
+      HighlightsCompanion(
+        cardCreatedAt: Value(cardCreatedAt),
+        manualCardId: Value(manualCardId),
+      ),
+    );
+  }
+
+  Future<void> deleteHighlight(int id) {
+    return (delete(highlights)..where((h) => h.id.equals(id))).go();
   }
 
   Future<void> markManualCardsExported(

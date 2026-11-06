@@ -185,6 +185,22 @@ SkippedQuestion skippedQuestionFromRow(SkippedQuestionRow row) {
   );
 }
 
+StudyHighlight highlightFromRow(HighlightRow row) {
+  return StudyHighlight(
+    id: row.id,
+    sessionId: row.sessionId,
+    questionId: row.questionId,
+    text: row.phrase,
+    context: row.context,
+    topicName: row.topicName,
+    practiceName: row.practiceName,
+    createdAt: row.createdAt.toUtc(),
+    keptAt: row.keptAt?.toUtc(),
+    cardCreatedAt: row.cardCreatedAt?.toUtc(),
+    manualCardId: row.manualCardId,
+  );
+}
+
 TopicSummary topicSummaryFromRow(TopicSummaryRow row) {
   return TopicSummary(
     topic: Topic(

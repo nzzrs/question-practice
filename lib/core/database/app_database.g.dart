@@ -6137,6 +6137,676 @@ class SkippedQuestionsCompanion extends UpdateCompanion<SkippedQuestionRow> {
   }
 }
 
+class $HighlightsTable extends Highlights
+    with TableInfo<$HighlightsTable, HighlightRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $HighlightsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _sessionIdMeta = const VerificationMeta(
+    'sessionId',
+  );
+  @override
+  late final GeneratedColumn<int> sessionId = GeneratedColumn<int>(
+    'session_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES sessions (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _questionIdMeta = const VerificationMeta(
+    'questionId',
+  );
+  @override
+  late final GeneratedColumn<int> questionId = GeneratedColumn<int>(
+    'question_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES questions (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _phraseMeta = const VerificationMeta('phrase');
+  @override
+  late final GeneratedColumn<String> phrase = GeneratedColumn<String>(
+    'phrase',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _contextMeta = const VerificationMeta(
+    'context',
+  );
+  @override
+  late final GeneratedColumn<String> context = GeneratedColumn<String>(
+    'context',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _topicNameMeta = const VerificationMeta(
+    'topicName',
+  );
+  @override
+  late final GeneratedColumn<String> topicName = GeneratedColumn<String>(
+    'topic_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _practiceNameMeta = const VerificationMeta(
+    'practiceName',
+  );
+  @override
+  late final GeneratedColumn<String> practiceName = GeneratedColumn<String>(
+    'practice_name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keptAtMeta = const VerificationMeta('keptAt');
+  @override
+  late final GeneratedColumn<DateTime> keptAt = GeneratedColumn<DateTime>(
+    'kept_at',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _cardCreatedAtMeta = const VerificationMeta(
+    'cardCreatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> cardCreatedAt =
+      GeneratedColumn<DateTime>(
+        'card_created_at',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _manualCardIdMeta = const VerificationMeta(
+    'manualCardId',
+  );
+  @override
+  late final GeneratedColumn<int> manualCardId = GeneratedColumn<int>(
+    'manual_card_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES manual_cards (id) ON DELETE SET NULL',
+    ),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sessionId,
+    questionId,
+    phrase,
+    context,
+    topicName,
+    practiceName,
+    createdAt,
+    keptAt,
+    cardCreatedAt,
+    manualCardId,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'highlights';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<HighlightRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('session_id')) {
+      context.handle(
+        _sessionIdMeta,
+        sessionId.isAcceptableOrUnknown(data['session_id']!, _sessionIdMeta),
+      );
+    }
+    if (data.containsKey('question_id')) {
+      context.handle(
+        _questionIdMeta,
+        questionId.isAcceptableOrUnknown(data['question_id']!, _questionIdMeta),
+      );
+    }
+    if (data.containsKey('phrase')) {
+      context.handle(
+        _phraseMeta,
+        phrase.isAcceptableOrUnknown(data['phrase']!, _phraseMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_phraseMeta);
+    }
+    if (data.containsKey('context')) {
+      context.handle(
+        _contextMeta,
+        this.context.isAcceptableOrUnknown(data['context']!, _contextMeta),
+      );
+    }
+    if (data.containsKey('topic_name')) {
+      context.handle(
+        _topicNameMeta,
+        topicName.isAcceptableOrUnknown(data['topic_name']!, _topicNameMeta),
+      );
+    }
+    if (data.containsKey('practice_name')) {
+      context.handle(
+        _practiceNameMeta,
+        practiceName.isAcceptableOrUnknown(
+          data['practice_name']!,
+          _practiceNameMeta,
+        ),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('kept_at')) {
+      context.handle(
+        _keptAtMeta,
+        keptAt.isAcceptableOrUnknown(data['kept_at']!, _keptAtMeta),
+      );
+    }
+    if (data.containsKey('card_created_at')) {
+      context.handle(
+        _cardCreatedAtMeta,
+        cardCreatedAt.isAcceptableOrUnknown(
+          data['card_created_at']!,
+          _cardCreatedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('manual_card_id')) {
+      context.handle(
+        _manualCardIdMeta,
+        manualCardId.isAcceptableOrUnknown(
+          data['manual_card_id']!,
+          _manualCardIdMeta,
+        ),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  HighlightRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return HighlightRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      sessionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}session_id'],
+      ),
+      questionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}question_id'],
+      ),
+      phrase: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}phrase'],
+      )!,
+      context: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}context'],
+      )!,
+      topicName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}topic_name'],
+      )!,
+      practiceName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}practice_name'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      keptAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}kept_at'],
+      ),
+      cardCreatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}card_created_at'],
+      ),
+      manualCardId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}manual_card_id'],
+      ),
+    );
+  }
+
+  @override
+  $HighlightsTable createAlias(String alias) {
+    return $HighlightsTable(attachedDatabase, alias);
+  }
+}
+
+class HighlightRow extends DataClass implements Insertable<HighlightRow> {
+  final int id;
+  final int? sessionId;
+  final int? questionId;
+  final String phrase;
+  final String context;
+  final String topicName;
+  final String practiceName;
+  final DateTime createdAt;
+  final DateTime? keptAt;
+  final DateTime? cardCreatedAt;
+  final int? manualCardId;
+  const HighlightRow({
+    required this.id,
+    this.sessionId,
+    this.questionId,
+    required this.phrase,
+    required this.context,
+    required this.topicName,
+    required this.practiceName,
+    required this.createdAt,
+    this.keptAt,
+    this.cardCreatedAt,
+    this.manualCardId,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    if (!nullToAbsent || sessionId != null) {
+      map['session_id'] = Variable<int>(sessionId);
+    }
+    if (!nullToAbsent || questionId != null) {
+      map['question_id'] = Variable<int>(questionId);
+    }
+    map['phrase'] = Variable<String>(phrase);
+    map['context'] = Variable<String>(context);
+    map['topic_name'] = Variable<String>(topicName);
+    map['practice_name'] = Variable<String>(practiceName);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    if (!nullToAbsent || keptAt != null) {
+      map['kept_at'] = Variable<DateTime>(keptAt);
+    }
+    if (!nullToAbsent || cardCreatedAt != null) {
+      map['card_created_at'] = Variable<DateTime>(cardCreatedAt);
+    }
+    if (!nullToAbsent || manualCardId != null) {
+      map['manual_card_id'] = Variable<int>(manualCardId);
+    }
+    return map;
+  }
+
+  HighlightsCompanion toCompanion(bool nullToAbsent) {
+    return HighlightsCompanion(
+      id: Value(id),
+      sessionId: sessionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sessionId),
+      questionId: questionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(questionId),
+      phrase: Value(phrase),
+      context: Value(context),
+      topicName: Value(topicName),
+      practiceName: Value(practiceName),
+      createdAt: Value(createdAt),
+      keptAt: keptAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(keptAt),
+      cardCreatedAt: cardCreatedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(cardCreatedAt),
+      manualCardId: manualCardId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(manualCardId),
+    );
+  }
+
+  factory HighlightRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return HighlightRow(
+      id: serializer.fromJson<int>(json['id']),
+      sessionId: serializer.fromJson<int?>(json['sessionId']),
+      questionId: serializer.fromJson<int?>(json['questionId']),
+      phrase: serializer.fromJson<String>(json['phrase']),
+      context: serializer.fromJson<String>(json['context']),
+      topicName: serializer.fromJson<String>(json['topicName']),
+      practiceName: serializer.fromJson<String>(json['practiceName']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      keptAt: serializer.fromJson<DateTime?>(json['keptAt']),
+      cardCreatedAt: serializer.fromJson<DateTime?>(json['cardCreatedAt']),
+      manualCardId: serializer.fromJson<int?>(json['manualCardId']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'sessionId': serializer.toJson<int?>(sessionId),
+      'questionId': serializer.toJson<int?>(questionId),
+      'phrase': serializer.toJson<String>(phrase),
+      'context': serializer.toJson<String>(context),
+      'topicName': serializer.toJson<String>(topicName),
+      'practiceName': serializer.toJson<String>(practiceName),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'keptAt': serializer.toJson<DateTime?>(keptAt),
+      'cardCreatedAt': serializer.toJson<DateTime?>(cardCreatedAt),
+      'manualCardId': serializer.toJson<int?>(manualCardId),
+    };
+  }
+
+  HighlightRow copyWith({
+    int? id,
+    Value<int?> sessionId = const Value.absent(),
+    Value<int?> questionId = const Value.absent(),
+    String? phrase,
+    String? context,
+    String? topicName,
+    String? practiceName,
+    DateTime? createdAt,
+    Value<DateTime?> keptAt = const Value.absent(),
+    Value<DateTime?> cardCreatedAt = const Value.absent(),
+    Value<int?> manualCardId = const Value.absent(),
+  }) => HighlightRow(
+    id: id ?? this.id,
+    sessionId: sessionId.present ? sessionId.value : this.sessionId,
+    questionId: questionId.present ? questionId.value : this.questionId,
+    phrase: phrase ?? this.phrase,
+    context: context ?? this.context,
+    topicName: topicName ?? this.topicName,
+    practiceName: practiceName ?? this.practiceName,
+    createdAt: createdAt ?? this.createdAt,
+    keptAt: keptAt.present ? keptAt.value : this.keptAt,
+    cardCreatedAt: cardCreatedAt.present
+        ? cardCreatedAt.value
+        : this.cardCreatedAt,
+    manualCardId: manualCardId.present ? manualCardId.value : this.manualCardId,
+  );
+  HighlightRow copyWithCompanion(HighlightsCompanion data) {
+    return HighlightRow(
+      id: data.id.present ? data.id.value : this.id,
+      sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
+      questionId: data.questionId.present
+          ? data.questionId.value
+          : this.questionId,
+      phrase: data.phrase.present ? data.phrase.value : this.phrase,
+      context: data.context.present ? data.context.value : this.context,
+      topicName: data.topicName.present ? data.topicName.value : this.topicName,
+      practiceName: data.practiceName.present
+          ? data.practiceName.value
+          : this.practiceName,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      keptAt: data.keptAt.present ? data.keptAt.value : this.keptAt,
+      cardCreatedAt: data.cardCreatedAt.present
+          ? data.cardCreatedAt.value
+          : this.cardCreatedAt,
+      manualCardId: data.manualCardId.present
+          ? data.manualCardId.value
+          : this.manualCardId,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HighlightRow(')
+          ..write('id: $id, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('questionId: $questionId, ')
+          ..write('phrase: $phrase, ')
+          ..write('context: $context, ')
+          ..write('topicName: $topicName, ')
+          ..write('practiceName: $practiceName, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('keptAt: $keptAt, ')
+          ..write('cardCreatedAt: $cardCreatedAt, ')
+          ..write('manualCardId: $manualCardId')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    sessionId,
+    questionId,
+    phrase,
+    context,
+    topicName,
+    practiceName,
+    createdAt,
+    keptAt,
+    cardCreatedAt,
+    manualCardId,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is HighlightRow &&
+          other.id == this.id &&
+          other.sessionId == this.sessionId &&
+          other.questionId == this.questionId &&
+          other.phrase == this.phrase &&
+          other.context == this.context &&
+          other.topicName == this.topicName &&
+          other.practiceName == this.practiceName &&
+          other.createdAt == this.createdAt &&
+          other.keptAt == this.keptAt &&
+          other.cardCreatedAt == this.cardCreatedAt &&
+          other.manualCardId == this.manualCardId);
+}
+
+class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
+  final Value<int> id;
+  final Value<int?> sessionId;
+  final Value<int?> questionId;
+  final Value<String> phrase;
+  final Value<String> context;
+  final Value<String> topicName;
+  final Value<String> practiceName;
+  final Value<DateTime> createdAt;
+  final Value<DateTime?> keptAt;
+  final Value<DateTime?> cardCreatedAt;
+  final Value<int?> manualCardId;
+  const HighlightsCompanion({
+    this.id = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.questionId = const Value.absent(),
+    this.phrase = const Value.absent(),
+    this.context = const Value.absent(),
+    this.topicName = const Value.absent(),
+    this.practiceName = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.keptAt = const Value.absent(),
+    this.cardCreatedAt = const Value.absent(),
+    this.manualCardId = const Value.absent(),
+  });
+  HighlightsCompanion.insert({
+    this.id = const Value.absent(),
+    this.sessionId = const Value.absent(),
+    this.questionId = const Value.absent(),
+    required String phrase,
+    this.context = const Value.absent(),
+    this.topicName = const Value.absent(),
+    this.practiceName = const Value.absent(),
+    required DateTime createdAt,
+    this.keptAt = const Value.absent(),
+    this.cardCreatedAt = const Value.absent(),
+    this.manualCardId = const Value.absent(),
+  }) : phrase = Value(phrase),
+       createdAt = Value(createdAt);
+  static Insertable<HighlightRow> custom({
+    Expression<int>? id,
+    Expression<int>? sessionId,
+    Expression<int>? questionId,
+    Expression<String>? phrase,
+    Expression<String>? context,
+    Expression<String>? topicName,
+    Expression<String>? practiceName,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? keptAt,
+    Expression<DateTime>? cardCreatedAt,
+    Expression<int>? manualCardId,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sessionId != null) 'session_id': sessionId,
+      if (questionId != null) 'question_id': questionId,
+      if (phrase != null) 'phrase': phrase,
+      if (context != null) 'context': context,
+      if (topicName != null) 'topic_name': topicName,
+      if (practiceName != null) 'practice_name': practiceName,
+      if (createdAt != null) 'created_at': createdAt,
+      if (keptAt != null) 'kept_at': keptAt,
+      if (cardCreatedAt != null) 'card_created_at': cardCreatedAt,
+      if (manualCardId != null) 'manual_card_id': manualCardId,
+    });
+  }
+
+  HighlightsCompanion copyWith({
+    Value<int>? id,
+    Value<int?>? sessionId,
+    Value<int?>? questionId,
+    Value<String>? phrase,
+    Value<String>? context,
+    Value<String>? topicName,
+    Value<String>? practiceName,
+    Value<DateTime>? createdAt,
+    Value<DateTime?>? keptAt,
+    Value<DateTime?>? cardCreatedAt,
+    Value<int?>? manualCardId,
+  }) {
+    return HighlightsCompanion(
+      id: id ?? this.id,
+      sessionId: sessionId ?? this.sessionId,
+      questionId: questionId ?? this.questionId,
+      phrase: phrase ?? this.phrase,
+      context: context ?? this.context,
+      topicName: topicName ?? this.topicName,
+      practiceName: practiceName ?? this.practiceName,
+      createdAt: createdAt ?? this.createdAt,
+      keptAt: keptAt ?? this.keptAt,
+      cardCreatedAt: cardCreatedAt ?? this.cardCreatedAt,
+      manualCardId: manualCardId ?? this.manualCardId,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (sessionId.present) {
+      map['session_id'] = Variable<int>(sessionId.value);
+    }
+    if (questionId.present) {
+      map['question_id'] = Variable<int>(questionId.value);
+    }
+    if (phrase.present) {
+      map['phrase'] = Variable<String>(phrase.value);
+    }
+    if (context.present) {
+      map['context'] = Variable<String>(context.value);
+    }
+    if (topicName.present) {
+      map['topic_name'] = Variable<String>(topicName.value);
+    }
+    if (practiceName.present) {
+      map['practice_name'] = Variable<String>(practiceName.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (keptAt.present) {
+      map['kept_at'] = Variable<DateTime>(keptAt.value);
+    }
+    if (cardCreatedAt.present) {
+      map['card_created_at'] = Variable<DateTime>(cardCreatedAt.value);
+    }
+    if (manualCardId.present) {
+      map['manual_card_id'] = Variable<int>(manualCardId.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('HighlightsCompanion(')
+          ..write('id: $id, ')
+          ..write('sessionId: $sessionId, ')
+          ..write('questionId: $questionId, ')
+          ..write('phrase: $phrase, ')
+          ..write('context: $context, ')
+          ..write('topicName: $topicName, ')
+          ..write('practiceName: $practiceName, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('keptAt: $keptAt, ')
+          ..write('cardCreatedAt: $cardCreatedAt, ')
+          ..write('manualCardId: $manualCardId')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $SettingsTable extends Settings
     with TableInfo<$SettingsTable, SettingRow> {
   @override
@@ -6362,6 +7032,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SkippedQuestionsTable skippedQuestions = $SkippedQuestionsTable(
     this,
   );
+  late final $HighlightsTable highlights = $HighlightsTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
   late final Index practicesTopic = Index(
     'practices_topic',
@@ -6419,6 +7090,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'skipped_questions_session',
     'CREATE INDEX skipped_questions_session ON skipped_questions (session_id)',
   );
+  late final Index highlightsSession = Index(
+    'highlights_session',
+    'CREATE INDEX highlights_session ON highlights (session_id)',
+  );
+  late final Index highlightsQuestion = Index(
+    'highlights_question',
+    'CREATE INDEX highlights_question ON highlights (question_id)',
+  );
   late final TopicDao topicDao = TopicDao(this as AppDatabase);
   late final SessionDao sessionDao = SessionDao(this as AppDatabase);
   late final CardDao cardDao = CardDao(this as AppDatabase);
@@ -6439,6 +7118,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     errorCards,
     manualCards,
     skippedQuestions,
+    highlights,
     settings,
     practicesTopic,
     questionsPractice,
@@ -6454,6 +7134,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     manualCardsExported,
     skippedQuestionsHandled,
     skippedQuestionsSession,
+    highlightsSession,
+    highlightsQuestion,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -6561,6 +7243,27 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('skipped_questions', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'sessions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('highlights', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'questions',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('highlights', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'manual_cards',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('highlights', kind: UpdateKind.update)],
     ),
   ]);
 }
@@ -7569,6 +8272,24 @@ final class $$QuestionsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$HighlightsTable, List<HighlightRow>>
+  _highlightsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.highlights,
+    aliasName: 'questions__id__highlights__question_id',
+  );
+
+  $$HighlightsTableProcessedTableManager get highlightsRefs {
+    final manager = $$HighlightsTableTableManager(
+      $_db,
+      $_db.highlights,
+    ).filter((f) => f.questionId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_highlightsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$QuestionsTableFilterComposer
@@ -7779,6 +8500,31 @@ class $$QuestionsTableFilterComposer
           }) => $$SkippedQuestionsTableFilterComposer(
             $db: $db,
             $table: $db.skippedQuestions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> highlightsRefs(
+    Expression<bool> Function($$HighlightsTableFilterComposer f) f,
+  ) {
+    final $$HighlightsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.highlights,
+      getReferencedColumn: (t) => t.questionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HighlightsTableFilterComposer(
+            $db: $db,
+            $table: $db.highlights,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -8067,6 +8813,31 @@ class $$QuestionsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> highlightsRefs<T extends Object>(
+    Expression<T> Function($$HighlightsTableAnnotationComposer a) f,
+  ) {
+    final $$HighlightsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.highlights,
+      getReferencedColumn: (t) => t.questionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HighlightsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.highlights,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$QuestionsTableTableManager
@@ -8090,6 +8861,7 @@ class $$QuestionsTableTableManager
             bool errorCardsRefs,
             bool manualCardsRefs,
             bool skippedQuestionsRefs,
+            bool highlightsRefs,
           })
         > {
   $$QuestionsTableTableManager(_$AppDatabase db, $QuestionsTable table)
@@ -8161,6 +8933,7 @@ class $$QuestionsTableTableManager
                 errorCardsRefs = false,
                 manualCardsRefs = false,
                 skippedQuestionsRefs = false,
+                highlightsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -8171,6 +8944,7 @@ class $$QuestionsTableTableManager
                     if (errorCardsRefs) db.errorCards,
                     if (manualCardsRefs) db.manualCards,
                     if (skippedQuestionsRefs) db.skippedQuestions,
+                    if (highlightsRefs) db.highlights,
                   ],
                   addJoins:
                       <
@@ -8324,6 +9098,26 @@ class $$QuestionsTableTableManager
                           referencedColumn: 'question_id',
                           typedResults: items,
                         ),
+                      if (highlightsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          QuestionRow,
+                          $QuestionsTable,
+                          HighlightRow,
+                          $HighlightsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$QuestionsTableReferences
+                              ._highlightsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$QuestionsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).highlightsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'question_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -8352,6 +9146,7 @@ typedef $$QuestionsTableProcessedTableManager =
         bool errorCardsRefs,
         bool manualCardsRefs,
         bool skippedQuestionsRefs,
+        bool highlightsRefs,
       })
     >;
 typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
@@ -8507,6 +9302,24 @@ final class $$SessionsTableReferences
     final cache = $_typedResult.readTableOrNull(
       _skippedQuestionsRefsTable($_db),
     );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$HighlightsTable, List<HighlightRow>>
+  _highlightsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.highlights,
+    aliasName: 'sessions__id__highlights__session_id',
+  );
+
+  $$HighlightsTableProcessedTableManager get highlightsRefs {
+    final manager = $$HighlightsTableTableManager(
+      $_db,
+      $_db.highlights,
+    ).filter((f) => f.sessionId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_highlightsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -8731,6 +9544,31 @@ class $$SessionsTableFilterComposer
           }) => $$SkippedQuestionsTableFilterComposer(
             $db: $db,
             $table: $db.skippedQuestions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> highlightsRefs(
+    Expression<bool> Function($$HighlightsTableFilterComposer f) f,
+  ) {
+    final $$HighlightsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.highlights,
+      getReferencedColumn: (t) => t.sessionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HighlightsTableFilterComposer(
+            $db: $db,
+            $table: $db.highlights,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9031,6 +9869,31 @@ class $$SessionsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> highlightsRefs<T extends Object>(
+    Expression<T> Function($$HighlightsTableAnnotationComposer a) f,
+  ) {
+    final $$HighlightsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.highlights,
+      getReferencedColumn: (t) => t.sessionId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HighlightsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.highlights,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$SessionsTableTableManager
@@ -9054,6 +9917,7 @@ class $$SessionsTableTableManager
             bool errorCardsRefs,
             bool manualCardsRefs,
             bool skippedQuestionsRefs,
+            bool highlightsRefs,
           })
         > {
   $$SessionsTableTableManager(_$AppDatabase db, $SessionsTable table)
@@ -9132,6 +9996,7 @@ class $$SessionsTableTableManager
                 errorCardsRefs = false,
                 manualCardsRefs = false,
                 skippedQuestionsRefs = false,
+                highlightsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -9142,6 +10007,7 @@ class $$SessionsTableTableManager
                     if (errorCardsRefs) db.errorCards,
                     if (manualCardsRefs) db.manualCards,
                     if (skippedQuestionsRefs) db.skippedQuestions,
+                    if (highlightsRefs) db.highlights,
                   ],
                   addJoins:
                       <
@@ -9295,6 +10161,26 @@ class $$SessionsTableTableManager
                           referencedColumn: 'session_id',
                           typedResults: items,
                         ),
+                      if (highlightsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          SessionRow,
+                          $SessionsTable,
+                          HighlightRow,
+                          $HighlightsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$SessionsTableReferences
+                              ._highlightsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$SessionsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).highlightsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'session_id',
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -9323,6 +10209,7 @@ typedef $$SessionsTableProcessedTableManager =
         bool errorCardsRefs,
         bool manualCardsRefs,
         bool skippedQuestionsRefs,
+        bool highlightsRefs,
       })
     >;
 typedef $$SessionQuestionsTableCreateCompanionBuilder =
@@ -11460,6 +12347,24 @@ final class $$ManualCardsTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
+
+  static MultiTypedResultKey<$HighlightsTable, List<HighlightRow>>
+  _highlightsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.highlights,
+    aliasName: 'manual_cards__id__highlights__manual_card_id',
+  );
+
+  $$HighlightsTableProcessedTableManager get highlightsRefs {
+    final manager = $$HighlightsTableTableManager(
+      $_db,
+      $_db.highlights,
+    ).filter((f) => f.manualCardId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_highlightsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$ManualCardsTableFilterComposer
@@ -11550,6 +12455,31 @@ class $$ManualCardsTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> highlightsRefs(
+    Expression<bool> Function($$HighlightsTableFilterComposer f) f,
+  ) {
+    final $$HighlightsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.highlights,
+      getReferencedColumn: (t) => t.manualCardId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HighlightsTableFilterComposer(
+            $db: $db,
+            $table: $db.highlights,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -11721,6 +12651,31 @@ class $$ManualCardsTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> highlightsRefs<T extends Object>(
+    Expression<T> Function($$HighlightsTableAnnotationComposer a) f,
+  ) {
+    final $$HighlightsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.highlights,
+      getReferencedColumn: (t) => t.manualCardId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HighlightsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.highlights,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$ManualCardsTableTableManager
@@ -11736,7 +12691,11 @@ class $$ManualCardsTableTableManager
           $$ManualCardsTableUpdateCompanionBuilder,
           (ManualCardRow, $$ManualCardsTableReferences),
           ManualCardRow,
-          PrefetchHooks Function({bool sessionId, bool questionId})
+          PrefetchHooks Function({
+            bool sessionId,
+            bool questionId,
+            bool highlightsRefs,
+          })
         > {
   $$ManualCardsTableTableManager(_$AppDatabase db, $ManualCardsTable table)
     : super(
@@ -11801,56 +12760,82 @@ class $$ManualCardsTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({sessionId = false, questionId = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [],
-              addJoins:
-                  <
-                    T extends TableManagerState<
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic,
-                      dynamic
-                    >
-                  >(state) {
-                    if (sessionId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.sessionId,
-                        referencedTable: $$ManualCardsTableReferences
-                            ._sessionIdTable(db),
-                        referencedColumn: $$ManualCardsTableReferences
-                            ._sessionIdTable(db)
-                            .id,
-                      ) as T;
-                    }
-                    if (questionId) {
-                      state = state.withJoin(
-                        currentTable: table,
-                        currentColumn: table.questionId,
-                        referencedTable: $$ManualCardsTableReferences
-                            ._questionIdTable(db),
-                        referencedColumn: $$ManualCardsTableReferences
-                            ._questionIdTable(db)
-                            .id,
-                      ) as T;
-                    }
+          prefetchHooksCallback:
+              ({
+                sessionId = false,
+                questionId = false,
+                highlightsRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [if (highlightsRefs) db.highlights],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (sessionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.sessionId,
+                            referencedTable: $$ManualCardsTableReferences
+                                ._sessionIdTable(db),
+                            referencedColumn: $$ManualCardsTableReferences
+                                ._sessionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (questionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.questionId,
+                            referencedTable: $$ManualCardsTableReferences
+                                ._questionIdTable(db),
+                            referencedColumn: $$ManualCardsTableReferences
+                                ._questionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
 
-                    return state;
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (highlightsRefs)
+                        await $_getPrefetchedDataByColumns<
+                          ManualCardRow,
+                          $ManualCardsTable,
+                          HighlightRow,
+                          $HighlightsTable
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ManualCardsTableReferences
+                              ._highlightsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ManualCardsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).highlightsRefs,
+                          currentColumn: 'id',
+                          referencedColumn: 'manual_card_id',
+                          typedResults: items,
+                        ),
+                    ];
                   },
-              getPrefetchedDataCallback: (items) async {
-                return [];
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -11867,7 +12852,11 @@ typedef $$ManualCardsTableProcessedTableManager =
       $$ManualCardsTableUpdateCompanionBuilder,
       (ManualCardRow, $$ManualCardsTableReferences),
       ManualCardRow,
-      PrefetchHooks Function({bool sessionId, bool questionId})
+      PrefetchHooks Function({
+        bool sessionId,
+        bool questionId,
+        bool highlightsRefs,
+      })
     >;
 typedef $$SkippedQuestionsTableCreateCompanionBuilder =
     SkippedQuestionsCompanion Function({
@@ -12479,6 +13468,609 @@ typedef $$SkippedQuestionsTableProcessedTableManager =
       SkippedQuestionRow,
       PrefetchHooks Function({bool sessionId, bool questionId})
     >;
+typedef $$HighlightsTableCreateCompanionBuilder = HighlightsCompanion Function({
+  Value<int> id,
+  Value<int?> sessionId,
+  Value<int?> questionId,
+  required String phrase,
+  Value<String> context,
+  Value<String> topicName,
+  Value<String> practiceName,
+  required DateTime createdAt,
+  Value<DateTime?> keptAt,
+  Value<DateTime?> cardCreatedAt,
+  Value<int?> manualCardId,
+});
+typedef $$HighlightsTableUpdateCompanionBuilder = HighlightsCompanion Function({
+  Value<int> id,
+  Value<int?> sessionId,
+  Value<int?> questionId,
+  Value<String> phrase,
+  Value<String> context,
+  Value<String> topicName,
+  Value<String> practiceName,
+  Value<DateTime> createdAt,
+  Value<DateTime?> keptAt,
+  Value<DateTime?> cardCreatedAt,
+  Value<int?> manualCardId,
+});
+
+final class $$HighlightsTableReferences
+    extends BaseReferences<_$AppDatabase, $HighlightsTable, HighlightRow> {
+  $$HighlightsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $SessionsTable _sessionIdTable(_$AppDatabase db) =>
+      db.sessions.createAlias('highlights__session_id__sessions__id');
+
+  $$SessionsTableProcessedTableManager? get sessionId {
+    final $_column = $_itemColumn<int>('session_id');
+    if ($_column == null) return null;
+    final manager = $$SessionsTableTableManager(
+      $_db,
+      $_db.sessions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_sessionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $QuestionsTable _questionIdTable(_$AppDatabase db) =>
+      db.questions.createAlias('highlights__question_id__questions__id');
+
+  $$QuestionsTableProcessedTableManager? get questionId {
+    final $_column = $_itemColumn<int>('question_id');
+    if ($_column == null) return null;
+    final manager = $$QuestionsTableTableManager(
+      $_db,
+      $_db.questions,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_questionIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $ManualCardsTable _manualCardIdTable(_$AppDatabase db) => db
+      .manualCards
+      .createAlias('highlights__manual_card_id__manual_cards__id');
+
+  $$ManualCardsTableProcessedTableManager? get manualCardId {
+    final $_column = $_itemColumn<int>('manual_card_id');
+    if ($_column == null) return null;
+    final manager = $$ManualCardsTableTableManager(
+      $_db,
+      $_db.manualCards,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_manualCardIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$HighlightsTableFilterComposer
+    extends Composer<_$AppDatabase, $HighlightsTable> {
+  $$HighlightsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get phrase => $composableBuilder(
+    column: $table.phrase,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get context => $composableBuilder(
+    column: $table.context,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get topicName => $composableBuilder(
+    column: $table.topicName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get practiceName => $composableBuilder(
+    column: $table.practiceName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get keptAt => $composableBuilder(
+    column: $table.keptAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get cardCreatedAt => $composableBuilder(
+    column: $table.cardCreatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$SessionsTableFilterComposer get sessionId {
+    final $$SessionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableFilterComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$QuestionsTableFilterComposer get questionId {
+    final $$QuestionsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableFilterComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ManualCardsTableFilterComposer get manualCardId {
+    final $$ManualCardsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.manualCardId,
+      referencedTable: $db.manualCards,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ManualCardsTableFilterComposer(
+            $db: $db,
+            $table: $db.manualCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$HighlightsTableOrderingComposer
+    extends Composer<_$AppDatabase, $HighlightsTable> {
+  $$HighlightsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get phrase => $composableBuilder(
+    column: $table.phrase,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get context => $composableBuilder(
+    column: $table.context,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get topicName => $composableBuilder(
+    column: $table.topicName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get practiceName => $composableBuilder(
+    column: $table.practiceName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get keptAt => $composableBuilder(
+    column: $table.keptAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get cardCreatedAt => $composableBuilder(
+    column: $table.cardCreatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$SessionsTableOrderingComposer get sessionId {
+    final $$SessionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$QuestionsTableOrderingComposer get questionId {
+    final $$QuestionsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableOrderingComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ManualCardsTableOrderingComposer get manualCardId {
+    final $$ManualCardsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.manualCardId,
+      referencedTable: $db.manualCards,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ManualCardsTableOrderingComposer(
+            $db: $db,
+            $table: $db.manualCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$HighlightsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $HighlightsTable> {
+  $$HighlightsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get phrase =>
+      $composableBuilder(column: $table.phrase, builder: (column) => column);
+
+  GeneratedColumn<String> get context =>
+      $composableBuilder(column: $table.context, builder: (column) => column);
+
+  GeneratedColumn<String> get topicName =>
+      $composableBuilder(column: $table.topicName, builder: (column) => column);
+
+  GeneratedColumn<String> get practiceName => $composableBuilder(
+    column: $table.practiceName,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get keptAt =>
+      $composableBuilder(column: $table.keptAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get cardCreatedAt => $composableBuilder(
+    column: $table.cardCreatedAt,
+    builder: (column) => column,
+  );
+
+  $$SessionsTableAnnotationComposer get sessionId {
+    final $$SessionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.sessionId,
+      referencedTable: $db.sessions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$SessionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.sessions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$QuestionsTableAnnotationComposer get questionId {
+    final $$QuestionsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.questionId,
+      referencedTable: $db.questions,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$QuestionsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.questions,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$ManualCardsTableAnnotationComposer get manualCardId {
+    final $$ManualCardsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.manualCardId,
+      referencedTable: $db.manualCards,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ManualCardsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.manualCards,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$HighlightsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $HighlightsTable,
+          HighlightRow,
+          $$HighlightsTableFilterComposer,
+          $$HighlightsTableOrderingComposer,
+          $$HighlightsTableAnnotationComposer,
+          $$HighlightsTableCreateCompanionBuilder,
+          $$HighlightsTableUpdateCompanionBuilder,
+          (HighlightRow, $$HighlightsTableReferences),
+          HighlightRow,
+          PrefetchHooks Function({
+            bool sessionId,
+            bool questionId,
+            bool manualCardId,
+          })
+        > {
+  $$HighlightsTableTableManager(_$AppDatabase db, $HighlightsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$HighlightsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$HighlightsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$HighlightsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> sessionId = const Value.absent(),
+                Value<int?> questionId = const Value.absent(),
+                Value<String> phrase = const Value.absent(),
+                Value<String> context = const Value.absent(),
+                Value<String> topicName = const Value.absent(),
+                Value<String> practiceName = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime?> keptAt = const Value.absent(),
+                Value<DateTime?> cardCreatedAt = const Value.absent(),
+                Value<int?> manualCardId = const Value.absent(),
+              }) => HighlightsCompanion(
+                id: id,
+                sessionId: sessionId,
+                questionId: questionId,
+                phrase: phrase,
+                context: context,
+                topicName: topicName,
+                practiceName: practiceName,
+                createdAt: createdAt,
+                keptAt: keptAt,
+                cardCreatedAt: cardCreatedAt,
+                manualCardId: manualCardId,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int?> sessionId = const Value.absent(),
+                Value<int?> questionId = const Value.absent(),
+                required String phrase,
+                Value<String> context = const Value.absent(),
+                Value<String> topicName = const Value.absent(),
+                Value<String> practiceName = const Value.absent(),
+                required DateTime createdAt,
+                Value<DateTime?> keptAt = const Value.absent(),
+                Value<DateTime?> cardCreatedAt = const Value.absent(),
+                Value<int?> manualCardId = const Value.absent(),
+              }) => HighlightsCompanion.insert(
+                id: id,
+                sessionId: sessionId,
+                questionId: questionId,
+                phrase: phrase,
+                context: context,
+                topicName: topicName,
+                practiceName: practiceName,
+                createdAt: createdAt,
+                keptAt: keptAt,
+                cardCreatedAt: cardCreatedAt,
+                manualCardId: manualCardId,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$HighlightsTable, HighlightRow>(table),
+                  $$HighlightsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({sessionId = false, questionId = false, manualCardId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (sessionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.sessionId,
+                            referencedTable: $$HighlightsTableReferences
+                                ._sessionIdTable(db),
+                            referencedColumn: $$HighlightsTableReferences
+                                ._sessionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (questionId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.questionId,
+                            referencedTable: $$HighlightsTableReferences
+                                ._questionIdTable(db),
+                            referencedColumn: $$HighlightsTableReferences
+                                ._questionIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (manualCardId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.manualCardId,
+                            referencedTable: $$HighlightsTableReferences
+                                ._manualCardIdTable(db),
+                            referencedColumn: $$HighlightsTableReferences
+                                ._manualCardIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$HighlightsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $HighlightsTable,
+      HighlightRow,
+      $$HighlightsTableFilterComposer,
+      $$HighlightsTableOrderingComposer,
+      $$HighlightsTableAnnotationComposer,
+      $$HighlightsTableCreateCompanionBuilder,
+      $$HighlightsTableUpdateCompanionBuilder,
+      (HighlightRow, $$HighlightsTableReferences),
+      HighlightRow,
+      PrefetchHooks Function({
+        bool sessionId,
+        bool questionId,
+        bool manualCardId,
+      })
+    >;
 typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
   required String key,
   required String value,
@@ -12640,6 +14232,8 @@ class $AppDatabaseManager {
       $$ManualCardsTableTableManager(_db, _db.manualCards);
   $$SkippedQuestionsTableTableManager get skippedQuestions =>
       $$SkippedQuestionsTableTableManager(_db, _db.skippedQuestions);
+  $$HighlightsTableTableManager get highlights =>
+      $$HighlightsTableTableManager(_db, _db.highlights);
   $$SettingsTableTableManager get settings =>
       $$SettingsTableTableManager(_db, _db.settings);
 }

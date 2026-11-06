@@ -108,4 +108,28 @@ void main() {
     );
     expect(queued, isEmpty);
   });
+
+  testWidgets('saved highlights stay visible in the cards view', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
+    await harness.cards.createHighlight(
+      sessionId: null,
+      questionId: question.id,
+      text: 'managed service',
+      context: question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    expect(find.textContaining('Highlights ·'), findsOneWidget);
+    expect(find.text('managed service'), findsOneWidget);
+  });
 }

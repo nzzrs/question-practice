@@ -78,6 +78,7 @@ class BackupService {
     final errorCards = await _db.select(_db.errorCards).get();
     final manualCards = await _db.select(_db.manualCards).get();
     final skippedQuestions = await _db.select(_db.skippedQuestions).get();
+    final highlights = await _db.select(_db.highlights).get();
     final settings = await _db.select(_db.settings).get();
 
     final tables = <String, dynamic>{
@@ -91,6 +92,7 @@ class BackupService {
       'errorCards': [for (final row in errorCards) row.toJson()],
       'manualCards': [for (final row in manualCards) row.toJson()],
       'skippedQuestions': [for (final row in skippedQuestions) row.toJson()],
+      'highlights': [for (final row in highlights) row.toJson()],
       'settings': [for (final row in settings) row.toJson()],
     };
     final payload = <String, dynamic>{
@@ -151,6 +153,9 @@ class BackupService {
         ]);
         batch.insertAll(_db.skippedQuestions, [
           for (final row in backup.skippedQuestions) row.toCompanion(false),
+        ]);
+        batch.insertAll(_db.highlights, [
+          for (final row in backup.highlights) row.toCompanion(false),
         ]);
         batch.insertAll(_db.settings, [
           for (final row in backup.settings) row.toCompanion(false),
@@ -296,6 +301,11 @@ class BackupService {
         'skippedQuestions',
         (json) => SkippedQuestionRow.fromJson(json),
       ),
+      highlights: _rowsOptional(
+        tables,
+        'highlights',
+        (json) => HighlightRow.fromJson(json),
+      ),
       settings: _rows(tables, 'settings', (json) => SettingRow.fromJson(json)),
     );
   }
@@ -385,6 +395,7 @@ class _BackupTables {
     required this.errorCards,
     required this.manualCards,
     required this.skippedQuestions,
+    required this.highlights,
     required this.settings,
   });
 
@@ -399,5 +410,6 @@ class _BackupTables {
   final List<ErrorCardRow> errorCards;
   final List<ManualCardRow> manualCards;
   final List<SkippedQuestionRow> skippedQuestions;
+  final List<HighlightRow> highlights;
   final List<SettingRow> settings;
 }

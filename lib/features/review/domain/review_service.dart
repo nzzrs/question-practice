@@ -43,6 +43,12 @@ class ConceptDefinitionStep extends ReviewStep {
   final Concept concept;
 }
 
+class HighlightReviewStep extends ReviewStep {
+  const HighlightReviewStep(this.highlight);
+
+  final StudyHighlight highlight;
+}
+
 class ReviewData {
   const ReviewData({
     required this.session,
@@ -77,6 +83,7 @@ class ReviewService {
     final questions = await _sessions.questionsForSession(sessionId);
     final attempts = await _sessions.attemptsForSession(sessionId);
     final concepts = await _cards.conceptsForSession(sessionId);
+    final highlights = await _cards.highlightsForSession(sessionId);
     final skippedRecords = await _cards.skippedQuestionsForSession(sessionId);
     final skippedByQuestion = {
       for (final record in skippedRecords) record.questionId: record,
@@ -123,6 +130,10 @@ class ReviewService {
       steps.add(ConceptDefinitionStep(concept));
     }
 
+    for (final highlight in highlights.where((item) => item.needsReview)) {
+      steps.add(HighlightReviewStep(highlight));
+    }
+
     return ReviewData(
       session: session,
       steps: steps,
@@ -145,6 +156,18 @@ class ReviewService {
 
   Future<void> saveConceptDefinition(int conceptId, String definition) {
     return _cards.updateConceptDefinition(conceptId, definition.trim());
+  }
+
+  Future<void> keepHighlight(int highlightId) {
+    return _cards.keepHighlight(highlightId, _clock.now().toUtc());
+  }
+
+  Future<void> markHighlightConverted(int highlightId, {int? manualCardId}) {
+    return _cards.markHighlightConverted(
+      highlightId,
+      cardCreatedAt: _clock.now().toUtc(),
+      manualCardId: manualCardId,
+    );
   }
 
   Future<int> createConcept({

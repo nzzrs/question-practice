@@ -485,6 +485,39 @@ class SkippedQuestion {
 }
 
 @immutable
+class StudyHighlight {
+  const StudyHighlight({
+    required this.id,
+    required this.sessionId,
+    required this.questionId,
+    required this.text,
+    required this.context,
+    required this.topicName,
+    required this.practiceName,
+    required this.createdAt,
+    required this.keptAt,
+    required this.cardCreatedAt,
+    required this.manualCardId,
+  });
+
+  final int id;
+  final int? sessionId;
+  final int? questionId;
+  final String text;
+  final String context;
+  final String topicName;
+  final String practiceName;
+  final DateTime createdAt;
+  final DateTime? keptAt;
+  final DateTime? cardCreatedAt;
+  final int? manualCardId;
+
+  bool get isKept => keptAt != null;
+  bool get hasCard => cardCreatedAt != null;
+  bool get needsReview => !isKept && !hasCard;
+}
+
+@immutable
 class SessionSummary {
   const SessionSummary({
     required this.session,

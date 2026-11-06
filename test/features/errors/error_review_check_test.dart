@@ -23,6 +23,8 @@ void main() {
                   'consistent': true,
                   'feedback':
                       'The assumption and the prevention rule match the error.',
+                  'bias': 'Confused the two similar terms.',
+                  'vaccine': 'Check the definition before choosing.',
                 }),
               },
             },
@@ -88,5 +90,16 @@ void main() {
       find.textContaining('The assumption and the prevention rule match'),
       findsOneWidget,
     );
+    expect(
+      find.byKey(const ValueKey('error-review-suggestions')),
+      findsOneWidget,
+    );
+    expect(find.text('Confused the two similar terms.'), findsOneWidget);
+    expect(find.text('Check the definition before choosing.'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Use').first);
+    await tester.tap(find.text('Use').first);
+    await tester.pump();
+    expect(bias.text, 'Confused the two similar terms.');
   });
 }

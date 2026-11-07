@@ -262,7 +262,7 @@ class _QuickActions extends StatelessWidget {
       title: 'Cards',
       value: cards?.toString() ?? '—',
       subtitle: stats == null
-          ? 'Concepts, errors and basic cards'
+          ? 'Concepts, errors, basic cards, skipped and highlights'
           : cards == 0
           ? 'Nothing waiting to export'
           : '$cards cards ready to export',

@@ -151,75 +151,34 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         ),
       ],
       bottomBar: AppActionDock(
-        child: hasIncompleteSelected || selectedSkipped.isNotEmpty
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.warning_amber_outlined,
-                        size: 18,
-                        color: hasIncompleteSelected
-                            ? M3ETheme.of(context).colorScheme.error
-                            : M3ETheme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          hasIncompleteSelected
-                              ? 'Complete the selected error cards before export.'
-                              : 'Review the selected items, or clear the selection to export cards.',
-                          style: M3ETheme.of(context)
-                              .typography
-                              .baseline
-                              .bodySmall
-                              .copyWith(
-                                color: M3ETheme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  AppPrimaryButton(
-                    onPressed: () =>
-                        _reviewCards(selectedErrorCards, selectedSkipped),
-                    label: 'Review selected',
-                    icon: Icons.fact_check_outlined,
-                  ),
-                ],
-              )
-            : Row(
-                children: [
-                  Expanded(
-                    child: AppPrimaryButton(
-                      onPressed: _busy || selection.total == 0
-                          ? null
-                          : () => _export(selection),
-                      label: _busy ? 'Exporting…' : 'Export to AnkiDroid',
-                      icon: Icons.upload_outlined,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  AppDockIconButton(
-                    icon: Icons.ios_share,
-                    tooltip: 'Share as files',
-                    onPressed: _busy || selection.total == 0
-                        ? null
-                        : () => _share(selection),
-                  ),
-                  AppDockIconButton(
-                    icon: Icons.delete_outline,
-                    tooltip: 'Delete selected',
-                    isDestructive: true,
-                    onPressed: selection.total == 0 ? null : _deleteSelected,
-                  ),
-                ],
+        child: Row(
+          children: [
+            Expanded(
+              child: AppPrimaryButton(
+                onPressed:
+                    _busy || selection.total == 0 || hasIncompleteSelected
+                    ? null
+                    : () => _export(selection),
+                label: _busy ? 'Exporting…' : 'Export to AnkiDroid',
+                icon: Icons.upload_outlined,
               ),
+            ),
+            const SizedBox(width: 6),
+            AppDockIconButton(
+              icon: Icons.ios_share,
+              tooltip: 'Share as files',
+              onPressed: _busy || selection.total == 0 || hasIncompleteSelected
+                  ? null
+                  : () => _share(selection),
+            ),
+            AppDockIconButton(
+              icon: Icons.delete_outline,
+              tooltip: 'Delete selected',
+              isDestructive: true,
+              onPressed: selection.total == 0 ? null : _deleteSelected,
+            ),
+          ],
+        ),
       ),
       children: [
         _FilterBar(
@@ -323,9 +282,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                   icon: const Icon(Icons.rate_review_outlined),
                   label: const Text('Review all'),
                 ),
-                if (hasReviewSelection &&
-                    !hasIncompleteSelected &&
-                    selectedSkipped.isEmpty)
+                if (hasReviewSelection)
                   M3EButton.filled(
                     onPressed: () =>
                         _reviewCards(selectedErrorCards, selectedSkipped),
@@ -411,6 +368,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                   ),
               ],
             ),
+            const SizedBox(height: 28),
           ],
           if ((_filter == _Filter.all || _filter == _Filter.highlights) &&
               highlights.isNotEmpty) ...[

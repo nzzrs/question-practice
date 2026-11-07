@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/export/cards_page.dart';
 
 import '../../helpers/test_harness.dart';
@@ -38,21 +39,41 @@ void main() {
     return harness;
   }
 
-  testWidgets('incomplete error selection replaces export with review', (
-    tester,
-  ) async {
-    final harness = await harnessWithErrorCard(complete: false);
-    addTearDown(harness.close);
+  testWidgets(
+    'incomplete selection disables export but keeps review selected',
+    (tester) async {
+      final harness = await harnessWithErrorCard(complete: false);
+      addTearDown(harness.close);
 
-    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    expect(find.text('Export to AnkiDroid'), findsOneWidget);
+      await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+      expect(find.text('Export to AnkiDroid'), findsOneWidget);
 
-    await tester.tap(find.byType(M3ECheckbox).first);
-    await pumpFrames(tester);
+      await tester.tap(find.byType(M3ECheckbox).first);
+      await pumpFrames(tester);
 
-    expect(find.text('Review selected'), findsOneWidget);
-    expect(find.text('Export to AnkiDroid'), findsNothing);
-  });
+      expect(find.text('Review all'), findsOneWidget);
+      expect(find.text('Review selected'), findsOneWidget);
+      expect(find.text('Export to AnkiDroid'), findsOneWidget);
+
+      final export = tester.widget<AppPrimaryButton>(
+        find.widgetWithText(AppPrimaryButton, 'Export to AnkiDroid'),
+      );
+      expect(export.onPressed, isNull);
+      final share = tester.widget<AppDockIconButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.ios_share),
+          matching: find.byType(AppDockIconButton),
+        ),
+      );
+      expect(share.onPressed, isNull);
+
+      await tester.tap(find.byType(M3ECheckbox).first);
+      await pumpFrames(tester);
+
+      expect(find.text('Review selected'), findsNothing);
+      expect(find.text('Export to AnkiDroid'), findsOneWidget);
+    },
+  );
 
   testWidgets('complete error selection keeps export visible', (tester) async {
     final harness = await harnessWithErrorCard(complete: true);

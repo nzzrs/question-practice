@@ -557,6 +557,7 @@ class _SkippedStep extends StatelessWidget {
         const SizedBox(height: 16),
         if (missing == _Missing.concept) ...[
           M3ETextField(
+            key: const ValueKey('skipped-review-term'),
             controller: term,
             label: 'Definition of…',
             placeholder: 'Term',
@@ -564,6 +565,7 @@ class _SkippedStep extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           M3ETextField(
+            key: const ValueKey('skipped-review-definition'),
             controller: definition,
             label: 'Definition',
             minLines: 2,
@@ -572,6 +574,7 @@ class _SkippedStep extends StatelessWidget {
           ),
         ] else ...[
           M3ETextField(
+            key: const ValueKey('skipped-review-question'),
             controller: newQuestion,
             label: 'New question',
             minLines: 2,
@@ -580,6 +583,7 @@ class _SkippedStep extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           M3ETextField(
+            key: const ValueKey('skipped-review-answer'),
             controller: newAnswer,
             label: 'Answer',
             minLines: 2,

@@ -143,6 +143,7 @@ class _NewCardDialogState extends State<_NewCardDialog> {
               const SizedBox(height: 16),
               if (_kind == NewCardKind.concept) ...[
                 M3ETextField(
+                  key: const ValueKey('new-card-term'),
                   controller: _term,
                   label: 'Term',
                   isRequired: true,
@@ -150,6 +151,7 @@ class _NewCardDialogState extends State<_NewCardDialog> {
                 ),
                 const SizedBox(height: 12),
                 M3ETextField(
+                  key: const ValueKey('new-card-definition'),
                   controller: _definition,
                   label: 'Definition',
                   minLines: 2,
@@ -159,6 +161,7 @@ class _NewCardDialogState extends State<_NewCardDialog> {
                 ),
               ] else ...[
                 M3ETextField(
+                  key: const ValueKey('new-card-question'),
                   controller: _question,
                   label: 'Question',
                   minLines: 2,
@@ -168,6 +171,7 @@ class _NewCardDialogState extends State<_NewCardDialog> {
                 ),
                 const SizedBox(height: 12),
                 M3ETextField(
+                  key: const ValueKey('new-card-answer'),
                   controller: _answer,
                   label: 'Answer',
                   minLines: 2,

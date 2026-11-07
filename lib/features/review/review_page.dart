@@ -9,6 +9,7 @@ import '../errors/error_card_review_view.dart';
 import '../export/cards_page.dart';
 import '../export/new_card_dialog.dart';
 import 'domain/review_service.dart';
+import 'skipped_question_view.dart';
 
 enum _Missing { concept, question }
 
@@ -454,91 +455,18 @@ class _SkippedStep extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final correctAnswer = question.correctAnswers.join('\n');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TonalBox(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  Pill(
-                    unknown ? "I didn't know this" : 'Skipped',
-                    tone: unknown ? PillTone.secondary : PillTone.neutral,
-                  ),
-                  if (topicName.trim().isNotEmpty) Pill(topicName),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                question.prompt,
-                style: theme.typography.baseline.titleMedium.copyWith(
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                decoration: BoxDecoration(
-                  color: AppSuccess.container(context),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline,
-                      size: 20,
-                      color: AppSuccess.foreground(context),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Correct answer',
-                            style: theme.typography.baseline.labelSmall
-                                .copyWith(
-                                  color: AppSuccess.onContainer(context)
-                                      .withValues(alpha: 0.8),
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            correctAnswer,
-                            style: theme.typography.baseline.bodyMedium
-                                .copyWith(
-                                  color: AppSuccess.onContainer(context),
-                                  height: 1.4,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 6),
-              _OtherAlternatives(question: question),
-              if (reasoning.trim().isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _ReviewNote(label: 'Your reasoning', text: reasoning),
-              ],
-              if (question.explanation.trim().isNotEmpty) ...[
-                const SizedBox(height: 12),
-                _ReviewNote(label: 'Why', text: question.explanation),
-              ],
-            ],
-          ),
+        SkippedQuestionView(
+          prompt: question.prompt,
+          alternatives: question.alternatives,
+          correctIndexes: question.correctIndexes,
+          alternativeExplanations: question.alternativeExplanations,
+          explanation: question.explanation,
+          reasoning: reasoning,
+          topicName: topicName,
+          unknown: unknown,
         ),
         const SizedBox(height: 20),
         Text(
@@ -594,167 +522,6 @@ class _SkippedStep extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _OtherAlternatives extends StatefulWidget {
-  const _OtherAlternatives({required this.question});
-
-  final Question question;
-
-  @override
-  State<_OtherAlternatives> createState() => _OtherAlternativesState();
-}
-
-class _OtherAlternativesState extends State<_OtherAlternatives> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final indexes = [
-      for (var index = 0; index < widget.question.alternatives.length; index++)
-        if (!widget.question.correctIndexes.contains(index)) index,
-    ];
-    if (indexes.isEmpty) return const SizedBox.shrink();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: M3EButton.text(
-            key: const ValueKey('skipped-review-other-alternatives'),
-            onPressed: () => setState(() => _open = !_open),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  _open ? 'Hide other alternatives' : 'See other alternatives',
-                ),
-              ],
-            ),
-          ),
-        ),
-        if (_open) ...[
-          const SizedBox(height: 4),
-          for (final index in indexes)
-            _OtherAlternativeRow(
-              index: index,
-              text: widget.question.alternatives[index],
-              explanation:
-                  index < widget.question.alternativeExplanations.length
-                  ? widget.question.alternativeExplanations[index]
-                  : '',
-            ),
-        ],
-        const SizedBox(height: 2),
-      ],
-    );
-  }
-}
-
-class _OtherAlternativeRow extends StatelessWidget {
-  const _OtherAlternativeRow({
-    required this.index,
-    required this.text,
-    required this.explanation,
-  });
-
-  final int index;
-  final String text;
-  final String explanation;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final letter = String.fromCharCode(65 + index);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              letter,
-              style: theme.typography.baseline.labelSmall.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  text,
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (explanation.trim().isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    explanation,
-                    style: theme.typography.baseline.bodySmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReviewNote extends StatelessWidget {
-  const _ReviewNote({required this.label, required this.text});
-
-  final String label;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.typography.baseline.labelSmall.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            text,
-            style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
-          ),
-        ],
-      ),
     );
   }
 }

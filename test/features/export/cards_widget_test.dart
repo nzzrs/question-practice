@@ -88,12 +88,17 @@ void main() {
     );
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    expect(find.textContaining('Error and skipped cards'), findsOneWidget);
+    expect(find.textContaining('Error and skipped'), findsOneWidget);
     expect(find.text('Question 1?'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.note_add_outlined));
+    await tester.tap(find.byIcon(Icons.edit_outlined));
     await pumpFrames(tester);
-    expect(find.text('Make a card from the skipped question'), findsOneWidget);
+    expect(find.text('Review the skipped question'), findsOneWidget);
+    expect(find.text('Item 1 of 1'), findsOneWidget);
+
+    await tester.tap(find.text('Make a card'));
+    await pumpFrames(tester);
+    expect(find.text('Turn this skipped question into a card'), findsOneWidget);
 
     await tester.tap(find.text('Create'));
     await pumpFrames(tester, frames: 24);
@@ -107,7 +112,69 @@ void main() {
       () => harness.cards.watchUnhandledSkippedQuestions().first,
     );
     expect(queued, isEmpty);
+
+    await tester.tap(find.text('Done'));
+    await pumpFrames(tester);
     expect(find.textContaining('Basic cards ·'), findsOneWidget);
+  });
+
+  testWidgets('review all walks error cards and skipped questions', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
+    final errorId = await harness.cards.createErrorCard(
+      questionId: question.id,
+      sessionId: null,
+      question: question.prompt,
+      alternatives: question.alternatives,
+      correctIndexes: question.correctIndexes,
+      wrongIndexes: const [1],
+      reasoning: 'Reason',
+      explanation: question.explanation,
+      alternativeExplanations: question.alternativeExplanations,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      lastWrongAt: harness.clock.now().toUtc(),
+      dueAfter: const Duration(hours: 48),
+    );
+    await harness.cards.updateErrorCardDetails(
+      id: errorId,
+      bias: 'Bias',
+      vaccine: 'Vaccine',
+      completedAt: harness.clock.now().toUtc(),
+    );
+    await harness.cards.saveSkippedQuestion(
+      sessionId: null,
+      questionId: question.id,
+      question: 'Skipped prompt?',
+      alternatives: question.alternatives,
+      correctIndexes: question.correctIndexes,
+      explanation: question.explanation,
+      alternativeExplanations: question.alternativeExplanations,
+      reasoning: '',
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      unknown: false,
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    await tester.tap(find.text('Review all'));
+    await pumpFrames(tester);
+
+    expect(find.text('Item 1 of 2'), findsOneWidget);
+    expect(find.text('Check the error card'), findsOneWidget);
+
+    await tester.tap(find.text('Skip'));
+    await pumpFrames(tester);
+
+    expect(find.text('Item 2 of 2'), findsOneWidget);
+    expect(find.text('Review the skipped question'), findsOneWidget);
   });
 
   testWidgets('saved highlights stay visible in the cards view', (

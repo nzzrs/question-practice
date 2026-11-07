@@ -380,22 +380,38 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              M3EButton.tonal(
-                onPressed: _busy ? null : _exportBackup,
-                icon: const Icon(Icons.download_outlined),
-                child: const Text('Export backup'),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final export = M3EButton.tonal(
+                    onPressed: _busy ? null : _exportBackup,
+                    icon: const Icon(Icons.download_outlined),
+                    label: const Text('Export backup'),
+                  );
+                  final restore = M3EButton.outlined(
+                    onPressed: _busy ? null : _restoreBackup,
+                    icon: const Icon(Icons.upload_outlined),
+                    label: const Text('Restore backup'),
+                  );
+                  if (constraints.maxWidth < 340) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [export, const SizedBox(height: 8), restore],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: export),
+                      const SizedBox(width: 8),
+                      Expanded(child: restore),
+                    ],
+                  );
+                },
               ),
-              const SizedBox(height: 8),
-              M3EButton.outlined(
-                onPressed: _busy ? null : _restoreBackup,
-                icon: const Icon(Icons.upload_outlined),
-                child: const Text('Restore backup'),
-              ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
               M3EButton.outlined(
                 onPressed: _busy ? null : _eraseAll,
                 icon: const Icon(Icons.delete_outline),
-                child: const Text('Erase all data'),
+                label: const Text('Erase all data'),
               ),
             ],
           ),

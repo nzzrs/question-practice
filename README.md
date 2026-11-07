@@ -18,10 +18,10 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
   - concept cards such as `Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}`, with an acronym's full form in the Anki extra field;
   - basic question/answer cards for skipped questions.
 - Review cards show the skipped or unknown question in a structured panel with the correct answer in green, the reasoning you wrote, and a collapsible list of the other alternatives and their explanations.
-- Skipped questions stay in the combined **Error and skipped cards** section of Cards after the session ends, so they can become cards later. They are only removed when converted or dismissed.
+- Skipped questions stay in the combined **Error and skipped** section of Cards after the session ends, so they can become cards later. They leave the section when converted into a card.
 - Re-test errors after 48 hours. A correct answer resolves the card but keeps the history.
 - Look up a selected term with an optional AI provider: OpenAI-compatible endpoints (OpenAI, Groq, OpenRouter, custom) or Gemini's native API, with a model list loaded from the provider. AI definitions appear in a read-only bubble and save automatically; acronyms also show what they stand for. Web lookup keeps the editable sheet. Or use DuckDuckGo/Wikipedia through a Custom Tab.
-- Export selected cards directly to AnkiDroid or share Anki-compatible files. Error cards can be reviewed all at once or by selection from Cards. Incomplete error cards can be selected to review them before export.
+- Export selected cards directly to AnkiDroid or share Anki-compatible files. Error and skipped cards can be reviewed all at once or by selection from Cards. Incomplete error cards can be selected to review them before export.
 - Give each topic its own AnkiDroid deck; topics without one use the default deck.
 - Export a complete JSON backup of practices, sessions, answers, cards and settings, and restore it on another install. The backup never contains the AI API key.
 - See per-topic accuracy and progress, and a mixed shuffled session across all topics.

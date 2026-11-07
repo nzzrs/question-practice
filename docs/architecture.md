@@ -52,7 +52,7 @@ A session is created at start and remains `inProgress` until every question has 
 - AI definitions render in an overlay bubble anchored to the selection and save before display. Web definitions keep the editable bottom sheet.
 - The 5-minute reminder is a `Timer.periodic` for the current question, paused while the app is in the background and reset when the question changes.
 - Text selection is a `SelectionArea` with custom Define, Highlight and Ask actions. Ask sends the selected passage, its question and the learner message to the configured AI; its answer can become a basic card whose front places the question context above the learner question. Highlights are stored per session/question, painted in place, and reviewed at the end of the session. Cards offers a plain-text download of all highlights; they are never part of an Anki export selection.
-- Skipped answers are snapshotted into `skipped_questions`. The review marks a record handled when it creates a card, and the combined **Error and skipped cards** section lists any records still unhandled so they survive the session.
+- Skipped answers are snapshotted into `skipped_questions`. The review marks a record handled when it creates a card, and the combined **Error and skipped** section lists any records still unhandled so they survive the session. `ErrorCardsReviewPage` walks error cards and skipped questions in one pass; the skipped rows use the same checkbox and pencil row as error cards.
 - Settings model selection uses `M3EDropdownMenu` and `LookupService.listModels`; Gemini models are filtered to those that support `generateContent`.
 
 ## Platform services

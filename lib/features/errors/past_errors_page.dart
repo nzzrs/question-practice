@@ -18,6 +18,7 @@ class PastErrorsPage extends ConsumerStatefulWidget {
 
 class _PastErrorsPageState extends ConsumerState<PastErrorsPage> {
   bool _starting = false;
+  bool _showDue = false;
   bool _showHistory = false;
 
   @override
@@ -60,20 +61,6 @@ class _PastErrorsPageState extends ConsumerState<PastErrorsPage> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SectionTitle(
-                  'Due now',
-                  count: cards.length,
-                  trailing: Pill(
-                    '${cards.length} waiting',
-                    tone: PillTone.error,
-                  ),
-                ),
-                AppGroup(
-                  children: [
-                    for (final card in cards) _ErrorTile(card: card, due: true),
-                  ],
-                ),
-                const SizedBox(height: 14),
                 AppPrimaryButton(
                   onPressed: _starting ? null : _start,
                   label: _starting
@@ -81,6 +68,22 @@ class _PastErrorsPageState extends ConsumerState<PastErrorsPage> {
                       : 'Review ${cards.length} error${cards.length == 1 ? '' : 's'}',
                   icon: Icons.play_arrow,
                 ),
+                const SizedBox(height: 18),
+                SectionTitle(
+                  'Due now',
+                  count: cards.length,
+                  trailing: M3EButton.text(
+                    onPressed: () => setState(() => _showDue = !_showDue),
+                    child: Text(_showDue ? 'Hide' : 'Show'),
+                  ),
+                ),
+                if (_showDue)
+                  AppGroup(
+                    children: [
+                      for (final card in cards)
+                        _ErrorTile(card: card, due: true),
+                    ],
+                  ),
               ],
             );
           },

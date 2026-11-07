@@ -88,7 +88,7 @@ void main() {
     );
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    expect(find.textContaining('Skipped questions'), findsOneWidget);
+    expect(find.textContaining('Error and skipped cards'), findsOneWidget);
     expect(find.text('Question 1?'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.note_add_outlined));
@@ -107,6 +107,7 @@ void main() {
       () => harness.cards.watchUnhandledSkippedQuestions().first,
     );
     expect(queued, isEmpty);
+    expect(find.textContaining('Basic cards ·'), findsOneWidget);
   });
 
   testWidgets('saved highlights stay visible in the cards view', (
@@ -131,5 +132,6 @@ void main() {
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     expect(find.textContaining('Highlights ·'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
+    expect(find.text('Download all'), findsOneWidget);
   });
 }

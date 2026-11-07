@@ -36,15 +36,24 @@ void main() {
     );
     await pumpFrames(tester);
 
+    await tester.scrollUntilVisible(
+      find.text('Another question'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
     await tester.tap(find.text('Another question'));
     await pumpFrames(tester);
     final fields = find.byType(EditableText);
     expect(fields, findsNWidgets(2));
+    await tester.ensureVisible(fields.at(0));
     await tester.enterText(fields.at(0), 'What is the right answer?');
+    await tester.ensureVisible(fields.at(1));
     await tester.enterText(fields.at(1), 'Correct 1');
     await pumpFrames(tester);
 
     expect(find.textContaining('Fill in both'), findsNothing);
+    await tester.ensureVisible(find.text('Save'));
     await tester.tap(find.text('Save'));
     await pumpFrames(tester, frames: 24);
 

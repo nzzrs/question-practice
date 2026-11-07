@@ -38,6 +38,13 @@ void main() {
     expect(find.text('Your reasoning'), findsOneWidget);
     expect(find.text('I mixed up the storage classes.'), findsOneWidget);
     expect(find.text('Why'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('See other alternatives'));
+    await tester.tap(find.text('See other alternatives'));
+    await pumpFrames(tester);
+    expect(find.text('Hide other alternatives'), findsOneWidget);
+    expect(find.text('Wrong 1'), findsOneWidget);
+    expect(find.text('Wrong: 1 is a distractor.'), findsOneWidget);
   });
 
   testWidgets('unknown review is labelled and keeps the reasoning', (

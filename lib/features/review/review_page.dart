@@ -527,6 +527,8 @@ class _SkippedStep extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: 6),
+              _OtherAlternatives(question: question),
               if (reasoning.trim().isNotEmpty) ...[
                 const SizedBox(height: 12),
                 _ReviewNote(label: 'Your reasoning', text: reasoning),
@@ -592,6 +594,130 @@ class _SkippedStep extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _OtherAlternatives extends StatefulWidget {
+  const _OtherAlternatives({required this.question});
+
+  final Question question;
+
+  @override
+  State<_OtherAlternatives> createState() => _OtherAlternativesState();
+}
+
+class _OtherAlternativesState extends State<_OtherAlternatives> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final indexes = [
+      for (var index = 0; index < widget.question.alternatives.length; index++)
+        if (!widget.question.correctIndexes.contains(index)) index,
+    ];
+    if (indexes.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: M3EButton.text(
+            key: const ValueKey('skipped-review-other-alternatives'),
+            onPressed: () => setState(() => _open = !_open),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_open ? Icons.expand_less : Icons.expand_more, size: 18),
+                const SizedBox(width: 6),
+                Text(
+                  _open ? 'Hide other alternatives' : 'See other alternatives',
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_open) ...[
+          const SizedBox(height: 4),
+          for (final index in indexes)
+            _OtherAlternativeRow(
+              index: index,
+              text: widget.question.alternatives[index],
+              explanation:
+                  index < widget.question.alternativeExplanations.length
+                  ? widget.question.alternativeExplanations[index]
+                  : '',
+            ),
+        ],
+        const SizedBox(height: 2),
+      ],
+    );
+  }
+}
+
+class _OtherAlternativeRow extends StatelessWidget {
+  const _OtherAlternativeRow({
+    required this.index,
+    required this.text,
+    required this.explanation,
+  });
+
+  final int index;
+  final String text;
+  final String explanation;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final letter = String.fromCharCode(65 + index);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              letter,
+              style: theme.typography.baseline.labelSmall.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  text,
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (explanation.trim().isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    explanation,
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

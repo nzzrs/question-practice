@@ -14,10 +14,11 @@ The suite runs on the Dart VM. Drift uses an in-memory SQLite database; HTTP and
 | Import | Schema rejection, JSON syntax paths, BOM/text files, semantic validation, `correctIndex` and `correctIndexes`, duplicate handling, size limit |
 | Practice | Scoring, multi-answer set matching, skipped answers, distraction checked and unchecked after feedback, resume/discard, mixed sessions, summary counts, session arrows |
 | Error queue | Exact 48-hour boundary, due query, resolution, history, wrong retry scheduling |
-| Review | Error steps, shared error-card review view, skipped concept/basic branches, missing definitions, AI bias/vaccine suggestions, structured skipped/unknown review with reasoning |
-| Highlights | Highlight persistence, painted phrases, keep/convert review steps, highlights in Cards |
+| Review | Error steps, shared error-card review view, skipped concept/basic branches, missing definitions, AI bias/vaccine suggestions, structured skipped/unknown review with reasoning and other alternatives |
+| Highlights | Highlight persistence, painted phrases, keep/convert review steps, highlights in Cards, plain-text download |
+| Cards browser | Combined error and skipped section, basic cards, filters, editor switches between concept and basic fields |
 | Ask | AI request carries passage/context/message, plain-text answer, ask sheet and card action |
-| Skipped queue | Persistence across the session, unknown toggle, early finish, late reasoning, Cards section and conversion |
+| Skipped queue | Persistence across the session, unknown toggle, early finish, late reasoning, combined Cards section and conversion |
 | Lookup | OpenAI-compatible and Gemini requests, AI JSON parsing, fenced JSON, 401 fallback, missing key/model, provider model lists, web URL selection, auto-saved concepts |
 | Export | Cloze format, HTML/cloze escaping, six error fields, distractor explanation, multi-answer fields, TSV content, per-topic deck routing, default deck fallback, permission/status failures, partial failures |
 | Data | Topic/practice summaries, accuracy/progress, due counts, unfinished sessions excluded |

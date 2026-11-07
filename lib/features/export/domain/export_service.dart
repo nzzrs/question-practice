@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/data/card_repository.dart';
 import '../../../core/data/practice_repository.dart';
+import '../../../core/domain/models.dart';
 import '../../../core/platform/anki_gateway.dart';
 import 'anki_note_builder.dart';
 
@@ -174,6 +175,49 @@ class ExportService {
         subject: 'Question Practice cards',
         text: 'Anki-compatible cards from Question Practice.',
         files: [for (final file in files) XFile(file.path)],
+      ),
+    );
+  }
+
+  /// Serializes saved highlights as human-readable plain text.
+  String highlightsText(List<StudyHighlight> highlights) {
+    final buffer = StringBuffer('Question Practice highlights\n');
+    buffer.writeln(
+      '${highlights.length} highlight${highlights.length == 1 ? '' : 's'}',
+    );
+    for (final highlight in highlights) {
+      buffer.writeln();
+      buffer.writeln('---');
+      final topic = highlight.topicName.trim();
+      if (topic.isNotEmpty) buffer.writeln('# $topic');
+      buffer.writeln(highlight.text.trim());
+      if (highlight.context.trim().isNotEmpty) {
+        buffer.writeln('Context: ${highlight.context.trim()}');
+      }
+      final status = highlight.hasCard
+          ? 'Card made'
+          : highlight.isKept
+          ? 'Kept'
+          : 'In review';
+      buffer.writeln('Status: $status');
+    }
+    return buffer.toString();
+  }
+
+  /// Writes all highlights to a text file and opens the share sheet.
+  Future<void> shareHighlights(List<StudyHighlight> highlights) async {
+    if (highlights.isEmpty) return;
+    final directory = await getTemporaryDirectory();
+    final stamp = DateFormat('yyyyMMdd-HHmm').format(_clock.now());
+    final file = File(
+      p.join(directory.path, 'question-practice-highlights-$stamp.txt'),
+    );
+    await file.writeAsString(highlightsText(highlights));
+    await SharePlus.instance.share(
+      ShareParams(
+        subject: 'Question Practice highlights',
+        text: 'Saved highlights from Question Practice.',
+        files: [XFile(file.path)],
       ),
     );
   }

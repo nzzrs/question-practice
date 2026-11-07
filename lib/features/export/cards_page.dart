@@ -11,7 +11,7 @@ import '../practice/selectable_linkified_text.dart';
 import 'domain/anki_note_builder.dart';
 import 'new_card_dialog.dart';
 
-enum _Filter { all, concepts, errors, basic, skipped, highlights }
+enum _Filter { all, concepts, review, basic, highlights }
 
 class CardsPage extends ConsumerStatefulWidget {
   const CardsPage({super.key});
@@ -222,36 +222,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             child: Center(child: M3ELoadingIndicator()),
           )
         else ...[
-          if ((_filter == _Filter.all || _filter == _Filter.skipped) &&
-              skipped.isNotEmpty) ...[
-            SectionTitle('Skipped questions', count: skipped.length),
-            AppGroup(
-              children: [
-                for (final question in skipped)
-                  _SkippedRow(
-                    question: question,
-                    onMakeCard: () => _createCardFromSkipped(question),
-                    onDismiss: () => _dismissSkipped(question),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 28),
-          ],
-          if ((_filter == _Filter.all || _filter == _Filter.highlights) &&
-              highlights.isNotEmpty) ...[
-            SectionTitle('Highlights', count: highlights.length),
-            AppGroup(
-              children: [
-                for (final highlight in highlights)
-                  _HighlightRow(
-                    highlight: highlight,
-                    onMakeCard: () => _createCardFromHighlight(highlight),
-                    onDelete: () => _deleteHighlight(highlight),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 28),
-          ],
           if ((_filter == _Filter.all || _filter == _Filter.concepts) &&
               concepts.isNotEmpty) ...[
             SectionTitle(
@@ -300,47 +270,49 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             const SizedBox(height: 28),
           ],
-          if ((_filter == _Filter.all || _filter == _Filter.errors) &&
-              errors.isNotEmpty) ...[
+          if ((_filter == _Filter.all || _filter == _Filter.review) &&
+              (errors.isNotEmpty || skipped.isNotEmpty)) ...[
             SectionTitle(
-              'Error cards',
-              count: errors.length,
-              trailing: _SelectAllButton(
-                allSelected: errors
-                    .where((item) => item.exportedAt == null)
-                    .every((item) => _selectedErrors.contains(item.id)),
-                onPressed: () => setState(() {
-                  final selectable = errors
-                      .where((item) => item.exportedAt == null)
-                      .map((item) => item.id);
-                  if (selectable.every(_selectedErrors.contains)) {
-                    _selectedErrors.removeAll(selectable);
-                  } else {
-                    _selectedErrors.addAll(selectable);
-                  }
-                }),
-              ),
+              'Error and skipped cards',
+              count: errors.length + skipped.length,
+              trailing: errors.isEmpty
+                  ? null
+                  : _SelectAllButton(
+                      allSelected: errors
+                          .where((item) => item.exportedAt == null)
+                          .every((item) => _selectedErrors.contains(item.id)),
+                      onPressed: () => setState(() {
+                        final selectable = errors
+                            .where((item) => item.exportedAt == null)
+                            .map((item) => item.id);
+                        if (selectable.every(_selectedErrors.contains)) {
+                          _selectedErrors.removeAll(selectable);
+                        } else {
+                          _selectedErrors.addAll(selectable);
+                        }
+                      }),
+                    ),
             ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                M3EButton.tonal(
-                  onPressed: errors.isEmpty
-                      ? null
-                      : () => _reviewErrors(errors),
-                  icon: const Icon(Icons.rate_review_outlined),
-                  label: const Text('Review all'),
-                ),
-                if (selectedErrorCards.isNotEmpty && !hasIncompleteSelected)
-                  M3EButton.filled(
-                    onPressed: () => _reviewErrors(selectedErrorCards),
-                    icon: const Icon(Icons.fact_check_outlined),
-                    label: const Text('Review selected'),
+            if (errors.isNotEmpty) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  M3EButton.tonal(
+                    onPressed: () => _reviewErrors(errors),
+                    icon: const Icon(Icons.rate_review_outlined),
+                    label: const Text('Review all'),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
+                  if (selectedErrorCards.isNotEmpty && !hasIncompleteSelected)
+                    M3EButton.filled(
+                      onPressed: () => _reviewErrors(selectedErrorCards),
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: const Text('Review selected'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
             AppGroup(
               children: [
                 for (final card in errors)
@@ -359,6 +331,12 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                         ? () => _reviewErrors([card])
                         : null,
                     onPreview: () => _previewError(card),
+                  ),
+                for (final question in skipped)
+                  _SkippedRow(
+                    question: question,
+                    onMakeCard: () => _createCardFromSkipped(question),
+                    onDismiss: () => _dismissSkipped(question),
                   ),
               ],
             ),
@@ -404,6 +382,37 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               ],
             ),
           ],
+          if ((_filter == _Filter.all || _filter == _Filter.highlights) &&
+              highlights.isNotEmpty) ...[
+            SectionTitle(
+              'Highlights',
+              count: highlights.length,
+              supporting:
+                  'Plain text only. Highlights are never sent to AnkiDroid.',
+              trailing: M3EButton.text(
+                onPressed: _busy ? null : () => _downloadHighlights(highlights),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.download_outlined, size: 18),
+                    SizedBox(width: 6),
+                    Text('Download all'),
+                  ],
+                ),
+              ),
+            ),
+            AppGroup(
+              children: [
+                for (final highlight in highlights)
+                  _HighlightRow(
+                    highlight: highlight,
+                    onMakeCard: () => _createCardFromHighlight(highlight),
+                    onDelete: () => _deleteHighlight(highlight),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 28),
+          ],
           if (!loading &&
               concepts.isEmpty &&
               errors.isEmpty &&
@@ -431,8 +440,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       dialog: M3EDialog(
         title: 'What goes to Anki',
         content: const Text(
-          'Concepts become cloze cards, error cards have six fields, and skipped-question cards are basic front/back. '
-          'Skipped questions stay here until you make a card from them. Each topic uses its own deck; topics without one use the default deck from Settings.',
+          'Concepts become cloze cards, error cards have six fields, and basic cards are front/back. '
+          'Skipped questions stay here until you make a card from them. '
+          'Highlights are never sent to AnkiDroid; use Download all in the Highlights section to save them as plain text. '
+          'Each topic uses its own deck; topics without one use the default deck from Settings.',
         ),
         actions: [
           M3EButton.filled(
@@ -720,6 +731,19 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     if (mounted) await showSnack(context, 'Highlight deleted.');
   }
 
+  Future<void> _downloadHighlights(List<StudyHighlight> highlights) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(exportServiceProvider).shareHighlights(highlights);
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not share highlights: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _createCardFromSkipped(SkippedQuestion question) async {
     final draft = await showNewCardDialog(
       context,
@@ -861,9 +885,8 @@ class _FilterBar extends StatelessWidget {
         for (final entry in const [
           (_Filter.all, 'All'),
           (_Filter.concepts, 'Concepts'),
-          (_Filter.errors, 'Errors'),
+          (_Filter.review, 'Errors & skipped'),
           (_Filter.basic, 'Basic'),
-          (_Filter.skipped, 'Skipped'),
           (_Filter.highlights, 'Highlights'),
         ])
           M3EChip(

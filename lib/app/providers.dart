@@ -131,6 +131,14 @@ final allManualCardsProvider = StreamProvider<List<ManualCard>>(
       ref.watch(cardRepositoryProvider).watchManualCards(includeExported: true),
 );
 
+final skippedQuestionsProvider = StreamProvider<List<SkippedQuestion>>(
+  (ref) => ref.watch(cardRepositoryProvider).watchUnhandledSkippedQuestions(),
+);
+
+final highlightsProvider = StreamProvider<List<StudyHighlight>>(
+  (ref) => ref.watch(cardRepositoryProvider).watchHighlights(),
+);
+
 final httpClientProvider = Provider<http.Client>((ref) {
   final client = http.Client();
   ref.onDispose(client.close);

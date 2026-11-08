@@ -82,6 +82,29 @@ void main() {
     ]);
   });
 
+  test('basic cards put the source context above the question', () {
+    final basic = ManualCard(
+      id: 3,
+      sessionId: 1,
+      questionId: 7,
+      question: 'What is a subnet?',
+      answer: 'A range of IP addresses.',
+      context: 'IPv4 addresses are split into networks.',
+      topicName: 'Networking basics',
+      createdAt: DateTime.utc(2026),
+      exportedAt: null,
+    );
+    final files = builder.files(ExportSelection(manualCards: [basic]));
+    expect(files.basic, contains('IPv4 addresses are split'));
+    expect(files.basic, contains('What is a subnet?'));
+    expect(files.basic, endsWith('\tA range of IP addresses.'));
+
+    final note = builder.notes(ExportSelection(manualCards: [basic])).single;
+    expect(note.fields.first, contains('IPv4 addresses are split'));
+    expect(note.fields.first, contains('What is a subnet?'));
+    expect(note.fields.last, 'A range of IP addresses.');
+  });
+
   test('files contain the selected cards only', () {
     final concept = _concept();
     final basic = ManualCard(

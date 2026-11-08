@@ -178,4 +178,42 @@ void main() {
     expect(outcome.success, isFalse);
     expect(gateway.importedNotes, isEmpty);
   });
+
+  test('highlights serialize as plain text outside the Anki selection', () {
+    final text = service.highlightsText([
+      StudyHighlight(
+        id: 1,
+        sessionId: 1,
+        questionId: 1,
+        text: 'managed service',
+        context: 'Which platform is fully managed?',
+        topicName: 'Cloud',
+        practiceName: 'Core',
+        createdAt: harness.clock.now().toUtc(),
+        keptAt: harness.clock.now().toUtc(),
+        cardCreatedAt: null,
+        manualCardId: null,
+      ),
+      StudyHighlight(
+        id: 2,
+        sessionId: 1,
+        questionId: 2,
+        text: 'load balancer',
+        context: 'What spreads traffic?',
+        topicName: 'Cloud',
+        practiceName: 'Core',
+        createdAt: harness.clock.now().toUtc(),
+        keptAt: null,
+        cardCreatedAt: harness.clock.now().toUtc(),
+        manualCardId: 7,
+      ),
+    ]);
+
+    expect(text, contains('Question Practice highlights'));
+    expect(text, contains('# Cloud'));
+    expect(text, contains('managed service'));
+    expect(text, contains('Context: Which platform is fully managed?'));
+    expect(text, contains('Status: Kept'));
+    expect(text, contains('Status: Card made'));
+  });
 }

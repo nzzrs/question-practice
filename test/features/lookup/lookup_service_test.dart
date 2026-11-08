@@ -348,6 +348,8 @@ void main() {
       final result = await serviceWith(client).checkErrorNotes(
         question: 'Which storage class?',
         correctAnswer: 'Coldline',
+        wrongAnswer: 'Standard',
+        reasoning: 'All storage classes looked the same to me.',
         bias: 'I assumed all storage classes cost the same.',
         vaccine: 'Remember that storage classes differ in price.',
       );
@@ -366,6 +368,119 @@ void main() {
     },
   );
 
+  test(
+    'AI review check sends the learner reasoning and returns short suggestions',
+    () async {
+      await useAi();
+      String? userPrompt;
+      String? systemPrompt;
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final messages = body['messages'] as List<dynamic>;
+        systemPrompt =
+            (messages.first as Map<String, dynamic>)['content'] as String;
+        userPrompt =
+            (messages.last as Map<String, dynamic>)['content'] as String;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({
+                    'consistent': false,
+                    'feedback': 'The note does not address the mix-up.',
+                    'bias': 'Confused the cold tier with the standard tier.',
+                    'vaccine': 'Check the tier before comparing prices.',
+                  }),
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final result = await serviceWith(client).checkErrorNotes(
+        question: 'Which storage class?',
+        correctAnswer: 'Coldline',
+        wrongAnswer: 'Standard',
+        reasoning: 'I thought the cheapest class was the cold one.',
+        bias: 'I read the price table backwards.',
+        vaccine: 'Read the table again.',
+      );
+
+      expect(result.consistent, isFalse);
+      expect(result.biasSuggestion, contains('cold tier'));
+      expect(result.vaccineSuggestion, contains('tier'));
+      expect(userPrompt, contains('Chosen wrong answer: Standard'));
+      expect(userPrompt, contains('Learner reasoning: I thought the cheapest'));
+      expect(systemPrompt, contains('learner'));
+      expect(systemPrompt, contains('one-phrase'));
+    },
+  );
+
+  test('ask sends the passage and the learner message as plain text', () async {
+    await useAi();
+    String? userPrompt;
+    String? systemPrompt;
+    Map<String, dynamic>? requestBody;
+    final client = MockClient((request) async {
+      requestBody = jsonDecode(request.body) as Map<String, dynamic>;
+      final messages = requestBody!['messages'] as List<dynamic>;
+      systemPrompt =
+          (messages.first as Map<String, dynamic>)['content'] as String;
+      userPrompt = (messages.last as Map<String, dynamic>)['content'] as String;
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'content': 'It distributes traffic across several backends.',
+              },
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    final answer = await serviceWith(client).ask(
+      selection: 'load balancer',
+      question: 'Which component spreads requests?',
+      topicName: 'Cloud',
+      userQuestion: 'What does this do in practice?',
+    );
+
+    expect(answer, 'It distributes traffic across several backends.');
+    expect(userPrompt, contains('Highlighted passage: load balancer'));
+    expect(
+      userPrompt,
+      contains('Learner question: What does this do in practice?'),
+    );
+    expect(
+      userPrompt,
+      contains('Question context: Which component spreads requests?'),
+    );
+    expect(systemPrompt, contains('highlighted passage'));
+    expect(requestBody!.containsKey('response_format'), isFalse);
+  });
+
+  test('ask needs a saved API key', () async {
+    await harness.settings.save(
+      const AppSettings(lookupMode: LookupMode.ai, aiModel: 'test-model'),
+    );
+
+    await expectLater(
+      serviceWith(MockClient((_) async => http.Response('{}', 200))).ask(
+        selection: 'term',
+        question: 'Question',
+        topicName: 'Topic',
+        userQuestion: 'Why?',
+      ),
+      throwsA(isA<LookupException>()),
+    );
+  });
+
   test('AI review check needs a saved API key', () async {
     await harness.settings.save(
       const AppSettings(
@@ -380,6 +495,8 @@ void main() {
           .checkErrorNotes(
             question: 'Question',
             correctAnswer: 'Answer',
+            wrongAnswer: 'Wrong',
+            reasoning: 'Reason',
             bias: 'Bias',
             vaccine: 'Vaccine',
           ),

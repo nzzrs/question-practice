@@ -163,11 +163,76 @@ class ManualCards extends Table {
     #id,
     onDelete: KeyAction.cascade,
   )();
+  IntColumn get questionId => integer().nullable().references(
+    Questions,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
   TextColumn get question => text()();
   TextColumn get answer => text()();
+
+  /// Optional source passage shown above the question on the card front.
+  TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get exportedAt => dateTime().nullable()();
+}
+
+@DataClassName('SkippedQuestionRow')
+@TableIndex(name: 'skipped_questions_handled', columns: {#handledAt})
+@TableIndex(name: 'skipped_questions_session', columns: {#sessionId})
+class SkippedQuestions extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get sessionId => integer().nullable().references(
+    Sessions,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
+  IntColumn get questionId =>
+      integer().references(Questions, #id, onDelete: KeyAction.cascade)();
+  TextColumn get question => text()();
+  TextColumn get alternativesJson => text()();
+  TextColumn get correctIndexesJson =>
+      text().withDefault(const Constant('[0]'))();
+  TextColumn get explanation => text().withDefault(const Constant(''))();
+  TextColumn get alternativeExplanationsJson =>
+      text().withDefault(const Constant('[]'))();
+  TextColumn get reasoning => text().withDefault(const Constant(''))();
+  TextColumn get topicName => text().withDefault(const Constant(''))();
+  TextColumn get practiceName => text().withDefault(const Constant(''))();
+  BoolColumn get unknown => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get handledAt => dateTime().nullable()();
+  TextColumn get handledKind => text().nullable()();
+}
+
+@DataClassName('HighlightRow')
+@TableIndex(name: 'highlights_session', columns: {#sessionId})
+@TableIndex(name: 'highlights_question', columns: {#questionId})
+class Highlights extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get sessionId => integer().nullable().references(
+    Sessions,
+    #id,
+    onDelete: KeyAction.cascade,
+  )();
+  IntColumn get questionId => integer().nullable().references(
+    Questions,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
+  TextColumn get phrase => text()();
+  TextColumn get context => text().withDefault(const Constant(''))();
+  TextColumn get topicName => text().withDefault(const Constant(''))();
+  TextColumn get practiceName => text().withDefault(const Constant(''))();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get keptAt => dateTime().nullable()();
+  DateTimeColumn get cardCreatedAt => dateTime().nullable()();
+  IntColumn get manualCardId => integer().nullable().references(
+    ManualCards,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
 }
 
 @DataClassName('SettingRow')

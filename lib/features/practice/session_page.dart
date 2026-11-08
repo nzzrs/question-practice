@@ -10,6 +10,7 @@ import '../../core/domain/models.dart';
 import '../../core/platform/practice_sound_player.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/lookup_actions.dart';
+import '../lookup/ask_sheet.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/selectable_linkified_text.dart';
 import '../practice/summary_page.dart';
@@ -34,6 +35,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   SessionQuestionItem? _item;
   int _index = 0;
   final _selectedIndexes = <int>{};
+  final _highlights = <int, Set<String>>{};
   bool _submitted = false;
   bool _submitting = false;
   bool _distracted = false;
@@ -62,9 +64,64 @@ class _SessionPageState extends ConsumerState<SessionPage>
         : _start.currentIndex.clamp(0, _start.items.length - 1).toInt();
     _item = _start.items.isEmpty ? null : _start.items[_index];
     _loadQuestionState();
+    unawaited(_loadHighlights());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_item == null) _finishExisting();
     });
+  }
+
+  Future<void> _loadHighlights() async {
+    try {
+      final highlights = await ref
+          .read(cardRepositoryProvider)
+          .highlightsForSession(_start.session.id);
+      if (!mounted) return;
+      setState(() {
+        _highlights.clear();
+        for (final highlight in highlights) {
+          final questionId = highlight.questionId;
+          if (questionId == null) continue;
+          (_highlights[questionId] ??= <String>{}).add(highlight.text);
+        }
+      });
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not load highlights: $error');
+      }
+    }
+  }
+
+  Future<void> _addHighlight(String selection, Rect? anchor) async {
+    final item = _item;
+    if (item == null) return;
+    final text = selection.trim();
+    if (text.isEmpty) return;
+    if (_highlights[item.question.id]?.contains(text) ?? false) {
+      await showSnack(context, 'That phrase is already highlighted.');
+      return;
+    }
+    try {
+      await ref
+          .read(cardRepositoryProvider)
+          .createHighlight(
+            sessionId: _start.session.id,
+            questionId: item.question.id,
+            text: text,
+            context: item.question.prompt,
+            topicName: item.topicName,
+            practiceName: item.practiceName,
+            createdAt: ref.read(clockProvider).now().toUtc(),
+          );
+      if (!mounted) return;
+      setState(() {
+        (_highlights[item.question.id] ??= <String>{}).add(text);
+      });
+      await showSnack(context, 'Highlight saved. It is ready in the review.');
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not save the highlight: $error');
+      }
+    }
   }
 
   @override
@@ -476,6 +533,20 @@ class _SessionPageState extends ConsumerState<SessionPage>
     return openStudyUrl(context, ref, value);
   }
 
+  Future<void> _openAsk(String selection, Rect? anchor) async {
+    final item = _item;
+    if (item == null) return;
+    await showAskAboutSelection(
+      context,
+      selection: selection,
+      question: item.question.prompt,
+      topicName: item.topicName,
+      practiceName: item.practiceName,
+      sessionId: _start.session.id,
+      questionId: item.question.id,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final item = _item;
@@ -578,6 +649,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   ),
                   onDefine: _openLookup,
                   onOpenUrl: _openUrl,
+                  onHighlight: _addHighlight,
+                  onAsk: _openAsk,
+                  highlights:
+                      _highlights[item.question.id]?.toList() ?? const [],
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -621,6 +696,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
                           : '',
                       onDefine: _openLookup,
                       onOpenUrl: _openUrl,
+                      onHighlight: _addHighlight,
+                      onAsk: _openAsk,
+                      highlights:
+                          _highlights[item.question.id]?.toList() ?? const [],
                       onPressed: _submitted
                           ? null
                           : () => setState(() {
@@ -1063,6 +1142,9 @@ class _OptionCard extends StatefulWidget {
     required this.explanation,
     required this.onDefine,
     required this.onOpenUrl,
+    required this.onHighlight,
+    required this.onAsk,
+    required this.highlights,
     required this.onPressed,
     super.key,
   });
@@ -1077,6 +1159,9 @@ class _OptionCard extends StatefulWidget {
   final String explanation;
   final void Function(String selection, Rect? anchor) onDefine;
   final ValueChanged<String> onOpenUrl;
+  final Future<void> Function(String selection, Rect? anchor) onHighlight;
+  final Future<void> Function(String selection, Rect? anchor) onAsk;
+  final List<String> highlights;
   final VoidCallback? onPressed;
 
   @override
@@ -1243,6 +1328,9 @@ class _OptionCardState extends State<_OptionCard> {
                           ),
                           onDefine: widget.onDefine,
                           onOpenUrl: widget.onOpenUrl,
+                          onHighlight: widget.onHighlight,
+                          onAsk: widget.onAsk,
+                          highlights: widget.highlights,
                         ),
                         if (widget.submitted &&
                             widget.explanation.isNotEmpty &&
@@ -1256,6 +1344,9 @@ class _OptionCardState extends State<_OptionCard> {
                             ),
                             onDefine: widget.onDefine,
                             onOpenUrl: widget.onOpenUrl,
+                            onHighlight: widget.onHighlight,
+                            onAsk: widget.onAsk,
+                            highlights: widget.highlights,
                           ),
                         ],
                       ],

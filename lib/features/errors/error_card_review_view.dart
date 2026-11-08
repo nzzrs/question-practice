@@ -6,6 +6,7 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../../app/providers.dart';
 import '../lookup/domain/lookup_service.dart';
+import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
 
@@ -45,6 +46,18 @@ class ErrorCardReviewView extends ConsumerWidget {
 
     void openUrl(String value) => openStudyUrl(context, ref, value);
 
+    Future<void> ask(String selection, Rect? anchor) {
+      return showAskAboutSelection(
+        context,
+        selection: selection,
+        question: card.question,
+        topicName: card.topicName,
+        practiceName: card.practiceName,
+        sessionId: card.sessionId,
+        questionId: card.questionId,
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -60,6 +73,7 @@ class ErrorCardReviewView extends ConsumerWidget {
                 ),
                 onDefine: define,
                 onOpenUrl: openUrl,
+                onAsk: ask,
               ),
               const SizedBox(height: 12),
               _AnswerBox(
@@ -69,6 +83,7 @@ class ErrorCardReviewView extends ConsumerWidget {
                 foreground: theme.colorScheme.onErrorContainer,
                 onDefine: define,
                 onOpenUrl: openUrl,
+                onAsk: ask,
               ),
               const SizedBox(height: 8),
               _AnswerBox(
@@ -78,6 +93,7 @@ class ErrorCardReviewView extends ConsumerWidget {
                 foreground: AppSuccess.onContainer(context),
                 onDefine: define,
                 onOpenUrl: openUrl,
+                onAsk: ask,
               ),
               if (card.reasoning.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -95,6 +111,7 @@ class ErrorCardReviewView extends ConsumerWidget {
                   ),
                   onDefine: define,
                   onOpenUrl: openUrl,
+                  onAsk: ask,
                 ),
               ],
               if (card.topicName.isNotEmpty) ...[
@@ -107,7 +124,12 @@ class ErrorCardReviewView extends ConsumerWidget {
         if (card.explanation.isNotEmpty ||
             card.alternativeExplanations.isNotEmpty) ...[
           const SizedBox(height: 12),
-          _ExplanationBox(card: card, onDefine: define, onOpenUrl: openUrl),
+          _ExplanationBox(
+            card: card,
+            onDefine: define,
+            onOpenUrl: openUrl,
+            onAsk: ask,
+          ),
         ],
         const SizedBox(height: 8),
         Padding(
@@ -149,6 +171,8 @@ class ErrorCardReviewView extends ConsumerWidget {
         _ReviewCheck(
           question: card.question,
           correctAnswer: card.correctAnswer,
+          wrongAnswer: card.wrongAnswer,
+          reasoning: card.reasoning,
           bias: bias,
           vaccine: vaccine,
         ),
@@ -161,12 +185,16 @@ class _ReviewCheck extends ConsumerStatefulWidget {
   const _ReviewCheck({
     required this.question,
     required this.correctAnswer,
+    required this.wrongAnswer,
+    required this.reasoning,
     required this.bias,
     required this.vaccine,
   });
 
   final String question;
   final String correctAnswer;
+  final String wrongAnswer;
+  final String reasoning;
   final TextEditingController bias;
   final TextEditingController vaccine;
 
@@ -195,6 +223,8 @@ class _ReviewCheckState extends ConsumerState<_ReviewCheck> {
           .checkErrorNotes(
             question: widget.question,
             correctAnswer: widget.correctAnswer,
+            wrongAnswer: widget.wrongAnswer,
+            reasoning: widget.reasoning,
             bias: bias,
             vaccine: vaccine,
           );
@@ -258,8 +288,95 @@ class _ReviewCheckState extends ConsumerState<_ReviewCheck> {
               ],
             ),
           ),
+          if (result.biasSuggestion.isNotEmpty ||
+              result.vaccineSuggestion.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            TonalBox(
+              key: const ValueKey('error-review-suggestions'),
+              padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Suggestions',
+                    style: theme.typography.baseline.labelMedium.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (result.biasSuggestion.isNotEmpty)
+                    _SuggestionRow(
+                      label: 'Flawed assumption',
+                      text: result.biasSuggestion,
+                      onUse: () => widget.bias
+                        ..text = result.biasSuggestion
+                        ..selection = TextSelection.collapsed(
+                          offset: result.biasSuggestion.length,
+                        ),
+                    ),
+                  if (result.vaccineSuggestion.isNotEmpty)
+                    _SuggestionRow(
+                      label: 'Vaccine',
+                      text: result.vaccineSuggestion,
+                      onUse: () => widget.vaccine
+                        ..text = result.vaccineSuggestion
+                        ..selection = TextSelection.collapsed(
+                          offset: result.vaccineSuggestion.length,
+                        ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ],
+    );
+  }
+}
+
+class _SuggestionRow extends StatelessWidget {
+  const _SuggestionRow({
+    required this.label,
+    required this.text,
+    required this.onUse,
+  });
+
+  final String label;
+  final String text;
+  final VoidCallback onUse;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: theme.typography.baseline.labelSmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  text,
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          M3EButton.text(onPressed: onUse, child: const Text('Use')),
+        ],
+      ),
     );
   }
 }
@@ -269,11 +386,13 @@ class _ExplanationBox extends StatelessWidget {
     required this.card,
     required this.onDefine,
     required this.onOpenUrl,
+    required this.onAsk,
   });
 
   final ErrorCard card;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
+  final Future<void> Function(String, Rect?) onAsk;
 
   @override
   Widget build(BuildContext context) {
@@ -307,6 +426,7 @@ class _ExplanationBox extends StatelessWidget {
               style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
               onDefine: onDefine,
               onOpenUrl: onOpenUrl,
+              onAsk: onAsk,
             ),
           ],
           if (hasExplanations) ...[
@@ -331,6 +451,7 @@ class _ExplanationBox extends StatelessWidget {
                   isWrong: card.wrongIndexes.contains(index),
                   onDefine: onDefine,
                   onOpenUrl: onOpenUrl,
+                  onAsk: onAsk,
                 ),
           ],
         ],
@@ -348,6 +469,7 @@ class _AlternativeExplanation extends StatefulWidget {
     required this.isWrong,
     required this.onDefine,
     required this.onOpenUrl,
+    required this.onAsk,
   });
 
   final int index;
@@ -357,6 +479,7 @@ class _AlternativeExplanation extends StatefulWidget {
   final bool isWrong;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
+  final Future<void> Function(String, Rect?) onAsk;
 
   @override
   State<_AlternativeExplanation> createState() =>
@@ -418,6 +541,7 @@ class _AlternativeExplanationState extends State<_AlternativeExplanation> {
                   ),
                   onDefine: widget.onDefine,
                   onOpenUrl: widget.onOpenUrl,
+                  onAsk: widget.onAsk,
                 ),
                 if (_open) ...[
                   const SizedBox(height: 2),
@@ -429,6 +553,7 @@ class _AlternativeExplanationState extends State<_AlternativeExplanation> {
                     ),
                     onDefine: widget.onDefine,
                     onOpenUrl: widget.onOpenUrl,
+                    onAsk: widget.onAsk,
                   ),
                 ],
               ],
@@ -504,6 +629,7 @@ class _AnswerBox extends StatelessWidget {
     required this.foreground,
     required this.onDefine,
     required this.onOpenUrl,
+    required this.onAsk,
   });
 
   final String label;
@@ -512,6 +638,7 @@ class _AnswerBox extends StatelessWidget {
   final Color foreground;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
+  final Future<void> Function(String, Rect?) onAsk;
 
   @override
   Widget build(BuildContext context) {
@@ -541,6 +668,7 @@ class _AnswerBox extends StatelessWidget {
             ),
             onDefine: onDefine,
             onOpenUrl: onOpenUrl,
+            onAsk: onAsk,
           ),
         ],
       ),

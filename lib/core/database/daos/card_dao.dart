@@ -7,7 +7,9 @@ import '../tables.dart';
 
 part 'card_dao.g.dart';
 
-@DriftAccessor(tables: [Concepts, ErrorCards, ManualCards])
+@DriftAccessor(
+  tables: [Concepts, ErrorCards, ManualCards, SkippedQuestions, Highlights],
+)
 class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   CardDao(super.db);
 
@@ -209,6 +211,112 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
 
   Future<int> insertManualCard(ManualCardsCompanion card) {
     return into(manualCards).insert(card);
+  }
+
+  Stream<List<SkippedQuestionRow>> watchUnhandledSkippedQuestions() {
+    return (select(skippedQuestions)
+          ..where((s) => s.handledAt.isNull())
+          ..orderBy([(s) => OrderingTerm.desc(s.createdAt)]))
+        .watch();
+  }
+
+  Future<List<SkippedQuestionRow>> skippedQuestionsForSession(int sessionId) {
+    return (select(skippedQuestions)
+          ..where((s) => s.sessionId.equals(sessionId))
+          ..orderBy([(s) => OrderingTerm.asc(s.id)]))
+        .get();
+  }
+
+  Future<SkippedQuestionRow?> skippedQuestionFor(
+    int sessionId,
+    int questionId,
+  ) {
+    return (select(skippedQuestions)
+          ..where(
+            (s) =>
+                s.sessionId.equals(sessionId) & s.questionId.equals(questionId),
+          )
+          ..orderBy([(s) => OrderingTerm.desc(s.id)])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
+  Future<int> insertSkippedQuestion(SkippedQuestionsCompanion question) {
+    return into(skippedQuestions).insert(question);
+  }
+
+  Future<void> updateSkippedQuestion(
+    int id, {
+    required String reasoning,
+    required bool unknown,
+    required DateTime createdAt,
+  }) {
+    return (update(skippedQuestions)..where((s) => s.id.equals(id))).write(
+      SkippedQuestionsCompanion(
+        reasoning: Value(reasoning),
+        unknown: Value(unknown),
+        createdAt: Value(createdAt),
+        handledAt: const Value(null),
+        handledKind: const Value(null),
+      ),
+    );
+  }
+
+  Future<void> markSkippedQuestionHandled(
+    int id,
+    DateTime handledAt,
+    String kind,
+  ) {
+    return (update(skippedQuestions)..where((s) => s.id.equals(id))).write(
+      SkippedQuestionsCompanion(
+        handledAt: Value(handledAt),
+        handledKind: Value(kind),
+      ),
+    );
+  }
+
+  Future<void> deleteSkippedQuestion(int id) {
+    return (delete(skippedQuestions)..where((s) => s.id.equals(id))).go();
+  }
+
+  Future<int> insertHighlight(HighlightsCompanion highlight) {
+    return into(highlights).insert(highlight);
+  }
+
+  Stream<List<HighlightRow>> watchHighlights() {
+    return (select(
+      highlights,
+    )..orderBy([(h) => OrderingTerm.desc(h.createdAt)])).watch();
+  }
+
+  Future<List<HighlightRow>> highlightsForSession(int sessionId) {
+    return (select(highlights)
+          ..where((h) => h.sessionId.equals(sessionId))
+          ..orderBy([(h) => OrderingTerm.asc(h.id)]))
+        .get();
+  }
+
+  Future<void> markHighlightKept(int id, DateTime keptAt) {
+    return (update(highlights)..where((h) => h.id.equals(id))).write(
+      HighlightsCompanion(keptAt: Value(keptAt)),
+    );
+  }
+
+  Future<void> markHighlightConverted(
+    int id, {
+    required DateTime cardCreatedAt,
+    int? manualCardId,
+  }) {
+    return (update(highlights)..where((h) => h.id.equals(id))).write(
+      HighlightsCompanion(
+        cardCreatedAt: Value(cardCreatedAt),
+        manualCardId: Value(manualCardId),
+      ),
+    );
+  }
+
+  Future<void> deleteHighlight(int id) {
+    return (delete(highlights)..where((h) => h.id.equals(id))).go();
   }
 
   Future<void> markManualCardsExported(

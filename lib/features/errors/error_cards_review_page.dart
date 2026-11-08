@@ -5,16 +5,21 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
+import '../export/new_card_dialog.dart';
 import 'error_card_review_view.dart';
+import '../review/skipped_question_view.dart';
 
+/// Reviews error cards and skipped questions together.
 class ErrorCardsReviewPage extends ConsumerStatefulWidget {
   const ErrorCardsReviewPage({
     required this.cards,
-    this.title = 'Review error cards',
+    this.skippedQuestions = const [],
+    this.title = 'Review cards',
     super.key,
   });
 
   final List<ErrorCard> cards;
+  final List<SkippedQuestion> skippedQuestions;
   final String title;
 
   @override
@@ -22,9 +27,29 @@ class ErrorCardsReviewPage extends ConsumerStatefulWidget {
       _ErrorCardsReviewPageState();
 }
 
+sealed class _ReviewStep {
+  const _ReviewStep();
+}
+
+class _ErrorStep extends _ReviewStep {
+  const _ErrorStep(this.card);
+
+  final ErrorCard card;
+}
+
+class _SkippedStep extends _ReviewStep {
+  const _SkippedStep(this.question);
+
+  final SkippedQuestion question;
+}
+
 class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
   final _bias = TextEditingController();
   final _vaccine = TextEditingController();
+  late final List<_ReviewStep> _steps = [
+    for (final card in widget.cards) _ErrorStep(card),
+    for (final question in widget.skippedQuestions) _SkippedStep(question),
+  ];
   int _index = 0;
   int _saved = 0;
   bool _busy = false;
@@ -33,7 +58,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
   @override
   void initState() {
     super.initState();
-    _prepareCard();
+    _prepareStep();
   }
 
   @override
@@ -43,30 +68,32 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
     super.dispose();
   }
 
-  ErrorCard? get _card =>
-      _index < widget.cards.length ? widget.cards[_index] : null;
+  _ReviewStep? get _step => _index < _steps.length ? _steps[_index] : null;
 
-  void _prepareCard() {
-    final card = _card;
-    _bias.text = card?.bias ?? '';
-    _vaccine.text = card?.vaccine ?? '';
+  void _prepareStep() {
+    final step = _step;
+    if (step is _ErrorStep) {
+      _bias.text = step.card.bias;
+      _vaccine.text = step.card.vaccine;
+    } else {
+      _bias.clear();
+      _vaccine.clear();
+    }
   }
 
   void _advance() {
-    if (_index + 1 >= widget.cards.length) {
+    if (_index + 1 >= _steps.length) {
       setState(() => _finished = true);
       ref.invalidate(homeStatsProvider);
       return;
     }
     setState(() {
       _index++;
-      _prepareCard();
+      _prepareStep();
     });
   }
 
-  Future<void> _save() async {
-    final card = _card;
-    if (card == null) return;
+  Future<void> _saveError(_ErrorStep step) async {
     if (_bias.text.trim().isEmpty || _vaccine.text.trim().isEmpty) {
       await showSnack(
         context,
@@ -79,7 +106,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
       await ref
           .read(reviewServiceProvider)
           .saveErrorDetails(
-            cardId: card.id,
+            cardId: step.card.id,
             bias: _bias.text,
             vaccine: _vaccine.text,
           );
@@ -90,10 +117,54 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
     }
   }
 
+  Future<void> _makeSkippedCard(_SkippedStep step) async {
+    final question = step.question;
+    final draft = await showNewCardDialog(
+      context,
+      title: 'Turn this skipped question into a card',
+      contextText: question.question,
+      initialTerm: '',
+      initialQuestion: question.question,
+      initialAnswer: question.correctAnswer,
+      initialKind: NewCardKind.basic,
+    );
+    if (draft == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final service = ref.read(reviewServiceProvider);
+      if (draft.kind == NewCardKind.concept) {
+        await service.createConcept(
+          sessionId: question.sessionId,
+          questionId: question.questionId,
+          term: draft.term,
+          definition: draft.definition,
+          context: question.question,
+          topicName: question.topicName,
+          source: ConceptSource.manual,
+          skippedQuestionId: question.id,
+        );
+      } else {
+        await service.createBasicCard(
+          sessionId: question.sessionId,
+          questionId: question.questionId,
+          question: draft.question,
+          answer: draft.answer,
+          context: question.question,
+          topicName: question.topicName,
+          skippedQuestionId: question.id,
+        );
+      }
+      _saved++;
+      _advance();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    if (widget.cards.isEmpty) {
+    if (_steps.isEmpty) {
       return AppPage(
         title: widget.title,
         showBack: true,
@@ -101,8 +172,8 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
         children: const [
           EmptyState(
             icon: Icons.style_outlined,
-            title: 'No error cards',
-            message: 'Wrong answers create error cards for review.',
+            title: 'Nothing to review',
+            message: 'Wrong answers create error cards; skipped answers wait here too.',
           ),
         ],
       );
@@ -124,7 +195,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
           Text(
             _saved == 0
                 ? 'No card details were saved.'
-                : '$_saved card${_saved == 1 ? '' : 's'} updated.',
+                : '$_saved card${_saved == 1 ? '' : 's'} completed or created.',
             textAlign: TextAlign.center,
             style: theme.typography.baseline.bodyMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -140,7 +211,8 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
       );
     }
 
-    final card = _card!;
+    final step = _step!;
+    final isSkipped = step is _SkippedStep;
     return AppPage(
       title: widget.title,
       showBack: true,
@@ -150,9 +222,22 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
           children: [
             Expanded(
               child: AppPrimaryButton(
-                onPressed: _busy ? null : _save,
-                label: _busy ? 'Saving…' : 'Save',
-                icon: Icons.check,
+                onPressed: _busy
+                    ? null
+                    : () {
+                        switch (step) {
+                          case _ErrorStep():
+                            _saveError(step);
+                          case _SkippedStep():
+                            _makeSkippedCard(step);
+                        }
+                      },
+                label: _busy
+                    ? 'Saving…'
+                    : isSkipped
+                    ? 'Make a card'
+                    : 'Save',
+                icon: isSkipped ? Icons.style_outlined : Icons.check,
               ),
             ),
             const SizedBox(width: 8),
@@ -165,22 +250,52 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
       ),
       children: [
         Text(
-          'Card ${_index + 1} of ${widget.cards.length}',
+          'Item ${_index + 1} of ${_steps.length}',
           style: theme.typography.baseline.labelMedium.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 8),
-        LinearScore(value: (_index + 1) / widget.cards.length),
+        LinearScore(value: (_index + 1) / _steps.length),
         const SizedBox(height: 22),
-        Text(
-          card.needsDetails
-              ? 'Complete the error card'
-              : 'Check the error card',
-          style: theme.typography.emphasized.headlineSmall,
-        ),
+        Text(switch (step) {
+          _ErrorStep(:final card) =>
+            card.needsDetails
+                ? 'Complete the error card'
+                : 'Check the error card',
+          _SkippedStep() => 'Review the skipped question',
+        }, style: theme.typography.emphasized.headlineSmall),
         const SizedBox(height: 16),
-        ErrorCardReviewView(card: card, bias: _bias, vaccine: _vaccine),
+        switch (step) {
+          _ErrorStep(:final card) => ErrorCardReviewView(
+            card: card,
+            bias: _bias,
+            vaccine: _vaccine,
+          ),
+          _SkippedStep(:final question) => Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkippedQuestionView(
+                prompt: question.question,
+                alternatives: question.alternatives,
+                correctIndexes: question.correctIndexes,
+                alternativeExplanations: question.alternativeExplanations,
+                explanation: question.explanation,
+                reasoning: question.reasoning,
+                topicName: question.topicName,
+                unknown: question.unknown,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Make a concept or basic card, or skip to leave it in the queue.',
+                style: theme.typography.baseline.bodySmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        },
       ],
     );
   }

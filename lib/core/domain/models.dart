@@ -421,15 +421,100 @@ class ManualCard {
     required this.topicName,
     required this.createdAt,
     required this.exportedAt,
+    this.questionId,
+    this.context = '',
   });
 
   final int id;
   final int? sessionId;
+  final int? questionId;
   final String question;
   final String answer;
+
+  /// Passage shown above the question on the card front, when one exists.
+  final String context;
   final String topicName;
   final DateTime createdAt;
   final DateTime? exportedAt;
+}
+
+@immutable
+class SkippedQuestion {
+  const SkippedQuestion({
+    required this.id,
+    required this.sessionId,
+    required this.questionId,
+    required this.question,
+    required this.alternatives,
+    required this.correctIndexes,
+    required this.explanation,
+    required this.alternativeExplanations,
+    required this.reasoning,
+    required this.topicName,
+    required this.practiceName,
+    required this.unknown,
+    required this.createdAt,
+    required this.handledAt,
+    required this.handledKind,
+  });
+
+  final int id;
+  final int? sessionId;
+  final int questionId;
+  final String question;
+  final List<String> alternatives;
+  final List<int> correctIndexes;
+  final String explanation;
+  final List<String> alternativeExplanations;
+  final String reasoning;
+  final String topicName;
+  final String practiceName;
+  final bool unknown;
+  final DateTime createdAt;
+  final DateTime? handledAt;
+  final String? handledKind;
+
+  bool get isHandled => handledAt != null;
+
+  List<String> get correctAnswers => [
+    for (final index in correctIndexes)
+      if (index >= 0 && index < alternatives.length) alternatives[index],
+  ];
+
+  String get correctAnswer => correctAnswers.join('; ');
+}
+
+@immutable
+class StudyHighlight {
+  const StudyHighlight({
+    required this.id,
+    required this.sessionId,
+    required this.questionId,
+    required this.text,
+    required this.context,
+    required this.topicName,
+    required this.practiceName,
+    required this.createdAt,
+    required this.keptAt,
+    required this.cardCreatedAt,
+    required this.manualCardId,
+  });
+
+  final int id;
+  final int? sessionId;
+  final int? questionId;
+  final String text;
+  final String context;
+  final String topicName;
+  final String practiceName;
+  final DateTime createdAt;
+  final DateTime? keptAt;
+  final DateTime? cardCreatedAt;
+  final int? manualCardId;
+
+  bool get isKept => keptAt != null;
+  bool get hasCard => cardCreatedAt != null;
+  bool get needsReview => !isKept && !hasCard;
 }
 
 @immutable

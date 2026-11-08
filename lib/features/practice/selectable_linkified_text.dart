@@ -1,14 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Selectable text with a Define action and tappable http(s) links.
+/// Selectable text with Define and Highlight actions, plus tappable links.
 class SelectableLinkifiedText extends StatefulWidget {
   const SelectableLinkifiedText({
     required this.text,
     required this.style,
     required this.onDefine,
     required this.onOpenUrl,
+    this.onHighlight,
+    this.onAsk,
+    this.highlights = const [],
     this.selectable = true,
     super.key,
   });
@@ -17,6 +22,15 @@ class SelectableLinkifiedText extends StatefulWidget {
   final TextStyle style;
   final void Function(String selection, Rect? anchor) onDefine;
   final ValueChanged<String> onOpenUrl;
+
+  /// Saves the selected phrase as a highlight.
+  final Future<void> Function(String selection, Rect? anchor)? onHighlight;
+
+  /// Asks the configured AI about the selected phrase.
+  final Future<void> Function(String selection, Rect? anchor)? onAsk;
+
+  /// Phrases painted with a highlight background inside [text].
+  final List<String> highlights;
   final bool selectable;
 
   @override
@@ -67,32 +81,54 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    var recognizerIndex = 0;
+    final text = widget.text;
+    final urlMatches = _urlPattern.allMatches(text).toList();
+    final highlightRanges = _highlightRanges();
+    final urlRanges = [
+      for (final match in urlMatches) (match.start, match.end),
+    ];
+
+    final cuts = <int>{0, text.length};
+    for (final (start, end) in [...urlRanges, ...highlightRanges]) {
+      if (start > 0 && start < text.length) cuts.add(start);
+      if (end > 0 && end < text.length) cuts.add(end);
+    }
+    final ordered = cuts.toList()..sort();
+
     final spans = <InlineSpan>[];
-    var cursor = 0;
-    for (final match in _urlPattern.allMatches(widget.text)) {
-      if (match.start > cursor) {
-        spans.add(TextSpan(text: widget.text.substring(cursor, match.start)));
+    for (var index = 0; index + 1 < ordered.length; index++) {
+      final start = ordered[index];
+      final end = ordered[index + 1];
+      if (end <= start) continue;
+      final chunk = text.substring(start, end);
+      final urlIndex = urlRanges.indexWhere(
+        (range) => range.$1 <= start && end <= range.$2,
+      );
+      final highlighted = highlightRanges.any(
+        (range) => range.$1 <= start && end <= range.$2,
+      );
+      TextStyle? style;
+      if (urlIndex >= 0) {
+        style = widget.style.copyWith(
+          color: theme.colorScheme.primary,
+          decoration: TextDecoration.underline,
+          decorationColor: theme.colorScheme.primary,
+        );
       }
-      final url = match.group(0)!;
+      if (highlighted) {
+        style = (style ?? widget.style).copyWith(
+          backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.18),
+        );
+      }
       spans.add(
         TextSpan(
-          text: url,
-          style: widget.style.copyWith(
-            color: theme.colorScheme.primary,
-            decoration: TextDecoration.underline,
-            decorationColor: theme.colorScheme.primary,
-          ),
-          recognizer: recognizerIndex < _recognizers.length
-              ? _recognizers[recognizerIndex]
+          text: chunk,
+          style: style,
+          recognizer: urlIndex >= 0 && urlIndex < _recognizers.length
+              ? _recognizers[urlIndex]
               : null,
         ),
       );
-      recognizerIndex++;
-      cursor = match.end;
-    }
-    if (cursor < widget.text.length) {
-      spans.add(TextSpan(text: widget.text.substring(cursor)));
     }
 
     final textWidget = Text.rich(
@@ -127,10 +163,72 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
                   );
                 },
               ),
+            if (selected.isNotEmpty && widget.onAsk != null)
+              ContextMenuButtonItem(
+                label: 'Ask',
+                onPressed: () {
+                  state.hideToolbar();
+                  unawaited(
+                    widget.onAsk!(
+                      selected,
+                      Rect.fromLTWH(
+                        state.contextMenuAnchors.primaryAnchor.dx,
+                        state.contextMenuAnchors.primaryAnchor.dy,
+                        0,
+                        0,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            if (selected.isNotEmpty && widget.onHighlight != null)
+              ContextMenuButtonItem(
+                label: 'Highlight',
+                onPressed: () {
+                  state.hideToolbar();
+                  unawaited(
+                    widget.onHighlight!(
+                      selected,
+                      Rect.fromLTWH(
+                        state.contextMenuAnchors.primaryAnchor.dx,
+                        state.contextMenuAnchors.primaryAnchor.dy,
+                        0,
+                        0,
+                      ),
+                    ),
+                  );
+                },
+              ),
           ],
         );
       },
       child: textWidget,
     );
+  }
+
+  List<(int, int)> _highlightRanges() {
+    final haystack = widget.text.toLowerCase();
+    final ranges = <(int, int)>[];
+    for (final highlight in widget.highlights) {
+      final needle = highlight.trim().toLowerCase();
+      if (needle.isEmpty) continue;
+      var from = 0;
+      while (from < haystack.length) {
+        final index = haystack.indexOf(needle, from);
+        if (index < 0) break;
+        ranges.add((index, index + needle.length));
+        from = index + needle.length;
+      }
+    }
+    ranges.sort((a, b) => a.$1.compareTo(b.$1));
+    final merged = <(int, int)>[];
+    for (final range in ranges) {
+      if (merged.isEmpty || range.$1 > merged.last.$2) {
+        merged.add(range);
+      } else if (range.$2 > merged.last.$2) {
+        merged[merged.length - 1] = (merged.last.$1, range.$2);
+      }
+    }
+    return merged;
   }
 }

@@ -47,6 +47,21 @@ void main() {
     expect(find.text('Base URL'), findsNothing);
   });
 
+  testWidgets('data actions keep their labels visible', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await pumpSettings(tester, harness, settings: const AppSettings());
+
+    await tester.scrollUntilVisible(
+      find.text('Export backup'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Export backup'), findsOneWidget);
+    expect(find.text('Restore backup'), findsOneWidget);
+    expect(find.text('Erase all data'), findsOneWidget);
+  });
+
   testWidgets('custom provider shows the base URL', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);

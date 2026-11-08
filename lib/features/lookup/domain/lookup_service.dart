@@ -42,10 +42,19 @@ class LookupResult {
 }
 
 class ReviewCheckResult {
-  const ReviewCheckResult({required this.consistent, required this.feedback});
+  const ReviewCheckResult({
+    required this.consistent,
+    required this.feedback,
+    this.biasSuggestion = '',
+    this.vaccineSuggestion = '',
+  });
 
   final bool consistent;
   final String feedback;
+
+  /// Short one-phrase rewrites the learner can apply to each field.
+  final String biasSuggestion;
+  final String vaccineSuggestion;
 }
 
 class LookupService {
@@ -181,6 +190,64 @@ class LookupService {
     )).definition;
   }
 
+  /// Answers a free-form question about [selection] with question context.
+  Future<String> ask({
+    required String selection,
+    required String question,
+    required String topicName,
+    required String userQuestion,
+  }) async {
+    final passage = selection.trim();
+    final ask = userQuestion.trim();
+    if (passage.isEmpty) {
+      throw const LookupException('Select a word or phrase first.');
+    }
+    if (ask.isEmpty) {
+      throw const LookupException('Write a question first.');
+    }
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'Ask needs an AI provider. Add an API key in Settings.',
+      );
+    }
+    const systemPrompt =
+        "You answer a learner's question about a highlighted passage in a "
+        'study app. Use the highlighted passage, the question around it and '
+        'the topic. Be accurate and concise: at most 90 words, plain text, no '
+        'markdown. If the passage does not contain the answer, say so and give '
+        'a short, grounded explanation.';
+    final userPrompt =
+        'Topic: $topicName\n'
+        'Question context: $question\n'
+        'Highlighted passage: $passage\n'
+        'Learner question: $ask';
+    final content = await _requestAi(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      jsonMode: false,
+    );
+    final trimmed = content.trim();
+    if (trimmed.isEmpty) {
+      throw const LookupException('The AI returned an empty answer.');
+    }
+    if (trimmed.startsWith('{')) {
+      try {
+        final payload = _decodeObject(trimmed);
+        final answer = payload['answer'] ?? payload['text'];
+        if (answer is String && answer.trim().isNotEmpty) {
+          return answer.trim();
+        }
+      } on Object {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+
   Future<List<String>> listModels({
     required AiProvider provider,
     required String baseUrl,
@@ -286,6 +353,8 @@ class LookupService {
   Future<ReviewCheckResult> checkErrorNotes({
     required String question,
     required String correctAnswer,
+    required String wrongAnswer,
+    required String reasoning,
     required String bias,
     required String vaccine,
   }) async {
@@ -295,16 +364,24 @@ class LookupService {
       throw const LookupException('No API key saved. Add one in Settings.');
     }
     const systemPrompt =
-        "You check a learner's error analysis for a study app. Decide whether "
-        'the flawed assumption explains the wrong answer and whether the '
-        'prevention note is a concrete rule or check. Answer with exactly one '
-        'JSON object: {"consistent":true,"feedback":"..."}. Set consistent to '
-        'false when the notes are vague, merely restate the mistake, or do not '
-        'match the question. Keep feedback under 45 words and do not add '
-        'markdown or extra keys.';
+        "You review a learner's error analysis for a study app. Focus on the "
+        "learner's own reasoning and flawed assumption, not on the question's "
+        'explanation: the explanation says why an answer is correct, but the '
+        'learner may have failed for a different reason. Infer how that '
+        'reasoning led to the wrong answer, then judge whether the flawed '
+        'assumption names that error and whether the prevention note is a '
+        'concrete rule or check derived from it. Answer with exactly one JSON '
+        'object: {"consistent":true,"feedback":"...","bias":"...",'
+        '"vaccine":"..."}. The bias and vaccine values are short one-phrase '
+        "suggestions (12 words or fewer) that could replace the learner's "
+        'notes. Set consistent to false when the notes are vague, merely '
+        'restate the mistake, or do not match the learner reasoning. Keep '
+        'feedback under 45 words and do not add markdown or extra keys.';
     final userPrompt =
         'Question: $question\n'
         'Correct answer: $correctAnswer\n'
+        'Chosen wrong answer: $wrongAnswer\n'
+        'Learner reasoning: ${reasoning.trim().isEmpty ? '(not written)' : reasoning}\n'
         'Flawed assumption: $bias\n'
         'Prevention note: $vaccine';
     final content = await _requestAi(
@@ -320,7 +397,12 @@ class LookupService {
       if (consistent is! bool || feedback.isEmpty) {
         throw const FormatException('Missing review verdict');
       }
-      return ReviewCheckResult(consistent: consistent, feedback: feedback);
+      return ReviewCheckResult(
+        consistent: consistent,
+        feedback: feedback,
+        biasSuggestion: (payload['bias'] as String? ?? '').trim(),
+        vaccineSuggestion: (payload['vaccine'] as String? ?? '').trim(),
+      );
     } on Object {
       throw const LookupException(
         'The AI returned an invalid review. Try again.',
@@ -385,6 +467,7 @@ class LookupService {
     required String apiKey,
     required String systemPrompt,
     required String userPrompt,
+    bool jsonMode = true,
   }) async {
     final model = settings.aiModel.trim();
     if (model.isEmpty) {
@@ -430,13 +513,13 @@ class LookupService {
             ],
             'generationConfig': {
               'temperature': 0.2,
-              'responseMimeType': 'application/json',
+              if (jsonMode) 'responseMimeType': 'application/json',
             },
           }
         : <String, dynamic>{
             'model': model,
             'temperature': 0.2,
-            'response_format': {'type': 'json_object'},
+            if (jsonMode) 'response_format': {'type': 'json_object'},
             'messages': [
               {'role': 'system', 'content': systemPrompt},
               {'role': 'user', 'content': userPrompt},

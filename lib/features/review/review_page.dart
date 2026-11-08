@@ -7,7 +7,9 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_card_review_view.dart';
 import '../export/cards_page.dart';
+import '../export/new_card_dialog.dart';
 import 'domain/review_service.dart';
+import 'skipped_question_view.dart';
 
 enum _Missing { concept, question }
 
@@ -25,6 +27,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   Object? _error;
   int _index = 0;
   int _created = 0;
+  int _kept = 0;
   bool _busy = false;
   bool _finished = false;
 
@@ -154,13 +157,17 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           context: step.question.prompt,
           topicName: step.topicName,
           source: ConceptSource.manual,
+          skippedQuestionId: step.skippedQuestionId,
         );
       } else {
         await service.createBasicCard(
           sessionId: widget.sessionId,
+          questionId: step.question.id,
           question: _newQuestion.text,
           answer: _newAnswer.text,
+          context: step.question.prompt,
           topicName: step.topicName,
+          skippedQuestionId: step.skippedQuestionId,
         );
       }
       if (!mounted) return;
@@ -181,6 +188,61 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       await ref
           .read(reviewServiceProvider)
           .saveConceptDefinition(step.concept.id, _definition.text);
+      _created++;
+      _advance();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _keepHighlight(HighlightReviewStep step) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(reviewServiceProvider).keepHighlight(step.highlight.id);
+      _kept++;
+      _advance();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _convertHighlight(HighlightReviewStep step) async {
+    final highlight = step.highlight;
+    final draft = await showNewCardDialog(
+      context,
+      title: 'Turn the highlight into a card',
+      contextText: highlight.context,
+      initialTerm: highlight.text,
+      initialQuestion: highlight.text,
+      initialKind: NewCardKind.concept,
+    );
+    if (draft == null || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final service = ref.read(reviewServiceProvider);
+      if (draft.kind == NewCardKind.concept) {
+        await service.createConcept(
+          sessionId: widget.sessionId,
+          questionId: highlight.questionId,
+          term: draft.term,
+          definition: draft.definition,
+          context: highlight.context,
+          topicName: highlight.topicName,
+          source: ConceptSource.manual,
+        );
+        await service.markHighlightConverted(highlight.id);
+      } else {
+        final id = await service.createBasicCard(
+          sessionId: widget.sessionId,
+          questionId: highlight.questionId,
+          question: draft.question,
+          answer: draft.answer,
+          context: highlight.context,
+          topicName: highlight.topicName,
+        );
+        await service.markHighlightConverted(highlight.id, manualCardId: id);
+      }
       _created++;
       _advance();
     } finally {
@@ -232,15 +294,15 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           Center(child: IconBadge(Icons.check_circle_outline, size: 72)),
           const SizedBox(height: 16),
           Text(
-            _created == 0 ? 'Review closed' : 'Review complete',
+            _created == 0 && _kept == 0 ? 'Review closed' : 'Review complete',
             textAlign: TextAlign.center,
             style: theme.typography.emphasized.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
-            _created == 0
+            _created == 0 && _kept == 0
                 ? 'No card details were saved.'
-                : '$_created card${_created == 1 ? '' : 's'} completed or created. You can finish missing details later in Cards.',
+                : '${[if (_created > 0) '$_created card${_created == 1 ? '' : 's'} completed or created', if (_kept > 0) '$_kept highlight${_kept == 1 ? '' : 's'} kept'].join(' and ')}. You can finish missing details later in Cards.',
             textAlign: TextAlign.center,
             style: theme.typography.baseline.bodyMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -274,6 +336,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       ErrorReviewStep() => 'Analyse the error',
       SkippedReviewStep() => 'What was missing?',
       ConceptDefinitionStep() => 'Complete the concept',
+      HighlightReviewStep() => 'Keep this highlight?',
     };
     return AppPage(
       title: 'Review',
@@ -294,9 +357,15 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                             _saveSkipped(step);
                           case ConceptDefinitionStep():
                             _saveConceptDefinition(step);
+                          case HighlightReviewStep():
+                            _keepHighlight(step);
                         }
                       },
-                label: _busy ? 'Saving…' : 'Save',
+                label: _busy
+                    ? 'Saving…'
+                    : step is HighlightReviewStep
+                    ? 'Keep & save'
+                    : 'Save',
                 icon: Icons.check,
               ),
             ),
@@ -326,18 +395,31 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             bias: _bias,
             vaccine: _vaccine,
           ),
-          SkippedReviewStep(:final question) => _SkippedStep(
-            question: question,
-            missing: _missing,
-            onMissingChanged: (value) => setState(() => _missing = value),
-            term: _term,
-            definition: _definition,
-            newQuestion: _newQuestion,
-            newAnswer: _newAnswer,
-          ),
+          SkippedReviewStep(
+            :final question,
+            :final topicName,
+            :final reasoning,
+            :final unknown,
+          ) =>
+            _SkippedStep(
+              question: question,
+              topicName: topicName,
+              reasoning: reasoning,
+              unknown: unknown,
+              missing: _missing,
+              onMissingChanged: (value) => setState(() => _missing = value),
+              term: _term,
+              definition: _definition,
+              newQuestion: _newQuestion,
+              newAnswer: _newAnswer,
+            ),
           ConceptDefinitionStep(:final concept) => _ConceptStep(
             concept: concept,
             definition: _definition,
+          ),
+          HighlightReviewStep(:final highlight) => _HighlightStep(
+            highlight: highlight,
+            onMakeCard: () => _convertHighlight(step),
           ),
         },
       ],
@@ -348,6 +430,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 class _SkippedStep extends StatelessWidget {
   const _SkippedStep({
     required this.question,
+    required this.topicName,
+    required this.reasoning,
+    required this.unknown,
     required this.missing,
     required this.onMissingChanged,
     required this.term,
@@ -357,6 +442,9 @@ class _SkippedStep extends StatelessWidget {
   });
 
   final Question question;
+  final String topicName;
+  final String reasoning;
+  final bool unknown;
   final _Missing missing;
   final ValueChanged<_Missing> onMissingChanged;
   final TextEditingController term;
@@ -370,42 +458,15 @@ class _SkippedStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        TonalBox(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                question.prompt,
-                style: theme.typography.baseline.titleSmall,
-              ),
-              const SizedBox(height: 10),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Text(
-                  'Answer: ${question.correctAnswer}',
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    color: theme.colorScheme.onPrimaryContainer,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                question.explanation,
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
+        SkippedQuestionView(
+          prompt: question.prompt,
+          alternatives: question.alternatives,
+          correctIndexes: question.correctIndexes,
+          alternativeExplanations: question.alternativeExplanations,
+          explanation: question.explanation,
+          reasoning: reasoning,
+          topicName: topicName,
+          unknown: unknown,
         ),
         const SizedBox(height: 20),
         Text(
@@ -426,6 +487,7 @@ class _SkippedStep extends StatelessWidget {
         const SizedBox(height: 16),
         if (missing == _Missing.concept) ...[
           M3ETextField(
+            key: const ValueKey('skipped-review-term'),
             controller: term,
             label: 'Definition of…',
             placeholder: 'Term',
@@ -433,6 +495,7 @@ class _SkippedStep extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           M3ETextField(
+            key: const ValueKey('skipped-review-definition'),
             controller: definition,
             label: 'Definition',
             minLines: 2,
@@ -441,6 +504,7 @@ class _SkippedStep extends StatelessWidget {
           ),
         ] else ...[
           M3ETextField(
+            key: const ValueKey('skipped-review-question'),
             controller: newQuestion,
             label: 'New question',
             minLines: 2,
@@ -449,6 +513,7 @@ class _SkippedStep extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           M3ETextField(
+            key: const ValueKey('skipped-review-answer'),
             controller: newAnswer,
             label: 'Answer',
             minLines: 2,
@@ -498,6 +563,85 @@ class _ConceptStep extends StatelessWidget {
           minLines: 2,
           maxLines: 4,
           isRequired: true,
+        ),
+      ],
+    );
+  }
+}
+
+class _HighlightStep extends StatelessWidget {
+  const _HighlightStep({required this.highlight, required this.onMakeCard});
+
+  final StudyHighlight highlight;
+  final VoidCallback onMakeCard;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TonalBox(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  const Pill('Highlight', tone: PillTone.primary),
+                  if (highlight.topicName.trim().isNotEmpty)
+                    Pill(highlight.topicName),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  highlight.text,
+                  style: theme.typography.baseline.titleMedium.copyWith(
+                    height: 1.35,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              if (highlight.context.trim().isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  'From the question',
+                  style: theme.typography.baseline.labelSmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  highlight.context,
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'Keep it for later, or turn it into a card.',
+          style: theme.typography.emphasized.titleSmall,
+        ),
+        const SizedBox(height: 12),
+        M3EButton.tonal(
+          onPressed: onMakeCard,
+          icon: const Icon(Icons.style_outlined),
+          label: const Text('Turn into a card'),
         ),
       ],
     );

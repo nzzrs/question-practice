@@ -9,7 +9,7 @@ import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/home/home_page.dart';
 import 'package:question_practice/features/topics/topic_actions.dart';
-import 'package:question_practice/features/topics/topic_editor_page.dart';
+import 'package:question_practice/features/topics/topic_editor_sheet.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -38,6 +38,13 @@ Finder _priorityField() => find.byKey(const ValueKey('topic-editor-priority'));
 Finder _deckField() => find.byKey(const ValueKey('topic-editor-deck'));
 Finder _saveButton() => find.byKey(const ValueKey('topic-editor-save'));
 Finder _tile(String field) => find.byKey(ValueKey('topic-editor-tile-$field'));
+
+Finder _sheetScrollable() => find
+    .descendant(
+      of: find.byType(TopicEditorSheet),
+      matching: find.byType(Scrollable),
+    )
+    .first;
 
 Finder _archivedButton() => find.byWidgetPredicate(
   (widget) => widget is M3EIconButton && widget.tooltip == 'Archived topics',
@@ -68,12 +75,26 @@ Future<void> _openField(WidgetTester tester, String field, String title) async {
   await _tapTileHeader(tester, field, title);
 }
 
+/// Asserts the editor is a modal bottom sheet rather than a pushed page.
+void _expectTopicSheet(WidgetTester tester) {
+  expect(find.byType(TopicEditorSheet), findsOneWidget);
+  expect(
+    find.ancestor(
+      of: find.byType(TopicEditorSheet),
+      matching: find.byType(AppPage),
+    ),
+    findsNothing,
+  );
+  final route = ModalRoute.of(tester.element(find.byType(TopicEditorSheet)));
+  expect(route, isA<RawDialogRoute<bool>>());
+}
+
 Future<void> _openFromLongPress(WidgetTester tester) async {
   await tester.longPress(find.text('Cloud'));
   await pumpFrames(tester);
   await tester.tap(find.text('Edit topic'));
   await pumpFrames(tester);
-  expect(find.byType(TopicEditorPage), findsOneWidget);
+  _expectTopicSheet(tester);
 }
 
 Future<void> _loadTestFont() async {
@@ -86,83 +107,84 @@ Future<void> _loadTestFont() async {
 void main() {
   setUpAll(_loadTestFont);
 
-  testWidgets('tile rows show current values and expand one field at a time', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(480, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'the sheet shows current values and expands one field at a time',
+    (tester) async {
+      tester.view.physicalSize = const Size(480, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    await harness.seedPractice(
-      topicName: 'Cloud',
-      practiceName: 'Core',
-      count: 1,
-      ankiDeck: 'Cloud deck',
-    );
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      await harness.seedPractice(
+        topicName: 'Cloud',
+        practiceName: 'Core',
+        count: 1,
+        ankiDeck: 'Cloud deck',
+      );
 
-    await pumpTestApp(
-      tester,
-      home: const HomePage(),
-      harness: harness,
-      fontFamily: 'Roboto',
-    );
-    await _openFromLongPress(tester);
+      await pumpTestApp(
+        tester,
+        home: const HomePage(),
+        harness: harness,
+        fontFamily: 'Roboto',
+      );
+      await _openFromLongPress(tester);
 
-    expect(find.text('Edit topic'), findsOneWidget);
-    expect(find.byType(M3EDialog), findsNothing);
-    expect(find.byType(OptionTile), findsNWidgets(4));
-    expect(_tile('name'), findsOneWidget);
-    expect(_tile('description'), findsOneWidget);
-    expect(_tile('priority'), findsOneWidget);
-    expect(_tile('deck'), findsOneWidget);
+      expect(find.text('Edit topic'), findsOneWidget);
+      expect(find.byType(M3EDialog), findsNothing);
+      expect(find.byType(OptionTile), findsNWidgets(4));
+      expect(_tile('name'), findsOneWidget);
+      expect(_tile('description'), findsOneWidget);
+      expect(_tile('priority'), findsOneWidget);
+      expect(_tile('deck'), findsOneWidget);
 
-    expect(
-      find.descendant(of: _tile('name'), matching: find.text('Cloud')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: _tile('description'),
-        matching: find.text('Topic description'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: _tile('priority'),
-        matching: find.text('1 · highest'),
-      ),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: _tile('deck'), matching: find.text('Cloud deck')),
-      findsOneWidget,
-    );
-    expect(find.text('AnkiDroid deck'), findsOneWidget);
-    expect(find.text('Browse decks'), findsNothing);
+      expect(
+        find.descendant(of: _tile('name'), matching: find.text('Cloud')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: _tile('description'),
+          matching: find.text('Topic description'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: _tile('priority'),
+          matching: find.text('1 · highest'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: _tile('deck'), matching: find.text('Cloud deck')),
+        findsOneWidget,
+      );
+      expect(find.text('AnkiDroid deck'), findsOneWidget);
+      expect(find.text('Browse decks'), findsNothing);
 
-    await _openField(tester, 'name', 'Name');
-    expect(_nameField(), findsOneWidget);
-    expect(_descriptionField(), findsNothing);
-    expect(_priorityField(), findsNothing);
-    expect(_deckField(), findsNothing);
+      await _openField(tester, 'name', 'Name');
+      expect(_nameField(), findsOneWidget);
+      expect(_descriptionField(), findsNothing);
+      expect(_priorityField(), findsNothing);
+      expect(_deckField(), findsNothing);
 
-    await _openField(tester, 'description', 'Description');
-    expect(_nameField(), findsNothing);
-    expect(_descriptionField(), findsOneWidget);
+      await _openField(tester, 'description', 'Description');
+      expect(_nameField(), findsNothing);
+      expect(_descriptionField(), findsOneWidget);
 
-    await _tapTileHeader(tester, 'description', 'Description');
-    expect(_descriptionField(), findsNothing);
+      await _tapTileHeader(tester, 'description', 'Description');
+      expect(_descriptionField(), findsNothing);
 
-    await _openField(tester, 'deck', 'AnkiDroid deck');
-    expect(_deckField(), findsOneWidget);
-    expect(find.text('Browse decks'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+      await _openField(tester, 'deck', 'AnkiDroid deck');
+      expect(_deckField(), findsOneWidget);
+      expect(find.text('Browse decks'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
-  testWidgets('long-press menu opens the page and saves every field', (
+  testWidgets('long-press menu opens the sheet and saves every field', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(480, 1000);
@@ -200,7 +222,7 @@ void main() {
     await tester.tap(_saveButton());
     await pumpFrames(tester);
 
-    expect(find.byType(TopicEditorPage), findsNothing);
+    expect(find.byType(TopicEditorSheet), findsNothing);
     expect(find.text('Topic updated.'), findsOneWidget);
 
     final stored = await harness.practices.topicById(seeded.topicId);
@@ -213,49 +235,50 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('an archived topic opens the page and keeps its archived state', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(480, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets(
+    'an archived topic opens the sheet and keeps its archived state',
+    (tester) async {
+      tester.view.physicalSize = const Size(480, 1000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
 
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await harness.seedPractice(
-      topicName: 'Cloud',
-      practiceName: 'Core',
-      count: 1,
-    );
-    await harness.practices.setTopicArchived(seeded.topicId, true);
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await harness.seedPractice(
+        topicName: 'Cloud',
+        practiceName: 'Core',
+        count: 1,
+      );
+      await harness.practices.setTopicArchived(seeded.topicId, true);
 
-    await pumpTestApp(
-      tester,
-      home: const HomePage(),
-      harness: harness,
-      fontFamily: 'Roboto',
-    );
-    await tester.tap(_archivedButton());
-    await pumpFrames(tester);
-    expect(find.text('Archived topics'), findsOneWidget);
+      await pumpTestApp(
+        tester,
+        home: const HomePage(),
+        harness: harness,
+        fontFamily: 'Roboto',
+      );
+      await tester.tap(_archivedButton());
+      await pumpFrames(tester);
+      expect(find.text('Archived topics'), findsOneWidget);
 
-    await tester.tap(find.text('Cloud'));
-    await pumpFrames(tester);
-    await tester.tap(find.text('Edit topic'));
-    await pumpFrames(tester);
-    expect(find.byType(TopicEditorPage), findsOneWidget);
+      await tester.tap(find.text('Cloud'));
+      await pumpFrames(tester);
+      await tester.tap(find.text('Edit topic'));
+      await pumpFrames(tester);
+      _expectTopicSheet(tester);
 
-    await _openField(tester, 'priority', 'Priority');
-    await _enter(tester, _priorityField(), '2');
-    await tester.tap(_saveButton());
-    await pumpFrames(tester);
+      await _openField(tester, 'priority', 'Priority');
+      await _enter(tester, _priorityField(), '2');
+      await tester.tap(_saveButton());
+      await pumpFrames(tester);
 
-    final stored = await harness.practices.topicById(seeded.topicId);
-    expect(stored!.priority, 2);
-    expect(stored.archived, isTrue);
-    expect(stored.name, 'Cloud');
-    expect(tester.takeException(), isNull);
-  });
+      final stored = await harness.practices.topicById(seeded.topicId);
+      expect(stored!.priority, 2);
+      expect(stored.archived, isTrue);
+      expect(stored.name, 'Cloud');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('validation blocks an empty name and an out-of-range priority', (
     tester,
@@ -285,7 +308,7 @@ void main() {
     await tester.tap(_saveButton());
     await pumpFrames(tester);
     expect(find.text('Name is required.'), findsOneWidget);
-    expect(find.byType(TopicEditorPage), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
 
     await _enter(tester, _nameField(), 'Cloud');
     await _openField(tester, 'priority', 'Priority');
@@ -297,7 +320,7 @@ void main() {
     await pumpFrames(tester);
     expect(find.text('Use a number from 1 to 5.'), findsOneWidget);
     expect(_priorityField(), findsOneWidget);
-    expect(find.byType(TopicEditorPage), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
 
     final stored = await harness.practices.topicById(seeded.topicId);
     expect(stored!.name, 'Cloud');
@@ -305,7 +328,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('cancel closes a clean editor without a warning', (tester) async {
+  testWidgets('cancel closes a clean sheet without a warning', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     await harness.seedPractice(topicName: 'Cloud', count: 1);
@@ -321,7 +344,7 @@ void main() {
     await tester.tap(find.text('Cancel'));
     await pumpFrames(tester);
 
-    expect(find.byType(TopicEditorPage), findsNothing);
+    expect(find.byType(TopicEditorSheet), findsNothing);
     expect(find.text('Discard changes?'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -344,7 +367,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await pumpFrames(tester);
     expect(find.text('Discard changes?'), findsOneWidget);
-    expect(find.byType(TopicEditorPage), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
 
     await tester.tap(
       find.descendant(
@@ -354,20 +377,58 @@ void main() {
     );
     await pumpFrames(tester);
     expect(find.text('Discard changes?'), findsNothing);
-    expect(find.byType(TopicEditorPage), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await pumpFrames(tester);
     await tester.tap(find.text('Discard'));
     await pumpFrames(tester);
 
-    expect(find.byType(TopicEditorPage), findsNothing);
+    expect(find.byType(TopicEditorSheet), findsNothing);
     final stored = await harness.practices.topicById(seeded.topicId);
     expect(stored!.description, 'Topic description');
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the page fits a 360 dp wide phone', (tester) async {
+  testWidgets('tapping outside a dirty sheet asks before discarding', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    await _openField(tester, 'description', 'Description');
+    await _enter(tester, _descriptionField(), 'Unsaved description');
+
+    await tester.tapAt(const Offset(4, 4));
+    await pumpFrames(tester);
+    expect(find.text('Discard changes?'), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+
+    await tester.tap(find.text('Discard'));
+    await pumpFrames(tester);
+
+    expect(find.byType(TopicEditorSheet), findsNothing);
+    final stored = await harness.practices.topicById(seeded.topicId);
+    expect(stored!.description, 'Topic description');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the sheet stays usable at 360 dp with the keyboard open', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(360, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -384,18 +445,25 @@ void main() {
     );
     await _openFromLongPress(tester);
 
-    expect(find.byType(TopicEditorPage), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await _openField(tester, 'deck', 'AnkiDroid deck');
     await tester.scrollUntilVisible(
       find.text('Browse decks'),
       250,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: _sheetScrollable(),
     );
     await pumpFrames(tester);
     expect(find.text('Browse decks'), findsOneWidget);
     expect(_saveButton(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // The pinned action row stays above the on-screen keyboard.
+    tester.view.viewInsets = const FakeViewPadding(bottom: 260);
+    await pumpFrames(tester);
+    expect(_saveButton().hitTestable(), findsOneWidget);
+    expect(tester.getRect(_saveButton()).bottom, lessThanOrEqualTo(720 - 260));
     expect(tester.takeException(), isNull);
   });
 
@@ -431,7 +499,7 @@ void main() {
       );
       await tester.tap(find.text('edit'));
       await pumpFrames(tester);
-      expect(find.byType(TopicEditorPage), findsOneWidget);
+      _expectTopicSheet(tester);
 
       await _openField(tester, 'deck', 'AnkiDroid deck');
       expect(

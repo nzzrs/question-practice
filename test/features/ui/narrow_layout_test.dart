@@ -302,7 +302,7 @@ void main() {
     final harness = TestHarness();
     addTearDown(harness.close);
     await _pumpNarrow(tester, home: const HelpPage(), harness: harness);
-    expect(find.text('A quiet loop for practice'), findsOneWidget);
+    expect(find.text('What you can do'), findsOneWidget);
   });
 
   testWidgets('past errors page fits 320', (tester) async {

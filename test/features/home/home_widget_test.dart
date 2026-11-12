@@ -27,7 +27,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.help_outline));
     await pumpFrames(tester);
     expect(find.text('How to use it'), findsOneWidget);
-    expect(find.text('A quiet loop for practice'), findsOneWidget);
+    expect(find.text('What you can do'), findsOneWidget);
   });
 
   testWidgets('the shuffle FAB is icon-only with a spoken label', (

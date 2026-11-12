@@ -11,10 +11,10 @@ Questions is an offline-first Android study app. This guide walks through every 
 - **Session in progress** cards list every paused session with its mode, question count and start time. Each card has **Resume** and **Discard**.
 - A topic card shows its practices, its question count (questions left unanswered in completed sessions are excluded), accuracy and progress.
 - **Review past errors** opens the 48-hour error queue.
-- **Cards** opens concepts, error cards and basic cards waiting for export.
+- **Cards** opens concepts, error cards, skipped questions, basic cards and highlights. The tile badge counts error cards that still need bias and vaccine.
 - The **Shuffle** floating button opens **Start shuffled practice**. The sheet explains that the session uses questions from every topic, keeps only unsolved and unskipped questions, and shuffles both questions and alternatives. If no question is eligible, it says so instead of starting an empty session.
 - **Import** creates topics and practices from a JSON file.
-- The **i** icon opens Help.
+- The help icon opens **How to use it**.
 - The settings icon opens Settings.
 
 ## Import
@@ -35,7 +35,7 @@ A practice file is limited to 10 MB and 5,000 questions. It is UTF-8 JSON in a `
 - **Practices** lists each practice with question count and last score. Tap a practice to start.
 - The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order across visits and app restarts.
 - Long-press a practice to open its options: **Edit practice**, mark it done or active, split it into two slices, or delete it.
-- **Edit practice** opens a second menu with **Rename**, **Edit description**, **Download practice JSON**, **Update practice JSON** and **AnkiDroid deck**. The deck row edits the topic's deck, which routes the practice's cards on export; **Edit topic** changes the same setting. There is no per-practice deck, and a practice JSON file cannot contain one.
+- **Edit practice** opens a second menu with **Rename**, **Edit description**, **Download practice JSON** and **Update practice JSON**. It has no deck row: decks are selected per topic. Use **Edit topic → AnkiDroid deck** instead. There is no per-practice deck, and a practice JSON file cannot contain one.
 - **Download practice JSON** shares one file with the topic, the practice name and description, and every current question, in the import format. Each question carries `sourceId`, the app's stable identity for that question, so a later update maps back to the stored question. Subtopics are included only when set. The file does not contain a deck.
 - **Update practice JSON** reads an edited export and shows a preview before writing anything: how many questions are new, modified, unchanged and deleted, with the affected prompts. The file's topic and practice names must match the stored practice after trimming and ignoring case. Questions are matched by `sourceId` first and then by exact trimmed prompt; files without identities therefore still work. **Apply changes** writes one transaction and refreshes the practice content hash and import time; **Cancel** leaves it untouched. Matched questions keep their answers, error cards, skipped records and statistics. New questions start empty. Deleted questions lose their answers, session links, error cards and skipped records; linked concept cards, basic cards and highlights remain but lose their question link. A file whose topic or practice name does not match is rejected with a clear message.
 - **Split into two** replaces the practice with "… Slice A" and "… Slice B", each holding half of its questions in random order. It needs an even number of questions and removes the original practice's sessions and cards. Finish or discard an in-progress session first.
@@ -103,18 +103,17 @@ A practice file is limited to 10 MB and 5,000 questions. It is UTF-8 JSON in a `
 
 ## Cards and export
 
-- Tabs: **All**, **Concepts**, **Errors**, **Basic**.
-- **Show exported cards** is a filter chip below the description. It includes exported cards in the list; exported cards stay unselectable.
-- Checkboxes choose what is included. By default all unexported, complete cards are selected. Incomplete error cards can also be checked.
-- **Review all** sits at the top of the Error cards section. **Review selected** appears for checked error cards.
-- If a checked error card is incomplete, the bottom bar hides export and share and offers **Review selected** instead. Export returns when every checked error card is complete.
-- Each row shows the target deck. Deck comes from the card's topic, or the default deck.
-- **Complete** opens the same error-card review view used after a session.
+- Filter chips: **All**, **Concepts**, **Errors & skipped**, **Basic** and **Highlights**, plus **Show exported** / **Hide exported**. Exported cards stay in the list but are not selectable.
+- Checkboxes choose what is included. By default all unexported, complete concepts, error cards and basic cards are selected. Incomplete error cards can also be checked so they can be reviewed first.
+- **Review all** sits above the **Error and skipped** section. **Review selected** appears for checked error cards or skipped questions.
+- If a checked error card is incomplete, export and share stay disabled; finish it with **Complete** or **Review selected** first. Export becomes available when every checked error card is complete.
+- Each exportable row shows its target deck. The deck comes from the card's topic, or the default deck from Settings.
+- **Complete** on a concept opens its definition editor. On an error card it opens the same card review view used after a session, including the question/options editor and **Check with AI**.
 - **Export to AnkiDroid** creates the deck and note types if needed, bulk-adds notes, marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
-- **Share as files** creates Anki-compatible text files. File export does not encode a deck.
-- **Delete selected** permanently removes cards; deleting an active error card also removes it from the error queue.
-- Use **Show exported cards** to include exported cards in the list (they are not selectable).
+- **Share as files** creates Anki-compatible text files. File export does not encode a deck and never includes highlights.
+- **Delete selected** permanently removes the selected cards; deleting an active error card also removes it from the error queue.
 - Missing bias/vaccine or definitions block export until completed.
+- **Highlights** are plain text only. **Download all** saves them as a text file through the share sheet. A highlight can be turned into a concept or basic card, or deleted individually; highlights are never sent to AnkiDroid.
 
 ## Lookup
 
@@ -129,7 +128,7 @@ A practice file is limited to 10 MB and 5,000 questions. It is UTF-8 JSON in a `
 - **Looking up terms**: Web search or AI. Web engine: DuckDuckGo or Wikipedia. AI: provider (OpenAI, Groq, OpenRouter, Gemini or custom), model, API key and **Test connection**. The base URL is shown only for a custom provider. Opening the model dropdown loads the provider list. Provider, model, base URL and API key save automatically; clear the key field to remove the saved key. The key is stored in Android secure storage and never shown after saving.
 - **AnkiDroid**: status of install/API/permission/Cloze type, permission request, open AnkiDroid, default deck name, and **Browse decks** to pick a live deck name.
 - **Data**: **Export backup** shares one JSON file with every topic (including archived topics and Anki decks), practice, question and subtopic, session, answer, card, skipped question, highlight and setting. The file records its format version, app version/build, database schema version, export time and row counts, plus a checksum. **Restore backup** validates all of that before replacing anything, then replaces all local data in one step; a damaged or inconsistent file is rejected and leaves the current data untouched. Backups made by older app versions, including the first backup format, still restore. The AI API key is never part of a backup and is left untouched on the device. **Erase all data** removes practices, sessions, cards, settings and the API key. Restore and erase cannot be undone.
-- **About**: version.
+- **About**: the app version (`Questions 0.9.9`). Backup files record the same version and build number.
 
 ## Backup and restore
 
@@ -138,6 +137,7 @@ A practice file is limited to 10 MB and 5,000 questions. It is UTF-8 JSON in a `
 - A valid restore replaces every local table in one transaction. It does not merge with existing data, so the backup becomes the complete state of the app.
 - The AI API key lives in Android secure storage, not in the database. It is never exported, and a restore does not overwrite the key already on the device.
 - A backup is not a practice JSON file. A backup preserves history and settings; a practice JSON file contains only importable practice content and is used by **Import** or **Update practice JSON**.
+- The exact table-level coverage and backup format are listed in [Database reference](database.md#backup-coverage).
 
 ## Archived topics
 

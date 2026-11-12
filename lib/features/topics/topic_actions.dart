@@ -65,12 +65,18 @@ Future<bool> showEditTopicDialog(
   WidgetRef ref,
   Topic topic,
 ) async {
-  final name = TextEditingController(text: topic.name);
-  final description = TextEditingController(text: topic.description);
+  // The caller may hold a summary built before a backup restore or another
+  // database replacement. Re-read the row so the deck and the other fields are
+  // never saved back from a stale snapshot.
+  final current =
+      await ref.read(topicRepositoryProvider).topicById(topic.id) ?? topic;
+  if (!context.mounted) return false;
+  final name = TextEditingController(text: current.name);
+  final description = TextEditingController(text: current.description);
   final priority = TextEditingController(
-    text: topic.priority?.toString() ?? '',
+    text: current.priority?.toString() ?? '',
   );
-  final deck = TextEditingController(text: topic.ankiDeck ?? '');
+  final deck = TextEditingController(text: current.ankiDeck ?? '');
   String? error;
   final saved = await M3EDialog.show<bool>(
     context,

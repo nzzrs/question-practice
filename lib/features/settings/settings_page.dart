@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../app/data_refresh.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
@@ -635,12 +637,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final service = ref.read(backupServiceProvider);
       final info = await service.inspectBytes(bytes);
       if (!mounted) return;
+      final exportedAt = info.exportedAt;
+      final origin = exportedAt == null
+          ? 'From ${info.sourceLabel}.'
+          : 'From ${info.sourceLabel}, exported '
+                '${DateFormat('yyyy-MM-dd HH:mm').format(exportedAt.toLocal())}.';
       final confirmed = await confirmDialog(
         context,
         title: 'Restore backup?',
         message:
             'This replaces everything on this device with the backup: '
             '${info.description}.\n\n'
+            '$origin\n\n'
             'Your AI API key stays on this device and is not changed. '
             'This cannot be undone.',
         confirmLabel: 'Restore',
@@ -649,27 +657,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       if (!confirmed || !mounted) return;
       final restored = await service.restoreBytes(bytes);
       _loaded = false;
-      ref.invalidate(settingsProvider);
-      ref.invalidate(hasApiKeyProvider);
-      ref.invalidate(topicSummariesProvider);
-      ref.invalidate(homeStatsProvider);
-      ref.invalidate(dueErrorsProvider);
-      ref.invalidate(resolvedErrorsProvider);
-      ref.invalidate(errorsNeedingDetailsProvider);
-      ref.invalidate(conceptsProvider);
-      ref.invalidate(allConceptsProvider);
-      ref.invalidate(errorCardsProvider);
-      ref.invalidate(allErrorCardsProvider);
-      ref.invalidate(manualCardsProvider);
-      ref.invalidate(allManualCardsProvider);
-      ref.invalidate(inProgressSessionProvider);
-      ref.invalidate(inProgressSessionsProvider);
+      refreshDataProviders(ref);
       if (mounted) {
         setState(() {});
         await showSnack(context, 'Backup restored: ${restored.description}.');
       }
     } on BackupException catch (error) {
-      if (mounted) await showSnack(context, error.message);
+      if (mounted) {
+        await showSnack(
+          context,
+          'Could not restore the backup: ${error.message}',
+        );
+      }
     } on Object catch (error) {
       if (mounted) {
         await showSnack(context, 'Could not restore the backup: $error');
@@ -692,10 +691,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     try {
       await ref.read(databaseProvider).clearAll();
       await ref.read(settingsRepositoryProvider).deleteApiKey();
-      ref.invalidate(settingsProvider);
-      ref.invalidate(hasApiKeyProvider);
-      ref.invalidate(topicSummariesProvider);
-      ref.invalidate(homeStatsProvider);
+      refreshDataProviders(ref);
       if (!mounted) return;
       await showSnack(context, 'All data erased.');
     } finally {

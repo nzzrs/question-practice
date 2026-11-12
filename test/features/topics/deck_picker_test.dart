@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -9,6 +12,13 @@ import 'package:question_practice/core/platform/anki_gateway.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/topics/anki_deck_picker.dart';
 import 'package:question_practice/features/topics/topic_actions.dart';
+
+Future<void> _loadTestFont() async {
+  final bytes = await File('test/fixtures/Roboto-Regular.ttf').readAsBytes();
+  final loader = FontLoader('Roboto')
+    ..addFont(Future.value(ByteData.view(bytes.buffer)));
+  await loader.load();
+}
 
 class _PickerHost extends ConsumerStatefulWidget {
   const _PickerHost();
@@ -62,6 +72,8 @@ class _TopicEditHost extends ConsumerWidget {
 }
 
 void main() {
+  setUpAll(_loadTestFont);
+
   testWidgets('deck picker builds a tree and adds a child', (tester) async {
     tester.view.physicalSize = const Size(360, 720);
     tester.view.devicePixelRatio = 1;
@@ -148,11 +160,18 @@ void main() {
       tester,
       home: _TopicEditHost(topic: topic),
       harness: harness,
+      fontFamily: 'Roboto',
     );
     await tester.tap(find.text('edit'));
     await pumpFrames(tester);
     expect(find.text('Edit topic'), findsOneWidget);
 
+    await tester.scrollUntilVisible(
+      find.text('Browse decks'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
     await tester.tap(find.text('Browse decks'));
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);

@@ -174,6 +174,7 @@ TestAppBundle testAppBundle({
   required Widget home,
   TestHarness? harness,
   List<Override> overrides = const [],
+  String? fontFamily,
 }) {
   final suite = harness ?? TestHarness();
   final container = ProviderContainer(
@@ -195,6 +196,7 @@ TestAppBundle testAppBundle({
       child: M3EMaterialApp(
         title: 'Question Practice test',
         data: appThemeData(),
+        fontFamily: fontFamily,
         autoTheming: false,
         dynamicColoring: false,
         navigatorObservers: [reviewRouteObserver],
@@ -215,11 +217,13 @@ Future<void> pumpTestApp(
   required Widget home,
   TestHarness? harness,
   List<Override> overrides = const [],
+  String? fontFamily,
 }) async {
   final bundle = testAppBundle(
     home: home,
     harness: harness,
     overrides: overrides,
+    fontFamily: fontFamily,
   );
   await tester.pumpWidget(bundle.widget);
   await pumpFrames(tester);

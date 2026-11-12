@@ -162,6 +162,145 @@ void main() {
     },
   );
 
+  test('subtopic statistics group accuracy and progress', () async {
+    final practice = await harness.seedPractice(
+      count: 4,
+      subtopics: const ['Algebra', 'Algebra', 'Geometry', ''],
+    );
+    final start = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[0],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[1],
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[2],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[3],
+      selectedIndexes: const [],
+      reasoning: '',
+      distracted: false,
+    );
+
+    final stats = await harness.practices
+        .watchSubtopicStats(practice.topicId)
+        .first;
+
+    expect(stats.map((stat) => stat.label), [
+      'Algebra',
+      'Geometry',
+      'Uncategorized',
+    ]);
+    final algebra = stats.firstWhere((stat) => stat.label == 'Algebra');
+    expect(algebra.questionCount, 2);
+    expect(algebra.attemptedQuestionCount, 2);
+    expect(algebra.answeredCount, 2);
+    expect(algebra.correctCount, 1);
+    expect(algebra.accuracy, 0.5);
+    expect(algebra.progress, 1);
+
+    final geometry = stats.firstWhere((stat) => stat.label == 'Geometry');
+    expect(geometry.accuracy, 1);
+    expect(geometry.progress, 1);
+
+    final uncategorized = stats.firstWhere((stat) => stat.isUncategorized);
+    expect(uncategorized.questionCount, 1);
+    expect(uncategorized.attemptedQuestionCount, 0);
+    expect(uncategorized.answeredCount, 0);
+    expect(uncategorized.progress, 0);
+  });
+
+  test('questions without a subtopic form one uncategorized bucket', () async {
+    final practice = await harness.seedPractice(count: 2);
+    final stats = await harness.practices
+        .watchSubtopicStats(practice.topicId)
+        .first;
+
+    expect(stats, hasLength(1));
+    expect(stats.single.isUncategorized, isTrue);
+    expect(stats.single.questionCount, 2);
+  });
+
+  test('deleting a practice removes its answers, cards and stats', () async {
+    final practice = await harness.seedPractice(count: 2);
+    final start = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[0],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[1],
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: false,
+    );
+
+    var summary = (await harness.practices.watchTopicSummaries().first).single;
+    expect(summary.answeredCount, 2);
+    expect(summary.correctCount, 1);
+    expect(summary.activeErrorCount, 1);
+    expect(
+      await harness.practices.watchTopicProgress(practice.topicId).first,
+      hasLength(1),
+    );
+    expect((await harness.practices.watchHomeStats().first).activeErrors, 1);
+
+    await harness.practices.deletePractice(practice.practiceId);
+
+    summary = (await harness.practices.watchTopicSummaries().first).single;
+    expect(summary.questionCount, 0);
+    expect(summary.answeredCount, 0);
+    expect(summary.correctCount, 0);
+    expect(summary.activeErrorCount, 0);
+    expect(summary.sessionCount, 0);
+    expect(summary.progress, 0);
+    expect(
+      await harness.practices.watchTopicProgress(practice.topicId).first,
+      isEmpty,
+    );
+    expect(
+      await harness.practices.watchSubtopicStats(practice.topicId).first,
+      isEmpty,
+    );
+    expect(await harness.practices.watchHomeStats().first, isNotNull);
+    expect((await harness.practices.watchHomeStats().first).activeErrors, 0);
+    expect(
+      await harness.database.select(harness.database.attempts).get(),
+      isEmpty,
+    );
+    expect(
+      await harness.database.select(harness.database.errorCards).get(),
+      isEmpty,
+    );
+    expect(
+      await harness.database.select(harness.database.sessionQuestions).get(),
+      isEmpty,
+    );
+
+    await harness.practices.deleteTopic(practice.topicId);
+    expect(await harness.practices.watchTopicSummaries().first, isEmpty);
+    expect(await harness.practices.watchHomeStats().first, isNotNull);
+  });
+
   test('unfinished sessions do not affect stats', () async {
     final practice = await harness.seedPractice(count: 2);
     final start = await sessions.startPractice(practice.practiceId);

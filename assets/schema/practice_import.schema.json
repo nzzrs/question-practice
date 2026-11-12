@@ -63,6 +63,13 @@
       ],
       "properties": {
         "prompt": { "type": "string", "minLength": 1, "maxLength": 5000 },
+        "subtopic": { "type": "string", "maxLength": 120 },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Stable question identity used when updating an exported practice. Kept by the app; ignored by a normal import."
+        },
         "alternatives": {
           "type": "array",
           "minItems": 2,

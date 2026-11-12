@@ -154,6 +154,20 @@ class ReviewService {
     );
   }
 
+  /// Saves a shortened question and its options without changing the card's
+  /// link to the original practice question or its correct/wrong indexes.
+  Future<void> saveErrorContent({
+    required int cardId,
+    required String question,
+    required List<String> alternatives,
+  }) {
+    return _cards.updateErrorCardContent(
+      id: cardId,
+      question: question.trim(),
+      alternatives: [for (final value in alternatives) value.trim()],
+    );
+  }
+
   Future<void> saveConceptDefinition(int conceptId, String definition) {
     return _cards.updateConceptDefinition(conceptId, definition.trim());
   }

@@ -4,13 +4,15 @@ Questions is an offline-first Android study app. This guide walks through every 
 
 ## Home
 
-- **Topics** lists your topics, ordered by priority and name.
+- **Topics** lists your active topics, ordered by priority and name until you choose another order.
+- Long-press a topic card to open its options: **Edit topic**, **Archive topic** and **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
+- **Archive topic** hides the topic from Home while keeping its practices, questions, sessions and cards.
+- The **sort** icon beside **Topics** orders the list by **Name** or **Recency**, increasing or decreasing. The choice is remembered. The **archived topics** icon to its right lists archived topics; tap one to unarchive, edit or delete it.
 - **Session in progress** cards list every paused session with its mode, question count and start time. Each card has **Resume** and **Discard**.
 - A topic card shows its practices, its question count (questions left unanswered in completed sessions are excluded), accuracy and progress.
-- Long-press a topic card to delete the topic and everything inside it. The confirmation asks first.
 - **Review past errors** opens the 48-hour error queue.
 - **Cards** opens concepts, error cards and basic cards waiting for export.
-- The **shuffle** button turns on **Start shuffled practice**. That session mixes questions from every topic in random order. The setting is remembered.
+- The **Shuffle** floating button opens **Start shuffled practice**. That session mixes unsolved, unskipped questions from every topic in random order.
 - **Import** creates topics and practices from a JSON file.
 - The **i** icon opens Help.
 - The settings icon opens Settings.
@@ -22,18 +24,32 @@ Questions is an offline-first Android study app. This guide walks through every 
 3. Review the file name, counts, topic/practice list and duplicate notes.
 4. Tap **Import**.
 
-The whole file is validated first. A broken file shows the JSON path or line/column and imports nothing. **Load sample** loads the bundled practice. See [Import format](json-format.md).
+The whole file is validated first. A broken file shows the JSON path or line/column and imports nothing. **Load sample** loads the bundled practice. A question may include an optional `subtopic`; blank values are imported as uncategorized. See [Import format](json-format.md).
 
 ## Topic
 
 - Shows description, priority, Anki deck, accuracy, progress, correct answers, active errors and completed sessions.
 - **Progress** is answered questions divided by the topic's total questions after removing those left unanswered in completed sessions. It measures coverage; **Accuracy** measures how many answers were correct.
 - **Practices** lists each practice with question count and last score. Tap a practice to start.
-- Long-press a practice to open its options: rename, mark it done or active, split it into two slices, or delete it.
+- The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order across visits and app restarts.
+- Long-press a practice to open its options: **Edit practice**, mark it done or active, split it into two slices, or delete it.
+- **Edit practice** opens a second menu with **Rename**, **Edit description**, **Download practice JSON**, **Update practice JSON** and **AnkiDroid deck**. The deck entry sets the topic's deck, which routes this practice's cards on export.
+- **Download practice JSON** shares one file with the topic, the practice name and description, and every current question. Each question carries a stable identity so a later update maps back to the stored question.
+- **Update practice JSON** reads an edited export and shows a preview before writing anything: how many questions are new, modified, unchanged and deleted, with the affected prompts. **Apply changes** writes one transaction and refreshes the practice content hash and import time; **Cancel** leaves it untouched. Matched questions keep their answers, error cards and statistics. Deleted questions and their linked answers and cards are removed. Files without identities fall back to matching the exact prompt. A file whose topic or practice name does not match is rejected with a clear message.
 - **Split into two** replaces the practice with "… Slice A" and "… Slice B", each holding half of its questions in random order. It needs an even number of questions and removes the original practice's sessions and cards. Finish or discard an in-progress session first.
-- **Edit** changes name, description, priority and the Anki deck for that topic.
+- **Edit topic** is available from the topic's long-press menu on Home and from the archived topics list. It changes name, description, priority and the Anki deck.
 - **Browse decks** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
 - Blank deck means the default deck from Settings.
+
+## Statistics
+
+- Open **Statistics** from the insights icon on a topic.
+- The hero shows the latest score, best and average, and the number of completed sessions.
+- **Progress over time** plots one point per completed session. The solid line joins the sessions; the dashed **Trend** line is a least-squares fit through the same points, so it shows the overall direction rather than a single jump. The legend names both series.
+- **Learning rate** appears below the metrics once the history spans at least one week. It reports the average change in percentage points per week from the fitted trend, for example `+8 pp/week`. Short histories and single sessions do not show a figure.
+- **By subtopic** groups questions by their optional subtopic and shows accuracy and progress for each group. Questions without a subtopic appear under **Uncategorized**. The section is hidden when no question in the topic has a subtopic.
+- **Sessions** lists every completed session with its score and date.
+- The share icon exports the visible statistics as a JSON file through the system share sheet. The file contains the topic summary, progress points, per-subtopic figures and the trend data.
 
 ## Practice session
 

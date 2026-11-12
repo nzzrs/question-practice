@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
 import '../domain/models.dart';
+import '../domain/question_progress.dart';
 import 'mappers.dart';
 
 class SessionRepository {
@@ -67,6 +68,29 @@ class SessionRepository {
   Future<Attempt?> attemptForQuestion(int sessionId, int questionId) async {
     final row = await _db.sessionDao.attemptForQuestion(sessionId, questionId);
     return row == null ? null : attemptFromRow(row);
+  }
+
+  /// History for every question, derived from its attempts across sessions.
+  Future<QuestionProgress> questionProgress() async {
+    final rows = await _db.sessionDao.allAttempts();
+    final leftUnanswered = await _db.sessionDao.questionsLeftUnanswered();
+    final done = <int>{};
+    final solved = <int>{};
+    final skipped = <int>{...leftUnanswered};
+    for (final row in rows) {
+      final attempt = attemptFromRow(row);
+      if (attempt.isSkipped) {
+        skipped.add(attempt.questionId);
+      } else {
+        done.add(attempt.questionId);
+      }
+      if (attempt.isCorrect) solved.add(attempt.questionId);
+    }
+    return QuestionProgress(
+      doneQuestionIds: done,
+      solvedQuestionIds: solved,
+      skippedQuestionIds: skipped,
+    );
   }
 
   Future<Attempt> recordAttempt({

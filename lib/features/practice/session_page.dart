@@ -396,21 +396,21 @@ class _SessionPageState extends ConsumerState<SessionPage>
       _openSummary(_summary!);
       return;
     }
-    _finishExisting();
+    await _finishEarly();
   }
 
   Future<void> _finishEarly() async {
     if (_submitting) return;
     await _persistReasoning();
     if (!mounted) return;
-    final unanswered = _start.items.length - _start.attempts.length;
+    final unanswered = _start.pendingUnanswered.length;
     if (unanswered <= 0) {
       final summary =
           _summary ??
           await ref
               .read(sessionServiceProvider)
-              .completeIfReady(_start.session.id);
-      if (summary != null && mounted) await _openSummary(summary);
+              .finishEarly(start: _start, markSkipped: false);
+      if (mounted) await _openSummary(summary);
       return;
     }
     final choice = await M3EDialog.show<_FinishChoice>(
@@ -455,6 +455,17 @@ class _SessionPageState extends ConsumerState<SessionPage>
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
+  }
+
+  Future<void> _openQuestionList() async {
+    final selected = await M3EBottomSheet.show<int>(
+      context,
+      initialValue: M3EBottomSheetValue.expanded,
+      builder: (context) =>
+          _QuestionPickerSheet(start: _start, currentIndex: _index),
+    );
+    if (selected == null || !mounted) return;
+    await _goTo(selected);
   }
 
   Future<void> _openSummary(SessionSummary summary) async {
@@ -567,10 +578,11 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final total = _start.items.length;
     final position = _index + 1;
     final answered = _start.attempts.length;
-    final unanswered = total - answered;
+    final unanswered = _start.pendingUnanswered.length;
     final progress = answered.clamp(0, total) / total;
     final atLast = _index >= total - 1;
     final seesResults = unanswered == 0 && _summary != null && atLast;
+    final currentDone = _start.isDone(item);
     final modeTitle = switch (_start.session.mode) {
       SessionMode.practice => item.practiceName,
       SessionMode.mixed => 'Shuffled practice',
@@ -626,10 +638,12 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   total: total,
                   progress: progress,
                   pastErrors: _start.session.mode == SessionMode.pastErrors,
+                  done: currentDone,
                   previousEnabled: _index > 0 && !_submitting,
                   nextEnabled: _index < total - 1 && !_submitting,
                   onPrevious: () => _goTo(_index - 1),
                   onNext: () => _goTo(_index + 1),
+                  onOpenList: _openQuestionList,
                 ),
                 const SizedBox(height: 22),
                 if (item.topicName.isNotEmpty)
@@ -831,20 +845,24 @@ class _QuestionNavigator extends StatelessWidget {
     required this.total,
     required this.progress,
     required this.pastErrors,
+    required this.done,
     required this.previousEnabled,
     required this.nextEnabled,
     required this.onPrevious,
     required this.onNext,
+    required this.onOpenList,
   });
 
   final int position;
   final int total;
   final double progress;
   final bool pastErrors;
+  final bool done;
   final bool previousEnabled;
   final bool nextEnabled;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
+  final VoidCallback onOpenList;
 
   @override
   Widget build(BuildContext context) {
@@ -853,17 +871,34 @@ class _QuestionNavigator extends StatelessWidget {
       children: [
         Row(
           children: [
-            Text(
-              'Question $position of $total',
-              style: theme.typography.baseline.labelMedium.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+            Expanded(
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'Question $position of $total',
+                    style: theme.typography.baseline.labelMedium.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  if (done)
+                    const Pill(
+                      'Done',
+                      tone: PillTone.success,
+                      icon: Icons.check,
+                    ),
+                  if (pastErrors) const Pill('Re-test', tone: PillTone.primary),
+                ],
               ),
             ),
-            if (pastErrors) ...[
-              const SizedBox(width: 8),
-              const Pill('Re-test', tone: PillTone.primary),
-            ],
-            const Spacer(),
+            M3EIconButton(
+              variant: M3EIconButtonVariant.standard,
+              icon: const Icon(Icons.format_list_numbered),
+              tooltip: 'Question list',
+              onPressed: onOpenList,
+            ),
             M3EIconButton(
               variant: M3EIconButtonVariant.standard,
               icon: const Icon(Icons.chevron_left),
@@ -881,6 +916,105 @@ class _QuestionNavigator extends StatelessWidget {
         const SizedBox(height: 10),
         LinearScore(value: progress, semanticsLabel: 'Practice progress'),
       ],
+    );
+  }
+}
+
+class _QuestionPickerSheet extends StatelessWidget {
+  const _QuestionPickerSheet({required this.start, required this.currentIndex});
+
+  final SessionStart start;
+  final int currentIndex;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+              child: Text(
+                'Questions',
+                style: theme.typography.emphasized.titleLarge,
+              ),
+            ),
+            for (var index = 0; index < start.items.length; index++)
+              _QuestionPickerRow(
+                number: index + 1,
+                item: start.items[index],
+                done: start.isDone(start.items[index]),
+                current: index == currentIndex,
+                onTap: () => Navigator.of(context).pop(index),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuestionPickerRow extends StatelessWidget {
+  const _QuestionPickerRow({
+    required this.number,
+    required this.item,
+    required this.done,
+    required this.current,
+    required this.onTap,
+  });
+
+  final int number;
+  final SessionQuestionItem item;
+  final bool done;
+  final bool current;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final question = item.question;
+    return Material(
+      color: current
+          ? theme.colorScheme.secondaryContainer
+          : Colors.transparent,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28,
+                child: Text(
+                  '$number',
+                  style: theme.typography.emphasized.labelLarge.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  question.prompt,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.typography.baseline.bodyMedium,
+                ),
+              ),
+              if (done) ...[
+                const SizedBox(width: 8),
+                const Pill('Done', tone: PillTone.success, icon: Icons.check),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

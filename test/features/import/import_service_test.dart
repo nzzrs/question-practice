@@ -37,6 +37,33 @@ void main() {
     expect(preview.notes, isEmpty);
   });
 
+  test('imports optional subtopics and trims them', () async {
+    final payload = jsonDecode(sample) as Map<String, dynamic>;
+    final topics = payload['topics'] as List<dynamic>;
+    final practice =
+        ((topics.first as Map<String, dynamic>)['practices'] as List<dynamic>)
+                .first
+            as Map<String, dynamic>;
+    final questions = (practice['questions'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    questions[0].remove('subtopic');
+    questions[1]['subtopic'] = '  Virtual machines  ';
+
+    final preview = await service.previewText(
+      jsonEncode(payload),
+      fileName: 'subtopics.json',
+    );
+    await service.import(preview);
+
+    final importedPractice = (await harness.practices.allPractices()).first;
+    final imported = await harness.practices.questionsForPractice(
+      importedPractice.id,
+    );
+    expect(imported[0].subtopic, '');
+    expect(imported[1].subtopic, 'Virtual machines');
+    expect(imported[2].subtopic, 'Databases');
+  });
+
   test('import writes topics, practices and questions once', () async {
     final preview = await service.previewText(sample, fileName: 'sample.json');
     final result = await service.import(preview);
@@ -79,6 +106,30 @@ void main() {
     expect(second.practicesImported, 1);
     final rows = await harness.database.topicDao.allPractices();
     expect(rows.any((row) => row.name == 'Compute choices (2)'), isTrue);
+  });
+
+  test('question identities do not change duplicate detection', () async {
+    final first = await service.previewText(sample, fileName: 'sample.json');
+    await service.import(first);
+
+    final payload = jsonDecode(sample) as Map<String, dynamic>;
+    final topics = payload['topics'] as List<dynamic>;
+    final practice =
+        ((topics.first as Map<String, dynamic>)['practices'] as List<dynamic>)
+                .first
+            as Map<String, dynamic>;
+    final question =
+        (practice['questions'] as List<dynamic>).first as Map<String, dynamic>;
+    question['sourceId'] = '42';
+
+    final second = await service.import(
+      await service.previewText(
+        jsonEncode(payload),
+        fileName: 'with-identities.json',
+      ),
+    );
+    expect(second.practicesImported, 0);
+    expect(second.practicesSkipped, 3);
   });
 
   test('accepts a BOM and .txt contents', () async {

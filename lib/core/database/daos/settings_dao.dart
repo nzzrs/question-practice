@@ -28,6 +28,14 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
     return row?.value;
   }
 
+  Stream<String?> watchValue(String key) {
+    return (select(
+      settings,
+    )..where((s) => s.key.equals(key))).watchSingleOrNull().map((row) {
+      return row?.value;
+    });
+  }
+
   Future<void> setValue(String key, String value) {
     return into(
       settings,

@@ -79,6 +79,21 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _archivedMeta = const VerificationMeta(
+    'archived',
+  );
+  @override
+  late final GeneratedColumn<bool> archived = GeneratedColumn<bool>(
+    'archived',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("archived" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -87,6 +102,7 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
     priority,
     ankiDeck,
     createdAt,
+    archived,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -140,6 +156,12 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('archived')) {
+      context.handle(
+        _archivedMeta,
+        archived.isAcceptableOrUnknown(data['archived']!, _archivedMeta),
+      );
+    }
     return context;
   }
 
@@ -173,6 +195,10 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      archived: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}archived'],
+      )!,
     );
   }
 
@@ -189,6 +215,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
   final int? priority;
   final String? ankiDeck;
   final DateTime createdAt;
+  final bool archived;
   const TopicRow({
     required this.id,
     required this.name,
@@ -196,6 +223,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     this.priority,
     this.ankiDeck,
     required this.createdAt,
+    required this.archived,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -210,6 +238,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       map['anki_deck'] = Variable<String>(ankiDeck);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['archived'] = Variable<bool>(archived);
     return map;
   }
 
@@ -225,6 +254,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           ? const Value.absent()
           : Value(ankiDeck),
       createdAt: Value(createdAt),
+      archived: Value(archived),
     );
   }
 
@@ -240,6 +270,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       priority: serializer.fromJson<int?>(json['priority']),
       ankiDeck: serializer.fromJson<String?>(json['ankiDeck']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      archived: serializer.fromJson<bool>(json['archived']),
     );
   }
   @override
@@ -252,6 +283,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       'priority': serializer.toJson<int?>(priority),
       'ankiDeck': serializer.toJson<String?>(ankiDeck),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'archived': serializer.toJson<bool>(archived),
     };
   }
 
@@ -262,6 +294,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     Value<int?> priority = const Value.absent(),
     Value<String?> ankiDeck = const Value.absent(),
     DateTime? createdAt,
+    bool? archived,
   }) => TopicRow(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -269,6 +302,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     priority: priority.present ? priority.value : this.priority,
     ankiDeck: ankiDeck.present ? ankiDeck.value : this.ankiDeck,
     createdAt: createdAt ?? this.createdAt,
+    archived: archived ?? this.archived,
   );
   TopicRow copyWithCompanion(TopicsCompanion data) {
     return TopicRow(
@@ -280,6 +314,7 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       priority: data.priority.present ? data.priority.value : this.priority,
       ankiDeck: data.ankiDeck.present ? data.ankiDeck.value : this.ankiDeck,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      archived: data.archived.present ? data.archived.value : this.archived,
     );
   }
 
@@ -291,14 +326,22 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           ..write('description: $description, ')
           ..write('priority: $priority, ')
           ..write('ankiDeck: $ankiDeck, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('archived: $archived')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, name, description, priority, ankiDeck, createdAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    description,
+    priority,
+    ankiDeck,
+    createdAt,
+    archived,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -308,7 +351,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           other.description == this.description &&
           other.priority == this.priority &&
           other.ankiDeck == this.ankiDeck &&
-          other.createdAt == this.createdAt);
+          other.createdAt == this.createdAt &&
+          other.archived == this.archived);
 }
 
 class TopicsCompanion extends UpdateCompanion<TopicRow> {
@@ -318,6 +362,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
   final Value<int?> priority;
   final Value<String?> ankiDeck;
   final Value<DateTime> createdAt;
+  final Value<bool> archived;
   const TopicsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -325,6 +370,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     this.priority = const Value.absent(),
     this.ankiDeck = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.archived = const Value.absent(),
   });
   TopicsCompanion.insert({
     this.id = const Value.absent(),
@@ -333,6 +379,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     this.priority = const Value.absent(),
     this.ankiDeck = const Value.absent(),
     required DateTime createdAt,
+    this.archived = const Value.absent(),
   }) : name = Value(name),
        createdAt = Value(createdAt);
   static Insertable<TopicRow> custom({
@@ -342,6 +389,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     Expression<int>? priority,
     Expression<String>? ankiDeck,
     Expression<DateTime>? createdAt,
+    Expression<bool>? archived,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -350,6 +398,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
       if (priority != null) 'priority': priority,
       if (ankiDeck != null) 'anki_deck': ankiDeck,
       if (createdAt != null) 'created_at': createdAt,
+      if (archived != null) 'archived': archived,
     });
   }
 
@@ -360,6 +409,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     Value<int?>? priority,
     Value<String?>? ankiDeck,
     Value<DateTime>? createdAt,
+    Value<bool>? archived,
   }) {
     return TopicsCompanion(
       id: id ?? this.id,
@@ -368,6 +418,7 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
       priority: priority ?? this.priority,
       ankiDeck: ankiDeck ?? this.ankiDeck,
       createdAt: createdAt ?? this.createdAt,
+      archived: archived ?? this.archived,
     );
   }
 
@@ -392,6 +443,9 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (archived.present) {
+      map['archived'] = Variable<bool>(archived.value);
+    }
     return map;
   }
 
@@ -403,7 +457,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
           ..write('description: $description, ')
           ..write('priority: $priority, ')
           ..write('ankiDeck: $ankiDeck, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('archived: $archived')
           ..write(')'))
         .toString();
   }
@@ -975,6 +1030,17 @@ class $QuestionsTable extends Questions
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _subtopicMeta = const VerificationMeta(
+    'subtopic',
+  );
+  @override
+  late final GeneratedColumn<String> subtopic = GeneratedColumn<String>(
+    'subtopic',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -985,6 +1051,7 @@ class $QuestionsTable extends Questions
     explanation,
     alternativeExplanationsJson,
     position,
+    subtopic,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1067,6 +1134,12 @@ class $QuestionsTable extends Questions
     } else if (isInserting) {
       context.missing(_positionMeta);
     }
+    if (data.containsKey('subtopic')) {
+      context.handle(
+        _subtopicMeta,
+        subtopic.isAcceptableOrUnknown(data['subtopic']!, _subtopicMeta),
+      );
+    }
     return context;
   }
 
@@ -1108,6 +1181,10 @@ class $QuestionsTable extends Questions
         DriftSqlType.int,
         data['${effectivePrefix}position'],
       )!,
+      subtopic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subtopic'],
+      ),
     );
   }
 
@@ -1126,6 +1203,9 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
   final String explanation;
   final String alternativeExplanationsJson;
   final int position;
+
+  /// Optional grouping inside a practice. Null or empty means uncategorized.
+  final String? subtopic;
   const QuestionRow({
     required this.id,
     required this.practiceId,
@@ -1135,6 +1215,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     required this.explanation,
     required this.alternativeExplanationsJson,
     required this.position,
+    this.subtopic,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1149,6 +1230,9 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
       alternativeExplanationsJson,
     );
     map['position'] = Variable<int>(position);
+    if (!nullToAbsent || subtopic != null) {
+      map['subtopic'] = Variable<String>(subtopic);
+    }
     return map;
   }
 
@@ -1162,6 +1246,9 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
       explanation: Value(explanation),
       alternativeExplanationsJson: Value(alternativeExplanationsJson),
       position: Value(position),
+      subtopic: subtopic == null && nullToAbsent
+          ? const Value.absent()
+          : Value(subtopic),
     );
   }
 
@@ -1183,6 +1270,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
         json['alternativeExplanationsJson'],
       ),
       position: serializer.fromJson<int>(json['position']),
+      subtopic: serializer.fromJson<String?>(json['subtopic']),
     );
   }
   @override
@@ -1199,6 +1287,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
         alternativeExplanationsJson,
       ),
       'position': serializer.toJson<int>(position),
+      'subtopic': serializer.toJson<String?>(subtopic),
     };
   }
 
@@ -1211,6 +1300,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     String? explanation,
     String? alternativeExplanationsJson,
     int? position,
+    Value<String?> subtopic = const Value.absent(),
   }) => QuestionRow(
     id: id ?? this.id,
     practiceId: practiceId ?? this.practiceId,
@@ -1221,6 +1311,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     alternativeExplanationsJson:
         alternativeExplanationsJson ?? this.alternativeExplanationsJson,
     position: position ?? this.position,
+    subtopic: subtopic.present ? subtopic.value : this.subtopic,
   );
   QuestionRow copyWithCompanion(QuestionsCompanion data) {
     return QuestionRow(
@@ -1242,6 +1333,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
           ? data.alternativeExplanationsJson.value
           : this.alternativeExplanationsJson,
       position: data.position.present ? data.position.value : this.position,
+      subtopic: data.subtopic.present ? data.subtopic.value : this.subtopic,
     );
   }
 
@@ -1255,7 +1347,8 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
           ..write('correctIndexesJson: $correctIndexesJson, ')
           ..write('explanation: $explanation, ')
           ..write('alternativeExplanationsJson: $alternativeExplanationsJson, ')
-          ..write('position: $position')
+          ..write('position: $position, ')
+          ..write('subtopic: $subtopic')
           ..write(')'))
         .toString();
   }
@@ -1270,6 +1363,7 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
     explanation,
     alternativeExplanationsJson,
     position,
+    subtopic,
   );
   @override
   bool operator ==(Object other) =>
@@ -1283,7 +1377,8 @@ class QuestionRow extends DataClass implements Insertable<QuestionRow> {
           other.explanation == this.explanation &&
           other.alternativeExplanationsJson ==
               this.alternativeExplanationsJson &&
-          other.position == this.position);
+          other.position == this.position &&
+          other.subtopic == this.subtopic);
 }
 
 class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
@@ -1295,6 +1390,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
   final Value<String> explanation;
   final Value<String> alternativeExplanationsJson;
   final Value<int> position;
+  final Value<String?> subtopic;
   const QuestionsCompanion({
     this.id = const Value.absent(),
     this.practiceId = const Value.absent(),
@@ -1304,6 +1400,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     this.explanation = const Value.absent(),
     this.alternativeExplanationsJson = const Value.absent(),
     this.position = const Value.absent(),
+    this.subtopic = const Value.absent(),
   });
   QuestionsCompanion.insert({
     this.id = const Value.absent(),
@@ -1314,6 +1411,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     required String explanation,
     required String alternativeExplanationsJson,
     required int position,
+    this.subtopic = const Value.absent(),
   }) : practiceId = Value(practiceId),
        prompt = Value(prompt),
        alternativesJson = Value(alternativesJson),
@@ -1329,6 +1427,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     Expression<String>? explanation,
     Expression<String>? alternativeExplanationsJson,
     Expression<int>? position,
+    Expression<String>? subtopic,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1341,6 +1440,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
       if (alternativeExplanationsJson != null)
         'alternative_explanations_json': alternativeExplanationsJson,
       if (position != null) 'position': position,
+      if (subtopic != null) 'subtopic': subtopic,
     });
   }
 
@@ -1353,6 +1453,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     Value<String>? explanation,
     Value<String>? alternativeExplanationsJson,
     Value<int>? position,
+    Value<String?>? subtopic,
   }) {
     return QuestionsCompanion(
       id: id ?? this.id,
@@ -1364,6 +1465,7 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
       alternativeExplanationsJson:
           alternativeExplanationsJson ?? this.alternativeExplanationsJson,
       position: position ?? this.position,
+      subtopic: subtopic ?? this.subtopic,
     );
   }
 
@@ -1396,6 +1498,9 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
     if (position.present) {
       map['position'] = Variable<int>(position.value);
     }
+    if (subtopic.present) {
+      map['subtopic'] = Variable<String>(subtopic.value);
+    }
     return map;
   }
 
@@ -1409,7 +1514,8 @@ class QuestionsCompanion extends UpdateCompanion<QuestionRow> {
           ..write('correctIndexesJson: $correctIndexesJson, ')
           ..write('explanation: $explanation, ')
           ..write('alternativeExplanationsJson: $alternativeExplanationsJson, ')
-          ..write('position: $position')
+          ..write('position: $position, ')
+          ..write('subtopic: $subtopic')
           ..write(')'))
         .toString();
   }
@@ -7275,6 +7381,7 @@ typedef $$TopicsTableCreateCompanionBuilder = TopicsCompanion Function({
   Value<int?> priority,
   Value<String?> ankiDeck,
   required DateTime createdAt,
+  Value<bool> archived,
 });
 typedef $$TopicsTableUpdateCompanionBuilder = TopicsCompanion Function({
   Value<int> id,
@@ -7283,6 +7390,7 @@ typedef $$TopicsTableUpdateCompanionBuilder = TopicsCompanion Function({
   Value<int?> priority,
   Value<String?> ankiDeck,
   Value<DateTime> createdAt,
+  Value<bool> archived,
 });
 
 final class $$TopicsTableReferences
@@ -7344,6 +7452,11 @@ class $$TopicsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get archived => $composableBuilder(
+    column: $table.archived,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7411,6 +7524,11 @@ class $$TopicsTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<bool> get archived => $composableBuilder(
+    column: $table.archived,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$TopicsTableAnnotationComposer
@@ -7441,6 +7559,9 @@ class $$TopicsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<bool> get archived =>
+      $composableBuilder(column: $table.archived, builder: (column) => column);
 
   Expression<T> practicesRefs<T extends Object>(
     Expression<T> Function($$PracticesTableAnnotationComposer a) f,
@@ -7502,6 +7623,7 @@ class $$TopicsTableTableManager
                 Value<int?> priority = const Value.absent(),
                 Value<String?> ankiDeck = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<bool> archived = const Value.absent(),
               }) => TopicsCompanion(
                 id: id,
                 name: name,
@@ -7509,6 +7631,7 @@ class $$TopicsTableTableManager
                 priority: priority,
                 ankiDeck: ankiDeck,
                 createdAt: createdAt,
+                archived: archived,
               ),
           createCompanionCallback:
               ({
@@ -7518,6 +7641,7 @@ class $$TopicsTableTableManager
                 Value<int?> priority = const Value.absent(),
                 Value<String?> ankiDeck = const Value.absent(),
                 required DateTime createdAt,
+                Value<bool> archived = const Value.absent(),
               }) => TopicsCompanion.insert(
                 id: id,
                 name: name,
@@ -7525,6 +7649,7 @@ class $$TopicsTableTableManager
                 priority: priority,
                 ankiDeck: ankiDeck,
                 createdAt: createdAt,
+                archived: archived,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -8128,6 +8253,7 @@ typedef $$QuestionsTableCreateCompanionBuilder = QuestionsCompanion Function({
   required String explanation,
   required String alternativeExplanationsJson,
   required int position,
+  Value<String?> subtopic,
 });
 typedef $$QuestionsTableUpdateCompanionBuilder = QuestionsCompanion Function({
   Value<int> id,
@@ -8138,6 +8264,7 @@ typedef $$QuestionsTableUpdateCompanionBuilder = QuestionsCompanion Function({
   Value<String> explanation,
   Value<String> alternativeExplanationsJson,
   Value<int> position,
+  Value<String?> subtopic,
 });
 
 final class $$QuestionsTableReferences
@@ -8333,6 +8460,11 @@ class $$QuestionsTableFilterComposer
 
   ColumnFilters<int> get position => $composableBuilder(
     column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8579,6 +8711,11 @@ class $$QuestionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$PracticesTableOrderingComposer get practiceId {
     final $$PracticesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -8640,6 +8777,9 @@ class $$QuestionsTableAnnotationComposer
 
   GeneratedColumn<int> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<String> get subtopic =>
+      $composableBuilder(column: $table.subtopic, builder: (column) => column);
 
   $$PracticesTableAnnotationComposer get practiceId {
     final $$PracticesTableAnnotationComposer composer = $composerBuilder(
@@ -8886,6 +9026,7 @@ class $$QuestionsTableTableManager
                 Value<String> alternativeExplanationsJson =
                     const Value.absent(),
                 Value<int> position = const Value.absent(),
+                Value<String?> subtopic = const Value.absent(),
               }) => QuestionsCompanion(
                 id: id,
                 practiceId: practiceId,
@@ -8895,6 +9036,7 @@ class $$QuestionsTableTableManager
                 explanation: explanation,
                 alternativeExplanationsJson: alternativeExplanationsJson,
                 position: position,
+                subtopic: subtopic,
               ),
           createCompanionCallback:
               ({
@@ -8906,6 +9048,7 @@ class $$QuestionsTableTableManager
                 required String explanation,
                 required String alternativeExplanationsJson,
                 required int position,
+                Value<String?> subtopic = const Value.absent(),
               }) => QuestionsCompanion.insert(
                 id: id,
                 practiceId: practiceId,
@@ -8915,6 +9058,7 @@ class $$QuestionsTableTableManager
                 explanation: explanation,
                 alternativeExplanationsJson: alternativeExplanationsJson,
                 position: position,
+                subtopic: subtopic,
               ),
           withReferenceMapper: (p0) => p0
               .map(

@@ -40,16 +40,26 @@ class PracticeRepository {
         .map(homeStatsFromRow);
   }
 
-  Stream<List<TopicSummary>> watchTopicSummaries() {
+  Stream<List<TopicSummary>> watchTopicSummaries({
+    bool includeArchived = false,
+  }) {
     return _db.statsDao
-        .watchTopicSummaries(_clock.now().toUtc())
+        .watchTopicSummaries(
+          _clock.now().toUtc(),
+          includeArchived: includeArchived,
+        )
         .map((rows) => rows.map(topicSummaryFromRow).toList());
   }
 
+  Stream<List<TopicSummary>> watchArchivedTopicSummaries() {
+    return watchTopicSummaries(includeArchived: true)
+        .map((rows) => rows.where((row) => row.topic.archived).toList());
+  }
+
   Stream<TopicSummary?> watchTopicSummary(int topicId) {
-    return watchTopicSummaries().map(
-      (rows) => rows.where((row) => row.topic.id == topicId).firstOrNull,
-    );
+    return watchTopicSummaries(
+      includeArchived: true,
+    ).map((rows) => rows.where((row) => row.topic.id == topicId).firstOrNull);
   }
 
   Stream<List<PracticeSummary>> watchPracticeSummaries(int topicId) {
@@ -70,6 +80,23 @@ class PracticeRepository {
                 practiceName: row.practiceName,
                 correct: row.correct,
                 total: row.total,
+              ),
+          ],
+        );
+  }
+
+  Stream<List<SubtopicStat>> watchSubtopicStats(int topicId) {
+    return _db.statsDao
+        .watchSubtopicStats(topicId)
+        .map(
+          (rows) => [
+            for (final row in rows)
+              SubtopicStat(
+                subtopic: row.subtopic,
+                questionCount: row.questionCount,
+                attemptedQuestionCount: row.attemptedQuestionCount,
+                answeredCount: row.answeredCount,
+                correctCount: row.correctCount,
               ),
           ],
         );
@@ -170,12 +197,85 @@ class PracticeRepository {
             questions[i].alternativeExplanations,
           ),
           position: i,
+          subtopic: Value(_normalizeSubtopic(questions[i].subtopic)),
         ),
     ]);
   }
 
+  String? _normalizeSubtopic(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
   Future<void> renamePractice(int id, String name) {
     return _db.topicDao.renamePractice(id, name);
+  }
+
+  Future<void> updatePracticeDescription(int id, String description) {
+    return _db.topicDao.updatePracticeDescription(id, description);
+  }
+
+  /// Rewrites a practice's questions while keeping the rows of matched ones.
+  ///
+  /// Matched questions keep their id, so attempts, error cards, skipped
+  /// questions and statistics stay linked. Removed questions are deleted and
+  /// cascade through the existing schema relationships.
+  Future<void> applyPracticeUpdate({
+    required int practiceId,
+    required List<PracticeQuestionUpdate> questions,
+    required List<int> deletedQuestionIds,
+    required String contentHash,
+    required DateTime importedAt,
+  }) {
+    return _db.transaction(() async {
+      final practice = await _db.topicDao.practiceById(practiceId);
+      if (practice == null) {
+        throw StateError('This practice no longer exists.');
+      }
+      for (final id in deletedQuestionIds) {
+        await _db.topicDao.deleteQuestion(id);
+      }
+      final inserted = <QuestionsCompanion>[];
+      for (final update in questions) {
+        final question = update.question;
+        final existingId = update.existingQuestionId;
+        if (existingId == null) {
+          inserted.add(
+            QuestionsCompanion.insert(
+              practiceId: practiceId,
+              prompt: question.prompt,
+              alternativesJson: encodeStringList(question.alternatives),
+              correctIndexesJson: Value(encodeIntList(question.correctIndexes)),
+              explanation: question.explanation,
+              alternativeExplanationsJson: encodeStringList(
+                question.alternativeExplanations,
+              ),
+              position: update.position,
+              subtopic: Value(_normalizeSubtopic(question.subtopic)),
+            ),
+          );
+          continue;
+        }
+        await _db.topicDao.updateQuestion(
+          id: existingId,
+          prompt: question.prompt,
+          alternatives: question.alternatives,
+          correctIndexes: question.correctIndexes,
+          explanation: question.explanation,
+          alternativeExplanations: question.alternativeExplanations,
+          position: update.position,
+          subtopic: _normalizeSubtopic(question.subtopic),
+        );
+      }
+      if (inserted.isNotEmpty) {
+        await _db.topicDao.insertQuestions(inserted);
+      }
+      await _db.topicDao.updatePracticeContent(
+        id: practiceId,
+        contentHash: contentHash,
+        importedAt: importedAt,
+      );
+    });
   }
 
   Future<void> setPracticeDone(int id, bool isDone) {
@@ -299,12 +399,17 @@ class PracticeRepository {
           alternativeExplanationsJson:
               questions[index].alternativeExplanationsJson,
           position: index,
+          subtopic: Value(questions[index].subtopic),
         ),
     ]);
   }
 
   Future<void> deleteTopic(int id) {
     return _db.topicDao.deleteTopic(id);
+  }
+
+  Future<void> setTopicArchived(int id, bool archived) {
+    return _db.topicDao.setTopicArchived(id, archived);
   }
 
   Future<void> updateTopic({

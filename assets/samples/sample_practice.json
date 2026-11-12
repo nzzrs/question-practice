@@ -12,6 +12,7 @@
           "questions": [
             {
               "prompt": "Which Google Cloud service runs a container image without requiring you to manage a cluster?",
+              "subtopic": "Serverless compute",
               "alternatives": ["Compute Engine", "Cloud Run", "Google Kubernetes Engine", "Cloud Functions"],
               "correctIndex": 1,
               "explanation": "Cloud Run is a managed container platform. You give it a container image and it handles scaling and the underlying infrastructure.",
@@ -24,6 +25,7 @@
             },
             {
               "prompt": "A batch job needs a virtual machine with a specific GPU and a custom kernel. Which service fits best?",
+              "subtopic": "Virtual machines",
               "alternatives": ["Cloud Run", "Cloud Functions", "Compute Engine", "App Engine standard"],
               "correctIndex": 2,
               "explanation": "Compute Engine provides full control over the VM, including GPU selection and a custom kernel.",
@@ -36,6 +38,7 @@
             },
             {
               "prompt": "Which service is designed for a globally distributed NoSQL document database?",
+              "subtopic": "Databases",
               "alternatives": ["Cloud SQL", "Firestore", "Bigtable", "Spanner"],
               "correctIndex": 1,
               "explanation": "Firestore is a managed NoSQL document database with real-time synchronization and global distribution.",
@@ -54,6 +57,7 @@
           "questions": [
             {
               "prompt": "Which storage class in Cloud Storage is cheapest for long-term archives that are rarely read?",
+              "subtopic": "Object storage",
               "alternatives": ["Standard", "Nearline", "Coldline", "Archive"],
               "correctIndex": 3,
               "explanation": "Archive storage has the lowest storage price but the highest retrieval cost and minimum storage duration.",
@@ -66,6 +70,7 @@
             },
             {
               "prompt": "What is the main purpose of Pub/Sub?",
+              "subtopic": "Messaging",
               "alternatives": ["Running SQL queries", "Asynchronous messaging between services", "Serving static websites", "Managing TLS certificates"],
               "correctIndex": 1,
               "explanation": "Pub/Sub is a messaging service that decouples producers and consumers with topics and subscriptions.",
@@ -91,6 +96,7 @@
           "questions": [
             {
               "prompt": "Which transport protocol provides reliable, ordered delivery of a byte stream?",
+              "subtopic": "Transport layer",
               "alternatives": ["UDP", "TCP", "ICMP", "ARP"],
               "correctIndex": 1,
               "explanation": "TCP establishes a connection, acknowledges segments, and retransmits lost data to preserve order and reliability.",
@@ -103,6 +109,7 @@
             },
             {
               "prompt": "What does the Domain Name System (DNS) primarily do?",
+              "subtopic": "Name resolution",
               "alternatives": ["Encrypts web traffic", "Maps domain names to IP addresses", "Assigns MAC addresses", "Routes packets between autonomous systems"],
               "correctIndex": 1,
               "explanation": "DNS resolves human-readable names such as example.com into IP addresses that clients can connect to.",
@@ -115,6 +122,7 @@
             },
             {
               "prompt": "A client can reach a server by IP address but not by hostname. Which layer is the most likely source of the problem?",
+              "subtopic": "Name resolution",
               "alternatives": ["DNS resolution", "TCP congestion control", "TLS certificate validation", "Ethernet framing"],
               "correctIndex": 0,
               "explanation": "If the IP works but the name does not, name resolution is the first suspect.",

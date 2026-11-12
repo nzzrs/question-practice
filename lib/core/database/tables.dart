@@ -8,6 +8,7 @@ class Topics extends Table {
   IntColumn get priority => integer().nullable()();
   TextColumn get ankiDeck => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
 }
 
 @DataClassName('PracticeRow')
@@ -36,6 +37,9 @@ class Questions extends Table {
   TextColumn get explanation => text()();
   TextColumn get alternativeExplanationsJson => text()();
   IntColumn get position => integer()();
+
+  /// Optional grouping inside a practice. Null or empty means uncategorized.
+  TextColumn get subtopic => text().nullable()();
 }
 
 @DataClassName('SessionRow')

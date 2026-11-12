@@ -4,19 +4,15 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/data/practice_repository.dart';
+import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
+import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/session_page.dart';
-import 'anki_deck_picker.dart';
+import 'practice_actions.dart';
 import 'topic_stats_page.dart';
-
-enum _PracticeAction { rename, delete, markDone, markActive, split }
-
-enum _PracticeSort { name, recency }
-
-enum _SortDirection { increasing, decreasing }
 
 enum _ResumeChoice { continueSession, discardAndStart }
 
@@ -31,13 +27,14 @@ class TopicPage extends ConsumerStatefulWidget {
 
 class _TopicPageState extends ConsumerState<TopicPage> {
   bool _starting = false;
-  _PracticeSort _sort = _PracticeSort.name;
-  _SortDirection _sortDirection = _SortDirection.increasing;
 
   @override
   Widget build(BuildContext context) {
     final summary = ref.watch(topicSummaryProvider(widget.topicId));
     final practices = ref.watch(practiceSummariesProvider(widget.topicId));
+    final sort =
+        ref.watch(topicPracticeSortProvider(widget.topicId)).value ??
+        ListSort.defaultByName;
     final defaultDeck =
         ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
 
@@ -61,14 +58,6 @@ class _TopicPageState extends ConsumerState<TopicPage> {
               builder: (context) => TopicStatsPage(topicId: widget.topicId),
             ),
           ),
-        ),
-        M3EIconButton(
-          variant: M3EIconButtonVariant.standard,
-          icon: const Icon(Icons.edit_outlined),
-          tooltip: 'Edit topic',
-          onPressed: summary.value == null
-              ? null
-              : () => _editTopic(summary.value!.topic),
         ),
       ],
       children: [
@@ -141,7 +130,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                     variant: M3EIconButtonVariant.standard,
                     icon: const Icon(Icons.sort),
                     tooltip: 'Sort practices',
-                    onPressed: _chooseSort,
+                    onPressed: () => _chooseSort(sort),
                   ),
                 ),
                 practices.when(
@@ -158,7 +147,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                         message: 'Import a practice file that names this topic to add practices.',
                       );
                     }
-                    final sorted = _sortedPractices(items);
+                    final sorted = _sortedPractices(items, sort);
                     return AppGroup(
                       children: [
                         for (final practice in sorted)
@@ -193,13 +182,16 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     );
   }
 
-  List<PracticeSummary> _sortedPractices(List<PracticeSummary> items) {
+  List<PracticeSummary> _sortedPractices(
+    List<PracticeSummary> items,
+    ListSort sort,
+  ) {
     final sorted = List<PracticeSummary>.of(items);
-    final direction = _sortDirection == _SortDirection.increasing ? 1 : -1;
+    final direction = sort.direction == ListSortDirection.increasing ? 1 : -1;
     sorted.sort((a, b) {
-      final comparison = switch (_sort) {
-        _PracticeSort.name => compareNatural(a.practice.name, b.practice.name),
-        _PracticeSort.recency => a.practice.importedAt.compareTo(
+      final comparison = switch (sort.field) {
+        ListSortField.name => compareNatural(a.practice.name, b.practice.name),
+        ListSortField.recency => a.practice.importedAt.compareTo(
           b.practice.importedAt,
         ),
       };
@@ -209,82 +201,16 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     return sorted;
   }
 
-  Future<void> _chooseSort() async {
-    var sort = _sort;
-    var direction = _sortDirection;
-    final applied = await M3EDialog.show<bool>(
+  Future<void> _chooseSort(ListSort current) async {
+    final applied = await showListSortDialog(
       context,
-      dialog: StatefulBuilder(
-        builder: (context, setDialogState) {
-          final theme = M3ETheme.of(context);
-          return M3EDialog(
-            title: 'Sort practices',
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Sort by', style: theme.typography.baseline.labelMedium),
-                const SizedBox(height: 8),
-                M3ESegmentedButton<_PracticeSort>(
-                  segments: const [
-                    M3ESegment(value: _PracticeSort.name, label: 'Name'),
-                    M3ESegment(value: _PracticeSort.recency, label: 'Recency'),
-                  ],
-                  selected: {sort},
-                  onSelectionChanged: (values) {
-                    if (values.isEmpty) return;
-                    setDialogState(() => sort = values.first);
-                  },
-                ),
-                const SizedBox(height: 18),
-                Text('Order', style: theme.typography.baseline.labelMedium),
-                const SizedBox(height: 8),
-                M3ESegmentedButton<_SortDirection>(
-                  segments: const [
-                    M3ESegment(
-                      value: _SortDirection.increasing,
-                      label: 'Increasing',
-                    ),
-                    M3ESegment(
-                      value: _SortDirection.decreasing,
-                      label: 'Decreasing',
-                    ),
-                  ],
-                  selected: {direction},
-                  onSelectionChanged: (values) {
-                    if (values.isEmpty) return;
-                    setDialogState(() => direction = values.first);
-                  },
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Increasing: A to Z or oldest first. Decreasing: Z to A or newest first.',
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              M3EButton.text(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              M3EButton.filled(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Apply'),
-              ),
-            ],
-          );
-        },
-      ),
+      title: 'Sort practices',
+      initial: current,
     );
-    if (applied != true || !mounted) return;
-    setState(() {
-      _sort = sort;
-      _sortDirection = direction;
-    });
+    if (applied == null || !mounted) return;
+    await ref
+        .read(settingsRepositoryProvider)
+        .saveTopicPracticeSort(widget.topicId, applied);
   }
 
   Future<void> _openPractice(PracticeSummary summary) async {
@@ -371,16 +297,12 @@ class _TopicPageState extends ConsumerState<TopicPage> {
   }
 
   Future<void> _showPracticeActions(PracticeSummary summary) async {
-    final action = await M3EBottomSheet.show<_PracticeAction>(
-      context,
-      initialValue: M3EBottomSheetValue.expanded,
-      builder: (context) => _PracticeOptionsSheet(summary: summary),
-    );
+    final action = await showPracticeActions(context, summary);
     if (action == null || !mounted) return;
     switch (action) {
-      case _PracticeAction.rename:
-        await _renamePractice(summary);
-      case _PracticeAction.delete:
+      case PracticeAction.edit:
+        await showPracticeEditMenu(context, ref, summary);
+      case PracticeAction.delete:
         final practice = summary.practice;
         final confirmed = await confirmDialog(
           context,
@@ -393,17 +315,17 @@ class _TopicPageState extends ConsumerState<TopicPage> {
         if (!confirmed) return;
         await ref.read(topicRepositoryProvider).deletePractice(practice.id);
         if (mounted) await showSnack(context, 'Practice deleted.');
-      case _PracticeAction.markDone:
+      case PracticeAction.markDone:
         await ref
             .read(topicRepositoryProvider)
             .setPracticeDone(summary.practice.id, true);
         if (mounted) await showSnack(context, 'Practice marked as done.');
-      case _PracticeAction.markActive:
+      case PracticeAction.markActive:
         await ref
             .read(topicRepositoryProvider)
             .setPracticeDone(summary.practice.id, false);
         if (mounted) await showSnack(context, 'Practice marked active.');
-      case _PracticeAction.split:
+      case PracticeAction.split:
         await _splitPractice(summary);
     }
   }
@@ -456,174 +378,6 @@ class _TopicPageState extends ConsumerState<TopicPage> {
       if (mounted) await showSnack(context, error.message);
     } finally {
       if (mounted) setState(() => _starting = false);
-    }
-  }
-
-  Future<void> _renamePractice(PracticeSummary summary) async {
-    final practice = summary.practice;
-    final name = TextEditingController(text: practice.name);
-    String? error;
-    final saved = await M3EDialog.show<bool>(
-      context,
-      dialog: StatefulBuilder(
-        builder: (context, setDialogState) {
-          return M3EDialog(
-            title: 'Rename practice',
-            content: M3ETextField(
-              controller: name,
-              label: 'Name',
-              isRequired: true,
-              autofocus: true,
-              errorText: error,
-            ),
-            actions: [
-              M3EButton.text(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              M3EButton.filled(
-                onPressed: () async {
-                  final trimmed = name.text.trim();
-                  if (trimmed.isEmpty) {
-                    setDialogState(() => error = 'Name is required.');
-                    return;
-                  }
-                  if (trimmed.length > 120) {
-                    setDialogState(
-                      () => error = 'Use 120 characters or fewer.',
-                    );
-                    return;
-                  }
-                  await ref
-                      .read(topicRepositoryProvider)
-                      .renamePractice(practice.id, trimmed);
-                  if (context.mounted) Navigator.of(context).pop(true);
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    name.dispose();
-    if (saved == true && mounted) {
-      await showSnack(context, 'Practice renamed.');
-    }
-  }
-
-  Future<void> _editTopic(Topic topic) async {
-    final name = TextEditingController(text: topic.name);
-    final description = TextEditingController(text: topic.description);
-    final priority = TextEditingController(
-      text: topic.priority?.toString() ?? '',
-    );
-    final deck = TextEditingController(text: topic.ankiDeck ?? '');
-    String? error;
-    final saved = await M3EDialog.show<bool>(
-      context,
-      dialog: StatefulBuilder(
-        builder: (context, setDialogState) {
-          return M3EDialog(
-            title: 'Edit topic',
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  M3ETextField(
-                    controller: name,
-                    label: 'Name',
-                    isRequired: true,
-                  ),
-                  const SizedBox(height: 12),
-                  M3ETextField(
-                    controller: description,
-                    label: 'Description',
-                    maxLines: 3,
-                    minLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  M3ETextField(
-                    controller: priority,
-                    label: 'Priority (1 highest, optional)',
-                    keyboardType: TextInputType.number,
-                    errorText: error,
-                  ),
-                  const SizedBox(height: 12),
-                  M3ETextField(
-                    controller: deck,
-                    label: 'AnkiDroid deck',
-                    supportingText:
-                        'Blank uses the default deck from Settings.',
-                  ),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: M3EButton.tonal(
-                      onPressed: () async {
-                        final selected = await showAnkiDeckPicker(
-                          context,
-                          ref,
-                          current: deck.text,
-                        );
-                        if (selected == null) return;
-                        setDialogState(() => deck.text = selected);
-                      },
-                      icon: const Icon(Icons.style_outlined),
-                      label: const Text('Browse decks'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              M3EButton.text(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              M3EButton.filled(
-                onPressed: () async {
-                  final trimmedName = name.text.trim();
-                  final parsedPriority = priority.text.trim().isEmpty
-                      ? null
-                      : int.tryParse(priority.text.trim());
-                  if (trimmedName.isEmpty) {
-                    setDialogState(() => error = 'Name is required.');
-                    return;
-                  }
-                  if (priority.text.trim().isNotEmpty &&
-                      (parsedPriority == null ||
-                          parsedPriority < 1 ||
-                          parsedPriority > 5)) {
-                    setDialogState(() => error = 'Use a number from 1 to 5.');
-                    return;
-                  }
-                  await ref
-                      .read(topicRepositoryProvider)
-                      .updateTopic(
-                        id: topic.id,
-                        name: trimmedName,
-                        description: description.text.trim(),
-                        priority: parsedPriority,
-                        ankiDeck: deck.text.trim().isEmpty
-                            ? null
-                            : deck.text.trim(),
-                      );
-                  if (context.mounted) Navigator.of(context).pop(true);
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    name.dispose();
-    description.dispose();
-    priority.dispose();
-    deck.dispose();
-    if (saved == true && mounted) {
-      await showSnack(context, 'Topic updated.');
     }
   }
 }
@@ -761,159 +515,6 @@ class _PracticeTrailing extends StatelessWidget {
           const Pill('Done', tone: PillTone.success, icon: Icons.check),
         ],
       ],
-    );
-  }
-}
-
-class _PracticeOptionsSheet extends StatelessWidget {
-  const _PracticeOptionsSheet({required this.summary});
-
-  final PracticeSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final practice = summary.practice;
-    final questionCount = summary.questionCount;
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    practice.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.typography.emphasized.titleLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$questionCount questions · '
-                    '${practice.isDone ? 'Marked as done' : 'Active'}',
-                    style: theme.typography.baseline.bodySmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            _PracticeOptionTile(
-              icon: Icons.drive_file_rename_outline,
-              title: 'Rename',
-              subtitle: 'Change the practice name',
-              onTap: () => Navigator.of(context).pop(_PracticeAction.rename),
-            ),
-            _PracticeOptionTile(
-              icon: practice.isDone
-                  ? Icons.restart_alt
-                  : Icons.check_circle_outline,
-              title: practice.isDone ? 'Mark active' : 'Mark as done',
-              subtitle: practice.isDone
-                  ? 'Return it to the active list'
-                  : 'Keep it without deleting it',
-              onTap: () => Navigator.of(context).pop(
-                practice.isDone
-                    ? _PracticeAction.markActive
-                    : _PracticeAction.markDone,
-              ),
-            ),
-            _PracticeOptionTile(
-              icon: Icons.call_split,
-              title: 'Split into two',
-              subtitle: questionCount.isEven
-                  ? 'Create Slice A and Slice B with half the questions each'
-                  : 'Needs an even number of questions',
-              onTap: () => Navigator.of(context).pop(_PracticeAction.split),
-            ),
-            _PracticeOptionTile(
-              icon: Icons.delete_outline,
-              title: 'Delete',
-              subtitle: 'Remove the practice and its questions',
-              destructive: true,
-              onTap: () => Navigator.of(context).pop(_PracticeAction.delete),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PracticeOptionTile extends StatelessWidget {
-  const _PracticeOptionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final foreground = destructive
-        ? theme.colorScheme.error
-        : theme.colorScheme.onSurface;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              IconBadge(
-                icon,
-                size: 42,
-                tone: destructive ? PillTone.error : PillTone.neutral,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.typography.baseline.titleMedium.copyWith(
-                        color: foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: destructive
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

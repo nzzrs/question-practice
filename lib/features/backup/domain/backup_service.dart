@@ -114,8 +114,8 @@ class BackupService {
   ///
   /// Kept in sync with `pubspec.yaml` and the About section. The backup format
   /// must not depend on platform plugins just to read its own version.
-  static const appVersion = '0.9.9';
-  static const buildNumber = 10;
+  static const appVersion = '0.9.10';
+  static const buildNumber = 11;
 
   static const appId = 'question_practice';
   static const maxImportBytes = 50 * 1024 * 1024;

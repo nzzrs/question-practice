@@ -476,7 +476,7 @@ The database opens with `PRAGMA foreign_keys = ON`, so every reference and casca
 ## Backup coverage
 
 <!-- BEGIN GENERATED: backup -->
-Backup format **v2**; minimum readable format **v1**. Files record app version **0.9.9** build **10**, the database schema version, export time and per-table row counts.
+Backup format **v2**; minimum readable format **v1**. Files record app version **0.9.10** build **11**, the database schema version, export time and per-table row counts.
 
 | Coverage | Backup keys |
 |---|---|

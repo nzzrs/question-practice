@@ -11,12 +11,24 @@ import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
 
-/// Learner-edited question and options for an error card.
+/// Learner-edited question, options and explanations for an error card.
 class ErrorCardContent {
-  const ErrorCardContent({required this.question, required this.alternatives});
+  const ErrorCardContent({
+    required this.question,
+    required this.alternatives,
+    this.explanation = '',
+    this.alternativeExplanations = const [],
+  });
 
   final String question;
   final List<String> alternatives;
+  final String explanation;
+  final List<String> alternativeExplanations;
+
+  String alternativeExplanation(int index) {
+    if (index < 0 || index >= alternativeExplanations.length) return '';
+    return alternativeExplanations[index];
+  }
 }
 
 /// Shared error-card study view used by session review and the Cards screen.
@@ -67,6 +79,8 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
       ErrorCardContent(
         question: widget.card.question,
         alternatives: widget.card.alternatives,
+        explanation: widget.card.explanation,
+        alternativeExplanations: widget.card.alternativeExplanations,
       );
 
   String get _question => _content.question;
@@ -99,14 +113,16 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
             cardId: widget.card.id,
             question: updated.question,
             alternatives: updated.alternatives,
+            explanation: updated.explanation,
+            alternativeExplanations: updated.alternativeExplanations,
           );
       if (!mounted) return;
       setState(() => _localContent = updated);
       widget.onContentChanged?.call(updated);
-      await showSnack(context, 'Question and options updated.');
+      await showSnack(context, 'Card content updated.');
     } on Object catch (error) {
       if (mounted) {
-        await showSnack(context, 'Could not update the question: $error');
+        await showSnack(context, 'Could not update the card: $error');
       }
     }
   }
@@ -225,12 +241,15 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
             ],
           ),
         ),
-        if (card.explanation.isNotEmpty ||
-            card.alternativeExplanations.isNotEmpty) ...[
+        if (_content.explanation.isNotEmpty ||
+            _content.alternativeExplanations.isNotEmpty) ...[
           const SizedBox(height: 12),
           _ExplanationBox(
-            card: card,
+            explanation: _content.explanation,
             alternatives: alternatives,
+            alternativeExplanations: _content.alternativeExplanations,
+            correctIndexes: card.correctIndexes,
+            wrongIndexes: card.wrongIndexes,
             onDefine: define,
             onOpenUrl: openUrl,
             onAsk: ask,
@@ -503,15 +522,21 @@ class _SuggestionRow extends StatelessWidget {
 
 class _ExplanationBox extends StatelessWidget {
   const _ExplanationBox({
-    required this.card,
+    required this.explanation,
     required this.alternatives,
+    required this.alternativeExplanations,
+    required this.correctIndexes,
+    required this.wrongIndexes,
     required this.onDefine,
     required this.onOpenUrl,
     required this.onAsk,
   });
 
-  final ErrorCard card;
+  final String explanation;
   final List<String> alternatives;
+  final List<String> alternativeExplanations;
+  final List<int> correctIndexes;
+  final List<int> wrongIndexes;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
   final Future<void> Function(String, Rect?) onAsk;
@@ -519,7 +544,7 @@ class _ExplanationBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final hasExplanations = card.alternativeExplanations.any(
+    final hasExplanations = alternativeExplanations.any(
       (value) => value.trim().isNotEmpty,
     );
     return TonalBox(
@@ -541,10 +566,10 @@ class _ExplanationBox extends StatelessWidget {
               ),
             ],
           ),
-          if (card.explanation.trim().isNotEmpty) ...[
+          if (explanation.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             SelectableLinkifiedText(
-              text: card.explanation,
+              text: explanation,
               style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
               onDefine: onDefine,
               onOpenUrl: onOpenUrl,
@@ -561,16 +586,16 @@ class _ExplanationBox extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             for (var index = 0; index < alternatives.length; index++)
-              if (index >= card.alternativeExplanations.length ||
-                  card.alternativeExplanations[index].trim().isEmpty)
+              if (index >= alternativeExplanations.length ||
+                  alternativeExplanations[index].trim().isEmpty)
                 const SizedBox.shrink()
               else
                 _AlternativeExplanation(
                   index: index,
                   text: alternatives[index],
-                  explanation: card.alternativeExplanations[index],
-                  isCorrect: card.correctIndexes.contains(index),
-                  isWrong: card.wrongIndexes.contains(index),
+                  explanation: alternativeExplanations[index],
+                  isCorrect: correctIndexes.contains(index),
+                  isWrong: wrongIndexes.contains(index),
                   onDefine: onDefine,
                   onOpenUrl: onOpenUrl,
                   onAsk: onAsk,
@@ -743,7 +768,7 @@ class _PromptField extends StatelessWidget {
   }
 }
 
-/// Asks the learner to shorten the question and its answer options.
+/// Asks the learner to edit the question, options and explanations.
 Future<ErrorCardContent?> showEditErrorCardContentDialog(
   BuildContext context, {
   required ErrorCard card,
@@ -776,11 +801,23 @@ class _EditErrorCardContentDialogState
     for (final value in widget.current.alternatives)
       TextEditingController(text: value),
   ];
+  late final _explanations = [
+    for (var index = 0; index < widget.current.alternatives.length; index++)
+      TextEditingController(text: widget.current.alternativeExplanation(index)),
+  ];
+  late final _explanation = TextEditingController(
+    text: widget.current.explanation,
+  );
+  bool _overallExpanded = false;
 
   @override
   void dispose() {
     _question.dispose();
+    _explanation.dispose();
     for (final controller in _alternatives) {
+      controller.dispose();
+    }
+    for (final controller in _explanations) {
       controller.dispose();
     }
     super.dispose();
@@ -798,26 +835,19 @@ class _EditErrorCardContentDialogState
         alternatives: [
           for (final controller in _alternatives) controller.text.trim(),
         ],
+        explanation: _explanation.text.trim(),
+        alternativeExplanations: [
+          for (final controller in _explanations) controller.text.trim(),
+        ],
       ),
     );
-  }
-
-  String _optionLabel(int index) {
-    final letter = String.fromCharCode(65 + index);
-    if (widget.card.correctIndexes.contains(index)) {
-      return 'Option $letter · correct answer';
-    }
-    if (widget.card.wrongIndexes.contains(index)) {
-      return 'Option $letter · chosen wrong answer';
-    }
-    return 'Option $letter';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     return M3EDialog(
-      title: 'Edit question and options',
+      title: 'Edit card content',
       content: SizedBox(
         width: 480,
         child: SingleChildScrollView(
@@ -825,14 +855,19 @@ class _EditErrorCardContentDialogState
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Shorten imported text so the card is quicker to review. '
-                'The correct and chosen answers stay linked to this question.',
+                'Fix the wording or add the reasoning behind an answer. '
+                'Correct and chosen options keep their letters and links.',
                 style: theme.typography.baseline.bodySmall.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 20),
+              const _EditorSectionLabel(
+                icon: Icons.help_outline,
+                label: 'Question',
+              ),
+              const SizedBox(height: 8),
               M3ETextField(
                 key: const ValueKey('edit-error-question'),
                 controller: _question,
@@ -840,32 +875,84 @@ class _EditErrorCardContentDialogState
                 minLines: 2,
                 maxLines: 5,
                 isRequired: true,
+                trailing: AiSummarizeButton(
+                  key: const ValueKey('edit-error-question-summarize'),
+                  controller: _question,
+                  fieldLabel: 'question',
+                  compact: true,
+                  onChanged: () => setState(() {}),
+                ),
                 onChanged: (_) => setState(() {}),
               ),
-              AiSummarizeButton(
-                key: const ValueKey('edit-error-question-summarize'),
-                controller: _question,
-                fieldLabel: 'question',
-                onChanged: () => setState(() {}),
+              const SizedBox(height: 22),
+              const _EditorSectionLabel(
+                icon: Icons.checklist_outlined,
+                label: 'Options',
               ),
-              for (var index = 0; index < _alternatives.length; index++) ...[
-                const SizedBox(height: 14),
-                M3ETextField(
-                  key: ValueKey('edit-error-option-$index'),
-                  controller: _alternatives[index],
-                  label: _optionLabel(index),
-                  minLines: 1,
-                  maxLines: 3,
-                  isRequired: true,
-                  onChanged: (_) => setState(() {}),
+              const SizedBox(height: 4),
+              Text(
+                'Open an explanation only when the answer needs one.',
+                style: theme.typography.baseline.bodySmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.35,
                 ),
-                AiSummarizeButton(
-                  key: ValueKey('edit-error-option-$index-summarize'),
+              ),
+              const SizedBox(height: 10),
+              for (var index = 0; index < _alternatives.length; index++) ...[
+                if (index > 0) const SizedBox(height: 10),
+                _OptionEditor(
+                  index: index,
                   controller: _alternatives[index],
-                  fieldLabel: 'option ${String.fromCharCode(65 + index)}',
+                  explanation: _explanations[index],
+                  isCorrect: widget.card.correctIndexes.contains(index),
+                  isWrong: widget.card.wrongIndexes.contains(index),
                   onChanged: () => setState(() {}),
                 ),
               ],
+              const SizedBox(height: 18),
+              TonalBox(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _SectionToggle(
+                      toggleKey: const ValueKey(
+                        'edit-error-explanation-toggle',
+                      ),
+                      icon: Icons.lightbulb_outline,
+                      title: 'Overall explanation',
+                      supporting: _explanation.text.trim().isEmpty
+                          ? 'Optional context for the whole question'
+                          : 'Explanation added',
+                      expanded: _overallExpanded,
+                      onTap: () =>
+                          setState(() => _overallExpanded = !_overallExpanded),
+                    ),
+                    if (_overallExpanded) ...[
+                      const SizedBox(height: 8),
+                      M3ETextField(
+                        key: const ValueKey('edit-error-explanation'),
+                        controller: _explanation,
+                        label: 'Overall explanation',
+                        placeholder: 'Why the correct answer is right.',
+                        minLines: 2,
+                        maxLines: 5,
+                        trailing: AiSummarizeButton(
+                          key: const ValueKey(
+                            'edit-error-explanation-summarize',
+                          ),
+                          controller: _explanation,
+                          fieldLabel: 'overall explanation',
+                          question: _question.text,
+                          compact: true,
+                          onChanged: () => setState(() {}),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -880,6 +967,237 @@ class _EditErrorCardContentDialogState
           child: const Text('Save changes'),
         ),
       ],
+    );
+  }
+}
+
+class _EditorSectionLabel extends StatelessWidget {
+  const _EditorSectionLabel({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: theme.colorScheme.primary),
+        const SizedBox(width: 6),
+        Text(label, style: theme.typography.emphasized.titleSmall),
+      ],
+    );
+  }
+}
+
+class _SectionToggle extends StatelessWidget {
+  const _SectionToggle({
+    required this.toggleKey,
+    required this.icon,
+    required this.title,
+    required this.expanded,
+    required this.onTap,
+    this.supporting,
+  });
+
+  final Key toggleKey;
+  final IconData icon;
+  final String title;
+  final String? supporting;
+  final bool expanded;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Semantics(
+      button: true,
+      label: expanded ? 'Hide $title' : 'Show $title',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          key: toggleKey,
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+            child: Row(
+              children: [
+                Icon(icon, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.typography.baseline.titleSmall.copyWith(
+                          height: 1.25,
+                        ),
+                      ),
+                      if (supporting != null) ...[
+                        const SizedBox(height: 1),
+                        Text(
+                          supporting!,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.typography.baseline.labelSmall.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(
+                  expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OptionEditor extends StatefulWidget {
+  const _OptionEditor({
+    required this.index,
+    required this.controller,
+    required this.explanation,
+    required this.isCorrect,
+    required this.isWrong,
+    required this.onChanged,
+  });
+
+  final int index;
+  final TextEditingController controller;
+  final TextEditingController explanation;
+  final bool isCorrect;
+  final bool isWrong;
+  final VoidCallback onChanged;
+
+  @override
+  State<_OptionEditor> createState() => _OptionEditorState();
+}
+
+class _OptionEditorState extends State<_OptionEditor> {
+  bool _expanded = false;
+
+  String get _letter => String.fromCharCode(65 + widget.index);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final tone = widget.isCorrect
+        ? AppSuccess.onContainer(context)
+        : widget.isWrong
+        ? theme.colorScheme.error
+        : theme.colorScheme.onSurfaceVariant;
+    return TonalBox(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: tone.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(
+                  _letter,
+                  style: theme.typography.baseline.labelMedium.copyWith(
+                    color: tone,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      'Option $_letter',
+                      style: theme.typography.baseline.labelLarge.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (widget.isCorrect)
+                      const Pill('Correct', tone: PillTone.success),
+                    if (widget.isWrong)
+                      const Pill('Chosen wrong', tone: PillTone.error),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          M3ETextField(
+            key: ValueKey('edit-error-option-${widget.index}'),
+            controller: widget.controller,
+            label: 'Option $_letter',
+            minLines: 1,
+            maxLines: 3,
+            isRequired: true,
+            trailing: AiSummarizeButton(
+              key: ValueKey('edit-error-option-${widget.index}-summarize'),
+              controller: widget.controller,
+              fieldLabel: 'option $_letter',
+              compact: true,
+              onChanged: widget.onChanged,
+            ),
+            onChanged: (_) => widget.onChanged(),
+          ),
+          const SizedBox(height: 2),
+          _SectionToggle(
+            toggleKey: ValueKey(
+              'edit-error-option-${widget.index}-explanation-toggle',
+            ),
+            icon: Icons.notes_outlined,
+            title: 'Explanation',
+            supporting: widget.explanation.text.trim().isEmpty
+                ? 'Optional reason for this option'
+                : 'Explanation added',
+            expanded: _expanded,
+            onTap: () => setState(() => _expanded = !_expanded),
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 6),
+            M3ETextField(
+              key: ValueKey('edit-error-option-${widget.index}-explanation'),
+              controller: widget.explanation,
+              label: 'Explanation for option $_letter',
+              placeholder: 'Why this option is right or wrong.',
+              minLines: 2,
+              maxLines: 4,
+              trailing: AiSummarizeButton(
+                key: ValueKey(
+                  'edit-error-option-${widget.index}-explanation-summarize',
+                ),
+                controller: widget.explanation,
+                fieldLabel: 'explanation for option $_letter',
+                question: widget.controller.text,
+                compact: true,
+                onChanged: widget.onChanged,
+              ),
+              onChanged: (_) => widget.onChanged(),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

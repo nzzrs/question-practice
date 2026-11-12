@@ -166,11 +166,15 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     int id, {
     required String question,
     required List<String> alternatives,
+    required String explanation,
+    required List<String> alternativeExplanations,
   }) {
     return (update(errorCards)..where((e) => e.id.equals(id))).write(
       ErrorCardsCompanion(
         question: Value(question),
         alternativesJson: Value(jsonEncode(alternatives)),
+        explanation: Value(explanation),
+        alternativeExplanationsJson: Value(jsonEncode(alternativeExplanations)),
       ),
     );
   }

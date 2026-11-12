@@ -33,8 +33,9 @@ Future<void> _pumpNarrow(
   WidgetTester tester, {
   required Widget home,
   required TestHarness harness,
+  Size size = _narrow,
 }) async {
-  tester.view.physicalSize = _narrow;
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final container = harness.container();
@@ -231,6 +232,43 @@ void main() {
     await _pumpNarrow(tester, home: const CardsPage(), harness: harness);
     expect(tester.takeException(), isNull);
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
+  });
+
+  testWidgets('card editor fits 360 with option explanations open', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'A very long topic name that keeps going for a while',
+      count: 1,
+    );
+    await _seedErrorCard(harness, seeded, complete: true);
+    await _pumpNarrow(
+      tester,
+      home: const CardsPage(),
+      harness: harness,
+      size: const Size(360, 640),
+    );
+    await tester.tap(find.text('Review all'));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('error-card-edit-content')));
+    await pumpFrames(tester);
+    expect(find.text('Edit card content'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    final toggle = find.byKey(
+      const ValueKey('edit-error-option-0-explanation-toggle'),
+    );
+    await tester.ensureVisible(toggle);
+    await pumpFrames(tester);
+    await tester.tap(toggle);
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const ValueKey('edit-error-option-0-explanation')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('import page and preview fit 320', (tester) async {

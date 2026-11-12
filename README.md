@@ -72,7 +72,7 @@ adb install -r build/app/outputs/flutter-apk/app-debug.apk
 All documentation is in English. Start at [docs/README.md](docs/README.md).
 
 - [User guide](docs/user-guide.md)
-- [Import format](docs/json-format.md)
+- [Practice JSON format](docs/json-format.md)
 - [AnkiDroid export and per-topic decks](docs/anki.md)
 - [Architecture](docs/architecture.md)
 - [Testing](docs/testing.md)
@@ -83,11 +83,11 @@ The importer validates the whole file before writing anything. A broken file is 
 
 A question uses `correctIndex` for one correct alternative, or `correctIndexes` for several. A multi-answer question is correct only when every correct alternative is selected and no wrong one is selected.
 
-A sample with two topics and eight questions lives at [assets/samples/sample_practice.json](assets/samples/sample_practice.json). The Import screen can load it directly.
+A sample with two topics and eight questions lives at [assets/samples/sample_practice.json](assets/samples/sample_practice.json). The Import screen can load it directly. A second importable file, [assets/samples/practice_format_example.json](assets/samples/practice_format_example.json), demonstrates a single-answer question with a subtopic, a multi-answer question, per-alternative explanations, `sourceId` and two topics.
 
 ## Anki export
 
-See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze** note type. Error cards use the six-field **Question Practice: Error v2** model, created automatically with its HTML and CSS when missing. Basic note types are created automatically the first time. Each topic can target its own deck; the topic editor and Settings load deck names from AnkiDroid. Blank topics use the default deck from Settings.
+See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze** note type. Error cards use the six-field **Question Practice: Error v2** model, created automatically with its HTML and CSS when missing. Basic cards use the `Basic` note type, created automatically the first time it is needed. Each topic can target its own deck; there is no per-practice deck. The topic editor and Settings load deck names from AnkiDroid. Blank topics use the default deck from Settings.
 
 ## Data and privacy
 

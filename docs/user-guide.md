@@ -1,162 +1,182 @@
 # User guide
 
-Questions is an offline-first Android study app. This guide walks through every screen. The interface is English.
+Questions is an offline Android app for practising questions and exporting study cards to AnkiDroid. The interface is English.
 
 ## Home
 
-- **Topics** lists your active topics, ordered by priority and name until you choose another order.
-- Long-press a topic card to open its options: **Edit topic**, **Archive topic** and **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
-- **Archive topic** hides the topic from Home while keeping its practices, questions, sessions, cards and statistics. Archived topics are not deleted.
-- The **sort** icon beside **Topics** orders the list by **Name** or **Recency**, increasing or decreasing. The choice is remembered. The **archived topics** icon to its right lists archived topics; tap one to unarchive, edit or delete it.
-- **Session in progress** cards list every paused session with its mode, question count and start time. Each card has **Resume** and **Discard**.
-- A topic card shows its practices, its question count (questions left unanswered in completed sessions are excluded), accuracy and progress.
+- Active topic cards show their practices, questions, accuracy and progress.
+- The **sort** icon beside **Topics** orders the list by **Name** or **Recency**, increasing or decreasing. The choice is remembered.
+- The **archive** icon beside it opens archived topics.
+- Long-press a topic to **Edit topic**, **Archive topic** or **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
+- **Session in progress** cards sit at the top. Each has **Resume** and **Discard**. Several sessions can stay paused at once.
 - **Review past errors** opens the 48-hour error queue.
-- **Cards** opens concepts, error cards, skipped questions, basic cards and highlights. The tile badge counts error cards that still need bias and vaccine.
-- The **Shuffle** floating button opens **Start shuffled practice**. The sheet explains that the session uses questions from every topic, keeps only unsolved and unskipped questions, and shuffles both questions and alternatives. If no question is eligible, it says so instead of starting an empty session.
-- **Import** creates topics and practices from a JSON file.
-- The help icon opens **How to use it**.
-- The settings icon opens Settings.
+- **Cards** opens concepts, error and skipped cards, basic cards and highlights.
+- The **Shuffle** floating button opens **Start shuffled practice**.
+- **Import** adds practices from a file. The help icon opens **How to use it**; the settings icon opens **Settings**.
 
 ## Import
 
 1. Tap **Import**.
 2. Choose a `.json` file or a `.txt` file containing JSON.
-3. Review the file name, counts, topic/practice list and duplicate notes.
+3. Check the preview: file name, topic and question counts, contents and duplicate notes.
 4. Tap **Import**.
 
-The whole file is validated first. A broken file shows the JSON path or line/column and imports nothing. **Load sample** loads the bundled `assets/samples/sample_practice.json`. The separate `assets/samples/practice_format_example.json` demonstrates a single-answer question, a multi-answer question, per-alternative explanations, `sourceId` and two topics. A question may include an optional `subtopic`; blank values are imported as uncategorized.
-
-A practice file is limited to 10 MB and 5,000 questions. It is UTF-8 JSON in a `.json` or `.txt` file. The JSON schema and every semantic rule are documented in [Practice JSON format](json-format.md).
+- The whole file is validated first. A broken file shows the JSON path or line and column, and imports nothing.
+- **Load sample** opens the bundled `assets/samples/sample_practice.json`.
+- A file can contain many topics and practices. It is limited to 10 MB and 5,000 questions.
+- Import reuses an existing topic name, skips an identical practice, and adds `(2)`, `(3)` and so on to a different practice with the same name.
+- A question may include an optional `subtopic`. Blank values are imported as **Uncategorized**.
+- `assets/samples/practice_format_example.json` demonstrates two topics, single- and multi-answer questions, `subtopic`, `sourceId` and per-alternative explanations.
+- The full format and validation rules are in [Practice JSON format](json-format.md).
 
 ## Topic
 
-- Shows description, priority, Anki deck, accuracy, progress, correct answers, active errors and completed sessions.
-- **Progress** is answered questions divided by the topic's total questions after removing those left unanswered in completed sessions. It measures coverage; **Accuracy** measures how many answers were correct.
-- **Practices** lists each practice with question count and last score. Tap a practice to start.
-- The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order across visits and app restarts.
-- Long-press a practice to open its options: **Edit practice**, mark it done or active, split it into two slices, or delete it.
-- **Edit practice** opens a second menu with **Rename**, **Edit description**, **Download practice JSON** and **Update practice JSON**. It has no deck row: decks are selected per topic. Use **Edit topic → AnkiDroid deck** instead. There is no per-practice deck, and a practice JSON file cannot contain one.
-- **Download practice JSON** shares one file with the topic, the practice name and description, and every current question, in the import format. Each question carries `sourceId`, the app's stable identity for that question, so a later update maps back to the stored question. Subtopics are included only when set. The file does not contain a deck.
-- **Update practice JSON** reads an edited export and shows a preview before writing anything: how many questions are new, modified, unchanged and deleted, with the affected prompts. The file's topic and practice names must match the stored practice after trimming and ignoring case. Questions are matched by `sourceId` first and then by exact trimmed prompt; files without identities therefore still work. **Apply changes** writes one transaction and refreshes the practice content hash and import time; **Cancel** leaves it untouched. Matched questions keep their answers, error cards, skipped records and statistics. New questions start empty. Deleted questions lose their answers, session links, error cards and skipped records; linked concept cards, basic cards and highlights remain but lose their question link. A file whose topic or practice name does not match is rejected with a clear message.
-- **Split into two** replaces the practice with "… Slice A" and "… Slice B", each holding half of its questions in random order. It needs an even number of questions and removes the original practice's sessions and cards. Finish or discard an in-progress session first.
-- **Edit topic** is available from the topic's long-press menu on Home and from the archived topics list. It changes name, description, priority and the AnkiDroid deck.
-- AnkiDroid decks are selected **per topic only**. There is no practice-level deck, and a practice JSON file cannot contain one.
-- **Browse decks** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
-- Blank deck means the default deck from Settings.
+- The header shows the description, priority, AnkiDroid deck, accuracy, progress, correct answers, active errors and completed sessions.
+- The **insights** icon opens **Statistics**.
+- **Practices** lists each practice with its question count and last score. Tap one to start it.
+- The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order.
+- Long-press a practice to **Edit practice**, mark it done or active, **Split into two**, or delete it.
+- A practice marked done keeps a **Done** tag.
+- **Edit practice** offers **Rename**, **Edit description**, **Download practice JSON** and **Update practice JSON**.
+- **Split into two** needs an even number of questions. It replaces the practice with Slice A and Slice B, and removes the original practice's sessions and cards.
+- **Edit topic** is in the topic long-press menu. It changes the name, description, priority and AnkiDroid deck.
+- Decks are set per topic. There is no per-practice deck.
 
-## Statistics
+## Practice
 
-- Open **Statistics** from the insights icon on a topic.
-- The hero shows the latest score, best and average, and the number of completed sessions.
-- **Progress over time** plots one point per completed session. The solid line joins the sessions; the dashed **Trend** line is a least-squares fit through the same points, so it shows the overall direction rather than a single jump. The legend names both series.
-- **Learning rate** appears below the metrics once the history spans at least one week. It reports the average change in percentage points per week from the fitted trend, for example `+8 pp/week`. Short histories and single sessions do not show a figure.
-- **By subtopic** groups questions by their optional `subtopic` and shows accuracy and progress for each group, counted from completed sessions. Questions without a subtopic appear under **Uncategorized**. The section is hidden when no question in the topic has a subtopic. Spelling and capitalisation define the group, so `Networking` and `networking` are shown separately. The same per-subtopic figures are included in the shared statistics JSON.
-- **Sessions** lists every completed session with its score and date.
-- The share icon exports the visible statistics as a JSON file through the system share sheet. The file contains the topic summary, progress points, per-subtopic figures and the trend data.
+- Select one alternative, or every correct alternative when the question has several.
+- Reasoning is optional. It saves automatically and appears later in the error review.
+- Alternative letters stay hidden until feedback. The eye icon shows them early without changing the order.
+- **Check** stays on the same screen. Correct and wrong choices are marked, the correct and selected alternatives open with their explanation, and the overall explanation appears below.
+- The arrows and question list move between questions without answering. Submitted answers keep their feedback. Answered questions get a **Done** tag.
+- **Skip** records a skipped question.
+- **Finish practice** asks whether unanswered questions should be left out of the score or marked skipped.
+- Close offers **Cancel**, **Discard** and **Save for later**. Saved sessions wait on Home.
+- A banner appears after 5, 10, 15… minutes on the same question. It resets when the question changes and pauses in the background.
+- Select text to **Define** a term, **Ask** about it or save it as a **Highlight**. http(s) links open in the browser.
 
-## Practice session
+## Check and feedback
 
-- Each question shows the topic and practice, the prompt and 2–8 alternatives.
-- Alternatives are shuffled for every session and keep that order while the question is open. Before answering, badges are plain circles and hide the original letters. Tap the eye beside the flag to reveal each alternative's original letter without changing the order. After **Check**, the original letters appear automatically so explanations that refer to “A”, “B” or “C” stay unambiguous.
-- Select one alternative, or every correct alternative when the question has more than one. The reasoning field is optional. Write what led you to the answer, before or after **Check**; it saves automatically and appears later in the error review.
-- The arrows beside **Question X of Y** move to the previous or next question without answering. Answers already submitted keep their feedback when you return.
-- **Check** stays on the same screen. The correct answer is marked, the wrong choice is marked, and the correct alternatives plus your selection open with their explanation. Every other alternative stays collapsed until you tap its expand icon. The overall explanation appears below.
-- Prompt, alternatives, alternative explanations and the overall explanation are selectable, including before you answer. Select a word or phrase and tap **Define**. http(s) links are tappable.
-- While a practice is open, the app hides the status and navigation bars for fewer distractions. Leaving the session restores them.
-- After a wrong answer, check **I was distracted or read too fast** in the feedback to remove the new error card. Uncheck it to restore the card.
-- **Skip** records a skipped question. No error card is created; the end-of-session review asks what was missing.
-- Closing the session offers **Cancel**, **Discard** and **Save for later**. Save keeps the session on Home; several sessions can stay paused at once.
-- A small banner appears after 5, 10, 15… minutes of foreground practice. There is no countdown and no time score.
-- Long-press a word or phrase and tap **Define** to save it as a missing concept.
-- The progress bar and “Question X of Y” show position. Score is correct answers / total questions.
+- A wrong answer creates an error card with the question, your answer, the correct answer, your reasoning and the explanation.
+- **I was distracted or read too fast** removes the new error card. Uncheck it to restore the card.
+- **I didn't know this** counts as skipped and creates no error card.
+- Skipped questions create no error card. The review asks what was missing.
+- Feedback stays on screen while you move between questions.
 
-## Results
+## Results and review
 
-- Shows the overall percentage, correct/total, wrong and skipped counts, and the number of distinct terms looked up.
-- **Start review** creates error details and cards for this session.
-- **View cards** opens the export screen.
+**Results** shows the score, correct and total, wrong and skipped counts, and looked-up words.
+
+- **Start review** opens the review.
+- **View cards** opens **Cards**.
 - **Done** returns to the previous screen.
 
-## End-of-session review
+Review opens fullscreen.
 
-- **Wrong questions**: shows the question, your wrong answer, the correct answer and your reasoning, then asks:
-  - “What was the flawed assumption in your reasoning?”
-  - “What do you need to know to prevent that error in the future?”
-- **Skipped questions**: asks “What was missing here?” with two choices:
-  - **A concept** → term + definition, saved as a cloze concept card.
-  - **Another question** → question + answer, saved as a basic card.
-- **Concepts without a definition** (for example after a web lookup) get a definition field.
-- **Skip** leaves the step unfinished. Use the same review view from Cards → **Complete**, **Review all**, or **Review selected**.
-- The completion screen offers **Done** and **View cards**.
-- Review is idempotent: completed error cards disappear from a later review. Skipped questions are shown again if you reopen review before finishing.
-- Cards created here and in the session review share one view: question, your answer, the correct answer, your reasoning, bias and vaccine.
+- **Wrong questions** show your wrong answer, the correct answer, your reasoning and the explanations. Write the flawed assumption and what prevents it next time.
+- **Skipped questions** ask **What was missing here?**.
+  - **A concept** creates a concept card from a term and definition.
+  - **Another question** creates a basic card from a question and answer.
+- **Concepts without a definition** get a definition field.
+- **Highlights** from the session can be kept or turned into a concept or basic card.
+- **Skip** leaves a step for later. Missing card details can be finished from **Cards**.
 
 ## Past errors
 
-- Wrong answers enter the queue with a 48-hour delay from the last mistake.
-- The screen lists due cards and the resolved history.
+- Wrong answers wait 48 hours before they are offered again.
 - **Review N errors** starts a re-test session.
-- Correct answer → the card is resolved, removed from the active queue, and kept in history/statistics.
-- Wrong answer → the card stays active and its next attempt is scheduled 48 hours later.
-- Marking a re-test answer as distracted in the feedback does not resolve the card; it stays in the error queue.
-- Resolved cards are never deleted automatically.
+- A correct answer resolves the card and keeps it in history and statistics.
+- A wrong answer keeps the card active and schedules the next attempt 48 hours later.
+- Marking a re-test answer as distracted does not resolve the card.
+- Resolved cards stay in the history list.
 
-## Cards and export
+## Cards
 
-- Filter chips: **All**, **Concepts**, **Errors & skipped**, **Basic** and **Highlights**, plus **Show exported** / **Hide exported**. Exported cards stay in the list but are not selectable.
-- Checkboxes choose what is included. By default all unexported, complete concepts, error cards and basic cards are selected. Incomplete error cards can also be checked so they can be reviewed first.
-- **Review all** sits above the **Error and skipped** section. **Review selected** appears for checked error cards or skipped questions.
-- If a checked error card is incomplete, export and share stay disabled; finish it with **Complete** or **Review selected** first. Export becomes available when every checked error card is complete.
-- Each exportable row shows its target deck. The deck comes from the card's topic, or the default deck from Settings.
-- **Complete** on a concept opens its definition editor. On an error card it opens the same card review view used after a session, including the question/options editor and **Check with AI**.
-- **Export to AnkiDroid** creates the deck and note types if needed, bulk-adds notes, marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
-- **Share as files** creates Anki-compatible text files. File export does not encode a deck and never includes highlights.
-- **Delete selected** permanently removes the selected cards; deleting an active error card also removes it from the error queue.
-- Missing bias/vaccine or definitions block export until completed.
-- **Highlights** are plain text only. **Download all** saves them as a text file through the share sheet. A highlight can be turned into a concept or basic card, or deleted individually; highlights are never sent to AnkiDroid.
+- Filters: **All**, **Concepts**, **Errors & skipped**, **Basic**, **Highlights**, and **Show exported** or **Hide exported**.
+- Check the cards to include. **Review all** sits above the error and skipped section; **Review selected** appears for checked cards.
+- **Complete** finishes a missing concept definition or a checked error card's details.
+- Tap a card to preview it. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations.
+- **Export to AnkiDroid** sends the selected cards to AnkiDroid.
+- **Share as files** creates Anki-compatible text files.
+- **Delete selected** removes the chosen cards. Deleting an active error card also removes it from the error queue.
+- Incomplete error cards and concepts without a definition block export until they are completed.
+
+## Highlights
+
+- Select text during practice and choose **Highlight**. The phrase is painted in place.
+- Highlights stay in **Cards** and can become a concept or basic card.
+- **Download all** saves highlights as plain text.
+- Highlights are never sent to AnkiDroid.
+
+## AnkiDroid export
+
+- **Export to AnkiDroid** needs AnkiDroid installed, its API enabled and storage permission granted.
+- Concepts use the **Cloze** note type. Error cards use their own note type with six fields. Basic cards use the **Basic** note type, created automatically if missing.
+- Each topic can use its own deck. A topic without a deck uses the default deck from **Settings**.
+- Set a topic's deck with **Edit topic → AnkiDroid deck**. **Browse decks** lists live deck names; a typed name is created on export.
+- **Share as files** writes Anki-compatible text files. File export cannot encode a deck and never includes highlights.
+
+## Practice JSON
+
+- Long-press a practice and choose **Edit practice → Download practice JSON** to share the practice in the import format.
+- The file contains the topic and practice names, descriptions and every question, with `sourceId` on each question and `subtopic` only when set. It never contains a deck.
+- **Update practice JSON** reads an edited file and shows a preview: new, modified, unchanged and deleted questions, with the affected prompts.
+- Questions match by `sourceId` first, then by exact trimmed prompt. Matched questions keep their answers, error cards, skipped records and statistics. New questions start empty. Deleted questions lose their answers and linked records.
+- The file's topic and practice names must match the stored practice after trimming and ignoring case.
+- **Apply changes** writes in one step. **Cancel** leaves the practice untouched.
+
+## Subtopics and statistics
+
+- A subtopic is an optional group inside a practice. Questions without one appear under **Uncategorized**.
+- Spelling and capitalisation define a group, so `Networking` and `networking` are separate.
+- **Statistics** is opened from the **insights** icon on a topic. It shows the latest, best and average score and the number of completed sessions.
+- **Progress over time** plots one point per completed session. The dashed **Trend** line shows the overall direction.
+- **By subtopic** shows accuracy and progress for each group. It is hidden when no question has a subtopic.
+- **Learning rate** appears once the history spans at least one week and reports the average change per week.
+- The **share** icon exports the visible statistics as a JSON file. It includes the summary, progress points, per-subtopic figures and trend data.
 
 ## Lookup
 
-- Long-press text in a question → **Define**.
-- **AI mode**: sends the term, question and topic to the configured provider and saves a short definition. The definition appears in a read-only bubble and is saved automatically; there is no save button. OpenAI, Groq and OpenRouter use their chat-completions endpoint; Gemini uses its native `generateContent` API. Configure the provider, model and API key in Settings; the base URL appears only for a custom provider. Opening the model dropdown loads the models the provider makes available, and the field is searchable. If a list cannot be loaded, the saved model stays selected.
-- **Web mode**: opens DuckDuckGo or Wikipedia in a Custom Tab and keeps the editable definition sheet with **Save**, so you can fill the definition after reading.
-- Every lookup is saved automatically for the session and counted in Results.
+- Select text in a question, alternative or explanation, then choose **Define**.
+- With **Web search**, DuckDuckGo or Wikipedia opens in a browser tab and the editable definition sheet stays open.
+- With **AI**, a short definition appears in a read-only bubble and is saved automatically. Configure the provider, model and key in **Settings**.
+- **Ask** sends the selected passage to AI. Its answer can become a concept or basic card.
+- Only the selected text, question and topic are sent, and only when you use **Define** or **Ask**.
 
 ## Settings
 
-- **Appearance**: wallpaper colors (Material You) are on by default. Turn them off to use the app seed color. The app follows system light/dark. **Practice sounds** has a volume slider and a play icon to hear the sample; the slider saves when you release it.
-- **Looking up terms**: Web search or AI. Web engine: DuckDuckGo or Wikipedia. AI: provider (OpenAI, Groq, OpenRouter, Gemini or custom), model, API key and **Test connection**. The base URL is shown only for a custom provider. Opening the model dropdown loads the provider list. Provider, model, base URL and API key save automatically; clear the key field to remove the saved key. The key is stored in Android secure storage and never shown after saving.
-- **AnkiDroid**: status of install/API/permission/Cloze type, permission request, open AnkiDroid, default deck name, and **Browse decks** to pick a live deck name.
-- **Data**: **Export backup** shares one JSON file with every topic (including archived topics and Anki decks), practice, question and subtopic, session, answer, card, skipped question, highlight and setting. The file records its format version, app version/build, database schema version, export time and row counts, plus a checksum. **Restore backup** validates all of that before replacing anything, then replaces all local data in one step; a damaged or inconsistent file is rejected and leaves the current data untouched. Backups made by older app versions, including the first backup format, still restore. The AI API key is never part of a backup and is left untouched on the device. **Erase all data** removes practices, sessions, cards, settings and the API key. Restore and erase cannot be undone.
-- **About**: the app version (`Questions 0.9.9`). Backup files record the same version and build number.
+- **Appearance**: wallpaper colors, practice sounds and sound volume.
+- **Looking up terms**: web engine or AI provider, model and API key. **Test connection** checks the AI setup.
+- **AnkiDroid**: install, API and permission status, default deck, and **Browse decks**.
+- **Data**: **Export backup**, **Restore backup** and **Erase all data**.
+- **About**: app version and build type.
 
 ## Backup and restore
 
-- **Export backup** writes a UTF-8 JSON file through the system share sheet. It contains the complete local database, including archived topics, subtopics, practice done flags, session history, error history, skipped questions, highlights and settings.
-- **Restore backup** checks the file before writing anything. It must be UTF-8 JSON, no larger than 50 MB, with the expected app id, format version and checksum. An empty, malformed or incompatible file leaves the current data untouched.
-- A valid restore replaces every local table in one transaction. It does not merge with existing data, so the backup becomes the complete state of the app.
-- The AI API key lives in Android secure storage, not in the database. It is never exported, and a restore does not overwrite the key already on the device.
-- A backup is not a practice JSON file. A backup preserves history and settings; a practice JSON file contains only importable practice content and is used by **Import** or **Update practice JSON**.
-- The exact table-level coverage and backup format are listed in [Database reference](database.md#backup-coverage).
+- **Export backup** shares one JSON file with topics, practices, questions, subtopics, sessions, answers, cards, skipped questions, highlights and settings.
+- **Restore backup** validates the file before replacing all local data in one step. An empty, damaged or incompatible file leaves the current data untouched.
+- A restore does not merge: the backup becomes the complete state.
+- A backup is not a practice JSON file. Use **Import** or **Update practice JSON** for practice content.
+- The AI API key is never part of a backup. See [Backup coverage](database.md#backup-coverage).
+
+## Data and privacy
+
+- Practices, answers, cards, statistics and settings are stored locally on the device.
+- The AI API key is stored in Android secure storage and is never exported.
+- The app works offline and sends no analytics.
+- **Erase all data** removes practices, sessions, cards, settings and the saved key. Restore and erase cannot be undone.
+- For the developer data map, see [Database reference](database.md).
 
 ## Archived topics
 
-- Long-press a topic on Home and choose **Archive topic**. It disappears from the active list but keeps its practices, questions, sessions, cards, statistics and deck.
-- The archive icon beside **Topics** opens the archived list. When at least one topic is archived, the icon shows a badge with the count.
-- Tap an archived topic to open the same actions as an active topic: **Unarchive**, **Edit topic** or **Delete topic**. Unarchive returns it to Home with its data intact.
-- Deleting an archived topic is permanent and removes everything inside it, exactly like deleting an active topic.
+- **Archive topic** hides a topic from Home and keeps its practices, questions, sessions, cards, statistics and deck.
+- The **archive** icon beside **Topics** opens the archived list.
+- Tap an archived topic to **Unarchive topic**, **Edit topic** or **Delete topic**.
+- Unarchive returns it to Home with its data intact. Deleting an archived topic is permanent, like deleting an active topic.
 
 ## Shuffled practice
 
-- The **Shuffle** floating button opens **Start shuffled practice**, not a separate practice.
+- The **Shuffle** floating button opens **Start shuffled practice**.
 - The session uses questions from every topic, keeps only questions that are neither solved nor skipped, and shuffles questions and alternatives.
-- The sheet lists these rules before **Start practice**. If no question is eligible, the app reports that no unsolved questions are left.
-- A shuffled session is saved as a paused session like any other and appears on Home if you close it with **Save for later**.
-
-## Deck routing details
-
-- Topics with a deck set go to that deck.
-- Topics without a deck use the default deck from Settings.
-- Cards snapshot the topic name at creation. Renaming a topic affects only new cards; old cards fall back to the default deck.
-- AnkiDroid's API supports arbitrary decks; a missing deck is created on export.
-- File export cannot encode a deck; choose one during Anki import.
+- If no question is eligible, the app says so instead of starting an empty session.
+- A shuffled session can be saved for later like any other session.

@@ -2,50 +2,38 @@
   "formatVersion": 1,
   "topics": [
     {
-      "name": "Cloud fundamentals",
-      "description": "Core Google Cloud services and how to choose between them.",
+      "name": "Cloud",
+      "description": "Core services and when to use them.",
       "priority": 1,
       "practices": [
         {
-          "name": "Core services",
-          "description": "A practice with one single-answer question and one multi-answer question.",
+          "name": "Compute",
+          "description": "Choosing a runtime.",
           "questions": [
             {
               "sourceId": "101",
-              "prompt": "Which Google Cloud service runs a container image without requiring you to manage a cluster?",
-              "subtopic": "Serverless compute",
-              "alternatives": [
-                "Compute Engine",
-                "Cloud Run",
-                "Google Kubernetes Engine",
-                "Cloud Functions"
-              ],
+              "prompt": "Which service runs a container image without a cluster you manage?",
+              "subtopic": "Serverless",
+              "alternatives": ["Compute Engine", "Cloud Run", "Cloud SQL"],
               "correctIndex": 1,
-              "explanation": "Cloud Run is a managed container platform. You give it a container image and it handles scaling and the underlying infrastructure.",
+              "explanation": "Cloud Run runs containers on managed infrastructure.",
               "alternativeExplanations": [
-                "Compute Engine gives you virtual machines, so you manage the operating system and runtime yourself.",
-                "Correct. Cloud Run runs containers on fully managed infrastructure and scales with requests.",
-                "Google Kubernetes Engine runs containers, but you still manage a cluster and its node pools.",
-                "Cloud Functions runs event-driven functions, not arbitrary long-running container images."
+                "Compute Engine gives you a virtual machine to manage.",
+                "Correct. Cloud Run manages the cluster and scaling.",
+                "Cloud SQL is a managed relational database."
               ]
             },
             {
               "sourceId": "102",
-              "prompt": "Which of these are managed services that run code without requiring you to manage a cluster?",
-              "subtopic": "Serverless compute",
-              "alternatives": [
-                "Cloud Run",
-                "Compute Engine",
-                "Cloud Functions",
-                "Cloud SQL"
-              ],
+              "prompt": "Which are managed compute services?",
+              "subtopic": "Serverless",
+              "alternatives": ["Cloud Run", "Compute Engine", "Cloud Functions"],
               "correctIndexes": [0, 2],
-              "explanation": "Cloud Run and Cloud Functions are managed compute services. You do not provision or maintain a cluster for either one.",
+              "explanation": "Cloud Run and Cloud Functions run code without a cluster you manage.",
               "alternativeExplanations": [
                 "Correct. Cloud Run runs containers on managed infrastructure.",
-                "Compute Engine gives you virtual machines, so you manage the operating system and runtime yourself.",
-                "Correct. Cloud Functions runs event-driven functions on managed infrastructure.",
-                "Cloud SQL is a managed relational database, not a compute service for running your code."
+                "Compute Engine gives you a virtual machine to manage.",
+                "Correct. Cloud Functions runs event-driven code."
               ]
             }
           ]
@@ -53,26 +41,25 @@
       ]
     },
     {
-      "name": "Networking basics",
-      "description": "IP addressing, DNS, and transport-layer behaviour.",
+      "name": "Networking",
+      "description": "Transport-layer basics.",
       "priority": 2,
       "practices": [
         {
-          "name": "TCP/IP",
-          "description": "Transport and internet-layer fundamentals.",
+          "name": "TCP",
+          "description": "Reliable delivery.",
           "questions": [
             {
               "sourceId": "201",
-              "prompt": "Which transport protocol provides reliable, ordered delivery of a byte stream?",
-              "subtopic": "Transport layer",
-              "alternatives": ["UDP", "TCP", "ICMP", "ARP"],
+              "prompt": "Which protocol delivers a reliable, ordered byte stream?",
+              "subtopic": "Transport",
+              "alternatives": ["UDP", "TCP", "ICMP"],
               "correctIndex": 1,
-              "explanation": "TCP establishes a connection, acknowledges segments, and retransmits lost data to preserve order and reliability.",
+              "explanation": "TCP acknowledges segments and retransmits lost data.",
               "alternativeExplanations": [
-                "UDP is connectionless and does not guarantee delivery or ordering.",
-                "Correct. TCP provides a reliable, ordered byte stream.",
-                "ICMP carries control and error messages, such as ping requests.",
-                "ARP resolves IPv4 addresses to link-layer addresses; it does not carry a byte stream."
+                "UDP does not guarantee delivery or order.",
+                "Correct. TCP delivers an ordered stream.",
+                "ICMP carries control messages such as ping."
               ]
             }
           ]

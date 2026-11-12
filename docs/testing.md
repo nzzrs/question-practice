@@ -36,7 +36,7 @@ Use a connected Samsung Android device and AnkiDroid 2.25.3.
 
 1. Fresh install; open **How to use it** from the help icon.
 2. Import `assets/samples/sample_practice.json`; confirm two topics, three practices and eight questions.
-3. Import `assets/samples/practice_format_example.json`; confirm the preview notes the existing Cloud fundamentals topic and that the Networking basics practice becomes `TCP/IP (2)` because its name exists with different content. Open **Cloud fundamentals → Core services** and confirm its second question uses checkboxes: a partial selection fails and the complete set (`Cloud Run` and `Cloud Functions`) passes. Confirm the `sourceId` values in the file are accepted and ignored by a normal import.
+3. Import `assets/samples/practice_format_example.json`; confirm the preview shows two topics (Cloud and Networking) and three questions. Open **Cloud → Compute** and confirm its second question uses checkboxes: a partial selection fails and the complete set (`Cloud Run` and `Cloud Functions`) passes. Confirm the `sourceId` values in the file are accepted and ignored by a normal import.
 4. Start the sample practice `Compute choices`; answer one question correctly, one wrongly and skip one.
 5. Confirm feedback stays on the same screen and every alternative expands. Use the top arrows to move forward and back.
 6. Submit a wrong answer; check “I was distracted or read too fast” in the feedback; confirm the new error card disappears. Uncheck it; confirm the card returns. Then check “I didn’t know this”; confirm the card disappears, the answer counts as skipped and the review asks for a concept.

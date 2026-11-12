@@ -33,6 +33,7 @@ Topic topicFromRow(TopicRow row) {
     priority: row.priority,
     ankiDeck: row.ankiDeck,
     createdAt: row.createdAt.toUtc(),
+    archived: row.archived,
   );
 }
 
@@ -210,6 +211,7 @@ TopicSummary topicSummaryFromRow(TopicSummaryRow row) {
       priority: row.topicPriority,
       ankiDeck: row.topicAnkiDeck,
       createdAt: row.topicCreatedAt,
+      archived: row.topicArchived,
     ),
     practiceCount: row.practiceCount,
     questionCount: row.questionCount,

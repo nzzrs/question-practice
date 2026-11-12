@@ -4,13 +4,15 @@ Questions is an offline-first Android study app. This guide walks through every 
 
 ## Home
 
-- **Topics** lists your topics, ordered by priority and name.
+- **Topics** lists your active topics, ordered by priority and name until you choose another order.
+- Long-press a topic card to open its options: **Edit topic**, **Archive topic** and **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
+- **Archive topic** hides the topic from Home while keeping its practices, questions, sessions and cards.
+- The **sort** icon beside **Topics** orders the list by **Name** or **Recency**, increasing or decreasing. The choice is remembered. The **archived topics** icon to its right lists archived topics; tap one to unarchive, edit or delete it.
 - **Session in progress** cards list every paused session with its mode, question count and start time. Each card has **Resume** and **Discard**.
 - A topic card shows its practices, its question count (questions left unanswered in completed sessions are excluded), accuracy and progress.
-- Long-press a topic card to delete the topic and everything inside it. The confirmation asks first.
 - **Review past errors** opens the 48-hour error queue.
 - **Cards** opens concepts, error cards and basic cards waiting for export.
-- The **shuffle** button turns on **Start shuffled practice**. That session mixes questions from every topic in random order. The setting is remembered.
+- The **Shuffle** floating button opens **Start shuffled practice**. That session mixes unsolved, unskipped questions from every topic in random order.
 - **Import** creates topics and practices from a JSON file.
 - The **i** icon opens Help.
 - The settings icon opens Settings.
@@ -29,9 +31,10 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - Shows description, priority, Anki deck, accuracy, progress, correct answers, active errors and completed sessions.
 - **Progress** is answered questions divided by the topic's total questions after removing those left unanswered in completed sessions. It measures coverage; **Accuracy** measures how many answers were correct.
 - **Practices** lists each practice with question count and last score. Tap a practice to start.
+- The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order across visits and app restarts.
 - Long-press a practice to open its options: rename, mark it done or active, split it into two slices, or delete it.
 - **Split into two** replaces the practice with "… Slice A" and "… Slice B", each holding half of its questions in random order. It needs an even number of questions and removes the original practice's sessions and cards. Finish or discard an in-progress session first.
-- **Edit** changes name, description, priority and the Anki deck for that topic.
+- **Edit topic** is available from the topic's long-press menu on Home and from the archived topics list. It changes name, description, priority and the Anki deck.
 - **Browse decks** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
 - Blank deck means the default deck from Settings.
 

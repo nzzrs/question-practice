@@ -71,7 +71,12 @@ void main() {
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
     await tester.longPress(find.text('Cloud'));
     await pumpFrames(tester);
+    expect(find.text('Edit topic'), findsOneWidget);
+    expect(find.text('Archive topic'), findsOneWidget);
+    expect(find.text('Delete topic'), findsOneWidget);
 
+    await tester.tap(find.text('Delete topic'));
+    await pumpFrames(tester);
     expect(find.text('Delete topic?'), findsOneWidget);
     expect(find.textContaining('every practice, question'), findsOneWidget);
 

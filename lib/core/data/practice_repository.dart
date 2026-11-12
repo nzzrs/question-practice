@@ -40,16 +40,26 @@ class PracticeRepository {
         .map(homeStatsFromRow);
   }
 
-  Stream<List<TopicSummary>> watchTopicSummaries() {
+  Stream<List<TopicSummary>> watchTopicSummaries({
+    bool includeArchived = false,
+  }) {
     return _db.statsDao
-        .watchTopicSummaries(_clock.now().toUtc())
+        .watchTopicSummaries(
+          _clock.now().toUtc(),
+          includeArchived: includeArchived,
+        )
         .map((rows) => rows.map(topicSummaryFromRow).toList());
   }
 
+  Stream<List<TopicSummary>> watchArchivedTopicSummaries() {
+    return watchTopicSummaries(includeArchived: true)
+        .map((rows) => rows.where((row) => row.topic.archived).toList());
+  }
+
   Stream<TopicSummary?> watchTopicSummary(int topicId) {
-    return watchTopicSummaries().map(
-      (rows) => rows.where((row) => row.topic.id == topicId).firstOrNull,
-    );
+    return watchTopicSummaries(
+      includeArchived: true,
+    ).map((rows) => rows.where((row) => row.topic.id == topicId).firstOrNull);
   }
 
   Stream<List<PracticeSummary>> watchPracticeSummaries(int topicId) {
@@ -305,6 +315,10 @@ class PracticeRepository {
 
   Future<void> deleteTopic(int id) {
     return _db.topicDao.deleteTopic(id);
+  }
+
+  Future<void> setTopicArchived(int id, bool archived) {
+    return _db.topicDao.setTopicArchived(id, archived);
   }
 
   Future<void> updateTopic({

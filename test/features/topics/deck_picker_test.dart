@@ -6,8 +6,9 @@ import 'package:material_ui/material_ui.dart';
 import '../../helpers/test_harness.dart';
 
 import 'package:question_practice/core/platform/anki_gateway.dart';
+import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/topics/anki_deck_picker.dart';
-import 'package:question_practice/features/topics/topic_page.dart';
+import 'package:question_practice/features/topics/topic_actions.dart';
 
 class _PickerHost extends ConsumerStatefulWidget {
   const _PickerHost();
@@ -42,9 +43,27 @@ class _PickerHostState extends ConsumerState<_PickerHost> {
   }
 }
 
+class _TopicEditHost extends ConsumerWidget {
+  const _TopicEditHost({required this.topic});
+
+  final Topic topic;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      body: Center(
+        child: M3EButton.filled(
+          onPressed: () => showEditTopicDialog(context, ref, topic),
+          child: const Text('edit'),
+        ),
+      ),
+    );
+  }
+}
+
 void main() {
   testWidgets('deck picker builds a tree and adds a child', (tester) async {
-    tester.view.physicalSize = const Size(320, 640);
+    tester.view.physicalSize = const Size(360, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -123,13 +142,14 @@ void main() {
       practiceName: 'TCP/IP',
       count: 2,
     );
+    final topic = (await harness.practices.topicById(seeded.topicId))!;
 
     await pumpTestApp(
       tester,
-      home: TopicPage(topicId: seeded.topicId),
+      home: _TopicEditHost(topic: topic),
       harness: harness,
     );
-    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.tap(find.text('edit'));
     await pumpFrames(tester);
     expect(find.text('Edit topic'), findsOneWidget);
 

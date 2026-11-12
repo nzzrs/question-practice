@@ -24,7 +24,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Export selected cards directly to AnkiDroid or share Anki-compatible files. Error and skipped cards can be reviewed all at once or by selection from Cards. Incomplete error cards can be selected to review them before export.
 - Give each topic its own AnkiDroid deck; topics without one use the default deck.
 - Export a complete JSON backup of practices, sessions, answers, cards and settings, and restore it on another install. The backup never contains the AI API key.
-- See per-topic accuracy and progress, and a mixed shuffled session across all topics.
+- Sort topics and each topic's practices by name or recency, with the order remembered; archive topics without deleting their data. Start a mixed shuffled session from the **Shuffle** floating button.
 - Material You wallpaper colors are on by default; they can be turned off in Settings.
 - A floating reminder after five minutes on the same question, then every five minutes. It resets when you move on.
 

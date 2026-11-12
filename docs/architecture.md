@@ -14,13 +14,14 @@ Domain models in `lib/core/domain/models.dart` are immutable plain Dart. Reposit
 
 ## Database
 
-One `AppDatabase` with tables for topics, practices, questions, sessions, session questions, attempts, concepts, error cards, manual cards, skipped questions, highlights and settings. The schema is version 8; version 2 added the topic deck and manual-card topic columns, version 3 stores correct/selected/wrong indexes as JSON arrays, version 4 adds the overall explanation and alternative explanations to error-card snapshots, version 5 adds the practice done flag, version 6 adds unknown attempts and acronym extras, version 7 adds skipped-question persistence and manual-card context, and version 8 adds highlights.
+One `AppDatabase` with tables for topics, practices, questions, sessions, session questions, attempts, concepts, error cards, manual cards, skipped questions, highlights and settings. The schema is version 9; version 2 added the topic deck and manual-card topic columns, version 3 stores correct/selected/wrong indexes as JSON arrays, version 4 adds the overall explanation and alternative explanations to error-card snapshots, version 5 adds the practice done flag, version 6 adds unknown attempts and acronym extras, version 7 adds skipped-question persistence and manual-card context, version 8 adds highlights, and version 9 adds the topic archived flag.
 
 - Timestamps are UTC; rows are converted back to UTC in mappers.
 - Questions store alternatives, per-alternative explanations, and correct indexes as JSON arrays.
 - A partial unique index enforces one active error card per question.
 - Error cards snapshot the question, alternatives, reasoning, overall explanation and per-alternative explanations.
-- Topics store an optional AnkiDroid deck name. Cards snapshot the topic name; export resolves a deck per card, falling back to the Settings default.
+- Topics store an optional AnkiDroid deck name and an archived flag. Cards snapshot the topic name; export resolves a deck per card, falling back to the Settings default.
+- The Home topic order and each topic's practice order live in the settings table. The Home key stores one `field:direction` value; practice keys include the topic id, so each topic keeps its own order.
 - Sessions are created on start and can be resumed if the app is killed.
 - Deleting a topic/practice cascades through its content; deleting a session removes its attempts and cards created by it.
 
@@ -46,7 +47,8 @@ Per-question history is derived from attempts, never stored as a new column. A q
 
 - `M3EMaterialApp` owns theming (light/dark from the system, wallpaper colors by default), and `M3ETheme` tokens are used throughout.
 - Navigation is Navigator 1.0 with `MaterialPageRoute`, because `M3EMaterialApp` does not expose `routerConfig`.
-- Home is a topics list with quick actions for due errors and cards. An info icon opens the help screen.
+- Home is an active-topics list with quick actions for due errors and cards. An info icon opens the help screen. The section header sorts the list and opens archived topics, while long-pressing a topic opens edit, archive and delete actions. Archived topics stay out of the normal list but keep all their data and are reachable from the archived-topics sheet.
+- Shuffled practice starts from a `Shuffle` floating action button. Its sheet summarizes the eligible questions and starts the existing mixed session.
 - The practice screen keeps everything in place after submission: locked reasoning, marked alternatives, per-alternative explanations and the overall explanation. A wrong answer offers the distraction checkbox in the feedback; checking it updates the attempt and removes the new error card, and unchecking restores it.
 - Alternatives are shown in a per-session shuffled order. Circular badges hide the original letters until feedback or the eye toggle, which reveals them without reordering the alternatives.
 - Questions with several correct answers let you select every correct alternative. Selection is compared as a set, so every correct alternative is required and an extra wrong alternative fails the question.

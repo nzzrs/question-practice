@@ -4,19 +4,16 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/data/practice_repository.dart';
+import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
+import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/session_page.dart';
-import 'anki_deck_picker.dart';
 import 'topic_stats_page.dart';
 
 enum _PracticeAction { rename, delete, markDone, markActive, split }
-
-enum _PracticeSort { name, recency }
-
-enum _SortDirection { increasing, decreasing }
 
 enum _ResumeChoice { continueSession, discardAndStart }
 
@@ -31,13 +28,14 @@ class TopicPage extends ConsumerStatefulWidget {
 
 class _TopicPageState extends ConsumerState<TopicPage> {
   bool _starting = false;
-  _PracticeSort _sort = _PracticeSort.name;
-  _SortDirection _sortDirection = _SortDirection.increasing;
 
   @override
   Widget build(BuildContext context) {
     final summary = ref.watch(topicSummaryProvider(widget.topicId));
     final practices = ref.watch(practiceSummariesProvider(widget.topicId));
+    final sort =
+        ref.watch(topicPracticeSortProvider(widget.topicId)).value ??
+        ListSort.defaultByName;
     final defaultDeck =
         ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
 
@@ -61,14 +59,6 @@ class _TopicPageState extends ConsumerState<TopicPage> {
               builder: (context) => TopicStatsPage(topicId: widget.topicId),
             ),
           ),
-        ),
-        M3EIconButton(
-          variant: M3EIconButtonVariant.standard,
-          icon: const Icon(Icons.edit_outlined),
-          tooltip: 'Edit topic',
-          onPressed: summary.value == null
-              ? null
-              : () => _editTopic(summary.value!.topic),
         ),
       ],
       children: [
@@ -141,7 +131,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                     variant: M3EIconButtonVariant.standard,
                     icon: const Icon(Icons.sort),
                     tooltip: 'Sort practices',
-                    onPressed: _chooseSort,
+                    onPressed: () => _chooseSort(sort),
                   ),
                 ),
                 practices.when(
@@ -158,7 +148,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                         message: 'Import a practice file that names this topic to add practices.',
                       );
                     }
-                    final sorted = _sortedPractices(items);
+                    final sorted = _sortedPractices(items, sort);
                     return AppGroup(
                       children: [
                         for (final practice in sorted)
@@ -193,13 +183,16 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     );
   }
 
-  List<PracticeSummary> _sortedPractices(List<PracticeSummary> items) {
+  List<PracticeSummary> _sortedPractices(
+    List<PracticeSummary> items,
+    ListSort sort,
+  ) {
     final sorted = List<PracticeSummary>.of(items);
-    final direction = _sortDirection == _SortDirection.increasing ? 1 : -1;
+    final direction = sort.direction == ListSortDirection.increasing ? 1 : -1;
     sorted.sort((a, b) {
-      final comparison = switch (_sort) {
-        _PracticeSort.name => compareNatural(a.practice.name, b.practice.name),
-        _PracticeSort.recency => a.practice.importedAt.compareTo(
+      final comparison = switch (sort.field) {
+        ListSortField.name => compareNatural(a.practice.name, b.practice.name),
+        ListSortField.recency => a.practice.importedAt.compareTo(
           b.practice.importedAt,
         ),
       };
@@ -209,82 +202,16 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     return sorted;
   }
 
-  Future<void> _chooseSort() async {
-    var sort = _sort;
-    var direction = _sortDirection;
-    final applied = await M3EDialog.show<bool>(
+  Future<void> _chooseSort(ListSort current) async {
+    final applied = await showListSortDialog(
       context,
-      dialog: StatefulBuilder(
-        builder: (context, setDialogState) {
-          final theme = M3ETheme.of(context);
-          return M3EDialog(
-            title: 'Sort practices',
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Sort by', style: theme.typography.baseline.labelMedium),
-                const SizedBox(height: 8),
-                M3ESegmentedButton<_PracticeSort>(
-                  segments: const [
-                    M3ESegment(value: _PracticeSort.name, label: 'Name'),
-                    M3ESegment(value: _PracticeSort.recency, label: 'Recency'),
-                  ],
-                  selected: {sort},
-                  onSelectionChanged: (values) {
-                    if (values.isEmpty) return;
-                    setDialogState(() => sort = values.first);
-                  },
-                ),
-                const SizedBox(height: 18),
-                Text('Order', style: theme.typography.baseline.labelMedium),
-                const SizedBox(height: 8),
-                M3ESegmentedButton<_SortDirection>(
-                  segments: const [
-                    M3ESegment(
-                      value: _SortDirection.increasing,
-                      label: 'Increasing',
-                    ),
-                    M3ESegment(
-                      value: _SortDirection.decreasing,
-                      label: 'Decreasing',
-                    ),
-                  ],
-                  selected: {direction},
-                  onSelectionChanged: (values) {
-                    if (values.isEmpty) return;
-                    setDialogState(() => direction = values.first);
-                  },
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Increasing: A to Z or oldest first. Decreasing: Z to A or newest first.',
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.4,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              M3EButton.text(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              M3EButton.filled(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Apply'),
-              ),
-            ],
-          );
-        },
-      ),
+      title: 'Sort practices',
+      initial: current,
     );
-    if (applied != true || !mounted) return;
-    setState(() {
-      _sort = sort;
-      _sortDirection = direction;
-    });
+    if (applied == null || !mounted) return;
+    await ref
+        .read(settingsRepositoryProvider)
+        .saveTopicPracticeSort(widget.topicId, applied);
   }
 
   Future<void> _openPractice(PracticeSummary summary) async {
@@ -509,121 +436,6 @@ class _TopicPageState extends ConsumerState<TopicPage> {
     name.dispose();
     if (saved == true && mounted) {
       await showSnack(context, 'Practice renamed.');
-    }
-  }
-
-  Future<void> _editTopic(Topic topic) async {
-    final name = TextEditingController(text: topic.name);
-    final description = TextEditingController(text: topic.description);
-    final priority = TextEditingController(
-      text: topic.priority?.toString() ?? '',
-    );
-    final deck = TextEditingController(text: topic.ankiDeck ?? '');
-    String? error;
-    final saved = await M3EDialog.show<bool>(
-      context,
-      dialog: StatefulBuilder(
-        builder: (context, setDialogState) {
-          return M3EDialog(
-            title: 'Edit topic',
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  M3ETextField(
-                    controller: name,
-                    label: 'Name',
-                    isRequired: true,
-                  ),
-                  const SizedBox(height: 12),
-                  M3ETextField(
-                    controller: description,
-                    label: 'Description',
-                    maxLines: 3,
-                    minLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  M3ETextField(
-                    controller: priority,
-                    label: 'Priority (1 highest, optional)',
-                    keyboardType: TextInputType.number,
-                    errorText: error,
-                  ),
-                  const SizedBox(height: 12),
-                  M3ETextField(
-                    controller: deck,
-                    label: 'AnkiDroid deck',
-                    supportingText:
-                        'Blank uses the default deck from Settings.',
-                  ),
-                  const SizedBox(height: 6),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: M3EButton.tonal(
-                      onPressed: () async {
-                        final selected = await showAnkiDeckPicker(
-                          context,
-                          ref,
-                          current: deck.text,
-                        );
-                        if (selected == null) return;
-                        setDialogState(() => deck.text = selected);
-                      },
-                      icon: const Icon(Icons.style_outlined),
-                      label: const Text('Browse decks'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              M3EButton.text(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              M3EButton.filled(
-                onPressed: () async {
-                  final trimmedName = name.text.trim();
-                  final parsedPriority = priority.text.trim().isEmpty
-                      ? null
-                      : int.tryParse(priority.text.trim());
-                  if (trimmedName.isEmpty) {
-                    setDialogState(() => error = 'Name is required.');
-                    return;
-                  }
-                  if (priority.text.trim().isNotEmpty &&
-                      (parsedPriority == null ||
-                          parsedPriority < 1 ||
-                          parsedPriority > 5)) {
-                    setDialogState(() => error = 'Use a number from 1 to 5.');
-                    return;
-                  }
-                  await ref
-                      .read(topicRepositoryProvider)
-                      .updateTopic(
-                        id: topic.id,
-                        name: trimmedName,
-                        description: description.text.trim(),
-                        priority: parsedPriority,
-                        ankiDeck: deck.text.trim().isEmpty
-                            ? null
-                            : deck.text.trim(),
-                      );
-                  if (context.mounted) Navigator.of(context).pop(true);
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    name.dispose();
-    description.dispose();
-    priority.dispose();
-    deck.dispose();
-    if (saved == true && mounted) {
-      await showSnack(context, 'Topic updated.');
     }
   }
 }

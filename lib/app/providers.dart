@@ -8,6 +8,7 @@ import '../core/data/practice_repository.dart';
 import '../core/data/session_repository.dart';
 import '../core/data/settings_repository.dart';
 import '../core/database/app_database.dart';
+import '../core/domain/list_sort.dart';
 import '../core/domain/models.dart';
 import '../core/platform/anki_gateway.dart';
 import '../core/platform/practice_sound_player.dart';
@@ -67,9 +68,22 @@ final topicSummariesProvider = StreamProvider<List<TopicSummary>>(
   (ref) => ref.watch(topicRepositoryProvider).watchTopicSummaries(),
 );
 
+final archivedTopicSummariesProvider = StreamProvider<List<TopicSummary>>(
+  (ref) => ref.watch(topicRepositoryProvider).watchArchivedTopicSummaries(),
+);
+
 final topicSummaryProvider = StreamProvider.family<TopicSummary?, int>(
   (ref, topicId) =>
       ref.watch(topicRepositoryProvider).watchTopicSummary(topicId),
+);
+
+final topicPracticeSortProvider = StreamProvider.family<ListSort, int>(
+  (ref, topicId) =>
+      ref.watch(settingsRepositoryProvider).watchTopicPracticeSort(topicId),
+);
+
+final homeTopicSortProvider = StreamProvider<ListSort?>(
+  (ref) => ref.watch(settingsRepositoryProvider).watchHomeTopicSort(),
 );
 
 final practiceSummariesProvider =

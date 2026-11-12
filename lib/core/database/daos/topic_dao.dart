@@ -179,4 +179,10 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
       ),
     );
   }
+
+  Future<void> setTopicArchived(int id, bool archived) {
+    return (update(topics)..where((t) => t.id.equals(id))).write(
+      TopicsCompanion(archived: Value(archived)),
+    );
+  }
 }

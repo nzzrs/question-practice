@@ -257,7 +257,12 @@ class BackupService {
     );
     return _BackupTables(
       info: info,
-      topics: _rows(tables, 'topics', (json) => TopicRow.fromJson(json)),
+      topics: _rows(
+        tables,
+        'topics',
+        (json) =>
+            TopicRow.fromJson({...json, 'archived': json['archived'] ?? false}),
+      ),
       practices: _rows(
         tables,
         'practices',

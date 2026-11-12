@@ -53,7 +53,11 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
     );
   }
 
-  Stream<List<TopicSummaryRow>> watchTopicSummaries(DateTime now) {
+  Stream<List<TopicSummaryRow>> watchTopicSummaries(
+    DateTime now, {
+    bool includeArchived = false,
+  }) {
+    final archivedFilter = includeArchived ? '' : 'WHERE t.archived = 0';
     final query = customSelect(
       '''
       SELECT
@@ -63,6 +67,7 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         t.priority AS topic_priority,
         t.anki_deck AS topic_anki_deck,
         t.created_at AS topic_created_at,
+        t.archived AS topic_archived,
         (SELECT COUNT(*) FROM practices p WHERE p.topic_id = t.id) AS practice_count,
         (
           SELECT COUNT(*) FROM questions q
@@ -139,6 +144,7 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
           WHERE p.topic_id = t.id AND s.status = 'completed'
         ) AS last_practiced_at
       FROM topics t
+      $archivedFilter
       ORDER BY (t.priority IS NULL) ASC, t.priority ASC, t.name COLLATE NOCASE ASC
       ''',
       variables: [Variable.withDateTime(now)],
@@ -253,6 +259,7 @@ class TopicSummaryRow {
     required this.topicPriority,
     required this.topicAnkiDeck,
     required this.topicCreatedAt,
+    required this.topicArchived,
     required this.practiceCount,
     required this.questionCount,
     required this.attemptedQuestionCount,
@@ -274,6 +281,7 @@ class TopicSummaryRow {
       topicPriority: row.read<int?>('topic_priority'),
       topicAnkiDeck: row.read<String?>('topic_anki_deck'),
       topicCreatedAt: row.read<DateTime>('topic_created_at').toUtc(),
+      topicArchived: row.read<bool>('topic_archived'),
       practiceCount: row.read<int>('practice_count'),
       questionCount: row.read<int>('question_count'),
       attemptedQuestionCount: row.read<int>('attempted_question_count'),
@@ -294,6 +302,7 @@ class TopicSummaryRow {
   final int? topicPriority;
   final String? topicAnkiDeck;
   final DateTime topicCreatedAt;
+  final bool topicArchived;
   final int practiceCount;
   final int questionCount;
   final int attemptedQuestionCount;

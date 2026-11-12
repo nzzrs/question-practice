@@ -8,6 +8,7 @@ class Topics extends Table {
   IntColumn get priority => integer().nullable()();
   TextColumn get ankiDeck => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+  BoolColumn get archived => boolean().withDefault(const Constant(false))();
 }
 
 @DataClassName('PracticeRow')

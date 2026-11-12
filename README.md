@@ -6,7 +6,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 
 ## What it does
 
-- Import practices from JSON or a `.txt` file containing JSON. One file can contain many topics and practices.
+- Import practices from JSON or a `.txt` file containing JSON. One file can contain many topics and practices, and each question may name an optional subtopic for grouped statistics.
 - Answer with an optional written reasoning. Questions can have one correct alternative or several; feedback appears in place, with the correct and selected alternatives expanded to their explanation and the rest collapsed. Alternatives are shuffled per session, original letters stay hidden until feedback or the eye toggle, and answers and explanations are selectable with http(s) links opening in the browser.
 - Select any text to **Define** a term, **Highlight** it for later, or **Ask** the AI about it using the passage, its question and your own message. An answer can be turned into a basic card with the question context above the front.
 - Highlights are painted in place and wait in the end review, where each one can become a concept or basic card or simply be kept. Kept highlights remain in Cards, where **Download all** saves every highlight as a plain-text file. Highlights are never sent to AnkiDroid.
@@ -22,9 +22,10 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Re-test errors after 48 hours. A correct answer resolves the card but keeps the history.
 - Look up a selected term with an optional AI provider: OpenAI-compatible endpoints (OpenAI, Groq, OpenRouter, custom) or Gemini's native API, with a model list loaded from the provider. AI definitions appear in a read-only bubble and save automatically; acronyms also show what they stand for. Web lookup keeps the editable sheet. Or use DuckDuckGo/Wikipedia through a Custom Tab.
 - Export selected cards directly to AnkiDroid or share Anki-compatible files. Error and skipped cards can be reviewed all at once or by selection from Cards. Incomplete error cards can be selected to review them before export.
+- Open topic statistics for a per-subtopic accuracy and progress breakdown, a dashed least-squares trend line over the session history, and a weekly learning rate once the history spans a week. Share the whole statistics payload as JSON.
 - Give each topic its own AnkiDroid deck; topics without one use the default deck.
 - Export a complete JSON backup of practices, sessions, answers, cards and settings, and restore it on another install. The backup never contains the AI API key.
-- See per-topic accuracy and progress, and a mixed shuffled session across all topics.
+- Sort topics and each topic's practices by name or recency, with the order remembered; archive topics without deleting their data. Start a mixed shuffled session from the **Shuffle** floating button.
 - Material You wallpaper colors are on by default; they can be turned off in Settings.
 - A floating reminder after five minutes on the same question, then every five minutes. It resets when you move on.
 
@@ -52,7 +53,7 @@ flutter build apk --debug
 
 The debug build uses the `link.nzrs.questionpractice.dev` application ID, so it can be installed next to a release build.
 
-A tracked pre-push hook builds the debug APK on this laptop before every push. Install it once:
+A tracked pre-push hook checks that generated documentation is current and builds the debug APK on this laptop before every push. Install it once:
 
 ```bash
 ./tool/install_hooks.sh
@@ -71,10 +72,16 @@ adb install -r build/app/outputs/flutter-apk/app-debug.apk
 All documentation is in English. Start at [docs/README.md](docs/README.md).
 
 - [User guide](docs/user-guide.md)
-- [Import format](docs/json-format.md)
+- [Practice JSON format](docs/json-format.md)
 - [AnkiDroid export and per-topic decks](docs/anki.md)
-- [Architecture](docs/architecture.md)
+- [Architecture and feature map](docs/architecture.md)
+- [Database reference](docs/database.md)
 - [Testing](docs/testing.md)
+
+The database map, migration history and backup coverage in
+[docs/database.md](docs/database.md) are generated from the Drift code. After a
+schema change, run `dart run tool/docs/update_docs.dart`; verify with
+`dart run tool/docs/update_docs.dart --check`.
 
 ## Import
 
@@ -82,11 +89,11 @@ The importer validates the whole file before writing anything. A broken file is 
 
 A question uses `correctIndex` for one correct alternative, or `correctIndexes` for several. A multi-answer question is correct only when every correct alternative is selected and no wrong one is selected.
 
-A sample with two topics and eight questions lives at [assets/samples/sample_practice.json](assets/samples/sample_practice.json). The Import screen can load it directly.
+A sample with two topics and eight questions lives at [assets/samples/sample_practice.json](assets/samples/sample_practice.json). The Import screen can load it directly. A second importable file, [assets/samples/practice_format_example.json](assets/samples/practice_format_example.json), demonstrates a single-answer question with a subtopic, a multi-answer question, per-alternative explanations, `sourceId` and two topics.
 
 ## Anki export
 
-See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze** note type. Error cards use the six-field **Question Practice: Error v2** model, created automatically with its HTML and CSS when missing. Basic note types are created automatically the first time. Each topic can target its own deck; the topic editor and Settings load deck names from AnkiDroid. Blank topics use the default deck from Settings.
+See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze** note type. Error cards use the six-field **Question Practice: Error v2** model, created automatically with its HTML and CSS when missing. Basic cards use the `Basic` note type, created automatically the first time it is needed. Each topic can target its own deck; there is no per-practice deck. The topic editor and Settings load deck names from AnkiDroid. Blank topics use the default deck from Settings.
 
 ## Data and privacy
 
@@ -102,9 +109,10 @@ See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze
 ```bash
 flutter analyze
 flutter test
+dart run tool/docs/update_docs.dart --check
 ```
 
-The suite covers the importer and JSON schema (including `correctIndexes`), scoring and the 48-hour rule, multi-answer scoring, distraction checked and unchecked after feedback, session arrows and paused sessions, review cards, the shared error-card review view, Gemini and OpenAI-compatible lookup, provider model lists, acronym expansion, AI review checks, six-field Anki error notes, Drift statistics, and the main widget flows. See [docs/testing.md](docs/testing.md) for the manual on-device checklist.
+The suite covers the importer and JSON schema (including `correctIndexes` and subtopics), scoring and the 48-hour rule, multi-answer scoring, distraction checked and unchecked after feedback, session arrows and paused sessions, review cards, the shared error-card review view, Gemini and OpenAI-compatible lookup, provider model lists, acronym expansion, AI review checks, six-field Anki error notes, Drift statistics and deletion cascades, per-subtopic stats, regression and learning-rate math, statistics export, generated database documentation, and the main widget flows. See [docs/testing.md](docs/testing.md) for the manual on-device checklist.
 
 ## Project layout
 

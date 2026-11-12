@@ -11,14 +11,16 @@ Question Practice writes to AnkiDroid through its supported Instant-Add API (`co
 
 The manifest declares the database permission and a `<queries>` entry for `com.ichi2.anki`, required for package visibility on Android 11+.
 
-## Decks: default and per topic
+## Decks: selected at topic level
 
-Every topic can target its own AnkiDroid deck:
+Decks are selected **per topic only**. There is no per-practice deck: every card made from a topic routes to that topic's deck, or to the default deck when the topic has none.
 
 1. Open **Settings → AnkiDroid → Deck name** and set the default deck, for example `Question Practice`.
-2. Open a topic → **Edit** → **AnkiDroid deck** → **Browse decks**.
+2. Long-press a topic on Home and choose **Edit topic**, then **AnkiDroid deck** → **Browse decks**.
 3. Pick an existing deck from AnkiDroid, or type a new name. A missing deck is created on export.
 4. Leave the field blank to use the default deck.
+
+The **Edit practice** sheet has no deck row. Deck selection is topic-level only: it does not create a practice-specific deck, and practice JSON files never contain a deck.
 
 The picker reads the live deck list through AnkiDroid's API (`AddContentApi.deckList`). If the AnkiDroid API or database permission is unavailable, the picker explains the problem and still allows typing a deck name.
 
@@ -36,7 +38,9 @@ If a topic is renamed, cards created before the rename keep the old captured top
 |---|---|---|
 | AnkiDroid's Cloze type | existing `Text` and `Back Extra` fields | Concept cards |
 | `Question Practice: Error v2` | Problem, Wrong Solution, Correct Solution, Mental Trap, Vaccine, Explanation | Error cards |
-| `Question Practice Basic` | Front, Back | Skipped-question “another question” cards |
+| `Basic` | Front, Back | Skipped-question and other basic question/answer cards |
+
+Basic cards use the note type named exactly **`Basic`**, with the two fields `Front` and `Back`. If that note type is missing, the app creates it through AnkiDroid's `addNewBasicModel` before adding notes; it does not use `Basic (and reversed card)` or another variant.
 
 Questions checks for `Question Practice: Error v2` before inserting notes. If the model is missing, it creates it with the six fields, front/back templates and CSS defined in `AnkiBridge.kt`. The versioned name lets an existing AnkiDroid model keep its old cards while new exports use the revised template.
 
@@ -95,8 +99,8 @@ On a connected Android device with AnkiDroid installed:
 4. Open AnkiDroid, open the Question Practice deck and confirm:
    - concept notes render as cloze cards;
    - error notes use `Question Practice: Error v2` with all six fields;
-   - basic notes show front and back.
-5. Set the Cloud topic to a separate deck (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck.
+   - basic notes use the `Basic` note type with `Front` and `Back`.
+5. Set the Cloud topic to a separate deck with **Edit topic → AnkiDroid deck** (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck. Open **Edit practice** and confirm it has no deck row; deck selection is topic-level only.
 6. Import a multi-answer question and export its error card. Confirm both selected and correct alternatives appear in the respective fields.
 7. Delete `Question Practice: Error v2` in AnkiDroid, export again, and confirm the app creates it before adding notes.
 8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.

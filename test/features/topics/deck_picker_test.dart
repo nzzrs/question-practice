@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -6,8 +9,16 @@ import 'package:material_ui/material_ui.dart';
 import '../../helpers/test_harness.dart';
 
 import 'package:question_practice/core/platform/anki_gateway.dart';
+import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/topics/anki_deck_picker.dart';
-import 'package:question_practice/features/topics/topic_page.dart';
+import 'package:question_practice/features/topics/topic_actions.dart';
+
+Future<void> _loadTestFont() async {
+  final bytes = await File('test/fixtures/Roboto-Regular.ttf').readAsBytes();
+  final loader = FontLoader('Roboto')
+    ..addFont(Future.value(ByteData.view(bytes.buffer)));
+  await loader.load();
+}
 
 class _PickerHost extends ConsumerStatefulWidget {
   const _PickerHost();
@@ -42,9 +53,29 @@ class _PickerHostState extends ConsumerState<_PickerHost> {
   }
 }
 
+class _TopicEditHost extends ConsumerWidget {
+  const _TopicEditHost({required this.topic});
+
+  final Topic topic;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      body: Center(
+        child: M3EButton.filled(
+          onPressed: () => showEditTopicDialog(context, ref, topic),
+          child: const Text('edit'),
+        ),
+      ),
+    );
+  }
+}
+
 void main() {
+  setUpAll(_loadTestFont);
+
   testWidgets('deck picker builds a tree and adds a child', (tester) async {
-    tester.view.physicalSize = const Size(320, 640);
+    tester.view.physicalSize = const Size(360, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -123,16 +154,26 @@ void main() {
       practiceName: 'TCP/IP',
       count: 2,
     );
+    final topic = (await harness.practices.topicById(seeded.topicId))!;
 
     await pumpTestApp(
       tester,
-      home: TopicPage(topicId: seeded.topicId),
+      home: _TopicEditHost(topic: topic),
       harness: harness,
+      fontFamily: 'Roboto',
     );
-    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await tester.tap(find.text('edit'));
     await pumpFrames(tester);
     expect(find.text('Edit topic'), findsOneWidget);
 
+    await tester.tap(find.text('AnkiDroid deck'));
+    await pumpFrames(tester);
+    await tester.scrollUntilVisible(
+      find.text('Browse decks'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
     await tester.tap(find.text('Browse decks'));
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
@@ -144,6 +185,6 @@ void main() {
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
     expect(find.text('Edit topic'), findsOneWidget);
-    expect(find.text('Infrastructure::AWS'), findsOneWidget);
+    expect(find.text('Infrastructure::AWS'), findsNWidgets(2));
   });
 }

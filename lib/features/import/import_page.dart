@@ -322,6 +322,7 @@ class _FormatHelp extends StatelessWidget {
                       child: Text(
                         '{"formatVersion": 1, "topics": [{"name": "Cloud", '
                         '"practices": [{"name": "Core", "questions": [{"prompt": "…", '
+                        '"subtopic": "…", '
                         '"alternatives": ["…", "…"], "correctIndex": 0, '
                         '"explanation": "…", "alternativeExplanations": ["…", "…"]}]}]}]}',
                         style: const TextStyle(
@@ -333,7 +334,7 @@ class _FormatHelp extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Each question has one correct answer (correctIndex) or several (correctIndexes), with one explanation per alternative. See the help screen for the full format.',
+                    'Each question has one correct answer (correctIndex) or several (correctIndexes), with one explanation per alternative. Subtopic is optional. See the help screen for the full format.',
                     style: theme.typography.baseline.bodySmall.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                       height: 1.4,

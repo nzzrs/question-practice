@@ -8,6 +8,7 @@ import '../core/data/practice_repository.dart';
 import '../core/data/session_repository.dart';
 import '../core/data/settings_repository.dart';
 import '../core/database/app_database.dart';
+import '../core/domain/list_sort.dart';
 import '../core/domain/models.dart';
 import '../core/platform/anki_gateway.dart';
 import '../core/platform/practice_sound_player.dart';
@@ -18,7 +19,9 @@ import '../features/export/domain/export_service.dart';
 import '../features/import/domain/import_service.dart';
 import '../features/lookup/domain/lookup_service.dart';
 import '../features/practice/domain/session_service.dart';
+import '../features/practice_edit/domain/practice_edit_service.dart';
 import '../features/review/domain/review_service.dart';
+import '../features/topics/domain/statistics_export_service.dart';
 
 final databaseProvider = Provider<AppDatabase>(
   (ref) => throw UnimplementedError('databaseProvider must be overridden'),
@@ -67,9 +70,22 @@ final topicSummariesProvider = StreamProvider<List<TopicSummary>>(
   (ref) => ref.watch(topicRepositoryProvider).watchTopicSummaries(),
 );
 
+final archivedTopicSummariesProvider = StreamProvider<List<TopicSummary>>(
+  (ref) => ref.watch(topicRepositoryProvider).watchArchivedTopicSummaries(),
+);
+
 final topicSummaryProvider = StreamProvider.family<TopicSummary?, int>(
   (ref, topicId) =>
       ref.watch(topicRepositoryProvider).watchTopicSummary(topicId),
+);
+
+final topicPracticeSortProvider = StreamProvider.family<ListSort, int>(
+  (ref, topicId) =>
+      ref.watch(settingsRepositoryProvider).watchTopicPracticeSort(topicId),
+);
+
+final homeTopicSortProvider = StreamProvider<ListSort?>(
+  (ref) => ref.watch(settingsRepositoryProvider).watchHomeTopicSort(),
 );
 
 final practiceSummariesProvider =
@@ -82,6 +98,12 @@ final topicProgressProvider =
     StreamProvider.family<List<TopicProgressPoint>, int>(
       (ref, topicId) =>
           ref.watch(topicRepositoryProvider).watchTopicProgress(topicId),
+    );
+
+final topicSubtopicStatsProvider =
+    StreamProvider.family<List<SubtopicStat>, int>(
+      (ref, topicId) =>
+          ref.watch(topicRepositoryProvider).watchSubtopicStats(topicId),
     );
 
 final inProgressSessionProvider = StreamProvider<PracticeSession?>(
@@ -202,6 +224,21 @@ final exportServiceProvider = Provider<ExportService>(
   (ref) => ExportService(
     gateway: ref.watch(ankiGatewayProvider),
     cards: ref.watch(cardRepositoryProvider),
+    practices: ref.watch(topicRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final practiceEditServiceProvider = Provider<PracticeEditService>(
+  (ref) => PracticeEditService(
+    practices: ref.watch(topicRepositoryProvider),
+    importService: ref.watch(importServiceProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final statisticsExportServiceProvider = Provider<StatisticsExportService>(
+  (ref) => StatisticsExportService(
     practices: ref.watch(topicRepositoryProvider),
     clock: ref.watch(clockProvider),
   ),

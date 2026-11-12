@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:question_practice/features/errors/past_errors_page.dart';
+import 'package:question_practice/features/practice/session_page.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -60,5 +61,23 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Question 1?'), findsOneWidget);
+  });
+
+  testWidgets('review errors opens the immersive session without app chrome', (
+    tester,
+  ) async {
+    final recorder = SystemUiCallRecorder()..install();
+    addTearDown(recorder.dispose);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await createError(harness);
+    harness.clock.advance(const Duration(hours: 48));
+
+    await pumpTestApp(tester, home: const PastErrorsPage(), harness: harness);
+    await tester.tap(find.text('Review 1 error'));
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.byType(SessionPage), findsOneWidget);
+    expect(recorder.modes, contains('SystemUiMode.immersiveSticky'));
   });
 }

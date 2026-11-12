@@ -53,7 +53,11 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
     );
   }
 
-  Stream<List<TopicSummaryRow>> watchTopicSummaries(DateTime now) {
+  Stream<List<TopicSummaryRow>> watchTopicSummaries(
+    DateTime now, {
+    bool includeArchived = false,
+  }) {
+    final archivedFilter = includeArchived ? '' : 'WHERE t.archived = 0';
     final query = customSelect(
       '''
       SELECT
@@ -63,6 +67,7 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         t.priority AS topic_priority,
         t.anki_deck AS topic_anki_deck,
         t.created_at AS topic_created_at,
+        t.archived AS topic_archived,
         (SELECT COUNT(*) FROM practices p WHERE p.topic_id = t.id) AS practice_count,
         (
           SELECT COUNT(*) FROM questions q
@@ -139,6 +144,7 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
           WHERE p.topic_id = t.id AND s.status = 'completed'
         ) AS last_practiced_at
       FROM topics t
+      $archivedFilter
       ORDER BY (t.priority IS NULL) ASC, t.priority ASC, t.name COLLATE NOCASE ASC
       ''',
       variables: [Variable.withDateTime(now)],
@@ -177,6 +183,43 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
     );
     return query.watch().map(
       (rows) => rows.map(TopicProgressRow.fromRow).toList(),
+    );
+  }
+
+  Stream<List<SubtopicStatRow>> watchSubtopicStats(int topicId) {
+    final query = customSelect(
+      '''
+      SELECT
+        COALESCE(NULLIF(TRIM(q.subtopic), ''), '') AS subtopic,
+        COUNT(DISTINCT q.id) AS question_count,
+        COUNT(DISTINCT CASE
+          WHEN s.status = 'completed' AND a.selected_indexes_json != '[]'
+          THEN q.id
+        END) AS attempted_question_count,
+        SUM(CASE
+          WHEN s.status = 'completed' AND a.selected_indexes_json != '[]'
+          THEN 1 ELSE 0
+        END) AS answered_count,
+        SUM(CASE
+          WHEN s.status = 'completed' AND a.is_correct = 1
+          THEN 1 ELSE 0
+        END) AS correct_count
+      FROM questions q
+      INNER JOIN practices p ON p.id = q.practice_id
+      LEFT JOIN attempts a ON a.question_id = q.id
+      LEFT JOIN sessions s ON s.id = a.session_id
+      WHERE p.topic_id = ?
+      GROUP BY COALESCE(NULLIF(TRIM(q.subtopic), ''), '')
+      ORDER BY CASE
+          WHEN TRIM(COALESCE(q.subtopic, '')) = '' THEN 1 ELSE 0
+        END ASC,
+        subtopic COLLATE NOCASE ASC
+      ''',
+      variables: [Variable.withInt(topicId)],
+      readsFrom: {questions, practices, attempts, sessions},
+    );
+    return query.watch().map(
+      (rows) => rows.map(SubtopicStatRow.fromRow).toList(),
     );
   }
 
@@ -253,6 +296,7 @@ class TopicSummaryRow {
     required this.topicPriority,
     required this.topicAnkiDeck,
     required this.topicCreatedAt,
+    required this.topicArchived,
     required this.practiceCount,
     required this.questionCount,
     required this.attemptedQuestionCount,
@@ -274,6 +318,7 @@ class TopicSummaryRow {
       topicPriority: row.read<int?>('topic_priority'),
       topicAnkiDeck: row.read<String?>('topic_anki_deck'),
       topicCreatedAt: row.read<DateTime>('topic_created_at').toUtc(),
+      topicArchived: row.read<bool>('topic_archived'),
       practiceCount: row.read<int>('practice_count'),
       questionCount: row.read<int>('question_count'),
       attemptedQuestionCount: row.read<int>('attempted_question_count'),
@@ -294,6 +339,7 @@ class TopicSummaryRow {
   final int? topicPriority;
   final String? topicAnkiDeck;
   final DateTime topicCreatedAt;
+  final bool topicArchived;
   final int practiceCount;
   final int questionCount;
   final int attemptedQuestionCount;
@@ -331,6 +377,32 @@ class TopicProgressRow {
   final String practiceName;
   final int correct;
   final int total;
+}
+
+class SubtopicStatRow {
+  const SubtopicStatRow({
+    required this.subtopic,
+    required this.questionCount,
+    required this.attemptedQuestionCount,
+    required this.answeredCount,
+    required this.correctCount,
+  });
+
+  factory SubtopicStatRow.fromRow(QueryRow row) {
+    return SubtopicStatRow(
+      subtopic: row.read<String>('subtopic'),
+      questionCount: row.read<int>('question_count'),
+      attemptedQuestionCount: row.read<int>('attempted_question_count'),
+      answeredCount: row.read<int>('answered_count'),
+      correctCount: row.read<int>('correct_count'),
+    );
+  }
+
+  final String subtopic;
+  final int questionCount;
+  final int attemptedQuestionCount;
+  final int answeredCount;
+  final int correctCount;
 }
 
 class PracticeSummaryRow {

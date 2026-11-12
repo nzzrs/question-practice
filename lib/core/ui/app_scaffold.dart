@@ -18,6 +18,8 @@ class AppPage extends StatelessWidget {
     this.onBack,
     this.padding,
     this.maxWidth = 720,
+    this.focus = false,
+    this.scrollController,
     super.key,
   });
 
@@ -35,6 +37,16 @@ class AppPage extends StatelessWidget {
   final EdgeInsets? padding;
   final double maxWidth;
 
+  /// Hides the app bar for immersive reading and shows a slim exit row instead.
+  ///
+  /// Used by the review screens, where the card is the focus and the learner
+  /// only needs a clear way back to the rest of the app.
+  final bool focus;
+
+  /// Optional controller for the scrolling content, used by stepped reviews to
+  /// return to the top when the learner moves to another card.
+  final ScrollController? scrollController;
+
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
@@ -45,6 +57,62 @@ class AppPage extends StatelessWidget {
         : 24.0;
     final contentPadding =
         padding ?? EdgeInsets.fromLTRB(horizontal, 4, horizontal, bottomInset);
+    final close = onBack ?? () => Navigator.of(context).maybePop();
+
+    if (focus) {
+      final tablet = width >= 600;
+      final focusPadding =
+          padding ??
+          EdgeInsets.fromLTRB(
+            tablet ? 24 : 12,
+            4,
+            tablet ? 24 : 12,
+            bottomInset,
+          );
+      final content = CustomScrollView(
+        controller: scrollController,
+        slivers: [
+          SliverPadding(
+            padding: focusPadding,
+            sliver: SliverList.list(children: children),
+          ),
+        ],
+      );
+      return PopScope(
+        // Keep the system back gesture aligned with the visible close control,
+        // including on the completion screen where closing reports success.
+        canPop: onBack == null,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) close();
+        },
+        child: Scaffold(
+          key: const ValueKey('app-focus-page'),
+          backgroundColor: theme.colorScheme.surface,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                _FocusHeader(title: title, onClose: close, actions: actions),
+                Expanded(
+                  child: tablet
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: maxWidth),
+                            child: content,
+                          ),
+                        )
+                      : content,
+                ),
+                if (bottomBar != null) bottomBar!,
+              ],
+            ),
+          ),
+          floatingActionButton: floatingActionButton,
+          floatingActionButtonLocation: floatingActionButtonLocation,
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -53,6 +121,7 @@ class AppPage extends StatelessWidget {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: maxWidth),
           child: CustomScrollView(
+            controller: scrollController,
             slivers: [
               M3EAppBar.sliver(
                 title: titleWidget,
@@ -81,6 +150,49 @@ class AppPage extends StatelessWidget {
       bottomNavigationBar: bottomBar,
       floatingActionButton: floatingActionButton,
       floatingActionButtonLocation: floatingActionButtonLocation,
+    );
+  }
+}
+
+/// Slim top row used by [AppPage] focus mode: one clear exit and the title.
+class _FocusHeader extends StatelessWidget {
+  const _FocusHeader({
+    required this.title,
+    required this.onClose,
+    required this.actions,
+  });
+
+  final String title;
+  final VoidCallback onClose;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      key: const ValueKey('app-focus-header'),
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 2),
+      child: Row(
+        children: [
+          M3EIconButton(
+            key: const ValueKey('app-focus-exit'),
+            variant: M3EIconButtonVariant.standard,
+            icon: const Icon(M3EIcons.close),
+            tooltip: 'Exit review',
+            onPressed: onClose,
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.typography.emphasized.titleMedium,
+            ),
+          ),
+          ...actions,
+        ],
+      ),
     );
   }
 }

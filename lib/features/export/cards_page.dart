@@ -583,6 +583,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     if (cards.isEmpty && skipped.isEmpty) return;
     final completed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
+        fullscreenDialog: true,
         builder: (context) =>
             ErrorCardsReviewPage(cards: cards, skippedQuestions: skipped),
       ),

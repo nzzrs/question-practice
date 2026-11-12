@@ -1,6 +1,8 @@
 import 'package:clock/clock.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -17,6 +19,7 @@ import 'package:question_practice/core/platform/anki_gateway.dart';
 import 'package:question_practice/core/platform/practice_sound_player.dart';
 import 'package:question_practice/core/platform/secure_key_store.dart';
 import 'package:question_practice/core/platform/web_launcher.dart';
+import 'package:question_practice/core/ui/immersive_review.dart';
 
 class TestClock extends Clock {
   TestClock(this.current);
@@ -76,6 +79,7 @@ class TestHarness {
     int count = 2,
     int? priority = 1,
     String? ankiDeck,
+    List<String> subtopics = const [],
   }) async {
     final topicId = await practices.createTopic(
       name: topicName,
@@ -103,6 +107,7 @@ class TestHarness {
             'Correct: ${index + 1} is the right answer.',
             'Wrong: ${index + 1} is a distractor.',
           ],
+          subtopic: index < subtopics.length ? subtopics[index] : '',
         ),
       );
     }
@@ -132,6 +137,32 @@ class SeededPractice {
   final int practiceId;
 }
 
+/// Records the system UI modes requested through the platform channel.
+///
+/// Review pages hide the status and navigation bars and restore edge-to-edge
+/// layout when they close; widget tests use this recorder to assert both calls.
+class SystemUiCallRecorder {
+  final List<String> modes = [];
+  TestDefaultBinaryMessenger? _messenger;
+
+  void install() {
+    _messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    _messenger!.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'SystemChrome.setEnabledSystemUIMode') {
+        final arguments = call.arguments;
+        if (arguments is String) modes.add(arguments);
+      }
+      return null;
+    });
+  }
+
+  void dispose() {
+    _messenger?.setMockMethodCallHandler(SystemChannels.platform, null);
+    _messenger = null;
+  }
+}
+
 class TestAppBundle {
   TestAppBundle({required this.widget, required this.container});
 
@@ -139,7 +170,12 @@ class TestAppBundle {
   final ProviderContainer container;
 }
 
-TestAppBundle testAppBundle({required Widget home, TestHarness? harness}) {
+TestAppBundle testAppBundle({
+  required Widget home,
+  TestHarness? harness,
+  List<Override> overrides = const [],
+  String? fontFamily,
+}) {
   final suite = harness ?? TestHarness();
   final container = ProviderContainer(
     overrides: [
@@ -150,6 +186,7 @@ TestAppBundle testAppBundle({required Widget home, TestHarness? harness}) {
       ankiGatewayProvider.overrideWithValue(suite.anki),
       practiceSoundPlayerProvider.overrideWithValue(suite.soundPlayer),
       httpClientProvider.overrideWithValue(suite.httpClient),
+      ...overrides,
     ],
   );
   return TestAppBundle(
@@ -159,8 +196,10 @@ TestAppBundle testAppBundle({required Widget home, TestHarness? harness}) {
       child: M3EMaterialApp(
         title: 'Question Practice test',
         data: appThemeData(),
+        fontFamily: fontFamily,
         autoTheming: false,
         dynamicColoring: false,
+        navigatorObservers: [reviewRouteObserver],
         home: home,
       ),
     ),
@@ -177,8 +216,15 @@ Future<void> pumpTestApp(
   WidgetTester tester, {
   required Widget home,
   TestHarness? harness,
+  List<Override> overrides = const [],
+  String? fontFamily,
 }) async {
-  final bundle = testAppBundle(home: home, harness: harness);
+  final bundle = testAppBundle(
+    home: home,
+    harness: harness,
+    overrides: overrides,
+    fontFamily: fontFamily,
+  );
   await tester.pumpWidget(bundle.widget);
   await pumpFrames(tester);
   addTearDown(() async {

@@ -481,6 +481,64 @@ void main() {
     );
   });
 
+  test('AI summarize rewrites a card field without JSON mode', () async {
+    await useAi();
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final messages = body['messages'] as List<dynamic>;
+      final system =
+          (messages.first as Map<String, dynamic>)['content'] as String;
+      final user = (messages.last as Map<String, dynamic>)['content'] as String;
+      expect(system, contains('shorten'));
+      expect(
+        user,
+        contains('Original question: A very long imported question?'),
+      );
+      expect(user, contains('Question context: Which one?'));
+      expect(body.containsKey('response_format'), isFalse);
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'content': '  A shorter question?  '},
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    final summary = await serviceWith(client).summarizeText(
+      text: 'A very long imported question?',
+      fieldLabel: 'question',
+      question: 'Which one?',
+    );
+
+    expect(summary, 'A shorter question?');
+  });
+
+  test('AI summarize needs a saved API key', () async {
+    await harness.settings.save(
+      const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiModel: 'test-model',
+        aiBaseUrl: 'https://example.test/v1',
+      ),
+    );
+
+    await expectLater(
+      serviceWith(MockClient((_) async => http.Response('{}', 200)))
+          .summarizeText(text: 'Long text', fieldLabel: 'answer'),
+      throwsA(
+        isA<LookupException>().having(
+          (error) => error.message,
+          'message',
+          contains('Add an API key'),
+        ),
+      ),
+    );
+  });
+
   test('AI review check needs a saved API key', () async {
     await harness.settings.save(
       const AppSettings(

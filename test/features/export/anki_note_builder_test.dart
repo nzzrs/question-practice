@@ -82,7 +82,7 @@ void main() {
     ]);
   });
 
-  test('basic cards put the source context above the question', () {
+  test('basic cards contain only the question and the answer', () {
     final basic = ManualCard(
       id: 3,
       sessionId: 1,
@@ -95,13 +95,11 @@ void main() {
       exportedAt: null,
     );
     final files = builder.files(ExportSelection(manualCards: [basic]));
-    expect(files.basic, contains('IPv4 addresses are split'));
-    expect(files.basic, contains('What is a subnet?'));
-    expect(files.basic, endsWith('\tA range of IP addresses.'));
+    expect(files.basic, 'What is a subnet?\tA range of IP addresses.');
+    expect(files.basic, isNot(contains('IPv4 addresses are split')));
 
     final note = builder.notes(ExportSelection(manualCards: [basic])).single;
-    expect(note.fields.first, contains('IPv4 addresses are split'));
-    expect(note.fields.first, contains('What is a subnet?'));
+    expect(note.fields.first, 'What is a subnet?');
     expect(note.fields.last, 'A range of IP addresses.');
   });
 

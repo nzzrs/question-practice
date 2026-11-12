@@ -23,6 +23,7 @@ class Topic {
     required this.priority,
     required this.ankiDeck,
     required this.createdAt,
+    this.archived = false,
   });
 
   final int id;
@@ -32,11 +33,15 @@ class Topic {
   final String? ankiDeck;
   final DateTime createdAt;
 
+  /// Archived topics keep all their data but stay out of the normal list.
+  final bool archived;
+
   Topic copyWith({
     String? name,
     String? description,
     int? priority,
     String? ankiDeck,
+    bool? archived,
     bool clearPriority = false,
     bool clearAnkiDeck = false,
   }) {
@@ -47,6 +52,7 @@ class Topic {
       priority: clearPriority ? null : (priority ?? this.priority),
       ankiDeck: clearAnkiDeck ? null : (ankiDeck ?? this.ankiDeck),
       createdAt: createdAt,
+      archived: archived ?? this.archived,
     );
   }
 }
@@ -83,6 +89,7 @@ class Question {
     required this.explanation,
     required this.alternativeExplanations,
     required this.position,
+    this.subtopic = '',
   });
 
   final int id;
@@ -94,6 +101,10 @@ class Question {
   final List<String> alternativeExplanations;
   final int position;
 
+  /// Optional grouping inside a practice. Empty means uncategorized.
+  final String subtopic;
+
+  bool get hasSubtopic => subtopic.trim().isNotEmpty;
   bool get allowsMultiple => correctIndexes.length > 1;
   int get correctIndex => correctIndexes.isEmpty ? -1 : correctIndexes.first;
   bool isCorrectSelection(Iterable<int> selected) =>
@@ -115,6 +126,8 @@ class QuestionDraft {
     required this.correctIndexes,
     required this.explanation,
     required this.alternativeExplanations,
+    this.subtopic = '',
+    this.sourceId = '',
   });
 
   final String prompt;
@@ -122,6 +135,34 @@ class QuestionDraft {
   final List<int> correctIndexes;
   final String explanation;
   final List<String> alternativeExplanations;
+  final String subtopic;
+
+  /// Stable identity from an exported practice file.
+  ///
+  /// Empty for files imported without question identities. The value is used
+  /// only while updating a practice; it is not stored in the database.
+  final String sourceId;
+}
+
+/// One question from an update file, at its new position in the practice.
+@immutable
+class PracticeQuestionUpdate {
+  const PracticeQuestionUpdate({
+    required this.question,
+    required this.position,
+    this.existingQuestionId,
+    this.changed = false,
+  });
+
+  /// The stored question this row maps to, or null for a new question.
+  final int? existingQuestionId;
+  final QuestionDraft question;
+  final int position;
+
+  /// Whether a matched question's visible content differs from the file.
+  final bool changed;
+
+  bool get isNew => existingQuestionId == null;
 }
 
 @immutable
@@ -270,6 +311,30 @@ class TopicProgressPoint {
   final int total;
 
   double get score => total == 0 ? 0 : correct / total;
+}
+
+@immutable
+class SubtopicStat {
+  const SubtopicStat({
+    required this.subtopic,
+    required this.questionCount,
+    required this.attemptedQuestionCount,
+    required this.answeredCount,
+    required this.correctCount,
+  });
+
+  /// Empty when the questions have no subtopic assigned.
+  final String subtopic;
+  final int questionCount;
+  final int attemptedQuestionCount;
+  final int answeredCount;
+  final int correctCount;
+
+  bool get isUncategorized => subtopic.trim().isEmpty;
+  String get label => isUncategorized ? 'Uncategorized' : subtopic;
+  double get accuracy => answeredCount == 0 ? 0 : correctCount / answeredCount;
+  double get progress =>
+      questionCount == 0 ? 0 : attemptedQuestionCount / questionCount;
 }
 
 @immutable
@@ -544,7 +609,6 @@ class AppSettings {
     this.aiProvider = AiProvider.openai,
     this.aiBaseUrl = 'https://api.openai.com/v1',
     this.aiModel = '',
-    this.shuffleTopics = false,
     this.dynamicColor = true,
     this.soundsEnabled = true,
     this.soundVolume = 0.85,
@@ -556,7 +620,6 @@ class AppSettings {
   final AiProvider aiProvider;
   final String aiBaseUrl;
   final String aiModel;
-  final bool shuffleTopics;
   final bool dynamicColor;
   final bool soundsEnabled;
 
@@ -570,7 +633,6 @@ class AppSettings {
     AiProvider? aiProvider,
     String? aiBaseUrl,
     String? aiModel,
-    bool? shuffleTopics,
     bool? dynamicColor,
     bool? soundsEnabled,
     double? soundVolume,
@@ -582,7 +644,6 @@ class AppSettings {
       aiProvider: aiProvider ?? this.aiProvider,
       aiBaseUrl: aiBaseUrl ?? this.aiBaseUrl,
       aiModel: aiModel ?? this.aiModel,
-      shuffleTopics: shuffleTopics ?? this.shuffleTopics,
       dynamicColor: dynamicColor ?? this.dynamicColor,
       soundsEnabled: soundsEnabled ?? this.soundsEnabled,
       soundVolume: soundVolume ?? this.soundVolume,

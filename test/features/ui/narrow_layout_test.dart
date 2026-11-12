@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/theme.dart';
+import 'package:question_practice/core/ui/immersive_review.dart';
 import 'package:question_practice/features/errors/past_errors_page.dart';
 import 'package:question_practice/features/export/cards_page.dart';
 import 'package:question_practice/features/help/help_page.dart';
@@ -33,8 +34,9 @@ Future<void> _pumpNarrow(
   WidgetTester tester, {
   required Widget home,
   required TestHarness harness,
+  Size size = _narrow,
 }) async {
-  tester.view.physicalSize = _narrow;
+  tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   final container = harness.container();
@@ -49,6 +51,7 @@ Future<void> _pumpNarrow(
         autoTheming: false,
         dynamicColoring: false,
         debugShowCheckedModeBanner: false,
+        navigatorObservers: [reviewRouteObserver],
         home: home,
       ),
     ),
@@ -233,6 +236,43 @@ void main() {
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
   });
 
+  testWidgets('card editor fits 360 with option explanations open', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'A very long topic name that keeps going for a while',
+      count: 1,
+    );
+    await _seedErrorCard(harness, seeded, complete: true);
+    await _pumpNarrow(
+      tester,
+      home: const CardsPage(),
+      harness: harness,
+      size: const Size(360, 640),
+    );
+    await tester.tap(find.text('Review all'));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('error-card-edit-content')));
+    await pumpFrames(tester);
+    expect(find.text('Edit card content'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    final toggle = find.byKey(
+      const ValueKey('edit-error-option-0-explanation-toggle'),
+    );
+    await tester.ensureVisible(toggle);
+    await pumpFrames(tester);
+    await tester.tap(toggle);
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
+    expect(
+      find.byKey(const ValueKey('edit-error-option-0-explanation')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('import page and preview fit 320', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
@@ -262,7 +302,7 @@ void main() {
     final harness = TestHarness();
     addTearDown(harness.close);
     await _pumpNarrow(tester, home: const HelpPage(), harness: harness);
-    expect(find.text('A quiet loop for practice'), findsOneWidget);
+    expect(find.text('What you can do'), findsOneWidget);
   });
 
   testWidgets('past errors page fits 320', (tester) async {

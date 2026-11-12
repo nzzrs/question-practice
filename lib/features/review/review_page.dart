@@ -8,6 +8,7 @@ import '../../core/ui/widgets.dart';
 import '../errors/error_card_review_view.dart';
 import '../export/cards_page.dart';
 import '../export/new_card_dialog.dart';
+import '../lookup/domain/lookup_service.dart';
 import 'domain/review_service.dart';
 import 'skipped_question_view.dart';
 
@@ -37,6 +38,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   final _definition = TextEditingController();
   final _newQuestion = TextEditingController();
   final _newAnswer = TextEditingController();
+  final _checks = <int, ReviewCheckResult>{};
+  final _edits = <int, ErrorCardContent>{};
+  final _scroll = ScrollController();
   _Missing _missing = _Missing.concept;
 
   @override
@@ -53,6 +57,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     _definition.dispose();
     _newQuestion.dispose();
     _newAnswer.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
@@ -108,6 +113,20 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       _index++;
       _prepareStep();
     });
+    _resetScroll();
+  }
+
+  void _goBack() {
+    if (_index == 0) return;
+    setState(() {
+      _index--;
+      _prepareStep();
+    });
+    _resetScroll();
+  }
+
+  void _resetScroll() {
+    if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
   Future<void> _saveError(ErrorReviewStep step) async {
@@ -252,11 +271,17 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    return ImmersiveReview(child: _buildPage(context));
+  }
+
+  Widget _buildPage(BuildContext context) {
     final theme = M3ETheme.of(context);
     if (_error != null) {
       return AppPage(
         title: 'Review',
         showBack: true,
+        focus: true,
+        scrollController: _scroll,
         variant: M3EAppBarVariant.small,
         children: [
           EmptyState(
@@ -276,6 +301,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       return AppPage(
         title: 'Review',
         showBack: true,
+        focus: true,
+        scrollController: _scroll,
         variant: M3EAppBarVariant.small,
         children: const [
           Padding(
@@ -288,6 +315,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     if (_finished || data.steps.isEmpty) {
       return AppPage(
         title: 'Review complete',
+        focus: true,
+        onBack: () => Navigator.of(context).pop(true),
+        scrollController: _scroll,
         variant: M3EAppBarVariant.small,
         children: [
           const SizedBox(height: 32),
@@ -341,10 +371,19 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     return AppPage(
       title: 'Review',
       showBack: true,
+      focus: true,
+      scrollController: _scroll,
       variant: M3EAppBarVariant.small,
       bottomBar: AppActionDock(
         child: Row(
           children: [
+            if (_index > 0) ...[
+              M3EButton.text(
+                onPressed: _busy ? null : _goBack,
+                child: const Text('Previous'),
+              ),
+              const SizedBox(width: 4),
+            ],
             Expanded(
               child: AppPrimaryButton(
                 onPressed: _busy
@@ -394,6 +433,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             card: card,
             bias: _bias,
             vaccine: _vaccine,
+            editedContent: _edits[card.id],
+            checkResult: _checks[card.id],
+            onContentChanged: (content) =>
+                setState(() => _edits[card.id] = content),
+            onCheckResult: (result) =>
+                setState(() => _checks[card.id] = result),
           ),
           SkippedReviewStep(
             :final question,

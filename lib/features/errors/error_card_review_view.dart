@@ -9,16 +9,24 @@ import '../lookup/domain/lookup_service.dart';
 import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
+import 'error_card_content.dart';
+import 'error_card_content_editor_page.dart';
+
+export 'error_card_content.dart';
 
 /// Shared error-card study view used by session review and the Cards screen.
 ///
 /// The question, answers, reasoning and explanations are selectable so a term
 /// can be defined exactly as it can during practice.
-class ErrorCardReviewView extends ConsumerWidget {
+class ErrorCardReviewView extends ConsumerStatefulWidget {
   const ErrorCardReviewView({
     required this.card,
     required this.bias,
     required this.vaccine,
+    this.editedContent,
+    this.checkResult,
+    this.onContentChanged,
+    this.onCheckResult,
     super.key,
   });
 
@@ -26,16 +34,80 @@ class ErrorCardReviewView extends ConsumerWidget {
   final TextEditingController bias;
   final TextEditingController vaccine;
 
+  /// Question and options already shortened by the learner for this card.
+  final ErrorCardContent? editedContent;
+
+  /// The AI verdict for this card, kept by the page so it survives stepping
+  /// away and back to the same card.
+  final ReviewCheckResult? checkResult;
+
+  /// Reports a saved edit so the page can keep showing it when the learner
+  /// returns to this card.
+  final ValueChanged<ErrorCardContent>? onContentChanged;
+
+  /// Reports a new AI verdict for this card.
+  final ValueChanged<ReviewCheckResult>? onCheckResult;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ErrorCardReviewView> createState() =>
+      _ErrorCardReviewViewState();
+}
+
+class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
+  ErrorCardContent? _localContent;
+
+  ErrorCardContent get _content =>
+      widget.editedContent ??
+      _localContent ??
+      ErrorCardContent(
+        question: widget.card.question,
+        alternatives: widget.card.alternatives,
+        explanation: widget.card.explanation,
+        alternativeExplanations: widget.card.alternativeExplanations,
+      );
+
+  String get _question => _content.question;
+
+  String _answersFor(List<int> indexes) => [
+    for (final index in indexes)
+      if (index >= 0 && index < _content.alternatives.length)
+        _content.alternatives[index],
+  ].join('; ');
+
+  @override
+  void didUpdateWidget(covariant ErrorCardReviewView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.card.id != widget.card.id) {
+      _localContent = null;
+    }
+  }
+
+  Future<void> _editContent() async {
+    final updated = await openErrorCardContentEditor(
+      context,
+      card: widget.card,
+      current: _content,
+    );
+    if (updated == null || !mounted) return;
+    setState(() => _localContent = updated);
+    widget.onContentChanged?.call(updated);
+    await showSnack(context, 'Card content updated.');
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final card = widget.card;
+    final alternatives = _content.alternatives;
+    final correctAnswer = _answersFor(card.correctIndexes);
+    final wrongAnswer = _answersFor(card.wrongIndexes);
 
     void define(String term, Rect? anchor) {
       openTermLookup(
         context,
         ref,
         term: term,
-        question: card.question,
+        question: _question,
         topicName: card.topicName,
         practiceName: card.practiceName,
         sessionId: card.sessionId,
@@ -50,7 +122,7 @@ class ErrorCardReviewView extends ConsumerWidget {
       return showAskAboutSelection(
         context,
         selection: selection,
-        question: card.question,
+        question: _question,
         topicName: card.topicName,
         practiceName: card.practiceName,
         sessionId: card.sessionId,
@@ -66,19 +138,34 @@ class ErrorCardReviewView extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SelectableLinkifiedText(
-                text: card.question,
-                style: theme.typography.baseline.titleSmall.copyWith(
-                  height: 1.35,
-                ),
-                onDefine: define,
-                onOpenUrl: openUrl,
-                onAsk: ask,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: SelectableLinkifiedText(
+                      text: _question,
+                      style: theme.typography.baseline.titleSmall.copyWith(
+                        height: 1.35,
+                      ),
+                      onDefine: define,
+                      onOpenUrl: openUrl,
+                      onAsk: ask,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  M3EIconButton(
+                    key: const ValueKey('error-card-edit-content'),
+                    variant: M3EIconButtonVariant.standard,
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Edit question and options',
+                    onPressed: _editContent,
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               _AnswerBox(
                 label: 'Wrong answer chosen',
-                value: card.wrongAnswer,
+                value: wrongAnswer,
                 container: theme.colorScheme.errorContainer,
                 foreground: theme.colorScheme.onErrorContainer,
                 onDefine: define,
@@ -88,7 +175,7 @@ class ErrorCardReviewView extends ConsumerWidget {
               const SizedBox(height: 8),
               _AnswerBox(
                 label: 'Right answer discarded',
-                value: card.correctAnswer,
+                value: correctAnswer,
                 container: AppSuccess.container(context),
                 foreground: AppSuccess.onContainer(context),
                 onDefine: define,
@@ -121,11 +208,15 @@ class ErrorCardReviewView extends ConsumerWidget {
             ],
           ),
         ),
-        if (card.explanation.isNotEmpty ||
-            card.alternativeExplanations.isNotEmpty) ...[
+        if (_content.explanation.isNotEmpty ||
+            _content.alternativeExplanations.isNotEmpty) ...[
           const SizedBox(height: 12),
           _ExplanationBox(
-            card: card,
+            explanation: _content.explanation,
+            alternatives: alternatives,
+            alternativeExplanations: _content.alternativeExplanations,
+            correctIndexes: card.correctIndexes,
+            wrongIndexes: card.wrongIndexes,
             onDefine: define,
             onOpenUrl: openUrl,
             onAsk: ask,
@@ -158,23 +249,25 @@ class ErrorCardReviewView extends ConsumerWidget {
           prompt: 'What was the flawed assumption in your reasoning?',
           label: 'Flawed assumption (bias)',
           hint: 'The belief that led you to the wrong answer.',
-          controller: bias,
+          controller: widget.bias,
         ),
         const SizedBox(height: 14),
         _PromptField(
           prompt: 'What do you need to know to prevent that error?',
           label: 'Vaccine (rule / protocol)',
           hint: 'The rule or check you will use next time.',
-          controller: vaccine,
+          controller: widget.vaccine,
         ),
         const SizedBox(height: 10),
         _ReviewCheck(
-          question: card.question,
-          correctAnswer: card.correctAnswer,
-          wrongAnswer: card.wrongAnswer,
+          question: _question,
+          correctAnswer: correctAnswer,
+          wrongAnswer: wrongAnswer,
           reasoning: card.reasoning,
-          bias: bias,
-          vaccine: vaccine,
+          bias: widget.bias,
+          vaccine: widget.vaccine,
+          result: widget.checkResult,
+          onResult: widget.onCheckResult,
         ),
       ],
     );
@@ -189,6 +282,8 @@ class _ReviewCheck extends ConsumerStatefulWidget {
     required this.reasoning,
     required this.bias,
     required this.vaccine,
+    this.result,
+    this.onResult,
   });
 
   final String question;
@@ -198,13 +293,19 @@ class _ReviewCheck extends ConsumerStatefulWidget {
   final TextEditingController bias;
   final TextEditingController vaccine;
 
+  /// Verdict owned by the review page, so it belongs to this card only.
+  final ReviewCheckResult? result;
+  final ValueChanged<ReviewCheckResult>? onResult;
+
   @override
   ConsumerState<_ReviewCheck> createState() => _ReviewCheckState();
 }
 
 class _ReviewCheckState extends ConsumerState<_ReviewCheck> {
-  ReviewCheckResult? _result;
+  ReviewCheckResult? _localResult;
   bool _busy = false;
+
+  ReviewCheckResult? get _result => widget.result ?? _localResult;
 
   Future<void> _check() async {
     final bias = widget.bias.text.trim();
@@ -229,7 +330,12 @@ class _ReviewCheckState extends ConsumerState<_ReviewCheck> {
             vaccine: vaccine,
           );
       if (!mounted) return;
-      setState(() => _result = result);
+      final report = widget.onResult;
+      if (report == null) {
+        setState(() => _localResult = result);
+      } else {
+        report(result);
+      }
     } on LookupException catch (error) {
       if (mounted) await showSnack(context, error.message);
     } finally {
@@ -383,13 +489,21 @@ class _SuggestionRow extends StatelessWidget {
 
 class _ExplanationBox extends StatelessWidget {
   const _ExplanationBox({
-    required this.card,
+    required this.explanation,
+    required this.alternatives,
+    required this.alternativeExplanations,
+    required this.correctIndexes,
+    required this.wrongIndexes,
     required this.onDefine,
     required this.onOpenUrl,
     required this.onAsk,
   });
 
-  final ErrorCard card;
+  final String explanation;
+  final List<String> alternatives;
+  final List<String> alternativeExplanations;
+  final List<int> correctIndexes;
+  final List<int> wrongIndexes;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
   final Future<void> Function(String, Rect?) onAsk;
@@ -397,7 +511,7 @@ class _ExplanationBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final hasExplanations = card.alternativeExplanations.any(
+    final hasExplanations = alternativeExplanations.any(
       (value) => value.trim().isNotEmpty,
     );
     return TonalBox(
@@ -419,10 +533,10 @@ class _ExplanationBox extends StatelessWidget {
               ),
             ],
           ),
-          if (card.explanation.trim().isNotEmpty) ...[
+          if (explanation.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             SelectableLinkifiedText(
-              text: card.explanation,
+              text: explanation,
               style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
               onDefine: onDefine,
               onOpenUrl: onOpenUrl,
@@ -438,17 +552,17 @@ class _ExplanationBox extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            for (var index = 0; index < card.alternatives.length; index++)
-              if (index >= card.alternativeExplanations.length ||
-                  card.alternativeExplanations[index].trim().isEmpty)
+            for (var index = 0; index < alternatives.length; index++)
+              if (index >= alternativeExplanations.length ||
+                  alternativeExplanations[index].trim().isEmpty)
                 const SizedBox.shrink()
               else
                 _AlternativeExplanation(
                   index: index,
-                  text: card.alternatives[index],
-                  explanation: card.alternativeExplanations[index],
-                  isCorrect: card.correctIndexes.contains(index),
-                  isWrong: card.wrongIndexes.contains(index),
+                  text: alternatives[index],
+                  explanation: alternativeExplanations[index],
+                  isCorrect: correctIndexes.contains(index),
+                  isWrong: wrongIndexes.contains(index),
                   onDefine: onDefine,
                   onOpenUrl: onOpenUrl,
                   onAsk: onAsk,

@@ -1,12 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/topics/topic_page.dart';
 
 import '../../helpers/test_harness.dart';
 
 void main() {
-  testWidgets('long pressing a practice renames it', (tester) async {
+  testWidgets('long pressing a practice opens edit and renames it', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -29,7 +32,18 @@ void main() {
     await pumpFrames(tester);
     await tester.longPress(find.text('TCP/IP'));
     await pumpFrames(tester);
+    expect(find.byType(OptionTile), findsNWidgets(4));
+    expect(find.text('Edit practice'), findsOneWidget);
+    expect(find.text('Rename'), findsNothing);
+
+    await tester.tap(find.text('Edit practice'));
+    await pumpFrames(tester);
+    expect(find.byType(OptionTile), findsNWidgets(4));
     expect(find.text('Rename'), findsOneWidget);
+    expect(find.text('Edit description'), findsOneWidget);
+    expect(find.text('Download practice JSON'), findsOneWidget);
+    expect(find.text('Update practice JSON'), findsOneWidget);
+    expect(find.text('AnkiDroid deck'), findsNothing);
 
     await tester.tap(find.text('Rename'));
     await pumpFrames(tester);
@@ -40,6 +54,46 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('TCP/IP basics'), findsOneWidget);
     expect(find.text('TCP/IP'), findsNothing);
+  });
+
+  testWidgets('the edit menu changes a practice description', (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 2,
+    );
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: seeded.topicId),
+      harness: harness,
+    );
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -240));
+    await pumpFrames(tester);
+    await tester.longPress(find.text('TCP/IP'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Edit practice'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Edit description'));
+    await pumpFrames(tester);
+    await tester.enterText(
+      find.byType(EditableText).last,
+      'Ports, handshakes and retransmission.',
+    );
+    await tester.tap(find.text('Save'));
+    await pumpFrames(tester);
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Ports, handshakes and retransmission.'), findsOneWidget);
+    final practice = await harness.practices.practiceById(seeded.practiceId);
+    expect(practice!.description, 'Ports, handshakes and retransmission.');
   });
 
   testWidgets('long pressing a practice marks it done', (tester) async {

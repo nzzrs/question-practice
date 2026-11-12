@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -86,6 +86,12 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 8) {
         await migrator.createTable(highlights);
+      }
+      if (from < 9) {
+        await migrator.addColumn(topics, topics.archived);
+      }
+      if (from < 10) {
+        await migrator.addColumn(questions, questions.subtopic);
       }
     },
     beforeOpen: (details) async {

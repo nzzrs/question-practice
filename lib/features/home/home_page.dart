@@ -4,7 +4,10 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
+import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/natural_compare.dart';
+import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/past_errors_page.dart';
 import '../export/cards_page.dart';
@@ -13,6 +16,8 @@ import '../import/import_page.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/session_page.dart';
 import '../settings/settings_page.dart';
+import '../topics/archived_topics_sheet.dart';
+import '../topics/topic_actions.dart';
 import '../topics/topic_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -28,8 +33,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     final topics = ref.watch(topicSummariesProvider);
+    final archived =
+        ref.watch(archivedTopicSummariesProvider).value ??
+        const <TopicSummary>[];
+    final topicSort = ref.watch(homeTopicSortProvider).value;
     final stats = ref.watch(homeStatsProvider).value;
-    final settings = ref.watch(settingsProvider).value ?? const AppSettings();
     final inProgress =
         ref.watch(inProgressSessionsProvider).value ??
         const <PracticeSession>[];
@@ -41,7 +49,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       actions: [
         M3EIconButton(
           variant: M3EIconButtonVariant.standard,
-          icon: const Icon(Icons.info_outline),
+          icon: const Icon(Icons.help_outline),
           tooltip: 'How to use Questions',
           onPressed: () => _push(const HelpPage()),
         ),
@@ -52,16 +60,30 @@ class _HomePageState extends ConsumerState<HomePage> {
           onPressed: () => _push(const SettingsPage()),
         ),
       ],
-      floatingActionButton: M3EExtendedFab(
-        label: 'Import',
-        icon: const Icon(Icons.add),
-        onPressed: () => _push(const ImportPage()),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          M3EFab(
+            icon: const Icon(Icons.shuffle),
+            size: M3EFabSize.regular,
+            color: M3EFabColor.secondary,
+            tooltip: 'Start shuffled practice',
+            onPressed: _starting ? null : _showShuffleOptions,
+          ),
+          const SizedBox(height: 12),
+          M3EExtendedFab(
+            label: 'Import',
+            icon: const Icon(Icons.add),
+            onPressed: () => _push(const ImportPage()),
+          ),
+        ],
       ),
       padding: EdgeInsets.fromLTRB(
         width >= 600 ? 24 : 20,
         4,
         width >= 600 ? 24 : 20,
-        112 + MediaQuery.paddingOf(context).bottom,
+        188 + MediaQuery.paddingOf(context).bottom,
       ),
       children: [
         if (inProgress.isNotEmpty) ...[
@@ -80,25 +102,25 @@ class _HomePageState extends ConsumerState<HomePage> {
         SectionTitle(
           'Topics',
           overline: 'Your library',
-          trailing: M3EIconButton(
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.shuffle),
-            selectedIcon: const Icon(Icons.shuffle_on_outlined),
-            isSelected: settings.shuffleTopics,
-            tooltip: settings.shuffleTopics
-                ? 'Disable shuffled practice'
-                : 'Shuffle topics into one practice',
-            onPressed: () => _toggleShuffle(settings),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              M3EIconButton(
+                variant: M3EIconButtonVariant.standard,
+                icon: const Icon(Icons.sort),
+                tooltip: 'Sort topics',
+                onPressed: () =>
+                    _chooseTopicSort(topicSort ?? ListSort.defaultByName),
+              ),
+              M3EIconButton(
+                variant: M3EIconButtonVariant.standard,
+                icon: const Icon(Icons.archive_outlined),
+                tooltip: 'Archived topics',
+                onPressed: _showArchivedTopics,
+              ),
+            ],
           ),
         ),
-        if (settings.shuffleTopics) ...[
-          _ShuffleBanner(
-            starting: _starting,
-            onStart: _startMixed,
-            onDisable: () => _toggleShuffle(settings),
-          ),
-          const SizedBox(height: 14),
-        ],
         topics.when(
           loading: () => const Padding(
             padding: EdgeInsets.symmetric(vertical: 48),
@@ -115,6 +137,19 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
           data: (items) {
             if (items.isEmpty) {
+              if (archived.isNotEmpty) {
+                return EmptyState(
+                  icon: Icons.archive_outlined,
+                  title: 'No active topics',
+                  message:
+                      'Every topic is archived. Open archived topics to '
+                      'restore one.',
+                  action: M3EButton.tonal(
+                    onPressed: _showArchivedTopics,
+                    child: const Text('Open archived topics'),
+                  ),
+                );
+              }
               return EmptyState(
                 icon: Icons.library_books_outlined,
                 title: 'No practices yet',
@@ -126,15 +161,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               );
             }
+            final sorted = _sortedTopics(items, topicSort);
             return AppGroup(
               variant: M3ECardVariant.filled,
               children: [
-                for (final summary in items)
+                for (final summary in sorted)
                   _TopicRow(
                     summary: summary,
                     onPressed: () =>
                         _push(TopicPage(topicId: summary.topic.id)),
-                    onLongPress: () => _showTopicActions(summary),
+                    onLongPress: () => showTopicActions(context, ref, summary),
                   ),
               ],
             );
@@ -152,36 +188,51 @@ class _HomePageState extends ConsumerState<HomePage> {
         .push(MaterialPageRoute<void>(builder: (context) => page));
   }
 
-  Future<void> _toggleShuffle(AppSettings settings) async {
-    await ref
-        .read(settingsRepositoryProvider)
-        .save(settings.copyWith(shuffleTopics: !settings.shuffleTopics));
+  Future<void> _chooseTopicSort(ListSort current) async {
+    final applied = await showListSortDialog(
+      context,
+      title: 'Sort topics',
+      initial: current,
+      description:
+          'Increasing: A to Z or oldest first. Decreasing: Z to A or newest '
+          'first. Recency uses the date the topic was created.',
+    );
+    if (applied == null || !mounted) return;
+    await ref.read(settingsRepositoryProvider).saveHomeTopicSort(applied);
   }
 
-  Future<void> _showTopicActions(TopicSummary summary) async {
-    final confirmed = await M3EDialog.show<bool>(
+  List<TopicSummary> _sortedTopics(List<TopicSummary> items, ListSort? sort) {
+    if (sort == null) return items;
+    final sorted = List<TopicSummary>.of(items);
+    final direction = sort.direction == ListSortDirection.increasing ? 1 : -1;
+    sorted.sort((a, b) {
+      final comparison = switch (sort.field) {
+        ListSortField.name => compareNatural(a.topic.name, b.topic.name),
+        ListSortField.recency => a.topic.createdAt.compareTo(b.topic.createdAt),
+      };
+      final tieBreak = a.topic.id.compareTo(b.topic.id);
+      return (comparison != 0 ? comparison : tieBreak) * direction;
+    });
+    return sorted;
+  }
+
+  Future<void> _showArchivedTopics() async {
+    final selected = await M3EBottomSheet.show<TopicSummary>(
       context,
-      dialog: M3EDialog(
-        title: 'Delete topic?',
-        content: Text(
-          'Deleting "${summary.topic.name}" removes every practice, question, '
-          'session and card in it. It cannot be undone.',
-        ),
-        actions: [
-          M3EButton.text(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          M3EButton.filled(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      initialValue: M3EBottomSheetValue.expanded,
+      builder: (context) => const ArchivedTopicsSheet(),
     );
-    if (confirmed != true || !mounted) return;
-    await ref.read(topicRepositoryProvider).deleteTopic(summary.topic.id);
-    if (mounted) await showSnack(context, 'Topic deleted.');
+    if (selected == null || !mounted) return;
+    await showTopicActions(context, ref, selected);
+  }
+
+  Future<void> _showShuffleOptions() async {
+    final start = await M3EBottomSheet.show<bool>(
+      context,
+      initialValue: M3EBottomSheetValue.expanded,
+      builder: (context) => const _ShuffleOptionsSheet(),
+    );
+    if (start == true && mounted) await _startMixed();
   }
 
   Future<void> _startMixed() async {
@@ -374,67 +425,105 @@ class _QuickTile extends StatelessWidget {
   }
 }
 
-class _ShuffleBanner extends StatelessWidget {
-  const _ShuffleBanner({
-    required this.starting,
-    required this.onStart,
-    required this.onDisable,
-  });
-
-  final bool starting;
-  final VoidCallback onStart;
-  final VoidCallback onDisable;
+class _ShuffleOptionsSheet extends StatelessWidget {
+  const _ShuffleOptionsSheet();
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(26),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.shuffle,
-                color: theme.colorScheme.onSecondaryContainer,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Shuffled practice',
-                  style: theme.typography.emphasized.titleSmall.copyWith(
-                    color: theme.colorScheme.onSecondaryContainer,
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const IconBadge(Icons.shuffle, size: 48),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Start shuffled practice',
+                    style: theme.typography.emphasized.titleLarge,
                   ),
                 ),
-              ),
-              M3EIconButton(
-                variant: M3EIconButtonVariant.standard,
-                icon: const Icon(Icons.close),
-                tooltip: 'Turn off shuffled practice',
-                onPressed: onDisable,
-              ),
-            ],
-          ),
-          Text(
-            'Questions from every topic, in a random order.',
-            style: theme.typography.baseline.bodySmall.copyWith(
-              color: theme.colorScheme.onSecondaryContainer.withValues(
-                alpha: 0.8,
-              ),
-              height: 1.4,
+              ],
             ),
-          ),
-          const SizedBox(height: 12),
-          AppPrimaryButton(
-            onPressed: starting ? null : onStart,
-            label: starting ? 'Starting…' : 'Start shuffled practice',
-            icon: Icons.play_arrow,
+            const SizedBox(height: 10),
+            Text(
+              'One mixed session built from the questions that are still '
+              'worth practising.',
+              style: theme.typography.baseline.bodyMedium.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
+            ),
+            const SizedBox(height: 18),
+            const _ShuffleOption(
+              icon: Icons.public,
+              title: 'Every topic',
+              subtitle: 'Questions come from your whole library.',
+            ),
+            const _ShuffleOption(
+              icon: Icons.filter_alt_off_outlined,
+              title: 'Unsolved and unskipped only',
+              subtitle: 'Solved questions and ones you skipped stay out.',
+            ),
+            const _ShuffleOption(
+              icon: Icons.shuffle,
+              title: 'Random order',
+              subtitle: 'Questions and alternatives are shuffled for this run.',
+            ),
+            const SizedBox(height: 18),
+            AppPrimaryButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              label: 'Start practice',
+              icon: Icons.play_arrow,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ShuffleOption extends StatelessWidget {
+  const _ShuffleOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          IconBadge(icon, size: 40, tone: PillTone.secondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.typography.baseline.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

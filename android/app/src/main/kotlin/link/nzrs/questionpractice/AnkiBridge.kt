@@ -21,7 +21,7 @@ class AnkiBridge(
         private const val PERMISSION_REQUEST = 4107
         private const val ANKI_PACKAGE = "com.ichi2.anki"
         private const val ERROR_MODEL = "Question Practice: Error v2"
-        private const val BASIC_MODEL = "Question Practice Basic"
+        private const val BASIC_MODEL = "Basic"
         private val ERROR_FIELDS = arrayOf(
             "Problem",
             "Wrong Solution",

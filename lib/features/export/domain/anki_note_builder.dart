@@ -103,7 +103,7 @@ class AnkiNoteBuilder {
         AnkiNote(
           model: AnkiModel.basic,
           deckName: deckFor(card.topicName),
-          fields: [_manualFront(card), html(card.answer)],
+          fields: [html(card.question), html(card.answer)],
         ),
     ];
   }
@@ -127,18 +127,9 @@ class AnkiNoteBuilder {
       ].join('\n'),
       basic: [
         for (final card in selection.manualCards)
-          [_manualFront(card), html(card.answer)].join('\t'),
+          [html(card.question), html(card.answer)].join('\t'),
       ].join('\n'),
     );
-  }
-
-  String _manualFront(ManualCard card) {
-    final question = html(card.question);
-    if (card.context.trim().isEmpty) return question;
-    final context = html(card.context);
-    return '<div style="border:1px solid #9e9e9e;border-radius:10px;'
-        'padding:8px;margin-bottom:10px;font-size:0.9em;">$context</div>'
-        '$question';
   }
 
   String _escapeCloze(String value) {

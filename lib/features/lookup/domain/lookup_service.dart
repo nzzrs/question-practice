@@ -248,6 +248,52 @@ class LookupService {
     return trimmed;
   }
 
+  /// Rewrites [text] as a shorter version of the named card field.
+  ///
+  /// Used before saving a card, when imported wording is too long to review.
+  Future<String> summarizeText({
+    required String text,
+    required String fieldLabel,
+    String? question,
+  }) async {
+    final source = text.trim();
+    if (source.isEmpty) {
+      throw LookupException('Write the $fieldLabel first.');
+    }
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'Summarizing needs an AI provider. Add an API key in Settings.',
+      );
+    }
+    final label = fieldLabel.trim().isEmpty ? 'text' : fieldLabel.trim();
+    final systemPrompt =
+        'You shorten one field of a study card for a learner. Rewrite the '
+        '$label so it is shorter and easier to review while keeping every '
+        'fact, name and number. Return only the rewritten $label as plain '
+        'text, at most 30 words, with no markdown and no quotation marks.';
+    final context = question?.trim() ?? '';
+    final userPrompt = [
+      if (context.isNotEmpty) 'Question context: $context',
+      'Original $label: $source',
+    ].join('\n');
+    final content = await _requestAi(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      jsonMode: false,
+    );
+    final trimmed = content
+        .replaceAll(RegExp(r'```(?:json)?', caseSensitive: false), '')
+        .trim();
+    if (trimmed.isEmpty) {
+      throw const LookupException('The AI returned an empty summary.');
+    }
+    return trimmed;
+  }
+
   Future<List<String>> listModels({
     required AiProvider provider,
     required String baseUrl,

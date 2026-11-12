@@ -162,6 +162,18 @@ class CardRepository {
     );
   }
 
+  Future<void> updateErrorCardContent({
+    required int id,
+    required String question,
+    required List<String> alternatives,
+  }) {
+    return _db.cardDao.updateErrorCardContent(
+      id,
+      question: question,
+      alternatives: alternatives,
+    );
+  }
+
   Future<void> updateErrorCardReasoning(int id, String reasoning) {
     return _db.cardDao.updateErrorCardReasoning(id, reasoning);
   }

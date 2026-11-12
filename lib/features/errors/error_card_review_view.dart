@@ -5,20 +5,33 @@ import 'package:material_ui/material_ui.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../../app/providers.dart';
+import '../lookup/ai_summarize_button.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
 
+/// Learner-edited question and options for an error card.
+class ErrorCardContent {
+  const ErrorCardContent({required this.question, required this.alternatives});
+
+  final String question;
+  final List<String> alternatives;
+}
+
 /// Shared error-card study view used by session review and the Cards screen.
 ///
 /// The question, answers, reasoning and explanations are selectable so a term
 /// can be defined exactly as it can during practice.
-class ErrorCardReviewView extends ConsumerWidget {
+class ErrorCardReviewView extends ConsumerStatefulWidget {
   const ErrorCardReviewView({
     required this.card,
     required this.bias,
     required this.vaccine,
+    this.editedContent,
+    this.checkResult,
+    this.onContentChanged,
+    this.onCheckResult,
     super.key,
   });
 
@@ -26,16 +39,92 @@ class ErrorCardReviewView extends ConsumerWidget {
   final TextEditingController bias;
   final TextEditingController vaccine;
 
+  /// Question and options already shortened by the learner for this card.
+  final ErrorCardContent? editedContent;
+
+  /// The AI verdict for this card, kept by the page so it survives stepping
+  /// away and back to the same card.
+  final ReviewCheckResult? checkResult;
+
+  /// Reports a saved edit so the page can keep showing it when the learner
+  /// returns to this card.
+  final ValueChanged<ErrorCardContent>? onContentChanged;
+
+  /// Reports a new AI verdict for this card.
+  final ValueChanged<ReviewCheckResult>? onCheckResult;
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ErrorCardReviewView> createState() =>
+      _ErrorCardReviewViewState();
+}
+
+class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
+  ErrorCardContent? _localContent;
+
+  ErrorCardContent get _content =>
+      widget.editedContent ??
+      _localContent ??
+      ErrorCardContent(
+        question: widget.card.question,
+        alternatives: widget.card.alternatives,
+      );
+
+  String get _question => _content.question;
+
+  String _answersFor(List<int> indexes) => [
+    for (final index in indexes)
+      if (index >= 0 && index < _content.alternatives.length)
+        _content.alternatives[index],
+  ].join('; ');
+
+  @override
+  void didUpdateWidget(covariant ErrorCardReviewView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.card.id != widget.card.id) {
+      _localContent = null;
+    }
+  }
+
+  Future<void> _editContent() async {
+    final updated = await showEditErrorCardContentDialog(
+      context,
+      card: widget.card,
+      current: _content,
+    );
+    if (updated == null || !mounted) return;
+    try {
+      await ref
+          .read(reviewServiceProvider)
+          .saveErrorContent(
+            cardId: widget.card.id,
+            question: updated.question,
+            alternatives: updated.alternatives,
+          );
+      if (!mounted) return;
+      setState(() => _localContent = updated);
+      widget.onContentChanged?.call(updated);
+      await showSnack(context, 'Question and options updated.');
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not update the question: $error');
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final card = widget.card;
+    final alternatives = _content.alternatives;
+    final correctAnswer = _answersFor(card.correctIndexes);
+    final wrongAnswer = _answersFor(card.wrongIndexes);
 
     void define(String term, Rect? anchor) {
       openTermLookup(
         context,
         ref,
         term: term,
-        question: card.question,
+        question: _question,
         topicName: card.topicName,
         practiceName: card.practiceName,
         sessionId: card.sessionId,
@@ -50,7 +139,7 @@ class ErrorCardReviewView extends ConsumerWidget {
       return showAskAboutSelection(
         context,
         selection: selection,
-        question: card.question,
+        question: _question,
         topicName: card.topicName,
         practiceName: card.practiceName,
         sessionId: card.sessionId,
@@ -66,19 +155,34 @@ class ErrorCardReviewView extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              SelectableLinkifiedText(
-                text: card.question,
-                style: theme.typography.baseline.titleSmall.copyWith(
-                  height: 1.35,
-                ),
-                onDefine: define,
-                onOpenUrl: openUrl,
-                onAsk: ask,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: SelectableLinkifiedText(
+                      text: _question,
+                      style: theme.typography.baseline.titleSmall.copyWith(
+                        height: 1.35,
+                      ),
+                      onDefine: define,
+                      onOpenUrl: openUrl,
+                      onAsk: ask,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  M3EIconButton(
+                    key: const ValueKey('error-card-edit-content'),
+                    variant: M3EIconButtonVariant.standard,
+                    icon: const Icon(Icons.edit_outlined),
+                    tooltip: 'Edit question and options',
+                    onPressed: _editContent,
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               _AnswerBox(
                 label: 'Wrong answer chosen',
-                value: card.wrongAnswer,
+                value: wrongAnswer,
                 container: theme.colorScheme.errorContainer,
                 foreground: theme.colorScheme.onErrorContainer,
                 onDefine: define,
@@ -88,7 +192,7 @@ class ErrorCardReviewView extends ConsumerWidget {
               const SizedBox(height: 8),
               _AnswerBox(
                 label: 'Right answer discarded',
-                value: card.correctAnswer,
+                value: correctAnswer,
                 container: AppSuccess.container(context),
                 foreground: AppSuccess.onContainer(context),
                 onDefine: define,
@@ -126,6 +230,7 @@ class ErrorCardReviewView extends ConsumerWidget {
           const SizedBox(height: 12),
           _ExplanationBox(
             card: card,
+            alternatives: alternatives,
             onDefine: define,
             onOpenUrl: openUrl,
             onAsk: ask,
@@ -158,23 +263,25 @@ class ErrorCardReviewView extends ConsumerWidget {
           prompt: 'What was the flawed assumption in your reasoning?',
           label: 'Flawed assumption (bias)',
           hint: 'The belief that led you to the wrong answer.',
-          controller: bias,
+          controller: widget.bias,
         ),
         const SizedBox(height: 14),
         _PromptField(
           prompt: 'What do you need to know to prevent that error?',
           label: 'Vaccine (rule / protocol)',
           hint: 'The rule or check you will use next time.',
-          controller: vaccine,
+          controller: widget.vaccine,
         ),
         const SizedBox(height: 10),
         _ReviewCheck(
-          question: card.question,
-          correctAnswer: card.correctAnswer,
-          wrongAnswer: card.wrongAnswer,
+          question: _question,
+          correctAnswer: correctAnswer,
+          wrongAnswer: wrongAnswer,
           reasoning: card.reasoning,
-          bias: bias,
-          vaccine: vaccine,
+          bias: widget.bias,
+          vaccine: widget.vaccine,
+          result: widget.checkResult,
+          onResult: widget.onCheckResult,
         ),
       ],
     );
@@ -189,6 +296,8 @@ class _ReviewCheck extends ConsumerStatefulWidget {
     required this.reasoning,
     required this.bias,
     required this.vaccine,
+    this.result,
+    this.onResult,
   });
 
   final String question;
@@ -198,13 +307,19 @@ class _ReviewCheck extends ConsumerStatefulWidget {
   final TextEditingController bias;
   final TextEditingController vaccine;
 
+  /// Verdict owned by the review page, so it belongs to this card only.
+  final ReviewCheckResult? result;
+  final ValueChanged<ReviewCheckResult>? onResult;
+
   @override
   ConsumerState<_ReviewCheck> createState() => _ReviewCheckState();
 }
 
 class _ReviewCheckState extends ConsumerState<_ReviewCheck> {
-  ReviewCheckResult? _result;
+  ReviewCheckResult? _localResult;
   bool _busy = false;
+
+  ReviewCheckResult? get _result => widget.result ?? _localResult;
 
   Future<void> _check() async {
     final bias = widget.bias.text.trim();
@@ -229,7 +344,12 @@ class _ReviewCheckState extends ConsumerState<_ReviewCheck> {
             vaccine: vaccine,
           );
       if (!mounted) return;
-      setState(() => _result = result);
+      final report = widget.onResult;
+      if (report == null) {
+        setState(() => _localResult = result);
+      } else {
+        report(result);
+      }
     } on LookupException catch (error) {
       if (mounted) await showSnack(context, error.message);
     } finally {
@@ -384,12 +504,14 @@ class _SuggestionRow extends StatelessWidget {
 class _ExplanationBox extends StatelessWidget {
   const _ExplanationBox({
     required this.card,
+    required this.alternatives,
     required this.onDefine,
     required this.onOpenUrl,
     required this.onAsk,
   });
 
   final ErrorCard card;
+  final List<String> alternatives;
   final void Function(String, Rect?) onDefine;
   final ValueChanged<String> onOpenUrl;
   final Future<void> Function(String, Rect?) onAsk;
@@ -438,14 +560,14 @@ class _ExplanationBox extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            for (var index = 0; index < card.alternatives.length; index++)
+            for (var index = 0; index < alternatives.length; index++)
               if (index >= card.alternativeExplanations.length ||
                   card.alternativeExplanations[index].trim().isEmpty)
                 const SizedBox.shrink()
               else
                 _AlternativeExplanation(
                   index: index,
-                  text: card.alternatives[index],
+                  text: alternatives[index],
                   explanation: card.alternativeExplanations[index],
                   isCorrect: card.correctIndexes.contains(index),
                   isWrong: card.wrongIndexes.contains(index),
@@ -615,6 +737,147 @@ class _PromptField extends StatelessWidget {
           placeholder: hint,
           minLines: 2,
           maxLines: 5,
+        ),
+      ],
+    );
+  }
+}
+
+/// Asks the learner to shorten the question and its answer options.
+Future<ErrorCardContent?> showEditErrorCardContentDialog(
+  BuildContext context, {
+  required ErrorCard card,
+  required ErrorCardContent current,
+}) {
+  return M3EDialog.show<ErrorCardContent>(
+    context,
+    dialog: _EditErrorCardContentDialog(card: card, current: current),
+  );
+}
+
+class _EditErrorCardContentDialog extends StatefulWidget {
+  const _EditErrorCardContentDialog({
+    required this.card,
+    required this.current,
+  });
+
+  final ErrorCard card;
+  final ErrorCardContent current;
+
+  @override
+  State<_EditErrorCardContentDialog> createState() =>
+      _EditErrorCardContentDialogState();
+}
+
+class _EditErrorCardContentDialogState
+    extends State<_EditErrorCardContentDialog> {
+  late final _question = TextEditingController(text: widget.current.question);
+  late final _alternatives = [
+    for (final value in widget.current.alternatives)
+      TextEditingController(text: value),
+  ];
+
+  @override
+  void dispose() {
+    _question.dispose();
+    for (final controller in _alternatives) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  bool get _valid =>
+      _question.text.trim().isNotEmpty &&
+      _alternatives.every((controller) => controller.text.trim().isNotEmpty);
+
+  void _save() {
+    if (!_valid) return;
+    Navigator.of(context).pop(
+      ErrorCardContent(
+        question: _question.text.trim(),
+        alternatives: [
+          for (final controller in _alternatives) controller.text.trim(),
+        ],
+      ),
+    );
+  }
+
+  String _optionLabel(int index) {
+    final letter = String.fromCharCode(65 + index);
+    if (widget.card.correctIndexes.contains(index)) {
+      return 'Option $letter · correct answer';
+    }
+    if (widget.card.wrongIndexes.contains(index)) {
+      return 'Option $letter · chosen wrong answer';
+    }
+    return 'Option $letter';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return M3EDialog(
+      title: 'Edit question and options',
+      content: SizedBox(
+        width: 480,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Shorten imported text so the card is quicker to review. '
+                'The correct and chosen answers stay linked to this question.',
+                style: theme.typography.baseline.bodySmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 14),
+              M3ETextField(
+                key: const ValueKey('edit-error-question'),
+                controller: _question,
+                label: 'Question',
+                minLines: 2,
+                maxLines: 5,
+                isRequired: true,
+                onChanged: (_) => setState(() {}),
+              ),
+              AiSummarizeButton(
+                key: const ValueKey('edit-error-question-summarize'),
+                controller: _question,
+                fieldLabel: 'question',
+                onChanged: () => setState(() {}),
+              ),
+              for (var index = 0; index < _alternatives.length; index++) ...[
+                const SizedBox(height: 14),
+                M3ETextField(
+                  key: ValueKey('edit-error-option-$index'),
+                  controller: _alternatives[index],
+                  label: _optionLabel(index),
+                  minLines: 1,
+                  maxLines: 3,
+                  isRequired: true,
+                  onChanged: (_) => setState(() {}),
+                ),
+                AiSummarizeButton(
+                  key: ValueKey('edit-error-option-$index-summarize'),
+                  controller: _alternatives[index],
+                  fieldLabel: 'option ${String.fromCharCode(65 + index)}',
+                  onChanged: () => setState(() {}),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        M3EButton.text(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        M3EButton.filled(
+          onPressed: _valid ? _save : null,
+          child: const Text('Save changes'),
         ),
       ],
     );

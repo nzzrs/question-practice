@@ -231,6 +231,7 @@ class _SummaryPageState extends ConsumerState<SummaryPage> {
   Future<void> _openReview(SessionSummary summary) async {
     final completed = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
+        fullscreenDialog: true,
         builder: (context) => ReviewPage(sessionId: summary.session.id),
       ),
     );

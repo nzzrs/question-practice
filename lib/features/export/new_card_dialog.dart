@@ -2,6 +2,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/ui/widgets.dart';
+import '../lookup/ai_summarize_button.dart';
 
 enum NewCardKind { concept, basic }
 
@@ -149,6 +150,13 @@ class _NewCardDialogState extends State<_NewCardDialog> {
                   isRequired: true,
                   onChanged: (_) => setState(() {}),
                 ),
+                AiSummarizeButton(
+                  key: const ValueKey('new-card-term-summarize'),
+                  controller: _term,
+                  fieldLabel: 'term',
+                  question: widget.contextText,
+                  onChanged: () => setState(() {}),
+                ),
                 const SizedBox(height: 12),
                 M3ETextField(
                   key: const ValueKey('new-card-definition'),
@@ -158,6 +166,13 @@ class _NewCardDialogState extends State<_NewCardDialog> {
                   maxLines: 4,
                   isRequired: true,
                   onChanged: (_) => setState(() {}),
+                ),
+                AiSummarizeButton(
+                  key: const ValueKey('new-card-definition-summarize'),
+                  controller: _definition,
+                  fieldLabel: 'definition',
+                  question: widget.contextText,
+                  onChanged: () => setState(() {}),
                 ),
               ] else ...[
                 M3ETextField(
@@ -169,6 +184,13 @@ class _NewCardDialogState extends State<_NewCardDialog> {
                   isRequired: true,
                   onChanged: (_) => setState(() {}),
                 ),
+                AiSummarizeButton(
+                  key: const ValueKey('new-card-question-summarize'),
+                  controller: _question,
+                  fieldLabel: 'question',
+                  question: widget.contextText,
+                  onChanged: () => setState(() {}),
+                ),
                 const SizedBox(height: 12),
                 M3ETextField(
                   key: const ValueKey('new-card-answer'),
@@ -178,6 +200,13 @@ class _NewCardDialogState extends State<_NewCardDialog> {
                   maxLines: 4,
                   isRequired: true,
                   onChanged: (_) => setState(() {}),
+                ),
+                AiSummarizeButton(
+                  key: const ValueKey('new-card-answer-summarize'),
+                  controller: _answer,
+                  fieldLabel: 'answer',
+                  question: widget.contextText,
+                  onChanged: () => setState(() {}),
                 ),
               ],
             ],

@@ -6,6 +6,8 @@ import 'package:http/testing.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/features/errors/error_card_content.dart';
+import 'package:question_practice/features/errors/error_card_content_editor_page.dart';
 import 'package:question_practice/features/errors/error_cards_review_page.dart';
 
 import '../../helpers/test_harness.dart';
@@ -66,6 +68,49 @@ Future<void> _enterVisible(
 }
 
 void main() {
+  testWidgets('the editor opens as a page and enables save after an edit', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final card = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [card]),
+      harness: harness,
+    );
+    await _openEditor(tester);
+
+    expect(find.byType(ErrorCardContentEditorPage), findsOneWidget);
+    expect(find.byType(M3EDialog), findsNothing);
+    expect(find.text('Edit card content'), findsOneWidget);
+    final route = ModalRoute.of(
+      tester.element(find.byType(ErrorCardContentEditorPage)),
+    );
+    expect(route, isA<MaterialPageRoute<ErrorCardContent>>());
+
+    M3EButton saveButton() => tester.widget<M3EButton>(
+      find.widgetWithText(M3EButton, 'Save changes'),
+    );
+    expect(saveButton().onPressed, isNull);
+
+    await _enterVisible(
+      tester,
+      find.byKey(const ValueKey('edit-error-question')),
+      'Edited question?',
+    );
+    expect(saveButton().onPressed, isNotNull);
+
+    await _enterVisible(
+      tester,
+      find.byKey(const ValueKey('edit-error-question')),
+      '',
+    );
+    expect(saveButton().onPressed, isNull);
+    expect(find.text('Write the question.'), findsOneWidget);
+  });
+
   testWidgets('editing the question, options and explanations persists', (
     tester,
   ) async {
@@ -173,14 +218,60 @@ void main() {
       'Discard this explanation',
     );
     await _tapVisible(tester, find.text('Cancel'));
+    expect(find.text('Discard changes?'), findsOneWidget);
+    await _tapVisible(tester, find.text('Discard'));
+    await pumpFrames(tester, frames: 24);
 
     final unchanged = await tester.runAsync(
       () => harness.cards.errorCardById(card.id),
     );
     expect(unchanged!.question, card.question);
     expect(unchanged.explanation, card.explanation);
+    expect(find.byType(ErrorCardContentEditorPage), findsNothing);
     expect(find.text('Discard this question'), findsNothing);
     expect(find.text(card.question), findsOneWidget);
+  });
+
+  testWidgets('back asks before discarding unsaved edits', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final card = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [card]),
+      harness: harness,
+    );
+    await _openEditor(tester);
+
+    await _enterVisible(
+      tester,
+      find.byKey(const ValueKey('edit-error-question')),
+      'Unsaved rewrite',
+    );
+    await _tapVisible(tester, find.byIcon(M3EIcons.arrow_back));
+    expect(find.text('Discard changes?'), findsOneWidget);
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(M3EDialog),
+        matching: find.text('Cancel'),
+      ),
+    );
+    await pumpFrames(tester);
+    expect(find.text('Discard changes?'), findsNothing);
+    expect(find.byType(ErrorCardContentEditorPage), findsOneWidget);
+    expect(find.text('Unsaved rewrite'), findsOneWidget);
+
+    await _tapVisible(tester, find.byIcon(M3EIcons.arrow_back));
+    await _tapVisible(tester, find.text('Discard'));
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.byType(ErrorCardContentEditorPage), findsNothing);
+    final unchanged = await tester.runAsync(
+      () => harness.cards.errorCardById(card.id),
+    );
+    expect(unchanged!.question, card.question);
   });
 
   testWidgets('a field can be shortened with the configured AI provider', (

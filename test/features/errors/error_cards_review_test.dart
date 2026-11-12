@@ -233,7 +233,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('error-card-edit-content')));
     await pumpFrames(tester);
-    expect(find.text('Edit question and options'), findsOneWidget);
+    expect(find.text('Edit card content'), findsOneWidget);
 
     await tester.enterText(
       find.byKey(const ValueKey('edit-error-question')),

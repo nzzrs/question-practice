@@ -17,6 +17,7 @@ class AiSummarizeButton extends ConsumerStatefulWidget {
     required this.fieldLabel,
     this.question,
     this.onChanged,
+    this.compact = false,
     super.key,
   });
 
@@ -28,6 +29,9 @@ class AiSummarizeButton extends ConsumerStatefulWidget {
   /// Optional surrounding text, such as the original question.
   final String? question;
   final VoidCallback? onChanged;
+
+  /// Shows a quiet trailing icon button for use inside a text field.
+  final bool compact;
 
   @override
   ConsumerState<AiSummarizeButton> createState() => _AiSummarizeButtonState();
@@ -58,6 +62,13 @@ class _AiSummarizeButtonState extends ConsumerState<AiSummarizeButton> {
       widget.onChanged?.call();
     } on LookupException catch (error) {
       if (mounted) await showSnack(context, error.message);
+    } on Object {
+      if (mounted) {
+        await showSnack(
+          context,
+          'Could not shorten the ${widget.fieldLabel}. Try again.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -65,6 +76,20 @@ class _AiSummarizeButtonState extends ConsumerState<AiSummarizeButton> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.compact) {
+      return M3EIconButton(
+        variant: M3EIconButtonVariant.standard,
+        icon: _busy
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.auto_awesome_outlined),
+        tooltip: _busy ? 'Shortening…' : 'Shorten ${widget.fieldLabel} with AI',
+        onPressed: _busy ? null : _summarize,
+      );
+    }
     return Align(
       alignment: Alignment.centerLeft,
       child: M3EButton.text(

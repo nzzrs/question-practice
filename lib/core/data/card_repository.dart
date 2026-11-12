@@ -166,11 +166,15 @@ class CardRepository {
     required int id,
     required String question,
     required List<String> alternatives,
+    required String explanation,
+    required List<String> alternativeExplanations,
   }) {
     return _db.cardDao.updateErrorCardContent(
       id,
       question: question,
       alternatives: alternatives,
+      explanation: explanation,
+      alternativeExplanations: alternativeExplanations,
     );
   }
 

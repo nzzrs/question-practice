@@ -127,6 +127,7 @@ class QuestionDraft {
     required this.explanation,
     required this.alternativeExplanations,
     this.subtopic = '',
+    this.sourceId = '',
   });
 
   final String prompt;
@@ -135,6 +136,33 @@ class QuestionDraft {
   final String explanation;
   final List<String> alternativeExplanations;
   final String subtopic;
+
+  /// Stable identity from an exported practice file.
+  ///
+  /// Empty for files imported without question identities. The value is used
+  /// only while updating a practice; it is not stored in the database.
+  final String sourceId;
+}
+
+/// One question from an update file, at its new position in the practice.
+@immutable
+class PracticeQuestionUpdate {
+  const PracticeQuestionUpdate({
+    required this.question,
+    required this.position,
+    this.existingQuestionId,
+    this.changed = false,
+  });
+
+  /// The stored question this row maps to, or null for a new question.
+  final int? existingQuestionId;
+  final QuestionDraft question;
+  final int position;
+
+  /// Whether a matched question's visible content differs from the file.
+  final bool changed;
+
+  bool get isNew => existingQuestionId == null;
 }
 
 @immutable

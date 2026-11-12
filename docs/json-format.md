@@ -142,6 +142,7 @@ The app compares the selected set with the correct set. With `correctIndexes: [0
 | `practices[].questions` | yes | array | At least one question. |
 | `question.prompt` | yes | string | 1–5,000 chars. |
 | `question.subtopic` | no | string | Up to 120 chars. Groups questions for per-subtopic statistics. Missing or blank means uncategorized. |
+| `question.sourceId` | no | string | 1–120 chars. Stable identity written by **Download practice JSON** and read by **Update practice JSON**. A normal import keeps the question but ignores the identity. |
 | `question.alternatives` | yes | string array | 2–8 non-empty alternatives, 2,000 chars each. |
 | `question.correctIndex` | one of | integer | Zero-based index of the single correct alternative. Must be inside `alternatives`. |
 | `question.correctIndexes` | one of | integer array | 1–8 unique zero-based indexes for a question with several correct answers. |
@@ -256,6 +257,36 @@ line 7, column 18: Unexpected character
 
 The preview screen shows the file name, topic/practice/question counts and duplicate notes. **Import** writes everything in one database transaction. **Cancel** leaves the database unchanged.
 
+## Editing a practice
+
+Long-press a practice and choose **Edit practice → Download practice JSON**. The file contains one topic and one practice in the format above. Every question includes a `sourceId` with the app's stable identity for that question:
+
+```json
+{
+  "sourceId": "42",
+  "prompt": "Which service runs containers?",
+  "alternatives": ["Cloud Run", "Cloud SQL"],
+  "correctIndex": 0,
+  "explanation": "Cloud Run runs container images on managed infrastructure.",
+  "alternativeExplanations": [
+    "Correct. Cloud Run is the managed container platform.",
+    "Cloud SQL is a managed relational database."
+  ]
+}
+```
+
+Edit, add or remove questions in the file, then choose **Edit practice → Update practice JSON** and pick the file. Before anything is written, the app shows counts for new, modified and deleted questions, and the change details. **Apply changes** writes everything in one transaction; **Cancel** leaves the practice unchanged.
+
+| Situation | Result |
+|---|---|
+| Same `sourceId`, same content | Unchanged. |
+| Same `sourceId`, different content | Modified in place. The question keeps its id, so answers, error cards, skipped records and statistics stay linked. |
+| `sourceId` present but unknown, or no `sourceId` | Falls back to an exact match on the trimmed prompt. This keeps files exported before identities existed updatable. |
+| Question only in the file | Added as a new question. |
+| Stored question missing from the file | Deleted. Its answers, session links and cards cascade away with the existing schema relationships. |
+
+The topic and practice names in the file must match the stored practice. Rename the practice and change its description from **Edit practice**, not by editing those file fields. Identity values are written only by the export and are not stored in the database; a normal import ignores them. `sourceId` is an additive field: files without it remain valid and keep working.
+
 ## Duplicate handling
 
 | Situation | Result |
@@ -280,4 +311,4 @@ Deck selection is app configuration, not file data. Set the default deck in **Se
 
 ## Versioning
 
-`formatVersion` is `1`. `correctIndexes` and `subtopic` are additive fields: files written without them keep working. Future incompatible changes must use a new version; the app rejects unknown versions rather than guessing.
+`formatVersion` is `1`. `correctIndexes`, `subtopic` and `sourceId` are additive fields: files written without them keep working. Future incompatible changes must use a new version; the app rejects unknown versions rather than guessing.

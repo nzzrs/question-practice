@@ -211,6 +211,73 @@ class PracticeRepository {
     return _db.topicDao.renamePractice(id, name);
   }
 
+  Future<void> updatePracticeDescription(int id, String description) {
+    return _db.topicDao.updatePracticeDescription(id, description);
+  }
+
+  /// Rewrites a practice's questions while keeping the rows of matched ones.
+  ///
+  /// Matched questions keep their id, so attempts, error cards, skipped
+  /// questions and statistics stay linked. Removed questions are deleted and
+  /// cascade through the existing schema relationships.
+  Future<void> applyPracticeUpdate({
+    required int practiceId,
+    required List<PracticeQuestionUpdate> questions,
+    required List<int> deletedQuestionIds,
+    required String contentHash,
+    required DateTime importedAt,
+  }) {
+    return _db.transaction(() async {
+      final practice = await _db.topicDao.practiceById(practiceId);
+      if (practice == null) {
+        throw StateError('This practice no longer exists.');
+      }
+      for (final id in deletedQuestionIds) {
+        await _db.topicDao.deleteQuestion(id);
+      }
+      final inserted = <QuestionsCompanion>[];
+      for (final update in questions) {
+        final question = update.question;
+        final existingId = update.existingQuestionId;
+        if (existingId == null) {
+          inserted.add(
+            QuestionsCompanion.insert(
+              practiceId: practiceId,
+              prompt: question.prompt,
+              alternativesJson: encodeStringList(question.alternatives),
+              correctIndexesJson: Value(encodeIntList(question.correctIndexes)),
+              explanation: question.explanation,
+              alternativeExplanationsJson: encodeStringList(
+                question.alternativeExplanations,
+              ),
+              position: update.position,
+              subtopic: Value(_normalizeSubtopic(question.subtopic)),
+            ),
+          );
+          continue;
+        }
+        await _db.topicDao.updateQuestion(
+          id: existingId,
+          prompt: question.prompt,
+          alternatives: question.alternatives,
+          correctIndexes: question.correctIndexes,
+          explanation: question.explanation,
+          alternativeExplanations: question.alternativeExplanations,
+          position: update.position,
+          subtopic: _normalizeSubtopic(question.subtopic),
+        );
+      }
+      if (inserted.isNotEmpty) {
+        await _db.topicDao.insertQuestions(inserted);
+      }
+      await _db.topicDao.updatePracticeContent(
+        id: practiceId,
+        contentHash: contentHash,
+        importedAt: importedAt,
+      );
+    });
+  }
+
   Future<void> setPracticeDone(int id, bool isDone) {
     return _db.topicDao.setPracticeDone(id, isDone);
   }

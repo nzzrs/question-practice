@@ -232,6 +232,7 @@ class ImportService {
           );
           final explanation = (rawQuestion['explanation'] as String).trim();
           final subtopic = (rawQuestion['subtopic'] as String? ?? '').trim();
+          final sourceId = (rawQuestion['sourceId'] as String? ?? '').trim();
 
           if (prompt.isEmpty) {
             _empty(issues, '$questionPath/prompt', 'Prompt');
@@ -294,6 +295,7 @@ class ImportService {
               explanation: explanation,
               alternativeExplanations: explanations,
               subtopic: subtopic,
+              sourceId: sourceId,
             ),
           );
           totalQuestions++;
@@ -303,9 +305,7 @@ class ImportService {
           ImportPractice(
             name: practiceName,
             description: (rawPractice['description'] as String? ?? '').trim(),
-            contentHash: sha256
-                .convert(utf8.encode(jsonEncode(rawPractice)))
-                .toString(),
+            contentHash: _contentHash(rawPractice),
             questions: questions,
           ),
         );
@@ -333,6 +333,26 @@ class ImportService {
       throw ImportException(issues);
     }
     return topics;
+  }
+
+  /// Hashes the practice content without file identities.
+  ///
+  /// `sourceId` exists only to map questions back during an update, so two
+  /// files with the same questions must produce the same hash whether or not
+  /// they carry identities.
+  String _contentHash(Map<String, dynamic> rawPractice) {
+    final content = Map<String, dynamic>.of(rawPractice);
+    final rawQuestions = content['questions'];
+    if (rawQuestions is List) {
+      content['questions'] = [
+        for (final question in rawQuestions)
+          if (question is Map<String, dynamic>)
+            Map<String, dynamic>.of(question)..remove('sourceId')
+          else
+            question,
+      ];
+    }
+    return sha256.convert(utf8.encode(jsonEncode(content))).toString();
   }
 
   Future<List<String>> _duplicateNotes(List<ImportTopic> topics) async {

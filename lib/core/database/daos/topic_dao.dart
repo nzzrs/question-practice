@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
@@ -147,6 +149,52 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     return (update(practices)..where((p) => p.id.equals(id))).write(
       PracticesCompanion(name: Value(name)),
     );
+  }
+
+  Future<void> updatePracticeDescription(int id, String description) {
+    return (update(practices)..where((p) => p.id.equals(id))).write(
+      PracticesCompanion(description: Value(description)),
+    );
+  }
+
+  Future<void> updatePracticeContent({
+    required int id,
+    required String contentHash,
+    required DateTime importedAt,
+  }) {
+    return (update(practices)..where((p) => p.id.equals(id))).write(
+      PracticesCompanion(
+        contentHash: Value(contentHash),
+        importedAt: Value(importedAt),
+      ),
+    );
+  }
+
+  Future<void> updateQuestion({
+    required int id,
+    required String prompt,
+    required List<String> alternatives,
+    required List<int> correctIndexes,
+    required String explanation,
+    required List<String> alternativeExplanations,
+    required int position,
+    required String? subtopic,
+  }) {
+    return (update(questions)..where((q) => q.id.equals(id))).write(
+      QuestionsCompanion(
+        prompt: Value(prompt),
+        alternativesJson: Value(jsonEncode(alternatives)),
+        correctIndexesJson: Value(jsonEncode(correctIndexes)),
+        explanation: Value(explanation),
+        alternativeExplanationsJson: Value(jsonEncode(alternativeExplanations)),
+        position: Value(position),
+        subtopic: Value(subtopic),
+      ),
+    );
+  }
+
+  Future<void> deleteQuestion(int id) {
+    return (delete(questions)..where((q) => q.id.equals(id))).go();
   }
 
   Future<void> setPracticeDone(int id, bool isDone) {

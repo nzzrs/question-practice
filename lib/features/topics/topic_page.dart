@@ -11,9 +11,8 @@ import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../practice/domain/session_service.dart';
 import '../practice/session_page.dart';
+import 'practice_actions.dart';
 import 'topic_stats_page.dart';
-
-enum _PracticeAction { rename, delete, markDone, markActive, split }
 
 enum _ResumeChoice { continueSession, discardAndStart }
 
@@ -298,16 +297,12 @@ class _TopicPageState extends ConsumerState<TopicPage> {
   }
 
   Future<void> _showPracticeActions(PracticeSummary summary) async {
-    final action = await M3EBottomSheet.show<_PracticeAction>(
-      context,
-      initialValue: M3EBottomSheetValue.expanded,
-      builder: (context) => _PracticeOptionsSheet(summary: summary),
-    );
+    final action = await showPracticeActions(context, summary);
     if (action == null || !mounted) return;
     switch (action) {
-      case _PracticeAction.rename:
-        await _renamePractice(summary);
-      case _PracticeAction.delete:
+      case PracticeAction.edit:
+        await showPracticeEditMenu(context, ref, summary);
+      case PracticeAction.delete:
         final practice = summary.practice;
         final confirmed = await confirmDialog(
           context,
@@ -320,17 +315,17 @@ class _TopicPageState extends ConsumerState<TopicPage> {
         if (!confirmed) return;
         await ref.read(topicRepositoryProvider).deletePractice(practice.id);
         if (mounted) await showSnack(context, 'Practice deleted.');
-      case _PracticeAction.markDone:
+      case PracticeAction.markDone:
         await ref
             .read(topicRepositoryProvider)
             .setPracticeDone(summary.practice.id, true);
         if (mounted) await showSnack(context, 'Practice marked as done.');
-      case _PracticeAction.markActive:
+      case PracticeAction.markActive:
         await ref
             .read(topicRepositoryProvider)
             .setPracticeDone(summary.practice.id, false);
         if (mounted) await showSnack(context, 'Practice marked active.');
-      case _PracticeAction.split:
+      case PracticeAction.split:
         await _splitPractice(summary);
     }
   }
@@ -383,59 +378,6 @@ class _TopicPageState extends ConsumerState<TopicPage> {
       if (mounted) await showSnack(context, error.message);
     } finally {
       if (mounted) setState(() => _starting = false);
-    }
-  }
-
-  Future<void> _renamePractice(PracticeSummary summary) async {
-    final practice = summary.practice;
-    final name = TextEditingController(text: practice.name);
-    String? error;
-    final saved = await M3EDialog.show<bool>(
-      context,
-      dialog: StatefulBuilder(
-        builder: (context, setDialogState) {
-          return M3EDialog(
-            title: 'Rename practice',
-            content: M3ETextField(
-              controller: name,
-              label: 'Name',
-              isRequired: true,
-              autofocus: true,
-              errorText: error,
-            ),
-            actions: [
-              M3EButton.text(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              M3EButton.filled(
-                onPressed: () async {
-                  final trimmed = name.text.trim();
-                  if (trimmed.isEmpty) {
-                    setDialogState(() => error = 'Name is required.');
-                    return;
-                  }
-                  if (trimmed.length > 120) {
-                    setDialogState(
-                      () => error = 'Use 120 characters or fewer.',
-                    );
-                    return;
-                  }
-                  await ref
-                      .read(topicRepositoryProvider)
-                      .renamePractice(practice.id, trimmed);
-                  if (context.mounted) Navigator.of(context).pop(true);
-                },
-                child: const Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-    name.dispose();
-    if (saved == true && mounted) {
-      await showSnack(context, 'Practice renamed.');
     }
   }
 }
@@ -573,159 +515,6 @@ class _PracticeTrailing extends StatelessWidget {
           const Pill('Done', tone: PillTone.success, icon: Icons.check),
         ],
       ],
-    );
-  }
-}
-
-class _PracticeOptionsSheet extends StatelessWidget {
-  const _PracticeOptionsSheet({required this.summary});
-
-  final PracticeSummary summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final practice = summary.practice;
-    final questionCount = summary.questionCount;
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    practice.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.typography.emphasized.titleLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '$questionCount questions · '
-                    '${practice.isDone ? 'Marked as done' : 'Active'}',
-                    style: theme.typography.baseline.bodySmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            _PracticeOptionTile(
-              icon: Icons.drive_file_rename_outline,
-              title: 'Rename',
-              subtitle: 'Change the practice name',
-              onTap: () => Navigator.of(context).pop(_PracticeAction.rename),
-            ),
-            _PracticeOptionTile(
-              icon: practice.isDone
-                  ? Icons.restart_alt
-                  : Icons.check_circle_outline,
-              title: practice.isDone ? 'Mark active' : 'Mark as done',
-              subtitle: practice.isDone
-                  ? 'Return it to the active list'
-                  : 'Keep it without deleting it',
-              onTap: () => Navigator.of(context).pop(
-                practice.isDone
-                    ? _PracticeAction.markActive
-                    : _PracticeAction.markDone,
-              ),
-            ),
-            _PracticeOptionTile(
-              icon: Icons.call_split,
-              title: 'Split into two',
-              subtitle: questionCount.isEven
-                  ? 'Create Slice A and Slice B with half the questions each'
-                  : 'Needs an even number of questions',
-              onTap: () => Navigator.of(context).pop(_PracticeAction.split),
-            ),
-            _PracticeOptionTile(
-              icon: Icons.delete_outline,
-              title: 'Delete',
-              subtitle: 'Remove the practice and its questions',
-              destructive: true,
-              onTap: () => Navigator.of(context).pop(_PracticeAction.delete),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PracticeOptionTile extends StatelessWidget {
-  const _PracticeOptionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final foreground = destructive
-        ? theme.colorScheme.error
-        : theme.colorScheme.onSurface;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              IconBadge(
-                icon,
-                size: 42,
-                tone: destructive ? PillTone.error : PillTone.neutral,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.typography.baseline.titleMedium.copyWith(
-                        color: foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: destructive
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

@@ -13,6 +13,7 @@ The suite runs on the Dart VM. Drift uses an in-memory SQLite database; HTTP and
 |---|---|
 | Import | Schema rejection, JSON syntax paths, BOM/text files, semantic validation, `correctIndex`, `correctIndexes`, optional subtopics, duplicate handling, size limit |
 | Practice | Scoring, multi-answer set matching, skipped answers, distraction checked and unchecked after feedback, resume/discard, mixed sessions, summary counts, session arrows, done/solved/skipped history, shuffled inclusion, redo prompt, done tag |
+| Practice edit | JSON export with stable question identities, diff counts for unchanged/modified/new/deleted, prompt fallback without identities, reworded questions with identities, wrong practice rejection, answers and cards preserved across apply, deleted-question cascade, edit menu and update preview Apply/Cancel |
 | Error queue | Exact 48-hour boundary, due query, resolution, history, wrong retry scheduling |
 | Review | Error steps, shared error-card review view, skipped concept/basic branches, missing definitions, AI bias/vaccine suggestions, structured skipped/unknown review with reasoning and other alternatives |
 | Highlights | Highlight persistence, painted phrases, keep/convert review steps, highlights in Cards, plain-text download |
@@ -59,6 +60,7 @@ Use the connected Pixel 9 Pro XL (Android 17) and AnkiDroid 2.25.3.
 26. Long-press a topic and open **Edit topic**; save a change. Long-press it again and choose **Archive topic**; confirm it leaves Home. Open the archived-topics icon, unarchive the topic, and confirm it returns with its practices intact.
 27. Open two topics, choose a different practice sort in each (for example Name decreasing and Recency increasing), leave and reopen them, then restart the app; confirm each topic keeps its own order.
 28. Tap the **Shuffle** floating button; confirm the **Start shuffled practice** sheet lists the options and starts a mixed session. Solve or skip every question, then tap Shuffle again and confirm the no-questions message appears.
+29. Long-press a practice and open **Edit practice**; rename it, change its description and pick a deck. Download its JSON, change a question, add one and remove one, then update from that file. Confirm the preview counts, apply, and verify answers/cards for matched questions survive while the removed question's records are gone.
 
 ## Notes
 

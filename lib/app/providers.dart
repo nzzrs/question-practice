@@ -19,6 +19,7 @@ import '../features/export/domain/export_service.dart';
 import '../features/import/domain/import_service.dart';
 import '../features/lookup/domain/lookup_service.dart';
 import '../features/practice/domain/session_service.dart';
+import '../features/practice_edit/domain/practice_edit_service.dart';
 import '../features/review/domain/review_service.dart';
 import '../features/topics/domain/statistics_export_service.dart';
 
@@ -224,6 +225,14 @@ final exportServiceProvider = Provider<ExportService>(
     gateway: ref.watch(ankiGatewayProvider),
     cards: ref.watch(cardRepositoryProvider),
     practices: ref.watch(topicRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final practiceEditServiceProvider = Provider<PracticeEditService>(
+  (ref) => PracticeEditService(
+    practices: ref.watch(topicRepositoryProvider),
+    importService: ref.watch(importServiceProvider),
     clock: ref.watch(clockProvider),
   ),
 );

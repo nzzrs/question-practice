@@ -26,6 +26,15 @@ One `AppDatabase` with tables for topics, practices, questions, sessions, sessio
 - Sessions are created on start and can be resumed if the app is killed.
 - Deleting a topic/practice cascades through its content; deleting a session removes its attempts and cards created by it.
 
+## Backups
+
+`BackupService` writes one checksummed JSON document with every local table: topics (including archived topics and their Anki deck), practices, questions (including subtopics), sessions, session questions, attempts, concepts, error cards, manual cards, skipped questions, highlights and settings. The AI API key lives in Android secure storage and is never exported.
+
+- Format **v2** keeps the v1 canonical checksum over the `tables` object and adds a `metadata` block with the format version, app version and build, database schema version, export time and per-table row counts. The app still imports v1 files (which omit metadata and some optional tables) and accepts files with missing `skippedQuestions` or `highlights` tables. Unknown tables are ignored so a newer file with extra optional data still restores.
+- v1 rows are read leniently: missing columns fall back to their database defaults, and a topic deck is accepted from `ankiDeck` or the legacy `anki_deck` spelling. This keeps decks from older installs intact.
+- Import validates the whole file before opening a transaction: required tables, metadata and recorded row counts, row shapes, JSON-array payloads, enum values, duplicate primary keys (including composite session/question keys), the one-active-error-card-per-question rule, and referential integrity from practices to topics, questions to practices, session questions and attempts to sessions/questions, and cards and highlights to their sessions, questions and manual cards. Each failure raises a `BackupException` with the table, row and field involved.
+- Restore replaces every table inside one transaction, so any failure leaves the current data untouched. After a restore or **Erase all data**, `refreshDataProviders` invalidates every data provider; the topic editor also re-reads its row before showing the deck so a snapshot captured before the replacement cannot save an empty deck back.
+
 ## Error lifecycle
 
 1. A wrong, non-distracted answer creates an active error card with snapshots and `dueAt = lastWrongAt + 48 h`.

@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import 'anki_deck_picker.dart';
+import 'topic_editor_page.dart';
 
 /// Actions offered when a topic row is long-pressed.
 enum TopicAction { edit, archive, unarchive, delete }
@@ -60,123 +60,24 @@ Future<void> _deleteTopic(
 }
 
 /// Edits a topic's name, description, priority and AnkiDroid deck.
+///
+/// Opens the full-page [TopicEditorPage] and returns whether the topic was
+/// saved. Callers keep their existing refresh and snackbar behaviour.
 Future<bool> showEditTopicDialog(
   BuildContext context,
   WidgetRef ref,
   Topic topic,
 ) async {
-  // The caller may hold a summary built before a backup restore or another
-  // database replacement. Re-read the row so the deck and the other fields are
-  // never saved back from a stale snapshot.
-  final current =
-      await ref.read(topicRepositoryProvider).topicById(topic.id) ?? topic;
-  if (!context.mounted) return false;
-  final name = TextEditingController(text: current.name);
-  final description = TextEditingController(text: current.description);
-  final priority = TextEditingController(
-    text: current.priority?.toString() ?? '',
-  );
-  final deck = TextEditingController(text: current.ankiDeck ?? '');
-  String? error;
-  final saved = await M3EDialog.show<bool>(
-    context,
-    dialog: StatefulBuilder(
-      builder: (context, setDialogState) {
-        return M3EDialog(
-          title: 'Edit topic',
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                M3ETextField(controller: name, label: 'Name', isRequired: true),
-                const SizedBox(height: 12),
-                M3ETextField(
-                  controller: description,
-                  label: 'Description',
-                  maxLines: 3,
-                  minLines: 2,
-                ),
-                const SizedBox(height: 12),
-                M3ETextField(
-                  controller: priority,
-                  label: 'Priority (1 highest, optional)',
-                  keyboardType: TextInputType.number,
-                  errorText: error,
-                ),
-                const SizedBox(height: 12),
-                M3ETextField(
-                  controller: deck,
-                  label: 'AnkiDroid deck',
-                  supportingText: 'Blank uses the default deck from Settings.',
-                ),
-                const SizedBox(height: 6),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: M3EButton.tonal(
-                    onPressed: () async {
-                      final selected = await showAnkiDeckPicker(
-                        context,
-                        ref,
-                        current: deck.text,
-                      );
-                      if (selected == null) return;
-                      setDialogState(() => deck.text = selected);
-                    },
-                    icon: const Icon(Icons.style_outlined),
-                    label: const Text('Browse decks'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            M3EButton.text(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            M3EButton.filled(
-              onPressed: () async {
-                final trimmedName = name.text.trim();
-                final parsedPriority = priority.text.trim().isEmpty
-                    ? null
-                    : int.tryParse(priority.text.trim());
-                if (trimmedName.isEmpty) {
-                  setDialogState(() => error = 'Name is required.');
-                  return;
-                }
-                if (priority.text.trim().isNotEmpty &&
-                    (parsedPriority == null ||
-                        parsedPriority < 1 ||
-                        parsedPriority > 5)) {
-                  setDialogState(() => error = 'Use a number from 1 to 5.');
-                  return;
-                }
-                await ref
-                    .read(topicRepositoryProvider)
-                    .updateTopic(
-                      id: topic.id,
-                      name: trimmedName,
-                      description: description.text.trim(),
-                      priority: parsedPriority,
-                      ankiDeck: deck.text.trim().isEmpty
-                          ? null
-                          : deck.text.trim(),
-                    );
-                if (context.mounted) Navigator.of(context).pop(true);
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
+  final saved = await Navigator.of(context).push<bool>(
+    MaterialPageRoute<bool>(
+      builder: (context) => TopicEditorPage(topic: topic),
     ),
   );
-  name.dispose();
-  description.dispose();
-  priority.dispose();
-  deck.dispose();
-  if (saved == true && context.mounted) {
-    await showSnack(context, 'Topic updated.');
+  if (saved == true) {
+    ref.invalidate(topicSummariesProvider);
+    ref.invalidate(archivedTopicSummariesProvider);
+    ref.invalidate(topicSummaryProvider(topic.id));
+    if (context.mounted) await showSnack(context, 'Topic updated.');
   }
   return saved == true;
 }

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../app/app_build_info.dart';
 import '../../app/data_refresh.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
@@ -421,8 +422,45 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         const SizedBox(height: 14),
         _SettingsSection(
           title: 'About',
-          supporting: 'Questions 0.9.9\nLocal-first practice with error cards and Anki export.',
-          child: const SizedBox.shrink(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '$appName $appVersion',
+                style: M3ETheme.of(context).typography.baseline.bodyMedium,
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(
+                    Icons.build_outlined,
+                    size: 16,
+                    color: M3ETheme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    appBuildTypeLabel,
+                    style: M3ETheme.of(context).typography.baseline.bodySmall
+                        .copyWith(
+                          color: M3ETheme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Local-first practice with error cards and Anki export.',
+                style: M3ETheme.of(context).typography.baseline.bodySmall
+                    .copyWith(
+                      color: M3ETheme.of(context).colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+              ),
+            ],
+          ),
         ),
       ],
     );

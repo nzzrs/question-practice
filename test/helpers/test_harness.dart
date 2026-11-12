@@ -1,5 +1,6 @@
 import 'package:clock/clock.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -18,6 +19,7 @@ import 'package:question_practice/core/platform/anki_gateway.dart';
 import 'package:question_practice/core/platform/practice_sound_player.dart';
 import 'package:question_practice/core/platform/secure_key_store.dart';
 import 'package:question_practice/core/platform/web_launcher.dart';
+import 'package:question_practice/core/ui/immersive_review.dart';
 
 class TestClock extends Clock {
   TestClock(this.current);
@@ -135,6 +137,32 @@ class SeededPractice {
   final int practiceId;
 }
 
+/// Records the system UI modes requested through the platform channel.
+///
+/// Review pages hide the status and navigation bars and restore edge-to-edge
+/// layout when they close; widget tests use this recorder to assert both calls.
+class SystemUiCallRecorder {
+  final List<String> modes = [];
+  TestDefaultBinaryMessenger? _messenger;
+
+  void install() {
+    _messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    _messenger!.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'SystemChrome.setEnabledSystemUIMode') {
+        final arguments = call.arguments;
+        if (arguments is String) modes.add(arguments);
+      }
+      return null;
+    });
+  }
+
+  void dispose() {
+    _messenger?.setMockMethodCallHandler(SystemChannels.platform, null);
+    _messenger = null;
+  }
+}
+
 class TestAppBundle {
   TestAppBundle({required this.widget, required this.container});
 
@@ -169,6 +197,7 @@ TestAppBundle testAppBundle({
         data: appThemeData(),
         autoTheming: false,
         dynamicColoring: false,
+        navigatorObservers: [reviewRouteObserver],
         home: home,
       ),
     ),

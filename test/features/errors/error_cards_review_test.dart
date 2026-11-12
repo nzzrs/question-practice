@@ -47,6 +47,8 @@ void main() {
   testWidgets('cards review opens full screen with a clear exit', (
     tester,
   ) async {
+    final recorder = SystemUiCallRecorder()..install();
+    addTearDown(recorder.dispose);
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
@@ -66,14 +68,61 @@ void main() {
     expect(route, isA<MaterialPageRoute<bool>>());
     expect((route as MaterialPageRoute<bool>).fullscreenDialog, isTrue);
     expect(find.byType(M3EAppBar), findsNothing);
+    expect(find.byType(NavigationBar), findsNothing);
     expect(find.byKey(const ValueKey('app-focus-header')), findsOneWidget);
+    expect(recorder.modes, contains('SystemUiMode.immersiveSticky'));
+
+    final pageSize = tester.getSize(find.byType(ErrorCardsReviewPage));
+    expect(
+      pageSize.width,
+      tester.view.physicalSize.width / tester.view.devicePixelRatio,
+    );
 
     await tester.tap(find.byKey(const ValueKey('app-focus-exit')));
     await pumpFrames(tester);
 
     expect(find.byType(ErrorCardsReviewPage), findsNothing);
     expect(find.text('Cards'), findsOneWidget);
+    expect(recorder.modes.last, 'SystemUiMode.edgeToEdge');
   });
+
+  testWidgets(
+    'leaving the completion screen reports success and restores bars',
+    (tester) async {
+      final recorder = SystemUiCallRecorder()..install();
+      addTearDown(recorder.dispose);
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await harness.seedPractice(count: 1);
+      final question = (await harness.practices.questionsForPractice(
+        seeded.practiceId,
+      )).single;
+      await createError(
+        harness,
+        question: question,
+        bias: 'Bias',
+        vaccine: 'Rule',
+      );
+
+      await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+      expect(find.text('Review selected'), findsOneWidget);
+      await tester.tap(find.text('Review all'));
+      await pumpFrames(tester);
+
+      await tester.tap(find.text('Skip'));
+      await pumpFrames(tester);
+      expect(find.text('Review complete'), findsWidgets);
+
+      // The Android back gesture leaves the completion screen as a success too.
+      await tester.binding.handlePopRoute();
+      await pumpFrames(tester);
+
+      expect(find.byType(ErrorCardsReviewPage), findsNothing);
+      // A completed review clears the selection, so only Review all remains.
+      expect(find.text('Review selected'), findsNothing);
+      expect(recorder.modes.last, 'SystemUiMode.edgeToEdge');
+    },
+  );
 
   testWidgets('the AI check belongs to its card, not the review page', (
     tester,

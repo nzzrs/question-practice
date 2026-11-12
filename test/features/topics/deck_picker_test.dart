@@ -166,6 +166,8 @@ void main() {
     await pumpFrames(tester);
     expect(find.text('Edit topic'), findsOneWidget);
 
+    await tester.tap(find.text('AnkiDroid deck'));
+    await pumpFrames(tester);
     await tester.scrollUntilVisible(
       find.text('Browse decks'),
       250,
@@ -183,6 +185,6 @@ void main() {
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
     expect(find.text('Edit topic'), findsOneWidget);
-    expect(find.text('Infrastructure::AWS'), findsOneWidget);
+    expect(find.text('Infrastructure::AWS'), findsNWidgets(2));
   });
 }

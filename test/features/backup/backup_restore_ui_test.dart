@@ -72,11 +72,20 @@ void main() {
     await tester.tap(find.text('Edit topic'));
     await pumpFrames(tester);
 
-    final fields = tester
-        .widgetList<EditableText>(find.byType(EditableText))
-        .map((field) => field.controller.text)
-        .toList();
-    expect(fields, contains('Cloud deck'));
+    // The deck value shows on the collapsed tile, before its editor mounts.
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('topic-editor-tile-deck')),
+        matching: find.text('Cloud deck'),
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('AnkiDroid deck'));
+    await pumpFrames(tester);
+    final deck = tester.widget<M3ETextField>(
+      find.byKey(const ValueKey('topic-editor-deck')),
+    );
+    expect(deck.controller!.text, 'Cloud deck');
   });
 
   testWidgets('topic editing re-reads the topic so a stale snapshot cannot '
@@ -111,12 +120,27 @@ void main() {
     await tester.tap(find.text('edit'));
     await pumpFrames(tester);
 
-    final fields = tester
-        .widgetList<EditableText>(find.byType(EditableText))
-        .map((field) => field.controller.text)
-        .toList();
-    expect(fields, contains('Cloud deck'));
-    expect(fields, contains('Topic description'));
+    await tester.tap(find.text('AnkiDroid deck'));
+    await pumpFrames(tester);
+    expect(
+      tester
+          .widget<M3ETextField>(find.byKey(const ValueKey('topic-editor-deck')))
+          .controller!
+          .text,
+      'Cloud deck',
+    );
+
+    await tester.tap(find.text('Description'));
+    await pumpFrames(tester);
+    expect(
+      tester
+          .widget<M3ETextField>(
+            find.byKey(const ValueKey('topic-editor-description')),
+          )
+          .controller!
+          .text,
+      'Topic description',
+    );
 
     await tester.tap(find.text('Save'));
     await pumpFrames(tester);

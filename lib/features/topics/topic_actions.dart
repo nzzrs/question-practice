@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import 'topic_editor_page.dart';
+import 'topic_editor_sheet.dart';
 
 /// Actions offered when a topic row is long-pressed.
 enum TopicAction { edit, archive, unarchive, delete }
@@ -61,17 +61,24 @@ Future<void> _deleteTopic(
 
 /// Edits a topic's name, description, priority and AnkiDroid deck.
 ///
-/// Opens the full-page [TopicEditorPage] and returns whether the topic was
-/// saved. Callers keep their existing refresh and snackbar behaviour.
+/// Opens the [TopicEditorSheet] and returns whether the topic was saved.
+/// Callers keep their existing refresh and snackbar behaviour.
 Future<bool> showEditTopicDialog(
   BuildContext context,
   WidgetRef ref,
   Topic topic,
 ) async {
-  final saved = await Navigator.of(context).push<bool>(
-    MaterialPageRoute<bool>(
-      builder: (context) => TopicEditorPage(topic: topic),
-    ),
+  final guard = TopicEditorSheetGuard();
+  final saved = await M3EBottomSheet.show<bool>(
+    context,
+    initialValue: M3EBottomSheetValue.expanded,
+    onDismissRequest: () async {
+      if (guard.saving) return false;
+      if (!guard.dirty) return true;
+      if (!context.mounted) return true;
+      return confirmDiscardTopicChanges(context);
+    },
+    builder: (context) => TopicEditorSheet(topic: topic, guard: guard),
   );
   if (saved == true) {
     ref.invalidate(topicSummariesProvider);

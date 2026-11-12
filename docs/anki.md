@@ -16,11 +16,11 @@ The manifest declares the database permission and a `<queries>` entry for `com.i
 Decks are selected **per topic only**. There is no per-practice deck: every card made from a topic routes to that topic's deck, or to the default deck when the topic has none.
 
 1. Open **Settings → AnkiDroid → Deck name** and set the default deck, for example `Question Practice`.
-2. Long-press a topic and choose **Edit topic** (or open the topic and use its edit action), then **AnkiDroid deck** → **Browse decks**.
+2. Long-press a topic on Home and choose **Edit topic**, then **AnkiDroid deck** → **Browse decks**.
 3. Pick an existing deck from AnkiDroid, or type a new name. A missing deck is created on export.
 4. Leave the field blank to use the default deck.
 
-The **AnkiDroid deck** row in the **Edit practice** sheet opens the same topic setting. It does not create a practice-specific deck, and practice JSON files never contain a deck.
+The **Edit practice** sheet has no deck row. Deck selection is topic-level only: it does not create a practice-specific deck, and practice JSON files never contain a deck.
 
 The picker reads the live deck list through AnkiDroid's API (`AddContentApi.deckList`). If the AnkiDroid API or database permission is unavailable, the picker explains the problem and still allows typing a deck name.
 
@@ -100,7 +100,7 @@ On a connected Android device with AnkiDroid installed:
    - concept notes render as cloze cards;
    - error notes use `Question Practice: Error v2` with all six fields;
    - basic notes use the `Basic` note type with `Front` and `Back`.
-5. Set the Cloud topic to a separate deck with **Edit topic → AnkiDroid deck** (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck. Open **Edit practice** and confirm its deck row shows the same topic deck; there is no separate practice deck.
+5. Set the Cloud topic to a separate deck with **Edit topic → AnkiDroid deck** (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck. Open **Edit practice** and confirm it has no deck row; deck selection is topic-level only.
 6. Import a multi-answer question and export its error card. Confirm both selected and correct alternatives appear in the respective fields.
 7. Delete `Question Practice: Error v2` in AnkiDroid, export again, and confirm the app creates it before adding notes.
 8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.

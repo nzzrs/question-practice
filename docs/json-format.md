@@ -473,9 +473,9 @@ per topic:
 - set a topic's deck in **Edit topic → AnkiDroid deck** (or in the topic
   long-press menu).
 
-There is no per-practice deck. The **AnkiDroid deck** entry in the **Edit
-practice** sheet edits the practice's topic deck, not a separate practice deck.
-A downloaded practice JSON file never contains a deck. See [anki.md](anki.md).
+There is no per-practice deck and the **Edit practice** sheet has no deck row.
+Deck selection lives with the topic. A downloaded practice JSON file never
+contains a deck. See [anki.md](anki.md).
 
 ## Versioning
 

@@ -4,4 +4,10 @@
 set -eu
 
 repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+# The database reference is generated from the Drift schema. Refuse to push
+# documentation that no longer matches the code.
+dart run tool/docs/update_docs.dart --check
+
 exec "$repo_root/tool/build_debug_apk.sh"

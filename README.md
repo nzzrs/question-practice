@@ -53,7 +53,7 @@ flutter build apk --debug
 
 The debug build uses the `link.nzrs.questionpractice.dev` application ID, so it can be installed next to a release build.
 
-A tracked pre-push hook builds the debug APK on this laptop before every push. Install it once:
+A tracked pre-push hook checks that generated documentation is current and builds the debug APK on this laptop before every push. Install it once:
 
 ```bash
 ./tool/install_hooks.sh
@@ -74,8 +74,14 @@ All documentation is in English. Start at [docs/README.md](docs/README.md).
 - [User guide](docs/user-guide.md)
 - [Practice JSON format](docs/json-format.md)
 - [AnkiDroid export and per-topic decks](docs/anki.md)
-- [Architecture](docs/architecture.md)
+- [Architecture and feature map](docs/architecture.md)
+- [Database reference](docs/database.md)
 - [Testing](docs/testing.md)
+
+The database map, migration history and backup coverage in
+[docs/database.md](docs/database.md) are generated from the Drift code. After a
+schema change, run `dart run tool/docs/update_docs.dart`; verify with
+`dart run tool/docs/update_docs.dart --check`.
 
 ## Import
 
@@ -103,9 +109,10 @@ See [docs/anki.md](docs/anki.md). Concept cards use AnkiDroid's existing **Cloze
 ```bash
 flutter analyze
 flutter test
+dart run tool/docs/update_docs.dart --check
 ```
 
-The suite covers the importer and JSON schema (including `correctIndexes` and subtopics), scoring and the 48-hour rule, multi-answer scoring, distraction checked and unchecked after feedback, session arrows and paused sessions, review cards, the shared error-card review view, Gemini and OpenAI-compatible lookup, provider model lists, acronym expansion, AI review checks, six-field Anki error notes, Drift statistics and deletion cascades, per-subtopic stats, regression and learning-rate math, statistics export, and the main widget flows. See [docs/testing.md](docs/testing.md) for the manual on-device checklist.
+The suite covers the importer and JSON schema (including `correctIndexes` and subtopics), scoring and the 48-hour rule, multi-answer scoring, distraction checked and unchecked after feedback, session arrows and paused sessions, review cards, the shared error-card review view, Gemini and OpenAI-compatible lookup, provider model lists, acronym expansion, AI review checks, six-field Anki error notes, Drift statistics and deletion cascades, per-subtopic stats, regression and learning-rate math, statistics export, generated database documentation, and the main widget flows. See [docs/testing.md](docs/testing.md) for the manual on-device checklist.
 
 ## Project layout
 

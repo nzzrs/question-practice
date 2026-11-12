@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/home/home_page.dart';
@@ -20,12 +21,42 @@ void main() {
     expect(find.text('Questions'), findsOneWidget);
     expect(find.text('No practices yet'), findsOneWidget);
     expect(find.text('Review past errors'), findsOneWidget);
-    expect(find.byIcon(Icons.info_outline), findsOneWidget);
+    expect(find.byIcon(Icons.help_outline), findsOneWidget);
+    expect(find.byIcon(Icons.info_outline), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.info_outline));
+    await tester.tap(find.byIcon(Icons.help_outline));
     await pumpFrames(tester);
     expect(find.text('How to use it'), findsOneWidget);
     expect(find.text('A quiet loop for practice'), findsOneWidget);
+  });
+
+  testWidgets('the shuffle FAB is icon-only with a spoken label', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(count: 2);
+
+    await pumpTestApp(tester, home: const HomePage(), harness: harness);
+
+    final shuffleFab = find.byWidgetPredicate(
+      (widget) =>
+          widget is M3EFab && widget.tooltip == 'Start shuffled practice',
+    );
+    expect(shuffleFab, findsOneWidget);
+    expect(
+      find.descendant(of: shuffleFab, matching: find.byType(Text)),
+      findsNothing,
+    );
+    expect(find.text('Shuffle'), findsNothing);
+    expect(
+      find.descendant(of: shuffleFab, matching: find.byIcon(Icons.shuffle)),
+      findsOneWidget,
+    );
+
+    await tester.tap(shuffleFab);
+    await pumpFrames(tester);
+    expect(find.text('Start shuffled practice'), findsOneWidget);
   });
 
   testWidgets('home shows imported topics and opens a topic', (tester) async {

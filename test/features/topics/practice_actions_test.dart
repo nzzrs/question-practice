@@ -40,7 +40,7 @@ void main() {
     expect(find.text('Edit description'), findsOneWidget);
     expect(find.text('Download practice JSON'), findsOneWidget);
     expect(find.text('Update practice JSON'), findsOneWidget);
-    expect(find.text('AnkiDroid deck'), findsOneWidget);
+    expect(find.text('AnkiDroid deck'), findsNothing);
 
     await tester.tap(find.text('Rename'));
     await pumpFrames(tester);

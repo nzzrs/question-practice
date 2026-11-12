@@ -11,6 +11,10 @@ void main() {
     (widget) => widget is M3EIconButton && widget.tooltip == 'Archived topics',
   );
 
+  Finder shuffleFab() => find.byWidgetPredicate(
+    (widget) => widget is M3EFab && widget.tooltip == 'Start shuffled practice',
+  );
+
   testWidgets('archiving hides a topic and the archived sheet restores it', (
     tester,
   ) async {
@@ -39,6 +43,8 @@ void main() {
       (await harness.practices.topicById(seeded.topicId))!.archived,
       isTrue,
     );
+    expect(tester.widget<M3EIconButton>(archivedButton()).badgeValue, isNull);
+    expect(find.byType(Badge), findsNothing);
 
     await tester.pump();
     await tester.pump(const Duration(seconds: 5));
@@ -75,6 +81,7 @@ void main() {
 
     expect(find.text('Edit topic'), findsOneWidget);
     expect(find.text('Browse decks'), findsOneWidget);
+    expect(find.text('AnkiDroid deck'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
@@ -128,7 +135,8 @@ void main() {
     await harness.seedPractice(count: 2);
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
-    await tester.tap(find.text('Shuffle'));
+    expect(find.text('Shuffle'), findsNothing);
+    await tester.tap(shuffleFab());
     await pumpFrames(tester);
 
     expect(find.text('Start shuffled practice'), findsOneWidget);
@@ -149,7 +157,7 @@ void main() {
     addTearDown(harness.close);
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
-    await tester.tap(find.text('Shuffle'));
+    await tester.tap(shuffleFab());
     await pumpFrames(tester);
     await tester.tap(find.text('Start practice'));
     await pumpFrames(tester);

@@ -36,7 +36,7 @@ If a topic is renamed, cards created before the rename keep the old captured top
 |---|---|---|
 | AnkiDroid's Cloze type | existing `Text` and `Back Extra` fields | Concept cards |
 | `Question Practice: Error v2` | Problem, Wrong Solution, Correct Solution, Mental Trap, Vaccine, Explanation | Error cards |
-| `Question Practice Basic` | Front, Back | Skipped-question “another question” cards |
+| `Basic` | Front, Back | Skipped-question and other basic question/answer cards |
 
 Questions checks for `Question Practice: Error v2` before inserting notes. If the model is missing, it creates it with the six fields, front/back templates and CSS defined in `AnkiBridge.kt`. The versioned name lets an existing AnkiDroid model keep its old cards while new exports use the revised template.
 

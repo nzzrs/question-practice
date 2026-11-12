@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/theme.dart';
+import 'package:question_practice/core/ui/immersive_review.dart';
 import 'package:question_practice/features/errors/past_errors_page.dart';
 import 'package:question_practice/features/export/cards_page.dart';
 import 'package:question_practice/features/help/help_page.dart';
@@ -49,6 +50,7 @@ Future<void> _pumpNarrow(
         autoTheming: false,
         dynamicColoring: false,
         debugShowCheckedModeBanner: false,
+        navigatorObservers: [reviewRouteObserver],
         home: home,
       ),
     ),

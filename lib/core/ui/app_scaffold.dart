@@ -60,36 +60,57 @@ class AppPage extends StatelessWidget {
     final close = onBack ?? () => Navigator.of(context).maybePop();
 
     if (focus) {
-      return Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        body: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              _FocusHeader(title: title, onClose: close, actions: actions),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: maxWidth),
-                    child: CustomScrollView(
-                      controller: scrollController,
-                      slivers: [
-                        SliverPadding(
-                          padding: contentPadding,
-                          sliver: SliverList.list(children: children),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
+      final tablet = width >= 600;
+      final focusPadding =
+          padding ??
+          EdgeInsets.fromLTRB(
+            tablet ? 24 : 12,
+            4,
+            tablet ? 24 : 12,
+            bottomInset,
+          );
+      final content = CustomScrollView(
+        controller: scrollController,
+        slivers: [
+          SliverPadding(
+            padding: focusPadding,
+            sliver: SliverList.list(children: children),
           ),
+        ],
+      );
+      return PopScope(
+        // Keep the system back gesture aligned with the visible close control,
+        // including on the completion screen where closing reports success.
+        canPop: onBack == null,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) close();
+        },
+        child: Scaffold(
+          key: const ValueKey('app-focus-page'),
+          backgroundColor: theme.colorScheme.surface,
+          body: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                _FocusHeader(title: title, onClose: close, actions: actions),
+                Expanded(
+                  child: tablet
+                      ? Align(
+                          alignment: Alignment.topCenter,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: maxWidth),
+                            child: content,
+                          ),
+                        )
+                      : content,
+                ),
+                if (bottomBar != null) bottomBar!,
+              ],
+            ),
+          ),
+          floatingActionButton: floatingActionButton,
+          floatingActionButtonLocation: floatingActionButtonLocation,
         ),
-        bottomNavigationBar: bottomBar,
-        floatingActionButton: floatingActionButton,
-        floatingActionButtonLocation: floatingActionButtonLocation,
       );
     }
 

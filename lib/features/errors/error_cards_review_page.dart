@@ -182,6 +182,10 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    return ImmersiveReview(child: _buildPage(context));
+  }
+
+  Widget _buildPage(BuildContext context) {
     final theme = M3ETheme.of(context);
     if (_steps.isEmpty) {
       return AppPage(
@@ -203,6 +207,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
       return AppPage(
         title: 'Review complete',
         focus: true,
+        onBack: () => Navigator.of(context).pop(true),
         scrollController: _scroll,
         variant: M3EAppBarVariant.small,
         children: [

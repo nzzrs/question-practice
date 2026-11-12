@@ -3,6 +3,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/domain/models.dart';
+import '../core/ui/immersive_review.dart';
 import '../features/home/home_page.dart';
 import 'providers.dart';
 import 'theme.dart';
@@ -20,6 +21,7 @@ class QuestionPracticeApp extends ConsumerWidget {
       autoTheming: true,
       dynamicColoring: settings.dynamicColor,
       drawUnderSystemBars: true,
+      navigatorObservers: [reviewRouteObserver],
       home: const HomePage(),
     );
   }

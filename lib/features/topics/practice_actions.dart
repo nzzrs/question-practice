@@ -9,12 +9,11 @@ import '../../core/ui/widgets.dart';
 import '../import/domain/import_models.dart';
 import '../practice_edit/domain/practice_edit_service.dart';
 import '../practice_edit/practice_update_preview_page.dart';
-import 'anki_deck_picker.dart';
 
 /// Actions offered when a practice row is long-pressed.
 enum PracticeAction { edit, delete, markDone, markActive, split }
 
-enum _PracticeEditAction { rename, description, downloadJson, updateJson, deck }
+enum _PracticeEditAction { rename, description, downloadJson, updateJson }
 
 /// Opens the practice options sheet and returns the chosen action.
 Future<PracticeAction?> showPracticeActions(
@@ -28,7 +27,7 @@ Future<PracticeAction?> showPracticeActions(
   );
 }
 
-/// Opens the edit menu for a practice: rename, description, files and deck.
+/// Opens the edit menu for a practice: rename, description and files.
 Future<void> showPracticeEditMenu(
   BuildContext context,
   WidgetRef ref,
@@ -42,16 +41,10 @@ Future<void> showPracticeEditMenu(
     await showSnack(context, 'This topic no longer exists.');
     return;
   }
-  final defaultDeck =
-      ref.read(settingsProvider).value?.ankiDeck ?? 'Question Practice';
   final action = await M3EBottomSheet.show<_PracticeEditAction>(
     context,
     initialValue: M3EBottomSheetValue.expanded,
-    builder: (context) => _PracticeEditOptionsSheet(
-      summary: summary,
-      defaultDeck: defaultDeck,
-      deck: topic.ankiDeck,
-    ),
+    builder: (context) => _PracticeEditOptionsSheet(summary: summary),
   );
   if (action == null || !context.mounted) return;
   switch (action) {
@@ -63,8 +56,6 @@ Future<void> showPracticeEditMenu(
       await _downloadJson(context, ref, summary);
     case _PracticeEditAction.updateJson:
       await _updateFromJson(context, ref, summary);
-    case _PracticeEditAction.deck:
-      await _chooseDeck(context, ref, topic, defaultDeck);
   }
 }
 
@@ -276,37 +267,6 @@ Future<void> _showIssues(BuildContext context, List<ImportIssue> issues) async {
   );
 }
 
-Future<void> _chooseDeck(
-  BuildContext context,
-  WidgetRef ref,
-  Topic topic,
-  String defaultDeck,
-) async {
-  final selected = await showAnkiDeckPicker(
-    context,
-    ref,
-    current: topic.ankiDeck ?? '',
-  );
-  if (selected == null || !context.mounted) return;
-  final deck = selected.trim();
-  await ref
-      .read(topicRepositoryProvider)
-      .updateTopic(
-        id: topic.id,
-        name: topic.name,
-        description: topic.description,
-        priority: topic.priority,
-        ankiDeck: deck.isEmpty ? null : deck,
-      );
-  if (!context.mounted) return;
-  await showSnack(
-    context,
-    deck.isEmpty
-        ? 'Deck reset to $defaultDeck (default).'
-        : 'Anki deck set to $deck.',
-  );
-}
-
 class _PracticeOptionsSheet extends StatelessWidget {
   const _PracticeOptionsSheet({required this.summary});
 
@@ -371,22 +331,12 @@ class _PracticeOptionsSheet extends StatelessWidget {
 }
 
 class _PracticeEditOptionsSheet extends StatelessWidget {
-  const _PracticeEditOptionsSheet({
-    required this.summary,
-    required this.defaultDeck,
-    required this.deck,
-  });
+  const _PracticeEditOptionsSheet({required this.summary});
 
   final PracticeSummary summary;
-  final String defaultDeck;
-  final String? deck;
 
   @override
   Widget build(BuildContext context) {
-    final deckName = deck?.trim();
-    final deckLabel = deckName == null || deckName.isEmpty
-        ? '$defaultDeck (default)'
-        : deckName;
     return SafeArea(
       top: false,
       child: SingleChildScrollView(
@@ -425,12 +375,6 @@ class _PracticeEditOptionsSheet extends StatelessWidget {
               subtitle: 'Add, modify or delete questions from a JSON file',
               onTap: () =>
                   Navigator.of(context).pop(_PracticeEditAction.updateJson),
-            ),
-            PracticeOptionTile(
-              icon: Icons.style_outlined,
-              title: 'AnkiDroid deck',
-              subtitle: deckLabel,
-              onTap: () => Navigator.of(context).pop(_PracticeEditAction.deck),
             ),
           ],
         ),

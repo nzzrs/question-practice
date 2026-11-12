@@ -49,7 +49,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       actions: [
         M3EIconButton(
           variant: M3EIconButtonVariant.standard,
-          icon: const Icon(Icons.info_outline),
+          icon: const Icon(Icons.help_outline),
           tooltip: 'How to use Questions',
           onPressed: () => _push(const HelpPage()),
         ),
@@ -64,10 +64,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          M3EExtendedFab(
-            label: 'Shuffle',
+          M3EFab(
             icon: const Icon(Icons.shuffle),
+            size: M3EFabSize.regular,
             color: M3EFabColor.secondary,
+            tooltip: 'Start shuffled practice',
             onPressed: _starting ? null : _showShuffleOptions,
           ),
           const SizedBox(height: 12),
@@ -115,7 +116,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 variant: M3EIconButtonVariant.standard,
                 icon: const Icon(Icons.archive_outlined),
                 tooltip: 'Archived topics',
-                badgeValue: archived.isEmpty ? null : archived.length,
                 onPressed: _showArchivedTopics,
               ),
             ],

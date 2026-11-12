@@ -122,6 +122,35 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
         .get();
   }
 
+  /// Every recorded attempt, used to derive per-question history.
+  Future<List<AttemptRow>> allAttempts() {
+    return (select(attempts)..orderBy([(a) => OrderingTerm.asc(a.id)])).get();
+  }
+
+  /// Questions that a completed session left out without an answer.
+  ///
+  /// These were skipped by finishing early with **Leave unanswered**, so the
+  /// shuffled queue treats them like skipped questions.
+  Future<List<int>> questionsLeftUnanswered() async {
+    final query = customSelect(
+      '''
+      SELECT DISTINCT sq.question_id AS question_id
+      FROM session_questions sq
+      INNER JOIN sessions s ON s.id = sq.session_id
+      WHERE s.status = 'completed'
+        AND NOT EXISTS (
+          SELECT 1 FROM attempts a
+          WHERE a.session_id = sq.session_id
+            AND a.question_id = sq.question_id
+            AND a.selected_indexes_json != '[]'
+        )
+      ''',
+      readsFrom: {sessionQuestions, sessions, attempts},
+    );
+    final rows = await query.get();
+    return rows.map((row) => row.read<int>('question_id')).toList();
+  }
+
   Future<AttemptRow?> attemptForQuestion(int sessionId, int questionId) {
     return (select(attempts)..where(
           (a) =>

@@ -12,7 +12,7 @@ The suite runs on the Dart VM. Drift uses an in-memory SQLite database; HTTP and
 | Area | Coverage |
 |---|---|
 | Import | Schema rejection, JSON syntax paths, BOM/text files, semantic validation, `correctIndex` and `correctIndexes`, duplicate handling, size limit |
-| Practice | Scoring, multi-answer set matching, skipped answers, distraction checked and unchecked after feedback, resume/discard, mixed sessions, summary counts, session arrows |
+| Practice | Scoring, multi-answer set matching, skipped answers, distraction checked and unchecked after feedback, resume/discard, mixed sessions, summary counts, session arrows, done/solved/skipped history, shuffled inclusion, redo prompt, done tag |
 | Error queue | Exact 48-hour boundary, due query, resolution, history, wrong retry scheduling |
 | Review | Error steps, shared error-card review view, skipped concept/basic branches, missing definitions, AI bias/vaccine suggestions, structured skipped/unknown review with reasoning and other alternatives |
 | Highlights | Highlight persistence, painted phrases, keep/convert review steps, highlights in Cards, plain-text download |

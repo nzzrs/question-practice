@@ -6,6 +6,7 @@ import '../../../core/data/card_repository.dart';
 import '../../../core/data/practice_repository.dart';
 import '../../../core/data/session_repository.dart';
 import '../../../core/domain/models.dart';
+import '../../../core/domain/question_progress.dart';
 
 const errorReviewDelay = Duration(hours: 48);
 
@@ -45,6 +46,7 @@ class SessionStart {
     required this.items,
     required this.attempts,
     required this.errorCards,
+    required this.progress,
   });
 
   final PracticeSession session;
@@ -52,7 +54,34 @@ class SessionStart {
   final Map<int, Attempt> attempts;
   final Map<int, ErrorCard> errorCards;
 
+  /// History for the questions in this session, from earlier attempts.
+  final QuestionProgress progress;
+
   int get answeredCount => attempts.length;
+
+  /// True when the question was answered here or in an earlier session.
+  bool isDone(SessionQuestionItem item) {
+    final attempt = attempts[item.question.id];
+    if (attempt != null && !attempt.isSkipped) return true;
+    return progress.isDone(item.question.id);
+  }
+
+  bool isSolved(SessionQuestionItem item) {
+    final attempt = attempts[item.question.id];
+    return (attempt?.isCorrect ?? false) || progress.isSolved(item.question.id);
+  }
+
+  /// Items with no attempt in this session that were never answered before.
+  ///
+  /// A question answered in an earlier attempt stays out, even when this redo
+  /// did not reach it again. A question skipped in this session also stays out:
+  /// the learner already chose how to leave it.
+  List<SessionQuestionItem> get pendingUnanswered => [
+    for (final item in items)
+      if (!attempts.containsKey(item.question.id) &&
+          !progress.isDone(item.question.id))
+        item,
+  ];
 
   SessionQuestionItem? get currentItem {
     for (final item in items) {
@@ -124,6 +153,7 @@ class SessionService {
     if (questions.isEmpty) {
       throw const SessionException('This practice has no questions.');
     }
+    final progress = await _sessions.questionProgress();
     final session = await _sessions.startSession(
       practiceId: practiceId,
       mode: SessionMode.practice,
@@ -142,13 +172,19 @@ class SessionService {
       ],
       attempts: <int, Attempt>{},
       errorCards: const {},
+      progress: progress,
     );
   }
 
   Future<SessionStart> startMixed() async {
-    final questions = await _practices.allQuestions();
+    final progress = await _sessions.questionProgress();
+    final questions = (await _practices.allQuestions())
+        .where((question) => progress.countsForShuffledPractice(question.id))
+        .toList();
     if (questions.isEmpty) {
-      throw const SessionException('Import a practice before starting.');
+      throw const SessionException(
+        'No unsolved questions are left for shuffled practice.',
+      );
     }
     final topics = await _practices.allTopics();
     final practices = await _practices.allPractices();
@@ -176,6 +212,7 @@ class SessionService {
       ],
       attempts: <int, Attempt>{},
       errorCards: const {},
+      progress: progress,
     );
   }
 
@@ -201,6 +238,7 @@ class SessionService {
     if (questions.isEmpty) {
       throw const SessionException('No errors are due for review yet.');
     }
+    final progress = await _sessions.questionProgress();
     final session = await _sessions.startSession(
       practiceId: null,
       mode: SessionMode.pastErrors,
@@ -212,6 +250,7 @@ class SessionService {
       items: questions,
       attempts: <int, Attempt>{},
       errorCards: cards,
+      progress: progress,
     );
   }
 
@@ -238,6 +277,7 @@ class SessionService {
         if (card != null) cards[question.id] = card;
       }
     }
+    final progress = await _sessions.questionProgress();
     return SessionStart(
       session: session,
       items: [
@@ -251,6 +291,7 @@ class SessionService {
       ],
       attempts: {for (final attempt in attempts) attempt.questionId: attempt},
       errorCards: cards,
+      progress: progress,
     );
   }
 
@@ -575,7 +616,9 @@ class SessionService {
   ///
   /// Unanswered questions are left out of the session when [markSkipped] is
   /// false, so they do not affect the score or the statistics. When it is true,
-  /// each unanswered question is recorded as a skipped attempt.
+  /// each never-answered question is recorded as a skipped attempt. A question
+  /// answered in an earlier attempt already counts as done on a redo and is
+  /// never marked unanswered again.
   Future<SessionSummary> finishEarly({
     required SessionStart start,
     required bool markSkipped,
@@ -584,10 +627,7 @@ class SessionService {
     if (session.status != SessionStatus.inProgress) {
       return summaryFor(session.id);
     }
-    final unanswered = [
-      for (final item in start.items)
-        if (!start.attempts.containsKey(item.question.id)) item,
-    ];
+    final unanswered = start.pendingUnanswered;
     final now = _clock.now().toUtc();
     if (markSkipped) {
       for (final item in unanswered) {

@@ -422,7 +422,8 @@ class _ShuffleBanner extends StatelessWidget {
             ],
           ),
           Text(
-            'Questions from every topic, in a random order.',
+            'Questions you have not solved or skipped, from every topic, in a '
+            'random order.',
             style: theme.typography.baseline.bodySmall.copyWith(
               color: theme.colorScheme.onSecondaryContainer.withValues(
                 alpha: 0.8,

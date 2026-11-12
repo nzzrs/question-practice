@@ -40,6 +40,8 @@ Skipped answers never create error cards. They are handled by the skipped branch
 
 A session is created at start and remains `inProgress` until every question has an attempt. The session screen keeps its own question index: the top arrows move without answering, and previously submitted attempts reload their selected alternatives, reasoning and feedback. Closing offers save, discard or cancel. Save leaves the session `inProgress`; Home watches a list of all in-progress sessions, not only the newest.
 
+Per-question history is derived from attempts, never stored as a new column. A question is **done** after an attempt with a non-empty selection that is not marked "I didn't know this" (correct, wrong and distracted answers all count); **solved** after a correct attempt; and **skipped** after an empty-selection or "I didn't know this" attempt. The session navigator tags done questions, and its question list marks them. Shuffled practice keeps only questions that are neither solved nor skipped, so solved questions and questions left unanswered stay out. On a redo, questions answered in an earlier attempt count as done for the end-of-session prompt, so "Leave unanswered" appears only for a question that has never been answered in any attempt.
+
 ## UI
 
 - `M3EMaterialApp` owns theming (light/dark from the system, wallpaper colors by default), and `M3ETheme` tokens are used throughout.
@@ -60,6 +62,7 @@ A session is created at start and remains `inProgress` until every question has 
 - `AnkiGateway` (Dart) ↔ `AnkiBridge` (Kotlin) over a MethodChannel. Kotlin uses AnkiDroid's AddContentApi, groups notes by target deck, creates missing decks, and broadcasts DO_SYNC. `deckNames()` reads live decks for the topic picker.
 - `WebLauncher` wraps Chrome Custom Tabs.
 - `SecureKeyStore` wraps Android secure storage.
+- `MethodChannelPracticeSoundPlayer` clamps the configured volume to the platform range (0..1). The WAV assets are mastered with 6 dB more gain than before; their peaks stay at least 7 dB below full scale, so doubling the loudness cannot clip.
 - `http.Client` is injected so lookup tests use mock responses.
 - `LookupService` has two AI transports: OpenAI-compatible `/chat/completions` with a Bearer key, and Gemini native `models/{model}:generateContent` with the key in the query string. `listModels` reads `/models` from either provider shape.
 

@@ -6,13 +6,13 @@ Questions is an offline-first Android study app. This guide walks through every 
 
 - **Topics** lists your active topics, ordered by priority and name until you choose another order.
 - Long-press a topic card to open its options: **Edit topic**, **Archive topic** and **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
-- **Archive topic** hides the topic from Home while keeping its practices, questions, sessions and cards.
+- **Archive topic** hides the topic from Home while keeping its practices, questions, sessions, cards and statistics. Archived topics are not deleted.
 - The **sort** icon beside **Topics** orders the list by **Name** or **Recency**, increasing or decreasing. The choice is remembered. The **archived topics** icon to its right lists archived topics; tap one to unarchive, edit or delete it.
 - **Session in progress** cards list every paused session with its mode, question count and start time. Each card has **Resume** and **Discard**.
 - A topic card shows its practices, its question count (questions left unanswered in completed sessions are excluded), accuracy and progress.
 - **Review past errors** opens the 48-hour error queue.
 - **Cards** opens concepts, error cards and basic cards waiting for export.
-- The **Shuffle** floating button opens **Start shuffled practice**. That session mixes unsolved, unskipped questions from every topic in random order.
+- The **Shuffle** floating button opens **Start shuffled practice**. The sheet explains that the session uses questions from every topic, keeps only unsolved and unskipped questions, and shuffles both questions and alternatives. If no question is eligible, it says so instead of starting an empty session.
 - **Import** creates topics and practices from a JSON file.
 - The **i** icon opens Help.
 - The settings icon opens Settings.
@@ -24,7 +24,9 @@ Questions is an offline-first Android study app. This guide walks through every 
 3. Review the file name, counts, topic/practice list and duplicate notes.
 4. Tap **Import**.
 
-The whole file is validated first. A broken file shows the JSON path or line/column and imports nothing. **Load sample** loads the bundled practice. A question may include an optional `subtopic`; blank values are imported as uncategorized. See [Import format](json-format.md).
+The whole file is validated first. A broken file shows the JSON path or line/column and imports nothing. **Load sample** loads the bundled `assets/samples/sample_practice.json`. The separate `assets/samples/practice_format_example.json` demonstrates a single-answer question, a multi-answer question, per-alternative explanations, `sourceId` and two topics. A question may include an optional `subtopic`; blank values are imported as uncategorized.
+
+A practice file is limited to 10 MB and 5,000 questions. It is UTF-8 JSON in a `.json` or `.txt` file. The JSON schema and every semantic rule are documented in [Practice JSON format](json-format.md).
 
 ## Topic
 
@@ -33,11 +35,12 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - **Practices** lists each practice with question count and last score. Tap a practice to start.
 - The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order across visits and app restarts.
 - Long-press a practice to open its options: **Edit practice**, mark it done or active, split it into two slices, or delete it.
-- **Edit practice** opens a second menu with **Rename**, **Edit description**, **Download practice JSON**, **Update practice JSON** and **AnkiDroid deck**. The deck entry sets the topic's deck, which routes this practice's cards on export.
-- **Download practice JSON** shares one file with the topic, the practice name and description, and every current question. Each question carries a stable identity so a later update maps back to the stored question.
-- **Update practice JSON** reads an edited export and shows a preview before writing anything: how many questions are new, modified, unchanged and deleted, with the affected prompts. **Apply changes** writes one transaction and refreshes the practice content hash and import time; **Cancel** leaves it untouched. Matched questions keep their answers, error cards and statistics. Deleted questions and their linked answers and cards are removed. Files without identities fall back to matching the exact prompt. A file whose topic or practice name does not match is rejected with a clear message.
+- **Edit practice** opens a second menu with **Rename**, **Edit description**, **Download practice JSON**, **Update practice JSON** and **AnkiDroid deck**. The deck row edits the topic's deck, which routes the practice's cards on export; **Edit topic** changes the same setting. There is no per-practice deck, and a practice JSON file cannot contain one.
+- **Download practice JSON** shares one file with the topic, the practice name and description, and every current question, in the import format. Each question carries `sourceId`, the app's stable identity for that question, so a later update maps back to the stored question. Subtopics are included only when set. The file does not contain a deck.
+- **Update practice JSON** reads an edited export and shows a preview before writing anything: how many questions are new, modified, unchanged and deleted, with the affected prompts. The file's topic and practice names must match the stored practice after trimming and ignoring case. Questions are matched by `sourceId` first and then by exact trimmed prompt; files without identities therefore still work. **Apply changes** writes one transaction and refreshes the practice content hash and import time; **Cancel** leaves it untouched. Matched questions keep their answers, error cards, skipped records and statistics. New questions start empty. Deleted questions lose their answers, session links, error cards and skipped records; linked concept cards, basic cards and highlights remain but lose their question link. A file whose topic or practice name does not match is rejected with a clear message.
 - **Split into two** replaces the practice with "… Slice A" and "… Slice B", each holding half of its questions in random order. It needs an even number of questions and removes the original practice's sessions and cards. Finish or discard an in-progress session first.
-- **Edit topic** is available from the topic's long-press menu on Home and from the archived topics list. It changes name, description, priority and the Anki deck.
+- **Edit topic** is available from the topic's long-press menu on Home and from the archived topics list. It changes name, description, priority and the AnkiDroid deck.
+- AnkiDroid decks are selected **per topic only**. There is no practice-level deck, and a practice JSON file cannot contain one.
 - **Browse decks** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
 - Blank deck means the default deck from Settings.
 
@@ -47,7 +50,7 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - The hero shows the latest score, best and average, and the number of completed sessions.
 - **Progress over time** plots one point per completed session. The solid line joins the sessions; the dashed **Trend** line is a least-squares fit through the same points, so it shows the overall direction rather than a single jump. The legend names both series.
 - **Learning rate** appears below the metrics once the history spans at least one week. It reports the average change in percentage points per week from the fitted trend, for example `+8 pp/week`. Short histories and single sessions do not show a figure.
-- **By subtopic** groups questions by their optional subtopic and shows accuracy and progress for each group. Questions without a subtopic appear under **Uncategorized**. The section is hidden when no question in the topic has a subtopic.
+- **By subtopic** groups questions by their optional `subtopic` and shows accuracy and progress for each group, counted from completed sessions. Questions without a subtopic appear under **Uncategorized**. The section is hidden when no question in the topic has a subtopic. Spelling and capitalisation define the group, so `Networking` and `networking` are shown separately. The same per-subtopic figures are included in the shared statistics JSON.
 - **Sessions** lists every completed session with its score and date.
 - The share icon exports the visible statistics as a JSON file through the system share sheet. The file contains the topic summary, progress points, per-subtopic figures and the trend data.
 
@@ -127,6 +130,28 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - **AnkiDroid**: status of install/API/permission/Cloze type, permission request, open AnkiDroid, default deck name, and **Browse decks** to pick a live deck name.
 - **Data**: **Export backup** shares one JSON file with every topic (including archived topics and Anki decks), practice, question and subtopic, session, answer, card, skipped question, highlight and setting. The file records its format version, app version/build, database schema version, export time and row counts, plus a checksum. **Restore backup** validates all of that before replacing anything, then replaces all local data in one step; a damaged or inconsistent file is rejected and leaves the current data untouched. Backups made by older app versions, including the first backup format, still restore. The AI API key is never part of a backup and is left untouched on the device. **Erase all data** removes practices, sessions, cards, settings and the API key. Restore and erase cannot be undone.
 - **About**: version.
+
+## Backup and restore
+
+- **Export backup** writes a UTF-8 JSON file through the system share sheet. It contains the complete local database, including archived topics, subtopics, practice done flags, session history, error history, skipped questions, highlights and settings.
+- **Restore backup** checks the file before writing anything. It must be UTF-8 JSON, no larger than 50 MB, with the expected app id, format version and checksum. An empty, malformed or incompatible file leaves the current data untouched.
+- A valid restore replaces every local table in one transaction. It does not merge with existing data, so the backup becomes the complete state of the app.
+- The AI API key lives in Android secure storage, not in the database. It is never exported, and a restore does not overwrite the key already on the device.
+- A backup is not a practice JSON file. A backup preserves history and settings; a practice JSON file contains only importable practice content and is used by **Import** or **Update practice JSON**.
+
+## Archived topics
+
+- Long-press a topic on Home and choose **Archive topic**. It disappears from the active list but keeps its practices, questions, sessions, cards, statistics and deck.
+- The archive icon beside **Topics** opens the archived list. When at least one topic is archived, the icon shows a badge with the count.
+- Tap an archived topic to open the same actions as an active topic: **Unarchive**, **Edit topic** or **Delete topic**. Unarchive returns it to Home with its data intact.
+- Deleting an archived topic is permanent and removes everything inside it, exactly like deleting an active topic.
+
+## Shuffled practice
+
+- The **Shuffle** floating button opens **Start shuffled practice**, not a separate practice.
+- The session uses questions from every topic, keeps only questions that are neither solved nor skipped, and shuffles questions and alternatives.
+- The sheet lists these rules before **Start practice**. If no question is eligible, the app reports that no unsolved questions are left.
+- A shuffled session is saved as a paused session like any other and appears on Home if you close it with **Save for later**.
 
 ## Deck routing details
 

@@ -288,13 +288,13 @@ class _PracticeOptionsSheet extends StatelessWidget {
                   '${summary.questionCount} questions · '
                   '${practice.isDone ? 'Marked as done' : 'Active'}',
             ),
-            PracticeOptionTile(
+            OptionTile(
               icon: Icons.edit_outlined,
               title: 'Edit practice',
               subtitle: 'Rename, edit the description or update the JSON',
               onTap: () => Navigator.of(context).pop(PracticeAction.edit),
             ),
-            PracticeOptionTile(
+            OptionTile(
               icon: practice.isDone
                   ? Icons.restart_alt
                   : Icons.check_circle_outline,
@@ -308,7 +308,7 @@ class _PracticeOptionsSheet extends StatelessWidget {
                     : PracticeAction.markDone,
               ),
             ),
-            PracticeOptionTile(
+            OptionTile(
               icon: Icons.call_split,
               title: 'Split into two',
               subtitle: summary.questionCount.isEven
@@ -316,7 +316,7 @@ class _PracticeOptionsSheet extends StatelessWidget {
                   : 'Needs an even number of questions',
               onTap: () => Navigator.of(context).pop(PracticeAction.split),
             ),
-            PracticeOptionTile(
+            OptionTile(
               icon: Icons.delete_outline,
               title: 'Delete',
               subtitle: 'Remove the practice and its questions',
@@ -348,28 +348,28 @@ class _PracticeEditOptionsSheet extends StatelessWidget {
               title: 'Edit practice',
               subtitle: summary.practice.name,
             ),
-            PracticeOptionTile(
+            OptionTile(
               icon: Icons.drive_file_rename_outline,
               title: 'Rename',
               subtitle: 'Change the practice name',
               onTap: () =>
                   Navigator.of(context).pop(_PracticeEditAction.rename),
             ),
-            PracticeOptionTile(
+            OptionTile(
               icon: Icons.notes_outlined,
               title: 'Edit description',
               subtitle: 'Describe what this practice covers',
               onTap: () =>
                   Navigator.of(context).pop(_PracticeEditAction.description),
             ),
-            PracticeOptionTile(
+            OptionTile(
               icon: Icons.download_outlined,
               title: 'Download practice JSON',
               subtitle: 'Share a file with every question and its identity',
               onTap: () =>
                   Navigator.of(context).pop(_PracticeEditAction.downloadJson),
             ),
-            PracticeOptionTile(
+            OptionTile(
               icon: Icons.upload_file_outlined,
               title: 'Update practice JSON',
               subtitle: 'Add, modify or delete questions from a JSON file',
@@ -413,79 +413,6 @@ class _SheetHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class PracticeOptionTile extends StatelessWidget {
-  const PracticeOptionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.destructive = false,
-    super.key,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final foreground = destructive
-        ? theme.colorScheme.error
-        : theme.colorScheme.onSurface;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              IconBadge(
-                icon,
-                size: 42,
-                tone: destructive ? PillTone.error : PillTone.neutral,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.typography.baseline.titleMedium.copyWith(
-                        color: foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: destructive
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

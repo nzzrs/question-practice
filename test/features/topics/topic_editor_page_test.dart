@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/home/home_page.dart';
 import 'package:question_practice/features/topics/topic_actions.dart';
 import 'package:question_practice/features/topics/topic_editor_page.dart';
@@ -36,6 +37,7 @@ Finder _descriptionField() =>
 Finder _priorityField() => find.byKey(const ValueKey('topic-editor-priority'));
 Finder _deckField() => find.byKey(const ValueKey('topic-editor-deck'));
 Finder _saveButton() => find.byKey(const ValueKey('topic-editor-save'));
+Finder _tile(String field) => find.byKey(ValueKey('topic-editor-tile-$field'));
 
 Finder _archivedButton() => find.byWidgetPredicate(
   (widget) => widget is M3EIconButton && widget.tooltip == 'Archived topics',
@@ -46,6 +48,24 @@ Future<void> _enter(WidgetTester tester, Finder finder, String text) async {
   await pumpFrames(tester);
   await tester.enterText(finder, text);
   await pumpFrames(tester);
+}
+
+/// Taps the header of a field tile to expand or collapse its inline editor.
+Future<void> _tapTileHeader(
+  WidgetTester tester,
+  String field,
+  String title,
+) async {
+  await tester.ensureVisible(_tile(field));
+  await pumpFrames(tester);
+  await tester.tap(
+    find.descendant(of: _tile(field), matching: find.text(title)).first,
+  );
+  await pumpFrames(tester);
+}
+
+Future<void> _openField(WidgetTester tester, String field, String title) async {
+  await _tapTileHeader(tester, field, title);
 }
 
 Future<void> _openFromLongPress(WidgetTester tester) async {
@@ -65,6 +85,82 @@ Future<void> _loadTestFont() async {
 
 void main() {
   setUpAll(_loadTestFont);
+
+  testWidgets('tile rows show current values and expand one field at a time', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(
+      topicName: 'Cloud',
+      practiceName: 'Core',
+      count: 1,
+      ankiDeck: 'Cloud deck',
+    );
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    expect(find.text('Edit topic'), findsOneWidget);
+    expect(find.byType(M3EDialog), findsNothing);
+    expect(find.byType(OptionTile), findsNWidgets(4));
+    expect(_tile('name'), findsOneWidget);
+    expect(_tile('description'), findsOneWidget);
+    expect(_tile('priority'), findsOneWidget);
+    expect(_tile('deck'), findsOneWidget);
+
+    expect(
+      find.descendant(of: _tile('name'), matching: find.text('Cloud')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: _tile('description'),
+        matching: find.text('Topic description'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: _tile('priority'),
+        matching: find.text('1 · highest'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: _tile('deck'), matching: find.text('Cloud deck')),
+      findsOneWidget,
+    );
+    expect(find.text('AnkiDroid deck'), findsOneWidget);
+    expect(find.text('Browse decks'), findsNothing);
+
+    await _openField(tester, 'name', 'Name');
+    expect(_nameField(), findsOneWidget);
+    expect(_descriptionField(), findsNothing);
+    expect(_priorityField(), findsNothing);
+    expect(_deckField(), findsNothing);
+
+    await _openField(tester, 'description', 'Description');
+    expect(_nameField(), findsNothing);
+    expect(_descriptionField(), findsOneWidget);
+
+    await _tapTileHeader(tester, 'description', 'Description');
+    expect(_descriptionField(), findsNothing);
+
+    await _openField(tester, 'deck', 'AnkiDroid deck');
+    expect(_deckField(), findsOneWidget);
+    expect(find.text('Browse decks'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('long-press menu opens the page and saves every field', (
     tester,
@@ -90,13 +186,15 @@ void main() {
     await _openFromLongPress(tester);
 
     expect(find.text('Edit topic'), findsOneWidget);
-    expect(find.byType(M3EDialog), findsNothing);
     expect(find.text('AnkiDroid deck'), findsOneWidget);
-    expect(find.text('Browse decks'), findsOneWidget);
 
+    await _openField(tester, 'name', 'Name');
     await _enter(tester, _nameField(), 'Cloud networking');
+    await _openField(tester, 'description', 'Description');
     await _enter(tester, _descriptionField(), 'Updated topic description');
+    await _openField(tester, 'priority', 'Priority');
     await _enter(tester, _priorityField(), '3');
+    await _openField(tester, 'deck', 'AnkiDroid deck');
     await _enter(tester, _deckField(), 'Cloud deck');
 
     await tester.tap(_saveButton());
@@ -147,6 +245,7 @@ void main() {
     await pumpFrames(tester);
     expect(find.byType(TopicEditorPage), findsOneWidget);
 
+    await _openField(tester, 'priority', 'Priority');
     await _enter(tester, _priorityField(), '2');
     await tester.tap(_saveButton());
     await pumpFrames(tester);
@@ -181,6 +280,7 @@ void main() {
     );
     await _openFromLongPress(tester);
 
+    await _openField(tester, 'name', 'Name');
     await _enter(tester, _nameField(), '');
     await tester.tap(_saveButton());
     await pumpFrames(tester);
@@ -188,10 +288,15 @@ void main() {
     expect(find.byType(TopicEditorPage), findsOneWidget);
 
     await _enter(tester, _nameField(), 'Cloud');
+    await _openField(tester, 'priority', 'Priority');
     await _enter(tester, _priorityField(), '9');
+    // Collapse the tile: saving must reopen it to show the error.
+    await _tapTileHeader(tester, 'priority', 'Priority');
+    expect(_priorityField(), findsNothing);
     await tester.tap(_saveButton());
     await pumpFrames(tester);
     expect(find.text('Use a number from 1 to 5.'), findsOneWidget);
+    expect(_priorityField(), findsOneWidget);
     expect(find.byType(TopicEditorPage), findsOneWidget);
 
     final stored = await harness.practices.topicById(seeded.topicId);
@@ -234,6 +339,7 @@ void main() {
     );
     await _openFromLongPress(tester);
 
+    await _openField(tester, 'description', 'Description');
     await _enter(tester, _descriptionField(), 'Unsaved description');
     await tester.binding.handlePopRoute();
     await pumpFrames(tester);
@@ -281,6 +387,7 @@ void main() {
     expect(find.byType(TopicEditorPage), findsOneWidget);
     expect(tester.takeException(), isNull);
 
+    await _openField(tester, 'deck', 'AnkiDroid deck');
     await tester.scrollUntilVisible(
       find.text('Browse decks'),
       250,
@@ -326,15 +433,18 @@ void main() {
       await pumpFrames(tester);
       expect(find.byType(TopicEditorPage), findsOneWidget);
 
+      await _openField(tester, 'deck', 'AnkiDroid deck');
       expect(
         tester.widget<M3ETextField>(_deckField()).controller!.text,
         'Cloud deck',
       );
+      await _openField(tester, 'description', 'Description');
       expect(
         tester.widget<M3ETextField>(_descriptionField()).controller!.text,
         'Topic description',
       );
 
+      await _openField(tester, 'name', 'Name');
       await _enter(tester, _nameField(), 'Cloud restored');
       await tester.tap(_saveButton());
       await pumpFrames(tester);

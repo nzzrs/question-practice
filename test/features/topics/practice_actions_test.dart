@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/topics/topic_page.dart';
 
@@ -31,11 +32,13 @@ void main() {
     await pumpFrames(tester);
     await tester.longPress(find.text('TCP/IP'));
     await pumpFrames(tester);
+    expect(find.byType(OptionTile), findsNWidgets(4));
     expect(find.text('Edit practice'), findsOneWidget);
     expect(find.text('Rename'), findsNothing);
 
     await tester.tap(find.text('Edit practice'));
     await pumpFrames(tester);
+    expect(find.byType(OptionTile), findsNWidgets(4));
     expect(find.text('Rename'), findsOneWidget);
     expect(find.text('Edit description'), findsOneWidget);
     expect(find.text('Download practice JSON'), findsOneWidget);

@@ -10,8 +10,13 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import 'anki_deck_picker.dart';
 
+/// The editable field a topic editor tile expands.
+enum _TopicField { name, description, priority, deck }
+
 /// Full-page editor for a topic's name, description, priority and Anki deck.
 ///
+/// The page lists the fields as option-style tiles. Tapping a tile expands its
+/// inline editor in place, matching the long-press topic and practice menus.
 /// The page re-reads the topic by id when it opens. A caller may hold a summary
 /// from before a backup restore or another database replacement, and saving
 /// that stale snapshot back would silently clear newer fields.
@@ -33,7 +38,9 @@ class _TopicEditorPageState extends ConsumerState<TopicEditorPage> {
   bool _loading = true;
   bool _saving = false;
   Object? _loadError;
+  _TopicField? _expanded;
 
+  String _topicName = '';
   String _initialName = '';
   String _initialDescription = '';
   String _initialPriority = '';
@@ -84,6 +91,7 @@ class _TopicEditorPageState extends ConsumerState<TopicEditorPage> {
       _priority.text = current.priority?.toString() ?? '';
       _deck.text = current.ankiDeck ?? '';
       setState(() {
+        _topicName = current.name;
         _initialName = current.name;
         _initialDescription = current.description;
         _initialPriority = current.priority?.toString() ?? '';
@@ -141,6 +149,12 @@ class _TopicEditorPageState extends ConsumerState<TopicEditorPage> {
       setState(() {
         _nameError = nameError;
         _priorityError = priorityError;
+        // Show the message next to the field that needs attention.
+        if (nameError != null) {
+          _expanded = _TopicField.name;
+        } else if (priorityError != null) {
+          _expanded = _TopicField.priority;
+        }
       });
       return;
     }
@@ -178,11 +192,38 @@ class _TopicEditorPageState extends ConsumerState<TopicEditorPage> {
     setState(() => _deck.text = selected);
   }
 
+  void _toggle(_TopicField field) {
+    if (_saving) return;
+    setState(() => _expanded = _expanded == field ? null : field);
+  }
+
+  String get _nameValue =>
+      _name.text.trim().isEmpty ? 'Not set' : _name.text.trim();
+
+  String get _descriptionValue => _description.text.trim().isEmpty
+      ? 'No description'
+      : _description.text.trim();
+
+  String get _priorityValue {
+    final text = _priority.text.trim();
+    if (text.isEmpty) return 'Not set';
+    return switch (text) {
+      '1' => '1 · highest',
+      '5' => '5 · lowest',
+      _ => '$text of 5',
+    };
+  }
+
+  String get _deckValue => _deck.text.trim().isEmpty
+      ? 'Default deck from Settings'
+      : _deck.text.trim();
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
       return AppPage(
         title: 'Edit topic',
+        subtitle: _topicName.isEmpty ? widget.topic.name : _topicName,
         showBack: true,
         onBack: () => Navigator.of(context).maybePop(),
         children: const [
@@ -196,6 +237,7 @@ class _TopicEditorPageState extends ConsumerState<TopicEditorPage> {
     if (_loadError != null) {
       return AppPage(
         title: 'Edit topic',
+        subtitle: widget.topic.name,
         showBack: true,
         onBack: () => Navigator.of(context).maybePop(),
         children: [
@@ -219,6 +261,7 @@ class _TopicEditorPageState extends ConsumerState<TopicEditorPage> {
       },
       child: AppPage(
         title: 'Edit topic',
+        subtitle: _topicName,
         showBack: true,
         onBack: _requestClose,
         bottomBar: AppActionDock(
@@ -244,86 +287,96 @@ class _TopicEditorPageState extends ConsumerState<TopicEditorPage> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SectionTitle(
-                'Details',
-                supporting: 'The name is required and appears on Home and practice lists.',
-              ),
-              TonalBox(
-                child: Column(
-                  children: [
-                    M3ETextField(
-                      key: const ValueKey('topic-editor-name'),
-                      controller: _name,
-                      label: 'Name',
-                      placeholder: 'e.g. Networking',
-                      isRequired: true,
-                      textCapitalization: TextCapitalization.sentences,
-                      textInputAction: TextInputAction.next,
-                      errorText: _nameError,
-                      onChanged: (_) {
-                        if (_nameError != null) {
-                          setState(() => _nameError = null);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    M3ETextField(
-                      key: const ValueKey('topic-editor-description'),
-                      controller: _description,
-                      label: 'Description',
-                      placeholder: 'What this topic covers',
-                      maxLines: 4,
-                      minLines: 3,
-                      textCapitalization: TextCapitalization.sentences,
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 22),
-              SectionTitle(
-                'Priority',
-                supporting:
-                    'Optional. 1 is the highest priority, 5 is the lowest. '
-                    'Leave blank when order does not matter.',
-              ),
-              TonalBox(
-                child: M3ETextField(
-                  key: const ValueKey('topic-editor-priority'),
-                  controller: _priority,
-                  label: 'Priority (1–5, optional)',
-                  placeholder: 'Blank',
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  errorText: _priorityError,
+              _fieldTile(
+                field: _TopicField.name,
+                icon: Icons.label_outline,
+                title: 'Name',
+                value: _nameValue,
+                editor: M3ETextField(
+                  key: const ValueKey('topic-editor-name'),
+                  controller: _name,
+                  label: 'Name',
+                  placeholder: 'e.g. Networking',
+                  isRequired: true,
+                  textCapitalization: TextCapitalization.sentences,
+                  textInputAction: TextInputAction.next,
+                  errorText: _nameError,
                   onChanged: (_) {
-                    if (_priorityError != null) {
-                      setState(() => _priorityError = null);
+                    if (_nameError != null) {
+                      setState(() => _nameError = null);
                     }
                   },
                 ),
               ),
-              const SizedBox(height: 22),
-              SectionTitle(
-                'Deck destination',
-                supporting: 'Choose where cards from this topic are sent.',
+              _fieldTile(
+                field: _TopicField.description,
+                icon: Icons.notes_outlined,
+                title: 'Description',
+                value: _descriptionValue,
+                editor: M3ETextField(
+                  key: const ValueKey('topic-editor-description'),
+                  controller: _description,
+                  label: 'Description',
+                  placeholder: 'What this topic covers',
+                  maxLines: 4,
+                  minLines: 3,
+                  textCapitalization: TextCapitalization.sentences,
+                ),
               ),
-              TonalBox(
-                child: Column(
+              _fieldTile(
+                field: _TopicField.priority,
+                icon: Icons.flag_outlined,
+                title: 'Priority',
+                value: _priorityValue,
+                editor: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    M3ETextField(
+                      key: const ValueKey('topic-editor-priority'),
+                      controller: _priority,
+                      label: 'Priority (1–5, optional)',
+                      placeholder: 'Blank',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      errorText: _priorityError,
+                      onChanged: (_) {
+                        if (_priorityError != null) {
+                          setState(() => _priorityError = null);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _HelperText(
+                      '1 is the highest priority, 5 is the lowest. '
+                      'Leave blank when order does not matter.',
+                    ),
+                  ],
+                ),
+              ),
+              _fieldTile(
+                field: _TopicField.deck,
+                icon: Icons.style_outlined,
+                title: 'AnkiDroid deck',
+                value: _deckValue,
+                editor: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     M3ETextField(
                       key: const ValueKey('topic-editor-deck'),
                       controller: _deck,
-                      label: 'AnkiDroid deck',
+                      label: 'Deck name',
                       supportingText:
                           'Blank uses the default deck from Settings.',
                       textCapitalization: TextCapitalization.sentences,
                     ),
                     const SizedBox(height: 12),
-                    M3EButton.tonal(
-                      onPressed: _saving ? null : _browseDecks,
-                      icon: const Icon(Icons.style_outlined),
-                      label: const Text('Browse decks'),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: M3EButton.tonal(
+                        onPressed: _saving ? null : _browseDecks,
+                        icon: const Icon(Icons.style_outlined),
+                        label: const Text('Browse decks'),
+                      ),
                     ),
                   ],
                 ),
@@ -331,6 +384,44 @@ class _TopicEditorPageState extends ConsumerState<TopicEditorPage> {
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _fieldTile({
+    required _TopicField field,
+    required IconData icon,
+    required String title,
+    required String value,
+    required Widget editor,
+  }) {
+    final expanded = _expanded == field;
+    return OptionTile(
+      key: ValueKey('topic-editor-tile-${field.name}'),
+      icon: icon,
+      title: title,
+      subtitle: value,
+      expanded: expanded,
+      onTap: _saving ? null : () => _toggle(field),
+      details: expanded ? editor : null,
+    );
+  }
+}
+
+/// Small helper line shown under an inline editor field.
+class _HelperText extends StatelessWidget {
+  const _HelperText(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Text(
+      text,
+      style: theme.typography.baseline.bodySmall.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        height: 1.35,
       ),
     );
   }

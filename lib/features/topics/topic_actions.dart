@@ -121,13 +121,13 @@ class TopicOptionsSheet extends StatelessWidget {
                 ],
               ),
             ),
-            _TopicOptionTile(
+            OptionTile(
               icon: Icons.edit_outlined,
               title: 'Edit topic',
               subtitle: 'Change the name, description, priority or deck',
               onTap: () => Navigator.of(context).pop(TopicAction.edit),
             ),
-            _TopicOptionTile(
+            OptionTile(
               icon: topic.archived
                   ? Icons.unarchive_outlined
                   : Icons.archive_outlined,
@@ -139,7 +139,7 @@ class TopicOptionsSheet extends StatelessWidget {
                 topic.archived ? TopicAction.unarchive : TopicAction.archive,
               ),
             ),
-            _TopicOptionTile(
+            OptionTile(
               icon: Icons.delete_outline,
               title: 'Delete topic',
               subtitle: 'Remove the topic and everything inside it',
@@ -147,78 +147,6 @@ class TopicOptionsSheet extends StatelessWidget {
               onTap: () => Navigator.of(context).pop(TopicAction.delete),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TopicOptionTile extends StatelessWidget {
-  const _TopicOptionTile({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.destructive = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final foreground = destructive
-        ? theme.colorScheme.error
-        : theme.colorScheme.onSurface;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              IconBadge(
-                icon,
-                size: 42,
-                tone: destructive ? PillTone.error : PillTone.neutral,
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.typography.baseline.titleMedium.copyWith(
-                        color: foreground,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.chevron_right,
-                color: destructive
-                    ? theme.colorScheme.error
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ],
-          ),
         ),
       ),
     );

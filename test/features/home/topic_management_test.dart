@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
+import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/home/home_page.dart';
 
 import '../../helpers/test_harness.dart';
@@ -31,6 +32,7 @@ void main() {
 
     await tester.longPress(find.text('Cloud'));
     await pumpFrames(tester);
+    expect(find.byType(OptionTile), findsNWidgets(3));
     expect(find.text('Edit topic'), findsOneWidget);
     expect(find.text('Archive topic'), findsOneWidget);
     expect(find.text('Delete topic'), findsOneWidget);
@@ -80,8 +82,12 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Edit topic'), findsOneWidget);
-    expect(find.text('Browse decks'), findsOneWidget);
+    expect(find.byType(OptionTile), findsNWidgets(4));
     expect(find.text('AnkiDroid deck'), findsOneWidget);
+    expect(find.text('Browse decks'), findsNothing);
+    await tester.tap(find.text('AnkiDroid deck'));
+    await pumpFrames(tester);
+    expect(find.text('Browse decks'), findsOneWidget);
     await tester.tap(find.text('Cancel'));
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);

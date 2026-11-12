@@ -1,6 +1,7 @@
 import 'package:clock/clock.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -76,6 +77,7 @@ class TestHarness {
     int count = 2,
     int? priority = 1,
     String? ankiDeck,
+    List<String> subtopics = const [],
   }) async {
     final topicId = await practices.createTopic(
       name: topicName,
@@ -103,6 +105,7 @@ class TestHarness {
             'Correct: ${index + 1} is the right answer.',
             'Wrong: ${index + 1} is a distractor.',
           ],
+          subtopic: index < subtopics.length ? subtopics[index] : '',
         ),
       );
     }
@@ -139,7 +142,11 @@ class TestAppBundle {
   final ProviderContainer container;
 }
 
-TestAppBundle testAppBundle({required Widget home, TestHarness? harness}) {
+TestAppBundle testAppBundle({
+  required Widget home,
+  TestHarness? harness,
+  List<Override> overrides = const [],
+}) {
   final suite = harness ?? TestHarness();
   final container = ProviderContainer(
     overrides: [
@@ -150,6 +157,7 @@ TestAppBundle testAppBundle({required Widget home, TestHarness? harness}) {
       ankiGatewayProvider.overrideWithValue(suite.anki),
       practiceSoundPlayerProvider.overrideWithValue(suite.soundPlayer),
       httpClientProvider.overrideWithValue(suite.httpClient),
+      ...overrides,
     ],
   );
   return TestAppBundle(
@@ -177,8 +185,13 @@ Future<void> pumpTestApp(
   WidgetTester tester, {
   required Widget home,
   TestHarness? harness,
+  List<Override> overrides = const [],
 }) async {
-  final bundle = testAppBundle(home: home, harness: harness);
+  final bundle = testAppBundle(
+    home: home,
+    harness: harness,
+    overrides: overrides,
+  );
   await tester.pumpWidget(bundle.widget);
   await pumpFrames(tester);
   addTearDown(() async {

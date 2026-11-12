@@ -8,23 +8,42 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/progress_math.dart';
 import '../../core/ui/widgets.dart';
 
-class TopicStatsPage extends ConsumerWidget {
+class TopicStatsPage extends ConsumerStatefulWidget {
   const TopicStatsPage({required this.topicId, super.key});
 
   final int topicId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<TopicStatsPage> createState() => _TopicStatsPageState();
+}
+
+class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
+  bool _exporting = false;
+
+  @override
+  Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final summary = ref.watch(topicSummaryProvider(topicId));
-    final progress = ref.watch(topicProgressProvider(topicId));
+    final summary = ref.watch(topicSummaryProvider(widget.topicId));
+    final progress = ref.watch(topicProgressProvider(widget.topicId));
+    final subtopics =
+        ref.watch(topicSubtopicStatsProvider(widget.topicId)).value ??
+        const <SubtopicStat>[];
 
     return AppPage(
       title: 'Statistics',
       showBack: true,
       variant: M3EAppBarVariant.small,
+      actions: [
+        M3EIconButton(
+          variant: M3EIconButtonVariant.standard,
+          icon: const Icon(Icons.ios_share),
+          tooltip: 'Export statistics',
+          onPressed: _exporting ? null : _exportStatistics,
+        ),
+      ],
       children: [
         Text(
           summary.value?.topic.name ?? 'Topic',
@@ -61,6 +80,11 @@ class TopicStatsPage extends ConsumerWidget {
             final average =
                 points.map((point) => point.score).reduce((a, b) => a + b) /
                 points.length;
+            final fit = fitProgressBySession([
+              for (final point in points) point.score,
+            ]);
+            final learningRate = learningRatePercentagePointsPerWeek(points);
+            final hasSubtopics = subtopics.any((stat) => !stat.isUncategorized);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -69,6 +93,7 @@ class TopicStatsPage extends ConsumerWidget {
                   latest: latest,
                   average: average,
                   best: best,
+                  learningRate: learningRate,
                 ),
                 const SizedBox(height: 24),
                 SectionTitle(
@@ -76,7 +101,21 @@ class TopicStatsPage extends ConsumerWidget {
                   count: points.length,
                   supporting: 'Each point is one completed session.',
                 ),
-                _ProgressChart(points: points),
+                _ProgressChart(points: points, fit: fit),
+                if (hasSubtopics) ...[
+                  const SizedBox(height: 24),
+                  SectionTitle(
+                    'By subtopic',
+                    count: subtopics.length,
+                    supporting:
+                        'Accuracy and progress for each question group.',
+                  ),
+                  AppGroup(
+                    children: [
+                      for (final stat in subtopics) _SubtopicRow(stat: stat),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 24),
                 const SectionTitle('Sessions'),
                 AppGroup(
@@ -92,6 +131,21 @@ class TopicStatsPage extends ConsumerWidget {
       ],
     );
   }
+
+  Future<void> _exportStatistics() async {
+    setState(() => _exporting = true);
+    try {
+      await ref
+          .read(statisticsExportServiceProvider)
+          .shareTopicStats(widget.topicId);
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not export statistics: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
 }
 
 class _TrendHero extends StatelessWidget {
@@ -100,6 +154,7 @@ class _TrendHero extends StatelessWidget {
     required this.latest,
     required this.average,
     required this.best,
+    required this.learningRate,
   });
 
   final List<TopicProgressPoint> points;
@@ -107,10 +162,14 @@ class _TrendHero extends StatelessWidget {
   final double average;
   final double best;
 
+  /// Percentage points per week, or null until the history spans a week.
+  final double? learningRate;
+
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final strong = latest.score > 0.8;
+    final rate = learningRate;
     return TonalBox(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -175,9 +234,29 @@ class _TrendHero extends StatelessWidget {
               ),
             ],
           ),
+          if (rate != null) ...[
+            const SizedBox(height: 8),
+            MetricTile(
+              label: 'Learning rate',
+              value: _learningRateLabel(rate),
+              caption: 'Average change per week',
+              icon: rate < 0 ? Icons.trending_down : Icons.trending_up,
+              tone: rate > 0
+                  ? MetricTone.success
+                  : rate < 0
+                  ? MetricTone.error
+                  : MetricTone.neutral,
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  String _learningRateLabel(double rate) {
+    final rounded = rate.round();
+    final prefix = rounded > 0 ? '+' : '';
+    return '$prefix$rounded pp/week';
   }
 
   String _trendLabel(List<TopicProgressPoint> points) {
@@ -190,13 +269,15 @@ class _TrendHero extends StatelessWidget {
 }
 
 class _ProgressChart extends StatelessWidget {
-  const _ProgressChart({required this.points});
+  const _ProgressChart({required this.points, required this.fit});
 
   final List<TopicProgressPoint> points;
+  final LinearProgressFit? fit;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final trendColor = theme.colorScheme.tertiary;
     return TonalBox(
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 10),
       child: Column(
@@ -208,7 +289,9 @@ class _ProgressChart extends StatelessWidget {
             child: CustomPaint(
               painter: _ProgressPainter(
                 points: points,
+                fit: fit,
                 lineColor: theme.colorScheme.primary,
+                trendColor: trendColor,
                 gridColor: theme.colorScheme.outlineVariant.withValues(
                   alpha: 0.55,
                 ),
@@ -237,8 +320,46 @@ class _ProgressChart extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 14,
+            runSpacing: 4,
+            children: [
+              _Legend(color: theme.colorScheme.primary, label: 'Sessions'),
+              if (fit != null) _Legend(color: trendColor, label: 'Trend'),
+            ],
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _Legend extends StatelessWidget {
+  const _Legend({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: theme.typography.baseline.labelSmall.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -246,7 +367,9 @@ class _ProgressChart extends StatelessWidget {
 class _ProgressPainter extends CustomPainter {
   _ProgressPainter({
     required this.points,
+    required this.fit,
     required this.lineColor,
+    required this.trendColor,
     required this.gridColor,
     required this.successColor,
     required this.errorColor,
@@ -255,7 +378,9 @@ class _ProgressPainter extends CustomPainter {
   });
 
   final List<TopicProgressPoint> points;
+  final LinearProgressFit? fit;
   final Color lineColor;
+  final Color trendColor;
   final Color gridColor;
   final Color successColor;
   final Color errorColor;
@@ -296,6 +421,23 @@ class _ProgressPainter extends CustomPainter {
 
     double yFor(double score) => chart.bottom - chart.height * score;
 
+    canvas.save();
+    canvas.clipRect(chart);
+
+    final trend = fit;
+    if (trend != null && count > 1) {
+      _drawDashedLine(
+        canvas,
+        Offset(xFor(0), yFor(trend.valueAt(0))),
+        Offset(xFor(count - 1), yFor(trend.valueAt(count - 1))),
+        Paint()
+          ..color = trendColor
+          ..strokeWidth = 2
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+
     final path = Path();
     for (var index = 0; index < count; index++) {
       final point = Offset(xFor(index), yFor(points[index].score));
@@ -325,6 +467,27 @@ class _ProgressPainter extends CustomPainter {
       final point = Offset(xFor(index), yFor(score));
       canvas.drawCircle(point, 4.5, Paint()..color = color);
     }
+
+    canvas.restore();
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset start, Offset end, Paint paint) {
+    const dash = 6.0;
+    const gap = 4.0;
+    final delta = end - start;
+    final distance = delta.distance;
+    if (distance == 0) return;
+    final direction = delta / distance;
+    var travelled = 0.0;
+    while (travelled < distance) {
+      final segmentEnd = math.min(travelled + dash, distance);
+      canvas.drawLine(
+        start + direction * travelled,
+        start + direction * segmentEnd,
+        paint,
+      );
+      travelled += dash + gap;
+    }
   }
 
   void _label(Canvas canvas, String text, Offset offset, TextStyle style) {
@@ -339,10 +502,63 @@ class _ProgressPainter extends CustomPainter {
   @override
   bool shouldRepaint(_ProgressPainter oldDelegate) {
     return oldDelegate.points != points ||
+        oldDelegate.fit != fit ||
         oldDelegate.lineColor != lineColor ||
+        oldDelegate.trendColor != trendColor ||
         oldDelegate.gridColor != gridColor ||
         oldDelegate.successColor != successColor ||
         oldDelegate.errorColor != errorColor;
+  }
+}
+
+class _SubtopicRow extends StatelessWidget {
+  const _SubtopicRow({required this.stat});
+
+  final SubtopicStat stat;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final accuracy = (stat.accuracy * 100).round();
+    final tone = stat.answeredCount == 0
+        ? PillTone.neutral
+        : stat.accuracy > 0.8
+        ? PillTone.success
+        : stat.accuracy < 0.5
+        ? PillTone.error
+        : PillTone.neutral;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  stat.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.typography.baseline.titleSmall,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Pill('$accuracy% accuracy', tone: tone),
+            ],
+          ),
+          const SizedBox(height: 8),
+          LinearScore(value: stat.progress),
+          const SizedBox(height: 5),
+          Text(
+            '${stat.attemptedQuestionCount}/${stat.questionCount} questions · '
+            '${stat.correctCount}/${stat.answeredCount} correct',
+            style: theme.typography.baseline.labelSmall.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

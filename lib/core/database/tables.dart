@@ -37,6 +37,9 @@ class Questions extends Table {
   TextColumn get explanation => text()();
   TextColumn get alternativeExplanationsJson => text()();
   IntColumn get position => integer()();
+
+  /// Optional grouping inside a practice. Null or empty means uncategorized.
+  TextColumn get subtopic => text().nullable()();
 }
 
 @DataClassName('SessionRow')

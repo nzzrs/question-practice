@@ -24,7 +24,7 @@ Questions is an offline-first Android study app. This guide walks through every 
 3. Review the file name, counts, topic/practice list and duplicate notes.
 4. Tap **Import**.
 
-The whole file is validated first. A broken file shows the JSON path or line/column and imports nothing. **Load sample** loads the bundled practice. See [Import format](json-format.md).
+The whole file is validated first. A broken file shows the JSON path or line/column and imports nothing. **Load sample** loads the bundled practice. A question may include an optional `subtopic`; blank values are imported as uncategorized. See [Import format](json-format.md).
 
 ## Topic
 
@@ -37,6 +37,16 @@ The whole file is validated first. A broken file shows the JSON path or line/col
 - **Edit topic** is available from the topic's long-press menu on Home and from the archived topics list. It changes name, description, priority and the Anki deck.
 - **Browse decks** reads live deck names from AnkiDroid when its API and permission are available. You can also type a new deck name; it is created on export.
 - Blank deck means the default deck from Settings.
+
+## Statistics
+
+- Open **Statistics** from the insights icon on a topic.
+- The hero shows the latest score, best and average, and the number of completed sessions.
+- **Progress over time** plots one point per completed session. The solid line joins the sessions; the dashed **Trend** line is a least-squares fit through the same points, so it shows the overall direction rather than a single jump. The legend names both series.
+- **Learning rate** appears below the metrics once the history spans at least one week. It reports the average change in percentage points per week from the fitted trend, for example `+8 pp/week`. Short histories and single sessions do not show a figure.
+- **By subtopic** groups questions by their optional subtopic and shows accuracy and progress for each group. Questions without a subtopic appear under **Uncategorized**. The section is hidden when no question in the topic has a subtopic.
+- **Sessions** lists every completed session with its score and date.
+- The share icon exports the visible statistics as a JSON file through the system share sheet. The file contains the topic summary, progress points, per-subtopic figures and the trend data.
 
 ## Practice session
 

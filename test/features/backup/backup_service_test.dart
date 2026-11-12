@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/backup/domain/backup_service.dart';
@@ -15,6 +16,7 @@ void main() {
       practiceName: 'Core',
       count: 2,
       ankiDeck: 'Cloud deck',
+      subtopics: const ['Containers', 'Storage'],
     );
     final questions = await harness.practices.questionsForPractice(
       seeded.practiceId,
@@ -107,6 +109,10 @@ void main() {
       restoredQuestions.map((question) => question.prompt),
       unorderedEquals(questions.map((question) => question.prompt)),
     );
+    expect(
+      restoredQuestions.map((question) => question.subtopic),
+      unorderedEquals(['Containers', 'Storage']),
+    );
     final attempts = await harness.sessions.attemptsForSession(session.id);
     expect(attempts.single.reasoning, 'I misread the prompt.');
     final concepts = await harness.cards.conceptsForSession(session.id);
@@ -122,6 +128,33 @@ void main() {
     final settings = await harness.settings.load();
     expect(settings.ankiDeck, 'Saved deck');
     expect(settings.soundsEnabled, isFalse);
+  });
+
+  test('an older backup without subtopics restores as uncategorized', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(
+      topicName: 'Cloud',
+      practiceName: 'Core',
+      count: 2,
+      subtopics: const ['Containers', 'Storage'],
+    );
+    final service = BackupService(
+      database: harness.database,
+      clock: harness.clock,
+    );
+    final payload = jsonDecode(await service.encode()) as Map<String, dynamic>;
+    final tables = payload['tables'] as Map<String, dynamic>;
+    for (final item in tables['questions'] as List<dynamic>) {
+      (item as Map<String, dynamic>).remove('subtopic');
+    }
+    payload['checksum'] = _checksum(tables);
+
+    await service.restoreText(jsonEncode(payload));
+
+    final practice = (await harness.practices.allPractices()).single;
+    final questions = await harness.practices.questionsForPractice(practice.id);
+    expect(questions.map((question) => question.subtopic), ['', '']);
   });
 
   test('a damaged backup is rejected without touching local data', () async {
@@ -163,4 +196,19 @@ void main() {
       throwsA(isA<BackupException>()),
     );
   });
+}
+
+String _checksum(Map<String, dynamic> tables) {
+  return sha256.convert(utf8.encode(_canonicalJson(tables))).toString();
+}
+
+String _canonicalJson(Object? value) {
+  if (value is Map) {
+    final keys = value.keys.map((key) => key.toString()).toList()..sort();
+    return '{${keys.map((key) => '${jsonEncode(key)}:${_canonicalJson(value[key])}').join(',')}}';
+  }
+  if (value is List) {
+    return '[${value.map(_canonicalJson).join(',')}]';
+  }
+  return jsonEncode(value);
 }

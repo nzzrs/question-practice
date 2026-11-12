@@ -59,6 +59,7 @@ Question questionFromRow(QuestionRow row) {
     explanation: row.explanation,
     alternativeExplanations: decodeStringList(row.alternativeExplanationsJson),
     position: row.position,
+    subtopic: row.subtopic?.trim() ?? '',
   );
 }
 

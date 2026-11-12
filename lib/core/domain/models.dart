@@ -89,6 +89,7 @@ class Question {
     required this.explanation,
     required this.alternativeExplanations,
     required this.position,
+    this.subtopic = '',
   });
 
   final int id;
@@ -100,6 +101,10 @@ class Question {
   final List<String> alternativeExplanations;
   final int position;
 
+  /// Optional grouping inside a practice. Empty means uncategorized.
+  final String subtopic;
+
+  bool get hasSubtopic => subtopic.trim().isNotEmpty;
   bool get allowsMultiple => correctIndexes.length > 1;
   int get correctIndex => correctIndexes.isEmpty ? -1 : correctIndexes.first;
   bool isCorrectSelection(Iterable<int> selected) =>
@@ -121,6 +126,7 @@ class QuestionDraft {
     required this.correctIndexes,
     required this.explanation,
     required this.alternativeExplanations,
+    this.subtopic = '',
   });
 
   final String prompt;
@@ -128,6 +134,7 @@ class QuestionDraft {
   final List<int> correctIndexes;
   final String explanation;
   final List<String> alternativeExplanations;
+  final String subtopic;
 }
 
 @immutable
@@ -276,6 +283,30 @@ class TopicProgressPoint {
   final int total;
 
   double get score => total == 0 ? 0 : correct / total;
+}
+
+@immutable
+class SubtopicStat {
+  const SubtopicStat({
+    required this.subtopic,
+    required this.questionCount,
+    required this.attemptedQuestionCount,
+    required this.answeredCount,
+    required this.correctCount,
+  });
+
+  /// Empty when the questions have no subtopic assigned.
+  final String subtopic;
+  final int questionCount;
+  final int attemptedQuestionCount;
+  final int answeredCount;
+  final int correctCount;
+
+  bool get isUncategorized => subtopic.trim().isEmpty;
+  String get label => isUncategorized ? 'Uncategorized' : subtopic;
+  double get accuracy => answeredCount == 0 ? 0 : correctCount / answeredCount;
+  double get progress =>
+      questionCount == 0 ? 0 : attemptedQuestionCount / questionCount;
 }
 
 @immutable

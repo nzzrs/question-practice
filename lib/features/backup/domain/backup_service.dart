@@ -271,7 +271,8 @@ class BackupService {
       questions: _rows(
         tables,
         'questions',
-        (json) => QuestionRow.fromJson(json),
+        (json) =>
+            QuestionRow.fromJson({...json, 'subtopic': json['subtopic'] ?? ''}),
       ),
       sessions: _rows(tables, 'sessions', (json) => SessionRow.fromJson(json)),
       sessionQuestions: _rows(

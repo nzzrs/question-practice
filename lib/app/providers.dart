@@ -20,6 +20,7 @@ import '../features/import/domain/import_service.dart';
 import '../features/lookup/domain/lookup_service.dart';
 import '../features/practice/domain/session_service.dart';
 import '../features/review/domain/review_service.dart';
+import '../features/topics/domain/statistics_export_service.dart';
 
 final databaseProvider = Provider<AppDatabase>(
   (ref) => throw UnimplementedError('databaseProvider must be overridden'),
@@ -96,6 +97,12 @@ final topicProgressProvider =
     StreamProvider.family<List<TopicProgressPoint>, int>(
       (ref, topicId) =>
           ref.watch(topicRepositoryProvider).watchTopicProgress(topicId),
+    );
+
+final topicSubtopicStatsProvider =
+    StreamProvider.family<List<SubtopicStat>, int>(
+      (ref, topicId) =>
+          ref.watch(topicRepositoryProvider).watchSubtopicStats(topicId),
     );
 
 final inProgressSessionProvider = StreamProvider<PracticeSession?>(
@@ -216,6 +223,13 @@ final exportServiceProvider = Provider<ExportService>(
   (ref) => ExportService(
     gateway: ref.watch(ankiGatewayProvider),
     cards: ref.watch(cardRepositoryProvider),
+    practices: ref.watch(topicRepositoryProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final statisticsExportServiceProvider = Provider<StatisticsExportService>(
+  (ref) => StatisticsExportService(
     practices: ref.watch(topicRepositoryProvider),
     clock: ref.watch(clockProvider),
   ),

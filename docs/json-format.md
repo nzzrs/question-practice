@@ -29,6 +29,7 @@ One topic, one practice, one question.
           "questions": [
             {
               "prompt": "Which service runs containers?",
+              "subtopic": "Containers",
               "alternatives": ["Cloud Run", "Cloud SQL"],
               "correctIndex": 0,
               "explanation": "Cloud Run runs container images on managed infrastructure.",
@@ -66,6 +67,28 @@ A question can have more than one correct alternative. Replace `correctIndex` wi
 
 Use either `correctIndex` or `correctIndexes` for a question, never both.
 
+## Subtopics
+
+Each question may name a subtopic. The value is trimmed, and a missing or blank value counts as **Uncategorized**. Topic statistics group questions and answers by this value, so use the same spelling and capitalisation for questions that belong together.
+
+```json
+{
+  "prompt": "Which storage class is cheapest for long-term archives?",
+  "subtopic": "Object storage",
+  "alternatives": ["Standard", "Nearline", "Coldline", "Archive"],
+  "correctIndex": 3,
+  "explanation": "Archive has the lowest storage price.",
+  "alternativeExplanations": [
+    "Standard is for frequent access.",
+    "Nearline is for monthly access.",
+    "Coldline is cheaper, but Archive is cheaper for long-term retention.",
+    "Correct. Archive is the lowest-cost long-term class."
+  ]
+}
+```
+
+Subtopics are optional and do not replace the practice name. A practice can mix several subtopics, and the statistics screen shows a group only when at least one question in the topic has a subtopic.
+
 The app compares the selected set with the correct set. With `correctIndexes: [0, 2]`, selecting only `0` is wrong, and selecting `0, 2, 3` is also wrong. Alternative explanations remain one per alternative; mark which ones are correct in the explanation text.
 
 ## File shape
@@ -85,6 +108,7 @@ The app compares the selected set with the correct set. With `correctIndexes: [0
           "questions": [
             {
               "prompt": "Question text?",
+              "subtopic": "Optional group name",
               "alternatives": ["A", "B", "C", "D"],
               "correctIndex": 2,
               "explanation": "Why the correct alternative is correct.",
@@ -117,6 +141,7 @@ The app compares the selected set with the correct set. With `correctIndexes: [0
 | `practices[].description` | no | string | Up to 2,000 chars. Defaults to empty. |
 | `practices[].questions` | yes | array | At least one question. |
 | `question.prompt` | yes | string | 1–5,000 chars. |
+| `question.subtopic` | no | string | Up to 120 chars. Groups questions for per-subtopic statistics. Missing or blank means uncategorized. |
 | `question.alternatives` | yes | string array | 2–8 non-empty alternatives, 2,000 chars each. |
 | `question.correctIndex` | one of | integer | Zero-based index of the single correct alternative. Must be inside `alternatives`. |
 | `question.correctIndexes` | one of | integer array | 1–8 unique zero-based indexes for a question with several correct answers. |
@@ -255,4 +280,4 @@ Deck selection is app configuration, not file data. Set the default deck in **Se
 
 ## Versioning
 
-`formatVersion` is `1`. `correctIndexes` is an additive field: files written for the original version with `correctIndex` keep working. Future incompatible changes must use a new version; the app rejects unknown versions rather than guessing.
+`formatVersion` is `1`. `correctIndexes` and `subtopic` are additive fields: files written without them keep working. Future incompatible changes must use a new version; the app rejects unknown versions rather than guessing.

@@ -11,7 +11,7 @@ The suite runs on the Dart VM. Drift uses an in-memory SQLite database; HTTP and
 
 | Area | Coverage |
 |---|---|
-| Import | Schema rejection, JSON syntax paths, BOM/text files, semantic validation, `correctIndex` and `correctIndexes`, duplicate handling, size limit |
+| Import | Schema rejection, JSON syntax paths, BOM/text files, semantic validation, `correctIndex`, `correctIndexes`, optional subtopics, duplicate handling, size limit |
 | Practice | Scoring, multi-answer set matching, skipped answers, distraction checked and unchecked after feedback, resume/discard, mixed sessions, summary counts, session arrows, done/solved/skipped history, shuffled inclusion, redo prompt, done tag |
 | Error queue | Exact 48-hour boundary, due query, resolution, history, wrong retry scheduling |
 | Review | Error steps, shared error-card review view, skipped concept/basic branches, missing definitions, AI bias/vaccine suggestions, structured skipped/unknown review with reasoning and other alternatives |
@@ -23,8 +23,9 @@ The suite runs on the Dart VM. Drift uses an in-memory SQLite database; HTTP and
 | Skipped queue | Persistence across the session, unknown toggle, early finish, late reasoning, combined Cards section and conversion |
 | Lookup | OpenAI-compatible and Gemini requests, AI JSON parsing, fenced JSON, 401 fallback, missing key/model, provider model lists, web URL selection, auto-saved concepts |
 | Export | Cloze format, HTML/cloze escaping, six error fields, distractor explanation, multi-answer fields, TSV content, per-topic deck routing, default deck fallback, permission/status failures, partial failures |
-| Data | Topic/practice summaries, accuracy/progress, due counts, unfinished sessions excluded, archive filtering, per-topic sort settings |
-| Widgets | Empty home, multiple paused sessions, help, topic list, topic details, topic long-press edit/archive/delete, archived-topics sheet, topic and practice sort persistence, shuffle FAB start sheet, question feedback/explanation, question arrows, distraction checkbox in feedback, five-minute reminder, sample import |
+| Data | Topic/practice summaries, accuracy/progress, due counts, unfinished sessions excluded, archive filtering, per-topic sort settings, subtopic grouping, deletion cascades through statistics |
+| Statistics | Regression line math (flat, upward, downward, fewer than two points), weekly learning rate and its one-week threshold, per-subtopic stats with Uncategorized, JSON statistics payload and share action |
+| Widgets | Empty home, multiple paused sessions, help, topic list, topic details, topic long-press edit/archive/delete, archived-topics sheet, topic and practice sort persistence, shuffle FAB start sheet, question feedback/explanation, question arrows, distraction checkbox in feedback, five-minute reminder, sample import, subtopic statistics section and its hidden state, statistics export button |
 
 ## Manual Android checklist
 

@@ -37,6 +37,33 @@ void main() {
     expect(preview.notes, isEmpty);
   });
 
+  test('imports optional subtopics and trims them', () async {
+    final payload = jsonDecode(sample) as Map<String, dynamic>;
+    final topics = payload['topics'] as List<dynamic>;
+    final practice =
+        ((topics.first as Map<String, dynamic>)['practices'] as List<dynamic>)
+                .first
+            as Map<String, dynamic>;
+    final questions = (practice['questions'] as List<dynamic>)
+        .cast<Map<String, dynamic>>();
+    questions[0].remove('subtopic');
+    questions[1]['subtopic'] = '  Virtual machines  ';
+
+    final preview = await service.previewText(
+      jsonEncode(payload),
+      fileName: 'subtopics.json',
+    );
+    await service.import(preview);
+
+    final importedPractice = (await harness.practices.allPractices()).first;
+    final imported = await harness.practices.questionsForPractice(
+      importedPractice.id,
+    );
+    expect(imported[0].subtopic, '');
+    expect(imported[1].subtopic, 'Virtual machines');
+    expect(imported[2].subtopic, 'Databases');
+  });
+
   test('import writes topics, practices and questions once', () async {
     final preview = await service.previewText(sample, fileName: 'sample.json');
     final result = await service.import(preview);

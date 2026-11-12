@@ -14,10 +14,11 @@ Domain models in `lib/core/domain/models.dart` are immutable plain Dart. Reposit
 
 ## Database
 
-One `AppDatabase` with tables for topics, practices, questions, sessions, session questions, attempts, concepts, error cards, manual cards, skipped questions, highlights and settings. The schema is version 9; version 2 added the topic deck and manual-card topic columns, version 3 stores correct/selected/wrong indexes as JSON arrays, version 4 adds the overall explanation and alternative explanations to error-card snapshots, version 5 adds the practice done flag, version 6 adds unknown attempts and acronym extras, version 7 adds skipped-question persistence and manual-card context, version 8 adds highlights, and version 9 adds the topic archived flag.
+One `AppDatabase` with tables for topics, practices, questions, sessions, session questions, attempts, concepts, error cards, manual cards, skipped questions, highlights and settings. The schema is version 10; version 2 added the topic deck and manual-card topic columns, version 3 stores correct/selected/wrong indexes as JSON arrays, version 4 adds the overall explanation and alternative explanations to error-card snapshots, version 5 adds the practice done flag, version 6 adds unknown attempts and acronym extras, version 7 adds skipped-question persistence and manual-card context, version 8 adds highlights, version 9 adds the topic archived flag, and version 10 adds the optional question subtopic.
 
 - Timestamps are UTC; rows are converted back to UTC in mappers.
-- Questions store alternatives, per-alternative explanations, and correct indexes as JSON arrays.
+- Questions store alternatives, per-alternative explanations, and correct indexes as JSON arrays. An optional subtopic groups questions inside a practice; null or blank means uncategorized.
+- Topic statistics are derived from completed sessions at query time. The stats DAO also groups questions and attempts by subtopic, fits a least-squares trend line through the session scores, and derives the weekly learning rate from the same history. No aggregate table is stored, so deleting a practice or topic removes its statistics with the cascading content.
 - A partial unique index enforces one active error card per question.
 - Error cards snapshot the question, alternatives, reasoning, overall explanation and per-alternative explanations.
 - Topics store an optional AnkiDroid deck name and an archived flag. Cards snapshot the topic name; export resolves a deck per card, falling back to the Settings default.

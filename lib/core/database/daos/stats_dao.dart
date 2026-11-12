@@ -186,6 +186,43 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
     );
   }
 
+  Stream<List<SubtopicStatRow>> watchSubtopicStats(int topicId) {
+    final query = customSelect(
+      '''
+      SELECT
+        COALESCE(NULLIF(TRIM(q.subtopic), ''), '') AS subtopic,
+        COUNT(DISTINCT q.id) AS question_count,
+        COUNT(DISTINCT CASE
+          WHEN s.status = 'completed' AND a.selected_indexes_json != '[]'
+          THEN q.id
+        END) AS attempted_question_count,
+        SUM(CASE
+          WHEN s.status = 'completed' AND a.selected_indexes_json != '[]'
+          THEN 1 ELSE 0
+        END) AS answered_count,
+        SUM(CASE
+          WHEN s.status = 'completed' AND a.is_correct = 1
+          THEN 1 ELSE 0
+        END) AS correct_count
+      FROM questions q
+      INNER JOIN practices p ON p.id = q.practice_id
+      LEFT JOIN attempts a ON a.question_id = q.id
+      LEFT JOIN sessions s ON s.id = a.session_id
+      WHERE p.topic_id = ?
+      GROUP BY COALESCE(NULLIF(TRIM(q.subtopic), ''), '')
+      ORDER BY CASE
+          WHEN TRIM(COALESCE(q.subtopic, '')) = '' THEN 1 ELSE 0
+        END ASC,
+        subtopic COLLATE NOCASE ASC
+      ''',
+      variables: [Variable.withInt(topicId)],
+      readsFrom: {questions, practices, attempts, sessions},
+    );
+    return query.watch().map(
+      (rows) => rows.map(SubtopicStatRow.fromRow).toList(),
+    );
+  }
+
   Stream<List<PracticeSummaryRow>> watchPracticeSummaries(
     int topicId,
     DateTime now,
@@ -340,6 +377,32 @@ class TopicProgressRow {
   final String practiceName;
   final int correct;
   final int total;
+}
+
+class SubtopicStatRow {
+  const SubtopicStatRow({
+    required this.subtopic,
+    required this.questionCount,
+    required this.attemptedQuestionCount,
+    required this.answeredCount,
+    required this.correctCount,
+  });
+
+  factory SubtopicStatRow.fromRow(QueryRow row) {
+    return SubtopicStatRow(
+      subtopic: row.read<String>('subtopic'),
+      questionCount: row.read<int>('question_count'),
+      attemptedQuestionCount: row.read<int>('attempted_question_count'),
+      answeredCount: row.read<int>('answered_count'),
+      correctCount: row.read<int>('correct_count'),
+    );
+  }
+
+  final String subtopic;
+  final int questionCount;
+  final int attemptedQuestionCount;
+  final int answeredCount;
+  final int correctCount;
 }
 
 class PracticeSummaryRow {

@@ -85,6 +85,23 @@ class PracticeRepository {
         );
   }
 
+  Stream<List<SubtopicStat>> watchSubtopicStats(int topicId) {
+    return _db.statsDao
+        .watchSubtopicStats(topicId)
+        .map(
+          (rows) => [
+            for (final row in rows)
+              SubtopicStat(
+                subtopic: row.subtopic,
+                questionCount: row.questionCount,
+                attemptedQuestionCount: row.attemptedQuestionCount,
+                answeredCount: row.answeredCount,
+                correctCount: row.correctCount,
+              ),
+          ],
+        );
+  }
+
   Future<List<Question>> questionsForPractice(int practiceId) async {
     final rows = await _db.topicDao.questionsForPractice(practiceId);
     return rows.map(questionFromRow).toList();
@@ -180,8 +197,14 @@ class PracticeRepository {
             questions[i].alternativeExplanations,
           ),
           position: i,
+          subtopic: Value(_normalizeSubtopic(questions[i].subtopic)),
         ),
     ]);
+  }
+
+  String? _normalizeSubtopic(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   Future<void> renamePractice(int id, String name) {
@@ -309,6 +332,7 @@ class PracticeRepository {
           alternativeExplanationsJson:
               questions[index].alternativeExplanationsJson,
           position: index,
+          subtopic: Value(questions[index].subtopic),
         ),
     ]);
   }

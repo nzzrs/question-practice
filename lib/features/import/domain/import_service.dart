@@ -231,6 +231,7 @@ class ImportService {
             issues,
           );
           final explanation = (rawQuestion['explanation'] as String).trim();
+          final subtopic = (rawQuestion['subtopic'] as String? ?? '').trim();
 
           if (prompt.isEmpty) {
             _empty(issues, '$questionPath/prompt', 'Prompt');
@@ -292,6 +293,7 @@ class ImportService {
               correctIndexes: correctIndexes,
               explanation: explanation,
               alternativeExplanations: explanations,
+              subtopic: subtopic,
             ),
           );
           totalQuestions++;

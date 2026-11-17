@@ -4,11 +4,13 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_cards_review_page.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
 import '../review/skipped_question_view.dart';
+import '../review/suggested_cards_sheet.dart';
 import 'domain/anki_note_builder.dart';
 import 'new_card_dialog.dart';
 
@@ -135,12 +137,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     );
     final hasReviewSelection =
         selectedErrorCards.isNotEmpty || selectedSkipped.isNotEmpty;
+    final selectedCount = selection.total + selectedSkipped.length;
 
     return AppPage(
       title: 'Cards',
-      subtitle: selection.total == 0
+      subtitle: selectedCount == 0
           ? 'Ready for AnkiDroid'
-          : '${selection.total} card${selection.total == 1 ? '' : 's'} selected',
+          : '$selectedCount card${selectedCount == 1 ? '' : 's'} selected',
       showBack: true,
       actions: [
         M3EIconButton(
@@ -175,7 +178,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               icon: Icons.delete_outline,
               tooltip: 'Delete selected',
               isDestructive: true,
-              onPressed: selection.total == 0 ? null : _deleteSelected,
+              onPressed: selectedCount == 0 ? null : _deleteSelected,
             ),
           ],
         ),
@@ -394,6 +397,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 for (final highlight in highlights)
                   _HighlightRow(
                     highlight: highlight,
+                    onSuggestCards: () => _suggestCards(highlight),
                     onMakeCard: () => _createCardFromHighlight(highlight),
                     onDelete: () => _deleteHighlight(highlight),
                   ),
@@ -516,7 +520,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final confirmed = await confirmDialog(
       context,
       title: 'Delete selected cards?',
-      message: 'Concepts and basic cards are removed permanently. Deleting an active error card also removes it from the 48-hour review queue.',
+      message:
+          'Concepts and basic cards are removed permanently. Deleting an '
+          'active error card also removes it from the 48-hour review queue. '
+          'Skipped questions are removed from the skipped queue; their '
+          'questions stay in the practice.',
       confirmLabel: 'Delete',
       destructive: true,
     );
@@ -527,11 +535,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           conceptIds: _selectedConcepts.toList(),
           errorCardIds: _selectedErrors.toList(),
           manualCardIds: _selectedBasic.toList(),
+          skippedQuestionIds: _selectedSkipped.toList(),
         );
     setState(() {
       _selectedConcepts.clear();
       _selectedErrors.clear();
       _selectedBasic.clear();
+      _selectedSkipped.clear();
     });
     if (mounted) await showSnack(context, 'Cards deleted.');
   }
@@ -662,6 +672,15 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _previewMeta([
         Pill(card.topicName),
         Pill('deck: ${_deckForTopic(card.topicName)}', tone: PillTone.primary),
+        Tooltip(
+          message: 'Estimated time to read the front',
+          child: Pill(
+            readingTimeLabel(
+              '${card.question} ${card.wrongAnswer} ${card.correctAnswer}',
+            ),
+            icon: Icons.schedule,
+          ),
+        ),
         Pill(
           card.needsDetails ? 'Needs notes' : 'Ready',
           tone: card.needsDetails ? PillTone.error : PillTone.success,
@@ -751,6 +770,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
   Widget _previewMeta(List<Widget> children) {
     return Wrap(spacing: 6, runSpacing: 4, children: children);
+  }
+
+  Future<void> _suggestCards(StudyHighlight highlight) async {
+    await suggestCardsFromHighlight(context, highlight);
   }
 
   Future<void> _createCardFromHighlight(StudyHighlight highlight) async {
@@ -1240,11 +1263,13 @@ class _ManualRow extends StatelessWidget {
 class _HighlightRow extends StatelessWidget {
   const _HighlightRow({
     required this.highlight,
+    required this.onSuggestCards,
     required this.onMakeCard,
     required this.onDelete,
   });
 
   final StudyHighlight highlight;
+  final VoidCallback onSuggestCards;
   final VoidCallback onMakeCard;
   final VoidCallback onDelete;
 
@@ -1307,6 +1332,13 @@ class _HighlightRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
+          if (!highlight.hasCard)
+            M3EIconButton(
+              variant: M3EIconButtonVariant.standard,
+              icon: const Icon(Icons.auto_awesome),
+              tooltip: 'Suggest cards with AI',
+              onPressed: onSuggestCards,
+            ),
           if (!highlight.hasCard)
             M3EIconButton(
               variant: M3EIconButtonVariant.standard,

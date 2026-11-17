@@ -395,11 +395,13 @@ class CardRepository {
     required List<int> conceptIds,
     required List<int> errorCardIds,
     required List<int> manualCardIds,
+    List<int> skippedQuestionIds = const [],
   }) {
     return _db.transaction(() async {
       await _db.cardDao.deleteConcepts(conceptIds);
       await _db.cardDao.deleteErrorCards(errorCardIds);
       await _db.cardDao.deleteManualCards(manualCardIds);
+      await _db.cardDao.deleteSkippedQuestions(skippedQuestionIds);
     });
   }
 }

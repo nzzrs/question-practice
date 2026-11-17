@@ -92,6 +92,8 @@ void main() {
       300,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(find.text('Copy JSON example'));
+    await pumpFrames(tester);
     await tester.tap(find.text('Copy JSON example'));
     await pumpFrames(tester);
 

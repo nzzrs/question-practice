@@ -99,6 +99,7 @@ class HelpPage extends StatelessWidget {
             'Check I was distracted or read too fast to remove the card. Uncheck it to restore the card.',
             "I didn't know this counts as skipped and creates no error card.",
             'The review asks for the flawed assumption and what prevents it.',
+            'A small pill shows the estimated time to read the card front.',
             'Skipped answers ask whether a concept or another question was missing.',
             'Review opens fullscreen. Missing details can be completed later from Cards.',
           ],
@@ -122,7 +123,8 @@ class HelpPage extends StatelessWidget {
             'Select cards, then use Review all or Review selected.',
             "Complete finishes a missing definition or an error card's details.",
             "Tap a card to preview it. In the error review, the pencil opens a full-page editor for the question, alternatives and explanations.",
-            'Delete selected removes the chosen cards.',
+            'Delete selected removes the chosen cards and checked skipped questions.',
+            'A deleted skipped question leaves the queue but stays in its practice.',
           ],
         ),
         const _Section(
@@ -131,6 +133,7 @@ class HelpPage extends StatelessWidget {
           points: [
             'Select text during practice and choose Highlight.',
             'Highlights stay in Cards and can become a concept or basic card.',
+            'Suggest cards with AI proposes up to six atomic cards; choose which ones to add.',
             'Download all saves highlights as plain text. Highlights are never sent to AnkiDroid.',
           ],
         ),

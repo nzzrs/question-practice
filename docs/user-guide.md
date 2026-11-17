@@ -73,12 +73,12 @@ Questions is an offline Android app for practising questions and exporting study
 
 Review opens fullscreen.
 
-- **Wrong questions** show your wrong answer, the correct answer, your reasoning and the explanations. Write the flawed assumption and what prevents it next time.
+- **Wrong questions** show your wrong answer, the correct answer, your reasoning and the explanations. Write the flawed assumption and what prevents it next time. A small pill estimates how long the card front takes to read.
 - **Skipped questions** ask **What was missing here?**.
   - **A concept** creates a concept card from a term and definition.
   - **Another question** creates a basic card from a question and answer.
 - **Concepts without a definition** get a definition field.
-- **Highlights** from the session can be kept or turned into a concept or basic card.
+- **Highlights** from the session can be kept or turned into a concept or basic card. **Suggest cards with AI** proposes atomic cards (one fact each); check the ones to add.
 - **Skip** leaves a step for later. Missing card details can be finished from **Cards**.
 
 ## Past errors
@@ -98,13 +98,14 @@ Review opens fullscreen.
 - Tap a card to preview it. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations.
 - **Export to AnkiDroid** sends the selected cards to AnkiDroid.
 - **Share as files** creates Anki-compatible text files.
-- **Delete selected** removes the chosen cards. Deleting an active error card also removes it from the error queue.
-- Incomplete error cards and concepts without a definition block export until they are completed.
+- **Delete selected** removes the chosen cards and checked skipped questions. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice.
+- Incomplete error cards and concepts without a definition block export until they are completed. Skipped questions cannot be exported, but they can still be selected and deleted.
 
 ## Highlights
 
 - Select text during practice and choose **Highlight**. The phrase is painted in place.
 - Highlights stay in **Cards** and can become a concept or basic card.
+- **Suggest cards with AI** reads the highlight, its question context and the topic, then proposes up to six atomic basic cards. Check the ones to add.
 - **Download all** saves highlights as plain text.
 - Highlights are never sent to AnkiDroid.
 

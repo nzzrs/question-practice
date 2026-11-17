@@ -3,6 +3,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/domain/models.dart';
+import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../../app/providers.dart';
 import '../lookup/domain/lookup_service.dart';
@@ -161,6 +162,17 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
                     onPressed: _editContent,
                   ),
                 ],
+              ),
+              const SizedBox(height: 8),
+              Tooltip(
+                message: 'Estimated time to read the front',
+                child: Pill(
+                  key: const ValueKey('error-card-reading-time'),
+                  readingTimeLabel(
+                    [_question, wrongAnswer, correctAnswer].join(' '),
+                  ),
+                  icon: Icons.schedule,
+                ),
               ),
               const SizedBox(height: 12),
               _AnswerBox(

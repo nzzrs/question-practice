@@ -131,6 +131,20 @@ the persistent skipped record handled with `concept` or `basic`. Skipped
 questions stay in the combined **Error and skipped** section of Cards until
 handled, where pencils open the same review surface.
 
+Highlight steps offer the manual card dialog and an AI suggestion sheet. The
+provider receives the highlight, its question context and the topic, and must
+return one JSON object with at most six atomic front/back cards. The parser
+tolerates fenced JSON, trims values, drops empty or duplicate pairs and caps the
+list at six. Checked suggestions become basic cards through
+`ReviewService.createBasicCard`; the highlight is then marked converted once,
+with the first created card id.
+
+The shared error-card view also shows an estimated reading time for the front.
+`core/domain/reading_time.dart` counts whitespace-separated words at 200 words
+per minute, rounds up to five seconds with a five-second minimum and formats
+`~15 s read`. Only the question and the two answers contribute; reasoning,
+bias, vaccine and explanations are excluded.
+
 Review pages run inside `ImmersiveReview`, which hides the system bars while the
 review is visible, restores them while another page covers it, and re-enters on
 resume or when the learner returns. The end-of-session review and the Cards
@@ -147,7 +161,7 @@ view.
 | Concept cards | Cloze text `Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
 | Basic cards | Question/answer cards from skipped questions, Ask or a highlight, with optional context above the front. | `CardRepository.createManualCard`, `new_card_dialog.dart` | `manual_cards` |
 | Skipped queue | Every skipped/unknown answer is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
-| Highlights | Selecting text offers Highlight. The phrase is stored with context, topic, practice, session and question; it paints in place. At review it can become a concept, become a basic card, be kept or be deleted. Kept highlights remain in Cards and can be downloaded as plain text; they are never sent to Anki. | `selectable_linkified_text.dart`, `CardRepository.createHighlight/keepHighlight/markHighlightConverted` | `highlights`, `manual_cards` |
+| Highlights | Selecting text offers Highlight. The phrase is stored with context, topic, practice, session and question; it paints in place. At review it can become a concept, become a basic card, be kept or be deleted. **Suggest cards with AI** proposes up to six atomic basic cards from the highlight and its context; each checked suggestion is created with `ReviewService.createBasicCard` and the highlight is marked converted once. Kept highlights remain in Cards and can be downloaded as plain text; they are never sent to Anki. | `selectable_linkified_text.dart`, `CardRepository.createHighlight/keepHighlight/markHighlightConverted`, `LookupService.suggestAtomicCards`, `suggested_cards_sheet.dart` | `highlights`, `manual_cards` |
 | Highlight download | **Download all** writes a plain-text file through the system share sheet. | `CardsPage._downloadHighlights`, `ExportService.shareHighlights` | `highlights` |
 
 ### Statistics and statistics export
@@ -184,14 +198,18 @@ Code: `lib/features/topics/topic_stats_page.dart`,
 - Selection defaults to unexported, complete cards. Incomplete error cards can
   be selected only to review them; export and share stay disabled until every
   selected error card has bias and vaccine. Concepts need a definition.
+  Skipped questions can be selected too: they count toward the subtitle and
+  **Delete selected**, but never toward export or share.
 - **Review all** sits above the combined error/skipped section;
   **Review selected** appears for checked cards or skipped questions.
 - **Export to AnkiDroid** creates missing decks and note types, bulk-adds notes,
   marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
 - **Share as files** writes Anki-compatible cloze `.txt` and error/basic `.tsv`
   files. File export does not encode a deck and never includes highlights.
-- **Delete selected** removes the selected cards; deleting an active error card
-  also removes it from the error queue. Highlights are deleted one by one.
+- **Delete selected** removes the selected concepts, error cards, basic cards
+  and skipped questions. Deleting an active error card also removes it from the
+  error queue; deleting a skipped row removes only the queue record, not its
+  question. Highlights are deleted one by one.
 - Decks are selected **per topic only**. A card snapshots its topic name;
   export looks up the current deck by that name and falls back to the Settings
   default. Renaming a topic affects new cards only. There is no per-practice

@@ -11,6 +11,7 @@ import '../export/new_card_dialog.dart';
 import '../lookup/domain/lookup_service.dart';
 import 'domain/review_service.dart';
 import 'skipped_question_view.dart';
+import 'suggested_cards_sheet.dart';
 
 enum _Missing { concept, question }
 
@@ -269,6 +270,13 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     }
   }
 
+  Future<void> _suggestHighlightCards(HighlightReviewStep step) async {
+    final added = await suggestCardsFromHighlight(context, step.highlight);
+    if (!mounted || added <= 0) return;
+    _created += added;
+    _advance();
+  }
+
   @override
   Widget build(BuildContext context) {
     return ImmersiveReview(child: _buildPage(context));
@@ -465,6 +473,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           HighlightReviewStep(:final highlight) => _HighlightStep(
             highlight: highlight,
             onMakeCard: () => _convertHighlight(step),
+            onSuggestCards: () => _suggestHighlightCards(step),
           ),
         },
       ],
@@ -615,10 +624,15 @@ class _ConceptStep extends StatelessWidget {
 }
 
 class _HighlightStep extends StatelessWidget {
-  const _HighlightStep({required this.highlight, required this.onMakeCard});
+  const _HighlightStep({
+    required this.highlight,
+    required this.onMakeCard,
+    required this.onSuggestCards,
+  });
 
   final StudyHighlight highlight;
   final VoidCallback onMakeCard;
+  final VoidCallback onSuggestCards;
 
   @override
   Widget build(BuildContext context) {
@@ -683,10 +697,22 @@ class _HighlightStep extends StatelessWidget {
           style: theme.typography.emphasized.titleSmall,
         ),
         const SizedBox(height: 12),
-        M3EButton.tonal(
-          onPressed: onMakeCard,
-          icon: const Icon(Icons.style_outlined),
-          label: const Text('Turn into a card'),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            M3EButton.tonal(
+              onPressed: onMakeCard,
+              icon: const Icon(Icons.style_outlined),
+              label: const Text('Turn into a card'),
+            ),
+            M3EButton.tonal(
+              key: const ValueKey('highlight-suggest-cards'),
+              onPressed: onSuggestCards,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('Suggest cards with AI'),
+            ),
+          ],
         ),
       ],
     );

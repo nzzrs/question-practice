@@ -582,6 +582,15 @@ class StudyHighlight {
   bool get needsReview => !isKept && !hasCard;
 }
 
+/// One atomic front/back card proposed by the AI for a saved highlight.
+@immutable
+class SuggestedCard {
+  const SuggestedCard({required this.front, required this.back});
+
+  final String front;
+  final String back;
+}
+
 @immutable
 class SessionSummary {
   const SessionSummary({

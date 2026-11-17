@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/topics/domain/statistics_export_service.dart';
 
@@ -41,6 +42,34 @@ void main() {
         distracted: false,
       );
     }
+  }
+
+  Future<int> addPractice({
+    required int topicId,
+    required String name,
+    required int count,
+  }) async {
+    final practiceId = await harness.practices.createPractice(
+      topicId: topicId,
+      name: name,
+      description: '',
+      contentHash: 'hash-$name-$count',
+      importedAt: harness.clock.now().toUtc(),
+    );
+    await harness.practices.createQuestions(practiceId, [
+      for (var index = 0; index < count; index++)
+        QuestionDraft(
+          prompt: 'Question ${index + 1}?',
+          alternatives: ['Correct ${index + 1}', 'Wrong ${index + 1}'],
+          correctIndexes: const [0],
+          explanation: 'Because ${index + 1} is correct.',
+          alternativeExplanations: [
+            'Correct: ${index + 1} is the right answer.',
+            'Wrong: ${index + 1} is a distractor.',
+          ],
+        ),
+    ]);
+    return practiceId;
   }
 
   test(
@@ -99,11 +128,49 @@ void main() {
       final trend = payload['trend'] as Map<String, dynamic>;
       expect(trend['sessionCount'], 2);
       final regression = trend['regression'] as Map<String, dynamic>;
-      expect(regression['slope'], closeTo(-1, 1e-9));
-      expect(regression['intercept'], closeTo(1, 1e-9));
-      expect(trend['learningRatePercentagePointsPerWeek'], closeTo(-100, 1e-9));
+      expect(regression['slope'], closeTo(-0.5, 1e-9));
+      expect(regression['intercept'], closeTo(2, 1e-9));
+      expect(
+        trend['learningRatePercentagePointsPer100Questions'],
+        closeTo(-5000, 1e-9),
+      );
+      expect(trend['learningRatePercentagePointsPerWeek'], closeTo(-700, 1e-9));
     },
   );
+
+  test('trend weights sessions by their question counts', () async {
+    final practice = await harness.seedPractice(topicName: 'Cloud', count: 1);
+    final bigPracticeId = await addPractice(
+      topicId: practice.topicId,
+      name: 'Large',
+      count: 9,
+    );
+    await completeSession(practice.practiceId, correct: false);
+    harness.clock.advance(const Duration(days: 7));
+    await completeSession(bigPracticeId, correct: true);
+
+    final service = StatisticsExportService(
+      practices: harness.practices,
+      clock: harness.clock,
+      temporaryDirectory: () async => directory,
+    );
+    final payload = await service.buildTopicPayload(practice.topicId);
+    final trend = payload['trend'] as Map<String, dynamic>;
+    final regression = trend['regression'] as Map<String, dynamic>;
+
+    // 1 wrong question followed by 9 correct ones: slope 1/9 per question.
+    expect(regression['slope'], closeTo(1 / 9, 1e-9));
+    expect(regression['intercept'], closeTo(-1 / 9, 1e-9));
+    expect(
+      trend['learningRatePercentagePointsPer100Questions'],
+      closeTo(10000 / 9, 1e-9),
+    );
+    // 10 questions over 2 active days = 5 per day.
+    expect(
+      trend['learningRatePercentagePointsPerWeek'],
+      closeTo((1 / 9) * 5 * 7 * 100, 1e-9),
+    );
+  });
 
   test('payload omits subtopics when no question has one', () async {
     final practice = await harness.seedPractice(count: 1);

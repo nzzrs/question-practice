@@ -49,7 +49,7 @@ testable.
 | Question shape | 2–8 alternatives, `correctIndex` or `correctIndexes`, overall explanation, one alternative explanation per alternative, optional subtopic and optional `sourceId`. | `assets/schema/practice_import.schema.json`, `ImportService._readTopics` | `questions` |
 | Practice JSON download | Shares one topic/practice file in import format with `sourceId` on every question, `subtopic` only when set, and `correctIndex`/`correctIndexes`. Never includes a deck. | `lib/features/practice_edit/domain/practice_edit_service.dart` | `topics`, `practices`, `questions` |
 | Practice JSON update | Requires the stored topic and practice names after trimming/case-folding. Matches questions by `sourceId` first, then exact trimmed prompt. Previews new/modified/unchanged/deleted counts, then applies one transaction. Matched ids keep attempts, error cards, skipped records and statistics; deleted questions cascade; linked concepts/basic cards/highlights lose only their question link. | `PracticeEditService.previewUpdate/apply`, `PracticeRepository.applyPracticeUpdate` | `practices`, `questions`; existing history |
-| Subtopics | Stored per question in `questions.subtopic`, trimmed; blank is stored as `NULL`. Used by practice JSON export/update, statistics grouping and backup. No separate table. | `QuestionDraft.subtopic`, `Question.subtopic`, `_normalizeSubtopic`, `StatsDao.watchSubtopicStats` | `questions` |
+| Subtopics | Stored per question in `questions.subtopic`, trimmed; blank is stored as `NULL`. Used by practice JSON export/update, statistics grouping, category management and backup. Rename, delete and merge update only this column for one topic; no separate table or migration. | `QuestionDraft.subtopic`, `Question.subtopic`, `_normalizeSubtopic`, `StatsDao.watchSubtopicStats`, `PracticeRepository.renameSubtopic/deleteSubtopics/mergeSubtopics`, `TopicDao.setSubtopicForTopic` | `questions` |
 | Multi-answer scoring | Correctness is set equality: every correct index is selected and no extra index is selected. Partial selections fail. | `Question.isCorrectSelection`, `SessionService.submitAnswer` | `questions`, `attempts` |
 
 ### Sessions, answers and progress
@@ -154,28 +154,48 @@ view.
 
 - Topic statistics are derived from completed sessions at query time; no
   aggregate table is stored.
-- The hero shows the latest score, average, best and completed-session count.
-  **Progress over time** plots one point per completed session. The solid line
-  joins sessions; the dashed **Trend** line is a least-squares fit through the
-  same points (`fitProgressBySession`).
-- **Learning rate** is the least-squares slope against elapsed days times seven,
-  shown as percentage points per week. It stays hidden until the history spans
-  at least seven days.
+- The hero shows the latest score, best session, completed-session count and a
+  question-weighted average: `sum(correct) / sum(total)` over completed
+  sessions, not the mean of session percentages.
+- **Progress over time** plots one point per completed session. The solid line
+  joins sessions; the dashed **Trend (questions)** line is a weighted least
+  squares fit of session score against cumulative questions answered, with each
+  session weighted by its own question count. The slope is the score change per
+  answered question.
+- **Learning rate** shows two figures from that fit: percentage points per 100
+  answered questions (`slope × 10,000`) and percentage points per week
+  (`slope × questionsPerDay × 7 × 100`). Questions per day are answered
+  questions divided by active study days, the distinct local calendar dates in
+  the completed session history. Both appear as soon as a fit exists; there is
+  no minimum span.
 - **By subtopic** groups questions with `COALESCE(NULLIF(TRIM(subtopic), ''), '')`
   and reports question count, attempted count, answered count, correct count,
   accuracy and progress. Questions without a subtopic appear last as
   **Uncategorized**. The section is hidden when no question has a named
-  subtopic.
+  subtopic. Long-press a row to select a category; in selection mode, tapping
+  another row toggles it. One selected row offers rename and delete, two or more
+  offer merge and delete. Rename assigns the new name to the topic's matching
+  questions. Delete keeps every question and clears the subtopic, so those
+  questions become Uncategorized; deleting Uncategorized is a no-op. Merge
+  applies one chosen name to every selected category, including Uncategorized
+  when selected. Only `questions.subtopic` changes; other topics, questions,
+  attempts, sessions and cards stay untouched.
 - The share action writes format v1 statistics JSON with `app`,
   `kind: statistics`, topic scope, summary, progress points, `subtopics` (when
-  named groups exist) and `trend` (session count, regression slope/intercept and
-  weekly learning rate).
+  named groups exist) and `trend` with `sessionCount`, `regression`
+  (`slope`/`intercept`), `learningRatePercentagePointsPer100Questions` and
+  `learningRatePercentagePointsPerWeek`. Rate keys are null without a fit.
+- A topic's hero accuracy is a rolling figure over its five most recent
+  completed sessions, weighted by questions answered. Shorter histories use
+  every session they have.
 - See [Database reference](database.md#subtopics-end-to-end) for the full
   subtopic path from import to backup.
 
 Code: `lib/features/topics/topic_stats_page.dart`,
 `lib/features/topics/domain/statistics_export_service.dart`,
-`lib/core/domain/progress_math.dart`, `StatsDao.watchSubtopicStats`.
+`lib/core/domain/progress_math.dart`, `StatsDao.watchSubtopicStats`,
+`PracticeRepository.renameSubtopic/deleteSubtopics/mergeSubtopics`,
+`TopicDao.setSubtopicForTopic`.
 
 ### Cards, Anki export and deck routing
 

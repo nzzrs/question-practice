@@ -203,6 +203,52 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     );
   }
 
+  /// Sets or clears the subtopic of matching questions in one topic.
+  ///
+  /// [subtopics] lists the named categories to change; blank entries are
+  /// ignored. When [includeUncategorized] is true, questions with a null or
+  /// blank subtopic are changed too. A null [name] clears the subtopic.
+  Future<void> setSubtopicForTopic({
+    required int topicId,
+    required Set<String> subtopics,
+    required String? name,
+    required bool includeUncategorized,
+  }) async {
+    final names = {
+      for (final subtopic in subtopics)
+        if (subtopic.trim().isNotEmpty) subtopic.trim(),
+    };
+    final conditions = <String>[];
+    if (names.isNotEmpty) {
+      final placeholders = List.filled(names.length, '?').join(', ');
+      conditions.add('subtopic IN ($placeholders)');
+    }
+    if (includeUncategorized) {
+      conditions.add("(subtopic IS NULL OR TRIM(subtopic) = '')");
+    }
+    if (conditions.isEmpty) return;
+
+    final setClause = name == null ? 'subtopic = NULL' : 'subtopic = ?';
+    final variables = <Variable>[
+      if (name != null) Variable.withString(name),
+      Variable.withInt(topicId),
+      for (final subtopic in names) Variable.withString(subtopic),
+    ];
+    await customUpdate(
+      '''
+      UPDATE questions
+      SET $setClause
+      WHERE practice_id IN (
+        SELECT id FROM practices WHERE topic_id = ?
+      )
+        AND (${conditions.join(' OR ')})
+      ''',
+      variables: variables,
+      updates: {questions, practices},
+      updateKind: UpdateKind.update,
+    );
+  }
+
   Future<void> deletePractice(int id) async {
     await (delete(practices)..where((p) => p.id.equals(id))).go();
   }

@@ -7,6 +7,7 @@ import '../../core/data/practice_repository.dart';
 import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
+import '../../core/domain/progress_math.dart';
 import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../practice/domain/session_service.dart';
@@ -32,6 +33,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
   Widget build(BuildContext context) {
     final summary = ref.watch(topicSummaryProvider(widget.topicId));
     final practices = ref.watch(practiceSummariesProvider(widget.topicId));
+    final progress = ref.watch(topicProgressProvider(widget.topicId));
     final sort =
         ref.watch(topicPracticeSortProvider(widget.topicId)).value ??
         ListSort.defaultByName;
@@ -122,7 +124,10 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                   ),
                 ],
                 const SizedBox(height: 20),
-                _TopicHero(summary: data),
+                _TopicHero(
+                  summary: data,
+                  progress: progress.value ?? const <TopicProgressPoint>[],
+                ),
                 const SizedBox(height: 24),
                 SectionTitle(
                   'Practices',
@@ -383,19 +388,24 @@ class _TopicPageState extends ConsumerState<TopicPage> {
 }
 
 class _TopicHero extends StatelessWidget {
-  const _TopicHero({required this.summary});
+  const _TopicHero({required this.summary, required this.progress});
 
   final TopicSummary summary;
+  final List<TopicProgressPoint> progress;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final accuracy = summary.answeredCount == 0
-        ? 0.0
-        : summary.accuracy.clamp(0, 1).toDouble();
-    final accuracyLabel = summary.answeredCount == 0
+    final recent = recentCompletedSessions(progress);
+    final accuracy = rollingAccuracy(progress);
+    final accuracyLabel = accuracy == null
         ? '—'
         : '${(accuracy * 100).round()}%';
+    final sessionCount = recent.length;
+    final accuracyCaption = sessionCount == 0
+        ? 'Rolling accuracy'
+        : 'Rolling accuracy · last $sessionCount '
+              'session${sessionCount == 1 ? '' : 's'}';
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -408,10 +418,10 @@ class _TopicHero extends StatelessWidget {
           Row(
             children: [
               ScoreRing(
-                value: accuracy,
+                value: accuracy ?? 0,
                 label: accuracyLabel,
-                caption: 'Accuracy',
-                size: 116,
+                caption: accuracyCaption,
+                size: 132,
                 strokeWidth: 11,
               ),
               const SizedBox(width: 18),

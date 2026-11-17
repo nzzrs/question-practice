@@ -215,6 +215,65 @@ class PracticeRepository {
     return _db.topicDao.updatePracticeDescription(id, description);
   }
 
+  /// Gives every question in one topic's subtopic a new name.
+  ///
+  /// An empty [from] renames Uncategorized questions, which assigns them a
+  /// name. Questions, attempts, sessions and cards keep their rows.
+  Future<void> renameSubtopic(int topicId, String from, String to) {
+    final name = to.trim();
+    if (name.isEmpty) {
+      throw ArgumentError.value(to, 'to', 'A category name is required.');
+    }
+    return _db.topicDao.setSubtopicForTopic(
+      topicId: topicId,
+      subtopics: {from},
+      name: name,
+      includeUncategorized: from.trim().isEmpty,
+    );
+  }
+
+  /// Removes named categories while keeping every question.
+  ///
+  /// Their subtopic becomes null, so they appear as Uncategorized. Deleting
+  /// Uncategorized is a no-op.
+  Future<void> deleteSubtopics(int topicId, Iterable<String> subtopics) {
+    final names = {
+      for (final subtopic in subtopics)
+        if (subtopic.trim().isNotEmpty) subtopic.trim(),
+    };
+    if (names.isEmpty) return Future<void>.value();
+    return _db.topicDao.setSubtopicForTopic(
+      topicId: topicId,
+      subtopics: names,
+      name: null,
+      includeUncategorized: false,
+    );
+  }
+
+  /// Applies one name to every question in the selected categories.
+  ///
+  /// Uncategorized questions join the merged category when an empty value is
+  /// selected. Other topics and all history rows stay untouched.
+  Future<void> mergeSubtopics(
+    int topicId,
+    Iterable<String> subtopics,
+    String to,
+  ) {
+    final name = to.trim();
+    if (name.isEmpty) {
+      throw ArgumentError.value(to, 'to', 'A category name is required.');
+    }
+    final selection = subtopics.toSet();
+    return _db.topicDao.setSubtopicForTopic(
+      topicId: topicId,
+      subtopics: selection,
+      name: name,
+      includeUncategorized: selection.any(
+        (subtopic) => subtopic.trim().isEmpty,
+      ),
+    );
+  }
+
   /// Rewrites a practice's questions while keeping the rows of matched ones.
   ///
   /// Matched questions keep their id, so attempts, error cards, skipped

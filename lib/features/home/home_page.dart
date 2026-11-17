@@ -507,8 +507,8 @@ class _ShuffleOptionsSheetState extends ConsumerState<_ShuffleOptionsSheet> {
             ),
             const SizedBox(height: 10),
             Text(
-              'One mixed session built from the questions that are still '
-              'worth practising.',
+              'Mixed questions from every topic, unsolved and unskipped only, '
+              'in random order.',
               style: theme.typography.baseline.bodyMedium.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.45,
@@ -528,22 +528,6 @@ class _ShuffleOptionsSheetState extends ConsumerState<_ShuffleOptionsSheet> {
               onSubmitted: (_) => _start(),
             ),
             const SizedBox(height: 18),
-            const _ShuffleOption(
-              icon: Icons.public,
-              title: 'Every topic',
-              subtitle: 'Questions come from your whole library.',
-            ),
-            const _ShuffleOption(
-              icon: Icons.filter_alt_off_outlined,
-              title: 'Unsolved and unskipped only',
-              subtitle: 'Solved questions and ones you skipped stay out.',
-            ),
-            const _ShuffleOption(
-              icon: Icons.shuffle,
-              title: 'Random order',
-              subtitle: 'Questions and alternatives are shuffled for this run.',
-            ),
-            const SizedBox(height: 18),
             AppPrimaryButton(
               onPressed: _chosen == null ? null : _start,
               label: 'Start practice',
@@ -551,49 +535,6 @@ class _ShuffleOptionsSheetState extends ConsumerState<_ShuffleOptionsSheet> {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _ShuffleOption extends StatelessWidget {
-  const _ShuffleOption({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          IconBadge(icon, size: 40, tone: PillTone.secondary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: theme.typography.baseline.titleSmall),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

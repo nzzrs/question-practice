@@ -188,6 +188,11 @@ final sessionServiceProvider = Provider<SessionService>(
   ),
 );
 
+/// Questions shuffled practice can draw from right now.
+final mixedEligibleCountProvider = FutureProvider.autoDispose<int>(
+  (ref) => ref.watch(sessionServiceProvider).mixedEligibleCount(),
+);
+
 final reviewServiceProvider = Provider<ReviewService>(
   (ref) => ReviewService(
     practices: ref.watch(topicRepositoryProvider),

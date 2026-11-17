@@ -178,6 +178,8 @@ Review opens fullscreen.
 ## Shuffled practice
 
 - The **Shuffle** floating button opens **Start shuffled practice**.
+- Choose how many questions to include in the **Questions** field; the default is 15.
 - The session uses questions from every topic, keeps only questions that are neither solved nor skipped, and shuffles questions and alternatives.
+- If you ask for more questions than are available, the session includes all eligible ones.
 - If no question is eligible, the app says so instead of starting an empty session.
 - A shuffled session can be saved for later like any other session.

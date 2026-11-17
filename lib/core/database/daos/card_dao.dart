@@ -338,7 +338,12 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   }
 
   Future<void> deleteHighlight(int id) {
-    return (delete(highlights)..where((h) => h.id.equals(id))).go();
+    return deleteHighlights([id]);
+  }
+
+  Future<void> deleteHighlights(List<int> ids) async {
+    if (ids.isEmpty) return;
+    await (delete(highlights)..where((h) => h.id.isIn(ids))).go();
   }
 
   Future<void> markManualCardsExported(

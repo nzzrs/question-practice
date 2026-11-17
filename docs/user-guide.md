@@ -93,19 +93,21 @@ Review opens fullscreen.
 ## Cards
 
 - Filters: **All**, **Concepts**, **Errors & skipped**, **Basic**, **Highlights**, and **Show exported** or **Hide exported**.
-- Check the cards to include. **Review all** sits above the error and skipped section; **Review selected** appears for checked cards.
-- **Complete** finishes a missing concept definition or a checked error card's details.
-- Tap a card to preview it. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations.
+- Cards has no checkboxes. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. The subtitle counts the selection and rows keep their positions.
+- **Review all** sits above the error and skipped section; **Review selected** appears while cards are selected.
+- **Complete** finishes a missing concept definition or an error card's details.
+- Tap a card to preview it. Tapping a highlight opens the highlight review at that highlight. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations.
 - **Export to AnkiDroid** sends the selected cards to AnkiDroid.
 - **Share as files** creates Anki-compatible text files.
-- **Delete selected** removes the chosen cards and checked skipped questions. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice.
-- Incomplete error cards and concepts without a definition block export until they are completed. Skipped questions cannot be exported, but they can still be selected and deleted.
+- **Delete selected** removes the chosen cards, skipped questions and highlights. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a highlight removes only the saved phrase; cards already made from it stay.
+- Incomplete error cards and concepts without a definition block export until they are completed. Skipped questions and highlights cannot be exported, but they can still be selected and deleted.
 
 ## Highlights
 
 - Select text during practice and choose **Highlight**. The phrase is painted in place.
-- Highlights stay in **Cards** and can become a concept or basic card.
-- **Suggest cards with AI** reads the highlight, its question context and the topic, then proposes up to six atomic basic cards. Check the ones to add.
+- Highlights stay in **Cards** and can be reviewed one at a time from **Review highlights** or by tapping one.
+- **Turn into a card** creates a concept or basic card. **Suggest cards with AI** reads the highlight, its question context and the topic, then proposes up to six atomic basic cards. Check the ones to add.
+- A highlight with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete highlight** removes only the saved phrase.
 - **Download all** saves highlights as plain text.
 - Highlights are never sent to AnkiDroid.
 

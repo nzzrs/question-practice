@@ -7,9 +7,10 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_card_review_view.dart';
 import '../export/cards_page.dart';
-import '../export/new_card_dialog.dart';
 import '../lookup/domain/lookup_service.dart';
 import 'domain/review_service.dart';
+import 'highlight_card_actions.dart';
+import 'highlight_review_view.dart';
 import 'skipped_question_view.dart';
 import 'suggested_cards_sheet.dart';
 
@@ -228,46 +229,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   }
 
   Future<void> _convertHighlight(HighlightReviewStep step) async {
-    final highlight = step.highlight;
-    final draft = await showNewCardDialog(
-      context,
-      title: 'Turn the highlight into a card',
-      contextText: highlight.context,
-      initialTerm: highlight.text,
-      initialQuestion: highlight.text,
-      initialKind: NewCardKind.concept,
-    );
-    if (draft == null || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      final service = ref.read(reviewServiceProvider);
-      if (draft.kind == NewCardKind.concept) {
-        await service.createConcept(
-          sessionId: widget.sessionId,
-          questionId: highlight.questionId,
-          term: draft.term,
-          definition: draft.definition,
-          context: highlight.context,
-          topicName: highlight.topicName,
-          source: ConceptSource.manual,
-        );
-        await service.markHighlightConverted(highlight.id);
-      } else {
-        final id = await service.createBasicCard(
-          sessionId: widget.sessionId,
-          questionId: highlight.questionId,
-          question: draft.question,
-          answer: draft.answer,
-          context: highlight.context,
-          topicName: highlight.topicName,
-        );
-        await service.markHighlightConverted(highlight.id, manualCardId: id);
-      }
-      _created++;
-      _advance();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final created = await convertHighlightToCard(context, ref, step.highlight);
+    if (!mounted || created == 0) return;
+    _created += created;
+    _advance();
   }
 
   Future<void> _suggestHighlightCards(HighlightReviewStep step) async {
@@ -470,7 +435,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             concept: concept,
             definition: _definition,
           ),
-          HighlightReviewStep(:final highlight) => _HighlightStep(
+          HighlightReviewStep(:final highlight) => HighlightReviewView(
             highlight: highlight,
             onMakeCard: () => _convertHighlight(step),
             onSuggestCards: () => _suggestHighlightCards(step),
@@ -617,102 +582,6 @@ class _ConceptStep extends StatelessWidget {
           minLines: 2,
           maxLines: 4,
           isRequired: true,
-        ),
-      ],
-    );
-  }
-}
-
-class _HighlightStep extends StatelessWidget {
-  const _HighlightStep({
-    required this.highlight,
-    required this.onMakeCard,
-    required this.onSuggestCards,
-  });
-
-  final StudyHighlight highlight;
-  final VoidCallback onMakeCard;
-  final VoidCallback onSuggestCards;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TonalBox(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  const Pill('Highlight', tone: PillTone.primary),
-                  if (highlight.topicName.trim().isNotEmpty)
-                    Pill(highlight.topicName),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Text(
-                  highlight.text,
-                  style: theme.typography.baseline.titleMedium.copyWith(
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              if (highlight.context.trim().isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'From the question',
-                  style: theme.typography.baseline.labelSmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  highlight.context,
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.45,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'Keep it for later, or turn it into a card.',
-          style: theme.typography.emphasized.titleSmall,
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            M3EButton.tonal(
-              onPressed: onMakeCard,
-              icon: const Icon(Icons.style_outlined),
-              label: const Text('Turn into a card'),
-            ),
-            M3EButton.tonal(
-              key: const ValueKey('highlight-suggest-cards'),
-              onPressed: onSuggestCards,
-              icon: const Icon(Icons.auto_awesome),
-              label: const Text('Suggest cards with AI'),
-            ),
-          ],
         ),
       ],
     );

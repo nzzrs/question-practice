@@ -140,4 +140,49 @@ void main() {
     expect(find.byType(SummaryPage), findsOneWidget);
     expect(recorder.modes.last, 'SystemUiMode.edgeToEdge');
   });
+
+  testWidgets('the end-of-session highlight step uses the shared view', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final sessions = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await sessions.startPractice(seeded.practiceId);
+    final item = start.items.single;
+    await sessions.submitAnswer(
+      start: start,
+      item: item,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await harness.cards.createHighlight(
+      sessionId: start.session.id,
+      questionId: item.question.id,
+      text: 'managed service',
+      context: item.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ReviewPage(sessionId: start.session.id),
+      harness: harness,
+    );
+
+    expect(find.text('Keep this highlight?'), findsOneWidget);
+    expect(find.text('managed service'), findsOneWidget);
+    expect(find.text('From the question'), findsOneWidget);
+    expect(find.text('Turn into a card'), findsOneWidget);
+    expect(find.text('Suggest cards with AI'), findsOneWidget);
+    expect(find.text('Keep & save'), findsOneWidget);
+  });
 }

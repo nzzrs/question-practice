@@ -19,7 +19,7 @@ The suite runs on the Dart VM. Drift uses an in-memory SQLite database; HTTP and
 | Review | Error steps, shared error-card review view, skipped concept/basic branches, missing definitions, AI bias/vaccine suggestions, structured skipped/unknown review with reasoning and other alternatives |
 | Highlights | Highlight persistence, painted phrases, keep/convert review steps, highlights in Cards, plain-text download |
 | Ask | AI request carries passage/context/message, plain-text answer, ask sheet and card action |
-| Cards browser | Combined error and skipped section with checkboxes and pencils, unified review all/selected, formatted previews, filters, editor switches between concept and basic fields |
+| Cards browser | Combined error and skipped section with long-press selection and pencils, unified review all/selected, highlight review surface, formatted previews, filters, editor switches between concept and basic fields |
 | Past errors | Due queue and resolved history collapsed by default, review action above the list |
 | Settings | AI key handling, data actions keep visible labels |
 | Skipped queue | Persistence across the session, unknown toggle, early finish, late reasoning, combined Cards section and conversion |

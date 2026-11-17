@@ -120,11 +120,13 @@ class HelpPage extends StatelessWidget {
           points: [
             'Cards holds concepts, error and skipped cards, basic cards and highlights.',
             'Filter by All, Concepts, Errors & skipped, Basic or Highlights. Show exported includes exported cards.',
-            'Select cards, then use Review all or Review selected.',
+            'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection.',
+            'Review all and Review selected sit above the error and skipped section.',
             "Complete finishes a missing definition or an error card's details.",
             "Tap a card to preview it. In the error review, the pencil opens a full-page editor for the question, alternatives and explanations.",
-            'Delete selected removes the chosen cards and checked skipped questions.',
+            'Delete selected removes the chosen cards, skipped questions and highlights. A deleted highlight leaves cards already made from it in place.',
             'A deleted skipped question leaves the queue but stays in its practice.',
+            'Review highlights opens the saved highlights one at a time, where each can become a card or be kept.',
           ],
         ),
         const _Section(
@@ -132,8 +134,9 @@ class HelpPage extends StatelessWidget {
           title: 'Highlights',
           points: [
             'Select text during practice and choose Highlight.',
-            'Highlights stay in Cards and can become a concept or basic card.',
-            'Suggest cards with AI proposes up to six atomic cards; choose which ones to add.',
+            'Highlights stay in Cards and can be reviewed one at a time from Review highlights or by tapping one.',
+            'Turn into a card creates a concept or basic card. Suggest cards with AI proposes up to six atomic cards; choose which ones to add.',
+            'A highlight with a card hides the card-making actions. Keep for later marks it as kept, and Delete highlight removes only the saved phrase.',
             'Download all saves highlights as plain text. Highlights are never sent to AnkiDroid.',
           ],
         ),

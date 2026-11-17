@@ -294,6 +294,77 @@ class LookupService {
     return trimmed;
   }
 
+  /// Suggests a short list of atomic basic cards from a saved highlight.
+  ///
+  /// Each card tests one fact, so a highlight that contains several facts
+  /// becomes several small cards instead of one long paragraph. The result is
+  /// empty when the AI finds nothing worth turning into a card.
+  Future<List<SuggestedCard>> suggestAtomicCards({
+    required String highlight,
+    required String questionContext,
+    required String topicName,
+  }) async {
+    final passage = highlight.trim();
+    if (passage.isEmpty) {
+      throw const LookupException('Select a highlight first.');
+    }
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'Suggesting cards needs an AI provider. Add an API key in Settings.',
+      );
+    }
+    const systemPrompt =
+        'You turn one saved highlight from a study app into atomic basic '
+        'cards. Use the highlight, the question around it and the topic. '
+        'Return exactly one JSON object: '
+        '{"cards":[{"front":"...","back":"..."}]}. Rules: each card tests '
+        'exactly ONE fact; at most 6 cards; the front is a short, specific '
+        'prompt or term, never a paragraph; the back is a concise answer; '
+        'front and back are at most 20 words each; no markdown; only facts '
+        'supported by the highlight or its context; skip trivial or duplicate '
+        'cards.';
+    final context = questionContext.trim();
+    final userPrompt = [
+      if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
+      if (context.isNotEmpty) 'Question context: $context',
+      'Highlighted passage: $passage',
+    ].join('\n');
+    final content = await _requestAi(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+    );
+    try {
+      final payload = _decodeObject(content);
+      final rawCards = payload['cards'];
+      if (rawCards is! List) {
+        throw const FormatException('Missing cards list');
+      }
+      final cards = <SuggestedCard>[];
+      final seen = <String>{};
+      for (final item in rawCards) {
+        if (item is! Map<String, dynamic>) continue;
+        final rawFront = item['front'];
+        final rawBack = item['back'];
+        final front = rawFront is String ? rawFront.trim() : '';
+        final back = rawBack is String ? rawBack.trim() : '';
+        if (front.isEmpty || back.isEmpty) continue;
+        final key = '${front.toLowerCase()}\u0000${back.toLowerCase()}';
+        if (!seen.add(key)) continue;
+        cards.add(SuggestedCard(front: front, back: back));
+        if (cards.length == 6) break;
+      }
+      return cards;
+    } on Object {
+      throw const LookupException(
+        'The AI returned invalid card suggestions. Try again.',
+      );
+    }
+  }
+
   Future<List<String>> listModels({
     required AiProvider provider,
     required String baseUrl,

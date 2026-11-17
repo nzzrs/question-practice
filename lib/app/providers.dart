@@ -100,6 +100,11 @@ final topicProgressProvider =
           ref.watch(topicRepositoryProvider).watchTopicProgress(topicId),
     );
 
+final topicReadinessProvider = StreamProvider.family<TopicReadiness, int>(
+  (ref, topicId) =>
+      ref.watch(topicRepositoryProvider).watchTopicReadiness(topicId),
+);
+
 final topicSubtopicStatsProvider =
     StreamProvider.family<List<SubtopicStat>, int>(
       (ref, topicId) =>
@@ -186,6 +191,11 @@ final sessionServiceProvider = Provider<SessionService>(
     cards: ref.watch(cardRepositoryProvider),
     clock: ref.watch(clockProvider),
   ),
+);
+
+/// Questions shuffled practice can draw from right now.
+final mixedEligibleCountProvider = FutureProvider.autoDispose<int>(
+  (ref) => ref.watch(sessionServiceProvider).mixedEligibleCount(),
 );
 
 final reviewServiceProvider = Provider<ReviewService>(

@@ -49,7 +49,7 @@ testable.
 | Question shape | 2–8 alternatives, `correctIndex` or `correctIndexes`, overall explanation, one alternative explanation per alternative, optional subtopic and optional `sourceId`. | `assets/schema/practice_import.schema.json`, `ImportService._readTopics` | `questions` |
 | Practice JSON download | Shares one topic/practice file in import format with `sourceId` on every question, `subtopic` only when set, and `correctIndex`/`correctIndexes`. Never includes a deck. | `lib/features/practice_edit/domain/practice_edit_service.dart` | `topics`, `practices`, `questions` |
 | Practice JSON update | Requires the stored topic and practice names after trimming/case-folding. Matches questions by `sourceId` first, then exact trimmed prompt. Previews new/modified/unchanged/deleted counts, then applies one transaction. Matched ids keep attempts, error cards, skipped records and statistics; deleted questions cascade; linked concepts/basic cards/highlights lose only their question link. | `PracticeEditService.previewUpdate/apply`, `PracticeRepository.applyPracticeUpdate` | `practices`, `questions`; existing history |
-| Subtopics | Stored per question in `questions.subtopic`, trimmed; blank is stored as `NULL`. Used by practice JSON export/update, statistics grouping and backup. No separate table. | `QuestionDraft.subtopic`, `Question.subtopic`, `_normalizeSubtopic`, `StatsDao.watchSubtopicStats` | `questions` |
+| Subtopics | Stored per question in `questions.subtopic`, trimmed; blank is stored as `NULL`. Used by practice JSON export/update, statistics grouping, category management and backup. Rename, delete and merge update only this column for one topic; no separate table or migration. | `QuestionDraft.subtopic`, `Question.subtopic`, `_normalizeSubtopic`, `StatsDao.watchSubtopicStats`, `PracticeRepository.renameSubtopic/deleteSubtopics/mergeSubtopics`, `TopicDao.setSubtopicForTopic` | `questions` |
 | Multi-answer scoring | Correctness is set equality: every correct index is selected and no extra index is selected. Partial selections fail. | `Question.isCorrectSelection`, `SessionService.submitAnswer` | `questions`, `attempts` |
 
 ### Sessions, answers and progress
@@ -131,6 +131,22 @@ the persistent skipped record handled with `concept` or `basic`. Skipped
 questions stay in the combined **Error and skipped** section of Cards until
 handled, where pencils open the same review surface.
 
+Highlight steps offer the manual card dialog and an AI suggestion sheet through
+the shared `HighlightReviewView`, the same view Cards uses for **Review
+highlights**. The provider receives the highlight, its question context and the
+topic, and must
+return one JSON object with at most six atomic front/back cards. The parser
+tolerates fenced JSON, trims values, drops empty or duplicate pairs and caps the
+list at six. Checked suggestions become basic cards through
+`ReviewService.createBasicCard`; the highlight is then marked converted once,
+with the first created card id.
+
+The shared error-card view also shows an estimated reading time for the front.
+`core/domain/reading_time.dart` counts whitespace-separated words at 200 words
+per minute, rounds up to five seconds with a five-second minimum and formats
+`~15 s read`. Only the question and the two answers contribute; reasoning,
+bias, vaccine and explanations are excluded.
+
 Review pages run inside `ImmersiveReview`, which hides the system bars while the
 review is visible, restores them while another page covers it, and re-enters on
 resume or when the learner returns. The end-of-session review and the Cards
@@ -147,57 +163,111 @@ view.
 | Concept cards | Cloze text `Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
 | Basic cards | Question/answer cards from skipped questions, Ask or a highlight, with optional context above the front. | `CardRepository.createManualCard`, `new_card_dialog.dart` | `manual_cards` |
 | Skipped queue | Every skipped/unknown answer is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
-| Highlights | Selecting text offers Highlight. The phrase is stored with context, topic, practice, session and question; it paints in place. At review it can become a concept, become a basic card, be kept or be deleted. Kept highlights remain in Cards and can be downloaded as plain text; they are never sent to Anki. | `selectable_linkified_text.dart`, `CardRepository.createHighlight/keepHighlight/markHighlightConverted` | `highlights`, `manual_cards` |
+| Highlights | Selecting text offers Highlight. The phrase is stored with context, topic, practice, session and question; it paints in place. At review it can become a concept, become a basic card, be kept or be deleted. **Suggest cards with AI** proposes up to six atomic basic cards from the highlight and its context; each checked suggestion is created with `ReviewService.createBasicCard` and the highlight is marked converted once. Kept highlights remain in Cards: **Review highlights** walks them one at a time through the shared view, where the card actions live and disappear once a card exists. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `CardRepository.createHighlight/keepHighlight/markHighlightConverted/deleteHighlights`, `LookupService.suggestAtomicCards`, `highlight_review_page.dart`, `highlight_review_view.dart`, `suggested_cards_sheet.dart` | `highlights`, `manual_cards` |
 | Highlight download | **Download all** writes a plain-text file through the system share sheet. | `CardsPage._downloadHighlights`, `ExportService.shareHighlights` | `highlights` |
 
 ### Statistics and statistics export
 
 - Topic statistics are derived from completed sessions at query time; no
   aggregate table is stored.
-- The hero shows the latest score, average, best and completed-session count.
-  **Progress over time** plots one point per completed session. The solid line
-  joins sessions; the dashed **Trend** line is a least-squares fit through the
-  same points (`fitProgressBySession`).
-- **Learning rate** is the least-squares slope against elapsed days times seven,
-  shown as percentage points per week. It stays hidden until the history spans
-  at least seven days.
+- The hero shows the latest score, best session, completed-session count and a
+  question-weighted average: `sum(correct) / sum(total)` over completed
+  sessions, not the mean of session percentages.
+- **Progress over time** plots one point per completed session. The solid line
+  joins sessions; the dashed **Trend (questions)** line is a weighted least
+  squares fit of session score against cumulative questions answered, with each
+  session weighted by its own question count. The slope is the score change per
+  answered question.
+- **Learning rate** shows two figures from that fit: percentage points per 100
+  answered questions (`slope × 10,000`) and percentage points per week
+  (`slope × questionsPerDay × 7 × 100`). Questions per day are answered
+  questions divided by active study days, the distinct local calendar dates in
+  the completed session history. Both appear as soon as a fit exists; there is
+  no minimum span.
 - **By subtopic** groups questions with `COALESCE(NULLIF(TRIM(subtopic), ''), '')`
   and reports question count, attempted count, answered count, correct count,
   accuracy and progress. Questions without a subtopic appear last as
   **Uncategorized**. The section is hidden when no question has a named
-  subtopic.
+  subtopic. Long-press a row to select a category; in selection mode, tapping
+  another row toggles it. One selected row offers rename and delete, two or more
+  offer merge and delete. Rename assigns the new name to the topic's matching
+  questions. Delete keeps every question and clears the subtopic, so those
+  questions become Uncategorized; deleting Uncategorized is a no-op. Merge
+  applies one chosen name to every selected category, including Uncategorized
+  when selected. Only `questions.subtopic` changes; other topics, questions,
+  attempts, sessions and cards stay untouched.
 - The share action writes format v1 statistics JSON with `app`,
   `kind: statistics`, topic scope, summary, progress points, `subtopics` (when
-  named groups exist) and `trend` (session count, regression slope/intercept and
-  weekly learning rate).
+  named groups exist) and `trend` with `sessionCount`, `regression`
+  (`slope`/`intercept`), `learningRatePercentagePointsPer100Questions` and
+  `learningRatePercentagePointsPerWeek`. Rate keys are null without a fit.
+- The **Sessions** list allows independent long-press selection. Selected rows
+  use a background tint and the app bar shows a clear action plus a trash
+  action; category and session selection clear each other. Deleting selected
+  sessions runs in one transaction and keeps in-progress sessions because the
+  list and delete query are limited to completed rows. Attempts, session
+  questions, error cards, skipped records, concepts, highlights and basic cards
+  cascade with a deleted session.
+- A topic's header **Readiness** is the correct share of its last 100 answered
+  attempts across completed sessions. The `watchTopicReadiness` inner query
+  orders attempts by `answered_at DESC, id DESC`, limits the window and joins
+  through sessions, questions and practices. Wrong, skipped and **I didn't know
+  this** attempts count because each recorded attempt is in the window;
+  questions left unanswered have no attempt. A short history uses all attempts.
+  When the window crosses a session boundary it keeps only the tail of the
+  oldest session needed. With no attempts the ring shows **—** and value zero.
 - See [Database reference](database.md#subtopics-end-to-end) for the full
   subtopic path from import to backup.
 
 Code: `lib/features/topics/topic_stats_page.dart`,
 `lib/features/topics/domain/statistics_export_service.dart`,
-`lib/core/domain/progress_math.dart`, `StatsDao.watchSubtopicStats`.
+`lib/core/domain/progress_math.dart`, `StatsDao.watchSubtopicStats`,
+`StatsDao.watchTopicReadiness`,
+`PracticeRepository.renameSubtopic/deleteSubtopics/mergeSubtopics/watchTopicReadiness`,
+`SessionRepository.deleteSessions`, `SessionDao.deleteSessions`,
+`TopicDao.setSubtopicForTopic`.
 
 ### Cards, Anki export and deck routing
 
 - Cards has filter chips **All**, **Concepts**, **Errors & skipped**, **Basic**
   and **Highlights**, plus Show/Hide exported.
+- Selection uses long-press, not checkboxes. Long-press any row to enter
+  selection mode and select it; while selection mode is active a tap toggles
+  that row, and a normal tap otherwise previews it (or opens the highlight
+  review for a highlight). The subtitle counts the selection, the app-bar close
+  clears it, and no banner or extra row is inserted, so rows keep their
+  positions as the selection grows. Selection is independent per section.
 - Selection defaults to unexported, complete cards. Incomplete error cards can
   be selected only to review them; export and share stay disabled until every
   selected error card has bias and vaccine. Concepts need a definition.
+  Skipped questions and highlights can be selected too: they count toward the
+  subtitle and **Delete selected**, but never toward export or share.
 - **Review all** sits above the combined error/skipped section;
-  **Review selected** appears for checked cards or skipped questions.
+  **Review selected** appears for selected cards or skipped questions.
+- **Review highlights** sits under the Highlights heading and walks every
+  visible highlight one at a time, with Previous, Keep/Skip and Done like the
+  error review. Tapping a highlight row opens the same review at that item.
+  The shared `HighlightReviewView` shows the phrase, its question context, topic
+  and practice pills, and the card actions; the end-of-session highlight step
+  uses the same view.
 - **Export to AnkiDroid** creates missing decks and note types, bulk-adds notes,
   marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
 - **Share as files** writes Anki-compatible cloze `.txt` and error/basic `.tsv`
   files. File export does not encode a deck and never includes highlights.
-- **Delete selected** removes the selected cards; deleting an active error card
-  also removes it from the error queue. Highlights are deleted one by one.
+- **Delete selected** removes the selected concepts, error cards, basic cards,
+  skipped questions and highlights. Deleting an active error card also removes
+  it from the error queue; deleting a skipped row removes only the queue record,
+  not its question. Deleting highlights removes only the saved phrases; cards
+  already made from them stay. Delete stays enabled for any selection even when
+  export and share are disabled.
 - Decks are selected **per topic only**. A card snapshots its topic name;
   export looks up the current deck by that name and falls back to the Settings
   default. Renaming a topic affects new cards only. There is no per-practice
   deck and practice JSON never contains one.
 
 Code: `lib/features/export/cards_page.dart`,
+`lib/features/review/highlight_review_page.dart`,
+`lib/features/review/highlight_review_view.dart`,
 `lib/features/export/domain/export_service.dart`,
 `lib/features/export/domain/anki_note_builder.dart`,
 `lib/core/platform/anki_gateway.dart`, Android `AnkiBridge.kt`.
@@ -248,7 +318,7 @@ See [User guide: Backup and restore](user-guide.md#backup-and-restore).
 - **AnkiDroid:** install/API/permission/Cloze status, permission request, open
   AnkiDroid, default deck name and live deck browsing.
 - **Data:** export backup, restore backup and erase all data.
-- **About:** app version `0.9.10`. Backup metadata records the same app version
+- **About:** app version `0.9.11`. Backup metadata records the same app version
   and build number (`BackupService.appVersion/buildNumber`).
 
 Code: `lib/features/settings/settings_page.dart`,
@@ -261,11 +331,13 @@ Code: `lib/features/settings/settings_page.dart`,
   unexported cards, then the active topic list. The app bar opens Help and
   Settings. The section header sorts topics and opens archived topics (with a
   count badge when non-empty).
-- The Shuffle floating button opens **Start shuffled practice**, which explains
-  that the run uses every topic, keeps only questions that are neither solved
-  nor skipped, and shuffles questions and alternatives. If no question is
-  eligible it reports so instead of creating an empty session. The resulting
-  session is `mixed` and can be saved like any other.
+- The Shuffle floating button opens **Start shuffled practice**, which asks how
+  many questions to include (15 by default), explains that the run uses every
+  topic, keeps only questions that are neither solved nor skipped, and shuffles
+  questions and alternatives. A request larger than the eligible pool includes
+  every available question. If no question is eligible it reports so instead of
+  creating an empty session. The resulting session is `mixed` and can be saved
+  like any other.
 - A topic/practice long-press opens the options sheets; actions are destructive
   only after confirmation.
 

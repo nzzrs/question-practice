@@ -32,6 +32,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
   Widget build(BuildContext context) {
     final summary = ref.watch(topicSummaryProvider(widget.topicId));
     final practices = ref.watch(practiceSummariesProvider(widget.topicId));
+    final readiness = ref.watch(topicReadinessProvider(widget.topicId));
     final sort =
         ref.watch(topicPracticeSortProvider(widget.topicId)).value ??
         ListSort.defaultByName;
@@ -122,7 +123,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                   ),
                 ],
                 const SizedBox(height: 20),
-                _TopicHero(summary: data),
+                _TopicHero(summary: data, readiness: readiness.value),
                 const SizedBox(height: 24),
                 SectionTitle(
                   'Practices',
@@ -383,19 +384,18 @@ class _TopicPageState extends ConsumerState<TopicPage> {
 }
 
 class _TopicHero extends StatelessWidget {
-  const _TopicHero({required this.summary});
+  const _TopicHero({required this.summary, required this.readiness});
 
   final TopicSummary summary;
+  final TopicReadiness? readiness;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final accuracy = summary.answeredCount == 0
-        ? 0.0
-        : summary.accuracy.clamp(0, 1).toDouble();
-    final accuracyLabel = summary.answeredCount == 0
-        ? '—'
-        : '${(accuracy * 100).round()}%';
+    final hasAnswers = readiness?.hasAnswers ?? false;
+    final readinessLabel = hasAnswers
+        ? '${(readiness!.value * 100).round()}%'
+        : '—';
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -408,10 +408,10 @@ class _TopicHero extends StatelessWidget {
           Row(
             children: [
               ScoreRing(
-                value: accuracy,
-                label: accuracyLabel,
-                caption: 'Accuracy',
-                size: 116,
+                value: hasAnswers ? readiness!.value : 0,
+                label: readinessLabel,
+                caption: 'Readiness',
+                size: 132,
                 strokeWidth: 11,
               ),
               const SizedBox(width: 18),

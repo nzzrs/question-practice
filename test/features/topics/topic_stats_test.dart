@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/providers.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
@@ -16,6 +17,35 @@ Future<void> _loadTestFont() async {
   final loader = FontLoader('Roboto')
     ..addFont(Future.value(ByteData.view(bytes.buffer)));
   await loader.load();
+}
+
+Future<int> _completeSession(
+  TestHarness harness,
+  int practiceId, {
+  int selected = 0,
+}) async {
+  final sessions = SessionService(
+    practices: harness.practices,
+    sessions: harness.sessions,
+    cards: harness.cards,
+    clock: harness.clock,
+  );
+  final start = await sessions.startPractice(practiceId);
+  for (final item in start.items) {
+    await sessions.submitAnswer(
+      start: start,
+      item: item,
+      selectedIndexes: [selected],
+      reasoning: '',
+      distracted: false,
+    );
+  }
+  return start.session.id;
+}
+
+Future<void> _reveal(WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await tester.pump();
 }
 
 void main() {
@@ -59,6 +89,8 @@ void main() {
     expect(find.textContaining('Progress over time'), findsOneWidget);
     expect(find.text('Latest'), findsOneWidget);
     expect(find.text('100%'), findsWidgets);
+    expect(find.text('weighted by questions'), findsOneWidget);
+    expect(find.textContaining('weighted average'), findsOneWidget);
   });
 
   testWidgets('topic statistics shows per-subtopic accuracy and progress', (
@@ -145,7 +177,7 @@ void main() {
     expect(find.text('Trend'), findsNothing);
   });
 
-  testWidgets('learning rate and trend appear after one week of history', (
+  testWidgets('learning rate and weighted trend appear after two sessions', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -180,8 +212,307 @@ void main() {
     );
 
     expect(find.text('Learning rate'), findsOneWidget);
-    expect(find.text('-100 pp/week'), findsOneWidget);
-    expect(find.text('Trend'), findsOneWidget);
+    expect(find.text('-10000 pp/100 questions'), findsOneWidget);
+    expect(find.text('-700 pp/week'), findsOneWidget);
+    expect(find.text('Trend (questions)'), findsOneWidget);
+  });
+
+  testWidgets('long-press selects a category and reveals selection actions', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(
+      topicName: 'Networking',
+      count: 4,
+      subtopics: const ['TCP', 'DNS', 'UDP', ''],
+    );
+    await _completeSession(harness, practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: TopicStatsPage(topicId: practice.topicId),
+      harness: harness,
+    );
+
+    const subtopicDescription =
+        'Accuracy and progress for each question group.';
+    expect(find.text(subtopicDescription), findsOneWidget);
+
+    await _reveal(tester, find.text('TCP'));
+    await tester.longPress(find.text('TCP'));
+    await pumpFrames(tester);
+    expect(find.text(subtopicDescription), findsOneWidget);
+    expect(find.textContaining('selected'), findsNothing);
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+    expect(find.byIcon(Icons.merge_type), findsNothing);
+    expect(find.byIcon(Icons.close), findsOneWidget);
+
+    await _reveal(tester, find.text('DNS'));
+    await tester.tap(find.text('DNS'));
+    await pumpFrames(tester);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+    expect(find.byIcon(Icons.merge_type), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close));
+    await pumpFrames(tester);
+    expect(find.byIcon(Icons.merge_type), findsNothing);
+    expect(find.byIcon(Icons.ios_share), findsOneWidget);
+  });
+
+  testWidgets('renaming a selected category updates the list', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(
+      topicName: 'Networking',
+      count: 3,
+      subtopics: const ['TCP', 'DNS', 'UDP'],
+    );
+    await _completeSession(harness, practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: TopicStatsPage(topicId: practice.topicId),
+      harness: harness,
+    );
+
+    await _reveal(tester, find.text('TCP'));
+    await tester.longPress(find.text('TCP'));
+    await pumpFrames(tester);
+    await tester.tap(find.byIcon(Icons.edit_outlined));
+    await pumpFrames(tester);
+
+    expect(find.text('Rename category'), findsOneWidget);
+    await tester.enterText(find.byType(M3ETextField), 'Transport');
+    await tester.tap(find.text('Save'));
+    await pumpFrames(tester);
+
+    expect(find.text('Transport'), findsOneWidget);
+    expect(find.text('TCP'), findsNothing);
+    expect(find.byIcon(Icons.ios_share), findsOneWidget);
+  });
+
+  testWidgets('merging selected categories combines their questions', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(
+      topicName: 'Networking',
+      count: 4,
+      subtopics: const ['TCP', 'DNS', 'UDP', ''],
+    );
+    await _completeSession(harness, practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: TopicStatsPage(topicId: practice.topicId),
+      harness: harness,
+    );
+
+    await _reveal(tester, find.text('TCP'));
+    await tester.longPress(find.text('TCP'));
+    await pumpFrames(tester);
+    await _reveal(tester, find.text('DNS'));
+    await tester.tap(find.text('DNS'));
+    await pumpFrames(tester);
+    await tester.tap(find.byIcon(Icons.merge_type));
+    await pumpFrames(tester);
+
+    expect(find.text('Merge categories'), findsOneWidget);
+    expect(find.text('New name'), findsWidgets);
+    await tester.tap(find.text('Merge'));
+    await pumpFrames(tester);
+
+    expect(find.text('TCP'), findsOneWidget);
+    expect(find.text('DNS'), findsNothing);
+    expect(find.textContaining('2/2 questions'), findsOneWidget);
+    expect(find.byIcon(Icons.ios_share), findsOneWidget);
+  });
+
+  testWidgets('deleting a category keeps its questions as Uncategorized', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(
+      topicName: 'Networking',
+      count: 4,
+      subtopics: const ['TCP', 'DNS', 'UDP', ''],
+    );
+    await _completeSession(harness, practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: TopicStatsPage(topicId: practice.topicId),
+      harness: harness,
+    );
+
+    await _reveal(tester, find.text('UDP'));
+    await tester.longPress(find.text('UDP'));
+    await pumpFrames(tester);
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    await pumpFrames(tester);
+    expect(find.text('Delete category?'), findsOneWidget);
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester);
+
+    expect(find.text('UDP'), findsNothing);
+    expect(find.text('Uncategorized'), findsOneWidget);
+    expect(find.textContaining('2/2 questions'), findsOneWidget);
+  });
+
+  testWidgets('topic hero shows readiness over recent answers', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(topicName: 'Cloud', count: 1);
+    final sessions = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+
+    // Wrong, then four of the next five correct: 4/6 answered.
+    for (final correct in [false, true, true, false, true, true]) {
+      final start = await sessions.startPractice(practice.practiceId);
+      await sessions.submitAnswer(
+        start: start,
+        item: start.items.single,
+        selectedIndexes: [correct ? 0 : 1],
+        reasoning: '',
+        distracted: false,
+      );
+    }
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: practice.topicId),
+      harness: harness,
+    );
+
+    expect(find.text('67%'), findsOneWidget);
+    expect(find.text('Readiness'), findsOneWidget);
+    expect(find.textContaining('Rolling accuracy'), findsNothing);
+    expect(find.textContaining('last 5'), findsNothing);
+  });
+
+  testWidgets('topic hero keeps a dash when no answer exists', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(topicName: 'Cloud', count: 1);
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: practice.topicId),
+      harness: harness,
+    );
+
+    expect(find.text('—'), findsOneWidget);
+    expect(find.text('Readiness'), findsOneWidget);
+    expect(find.textContaining('Rolling accuracy'), findsNothing);
+  });
+
+  testWidgets('session selection deletes sessions without moving the section', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(
+      topicName: 'Networking',
+      count: 2,
+      subtopics: const ['TCP', 'DNS'],
+    );
+    final firstId = await _completeSession(harness, practice.practiceId);
+    harness.clock.advance(const Duration(hours: 1));
+    final secondId = await _completeSession(harness, practice.practiceId);
+    harness.clock.advance(const Duration(hours: 1));
+    final keptId = await _completeSession(harness, practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: TopicStatsPage(topicId: practice.topicId),
+      harness: harness,
+    );
+
+    const subtopicDescription =
+        'Accuracy and progress for each question group.';
+    final supporting = find.text(subtopicDescription);
+    expect(supporting, findsOneWidget);
+    final topBefore = tester.getTopLeft(supporting).dy;
+
+    await tester.longPress(find.byKey(ValueKey('session-row-$firstId')));
+    await pumpFrames(tester);
+    expect(find.byIcon(Icons.close), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+    expect(find.byIcon(Icons.ios_share), findsNothing);
+    expect(tester.getTopLeft(supporting).dy, topBefore);
+
+    await tester.tap(find.byKey(ValueKey('session-row-$secondId')));
+    await pumpFrames(tester);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+    expect(tester.getTopLeft(supporting).dy, topBefore);
+    expect(find.textContaining('selected'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    await pumpFrames(tester);
+    expect(find.text('Delete sessions?'), findsOneWidget);
+    expect(find.textContaining('also removes its answers'), findsOneWidget);
+    expect(
+      find.textContaining('cards, highlights and skipped records'),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester);
+
+    expect(find.byKey(ValueKey('session-row-$firstId')), findsNothing);
+    expect(find.byKey(ValueKey('session-row-$secondId')), findsNothing);
+    expect(find.byKey(ValueKey('session-row-$keptId')), findsOneWidget);
+    expect(supporting, findsOneWidget);
+    expect(find.byIcon(Icons.ios_share), findsOneWidget);
+  });
+
+  testWidgets('category and session selection modes are exclusive', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final practice = await harness.seedPractice(
+      topicName: 'Networking',
+      count: 2,
+      subtopics: const ['TCP', 'DNS'],
+    );
+    final sessionId = await _completeSession(harness, practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: TopicStatsPage(topicId: practice.topicId),
+      harness: harness,
+    );
+
+    await tester.longPress(find.text('TCP'));
+    await pumpFrames(tester);
+    expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+
+    await tester.longPress(find.byKey(ValueKey('session-row-$sessionId')));
+    await pumpFrames(tester);
+    expect(find.byIcon(Icons.edit_outlined), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.close));
+    await pumpFrames(tester);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+    expect(find.byIcon(Icons.ios_share), findsOneWidget);
   });
 
   testWidgets('export statistics button shares the topic statistics', (

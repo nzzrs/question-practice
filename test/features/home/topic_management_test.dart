@@ -146,14 +146,45 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Start shuffled practice'), findsOneWidget);
-    expect(find.text('Every topic'), findsOneWidget);
-    expect(find.text('Random order'), findsOneWidget);
+    expect(
+      find.text(
+        'Mixed questions from every topic, unsolved and unskipped only, in '
+        'random order.',
+      ),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Start practice'));
     await pumpFrames(tester);
 
     expect(find.text('Question 1 of 2'), findsOneWidget);
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the shuffle sheet stays compact with no option rows', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(count: 5);
+
+    await pumpTestApp(tester, home: const HomePage(), harness: harness);
+    await tester.tap(shuffleFab());
+    await pumpFrames(tester);
+
+    expect(find.text('Every topic'), findsNothing);
+    expect(find.text('Unsolved and unskipped only'), findsNothing);
+    expect(find.text('Random order'), findsNothing);
+    expect(find.text('Questions come from your whole library.'), findsNothing);
+    expect(find.byType(OptionTile), findsNothing);
+    expect(find.byIcon(Icons.public), findsNothing);
+    expect(find.byIcon(Icons.filter_alt_off_outlined), findsNothing);
+    expect(find.text('Questions'), findsWidgets);
+    expect(find.text('Start practice'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('shuffle-question-count')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('the shuffle sheet reports when no question is eligible', (

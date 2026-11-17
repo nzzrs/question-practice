@@ -313,6 +313,23 @@ class TopicProgressPoint {
   double get score => total == 0 ? 0 : correct / total;
 }
 
+/// Correct share of a topic's most recent answered questions.
+@immutable
+class TopicReadiness {
+  const TopicReadiness({
+    required this.correctCount,
+    required this.answeredCount,
+  });
+
+  final int correctCount;
+  final int answeredCount;
+
+  bool get hasAnswers => answeredCount > 0;
+
+  /// A value from 0 to 1; zero when no question was answered.
+  double get value => answeredCount == 0 ? 0 : correctCount / answeredCount;
+}
+
 @immutable
 class SubtopicStat {
   const SubtopicStat({
@@ -580,6 +597,15 @@ class StudyHighlight {
   bool get isKept => keptAt != null;
   bool get hasCard => cardCreatedAt != null;
   bool get needsReview => !isKept && !hasCard;
+}
+
+/// One atomic front/back card proposed by the AI for a saved highlight.
+@immutable
+class SuggestedCard {
+  const SuggestedCard({required this.front, required this.back});
+
+  final String front;
+  final String back;
 }
 
 @immutable

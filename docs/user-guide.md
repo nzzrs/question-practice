@@ -31,7 +31,7 @@ Questions is an offline Android app for practising questions and exporting study
 
 ## Topic
 
-- The header shows the description, priority, AnkiDroid deck, accuracy, progress, correct answers, active errors and completed sessions.
+- The header shows the description, priority, AnkiDroid deck, readiness over the last 100 answered questions, progress, correct answers, active errors and completed sessions.
 - The **insights** icon opens **Statistics**.
 - **Practices** lists each practice with its question count and last score. Tap one to start it.
 - The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order.
@@ -73,12 +73,12 @@ Questions is an offline Android app for practising questions and exporting study
 
 Review opens fullscreen.
 
-- **Wrong questions** show your wrong answer, the correct answer, your reasoning and the explanations. Write the flawed assumption and what prevents it next time.
+- **Wrong questions** show your wrong answer, the correct answer, your reasoning and the explanations. Write the flawed assumption and what prevents it next time. A small pill estimates how long the card front takes to read.
 - **Skipped questions** ask **What was missing here?**.
   - **A concept** creates a concept card from a term and definition.
   - **Another question** creates a basic card from a question and answer.
 - **Concepts without a definition** get a definition field.
-- **Highlights** from the session can be kept or turned into a concept or basic card.
+- **Highlights** from the session can be kept or turned into a concept or basic card. **Suggest cards with AI** proposes atomic cards (one fact each); check the ones to add.
 - **Skip** leaves a step for later. Missing card details can be finished from **Cards**.
 
 ## Past errors
@@ -93,18 +93,21 @@ Review opens fullscreen.
 ## Cards
 
 - Filters: **All**, **Concepts**, **Errors & skipped**, **Basic**, **Highlights**, and **Show exported** or **Hide exported**.
-- Check the cards to include. **Review all** sits above the error and skipped section; **Review selected** appears for checked cards.
-- **Complete** finishes a missing concept definition or a checked error card's details.
-- Tap a card to preview it. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations.
+- Cards has no checkboxes. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. The subtitle counts the selection and rows keep their positions.
+- **Review all** sits above the error and skipped section; **Review selected** appears while cards are selected.
+- **Complete** finishes a missing concept definition or an error card's details.
+- Tap a card to preview it. Tapping a highlight opens the highlight review at that highlight. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations.
 - **Export to AnkiDroid** sends the selected cards to AnkiDroid.
 - **Share as files** creates Anki-compatible text files.
-- **Delete selected** removes the chosen cards. Deleting an active error card also removes it from the error queue.
-- Incomplete error cards and concepts without a definition block export until they are completed.
+- **Delete selected** removes the chosen cards, skipped questions and highlights. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a highlight removes only the saved phrase; cards already made from it stay.
+- Incomplete error cards and concepts without a definition block export until they are completed. Skipped questions and highlights cannot be exported, but they can still be selected and deleted.
 
 ## Highlights
 
 - Select text during practice and choose **Highlight**. The phrase is painted in place.
-- Highlights stay in **Cards** and can become a concept or basic card.
+- Highlights stay in **Cards** and can be reviewed one at a time from **Review highlights** or by tapping one.
+- **Turn into a card** creates a concept or basic card. **Suggest cards with AI** reads the highlight, its question context and the topic, then proposes up to six atomic basic cards. Check the ones to add.
+- A highlight with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete highlight** removes only the saved phrase.
 - **Download all** saves highlights as plain text.
 - Highlights are never sent to AnkiDroid.
 
@@ -129,11 +132,17 @@ Review opens fullscreen.
 
 - A subtopic is an optional group inside a practice. Questions without one appear under **Uncategorized**.
 - Spelling and capitalisation define a group, so `Networking` and `networking` are separate.
-- **Statistics** is opened from the **insights** icon on a topic. It shows the latest, best and average score and the number of completed sessions.
-- **Progress over time** plots one point per completed session. The dashed **Trend** line shows the overall direction.
+- **Statistics** is opened from the **insights** icon on a topic. It shows the latest, best and average score and the number of completed sessions. The average is weighted by the number of questions in each session, so a long session counts more than a short one.
+- **Progress over time** plots one point per completed session. The dashed **Trend (questions)** line is a weighted fit of score against the total questions answered so far; sessions with more questions have more influence.
+- **Learning rate** reports the fit as percentage points per 100 answered questions and as percentage points per week. It appears as soon as two sessions give a usable fit, without waiting for a week of history.
 - **By subtopic** shows accuracy and progress for each group. It is hidden when no question has a subtopic.
-- **Learning rate** appears once the history spans at least one week and reports the average change per week.
-- The **share** icon exports the visible statistics as a JSON file. It includes the summary, progress points, per-subtopic figures and trend data.
+- Long-press a subtopic to select it. With one selected, the pencil renames it and the trash deletes it. With two or more, the merge icon combines them under one name.
+- **Rename** changes the name on every question in this topic in that category. Renaming **Uncategorized** gives those questions a name.
+- **Delete** removes the category but keeps every question; its questions move to **Uncategorized**. Deleting **Uncategorized** does nothing.
+- **Merge** asks for the name to keep, either one of the selected categories or a new name, and applies it to all of them. Other topics are not changed.
+- The **share** icon exports the visible statistics as a JSON file. It includes the summary, progress points, per-subtopic figures and trend data, with the weighted regression slope and intercept plus learning rates per 100 questions and per week.
+- A topic's header **Readiness** is the correct share of the last 100 answered questions in that topic, across completed sessions. Every attempt counts, including wrong, skipped and **I didn't know this** answers; questions left unanswered have no attempt and stay out. Shorter histories use every answer they have, and only the tail of the oldest session needed joins the window.
+- The **Sessions** list keeps one row per completed session. Long-press a row to start selecting sessions, then tap others to toggle them. The trash icon asks for confirmation and deletes the selected completed sessions together with their answers, cards, highlights and skipped records. Selection tints the row and uses the app bar, so the page does not move; category and session selection are separate modes.
 
 ## Lookup
 
@@ -177,6 +186,8 @@ Review opens fullscreen.
 ## Shuffled practice
 
 - The **Shuffle** floating button opens **Start shuffled practice**.
+- Choose how many questions to include in the **Questions** field; the default is 15.
 - The session uses questions from every topic, keeps only questions that are neither solved nor skipped, and shuffles questions and alternatives.
+- If you ask for more questions than are available, the session includes all eligible ones.
 - If no question is eligible, the app says so instead of starting an empty session.
 - A shuffled session can be saved for later like any other session.

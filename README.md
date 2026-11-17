@@ -9,7 +9,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Import practices from JSON or a `.txt` file containing JSON. One file can contain many topics and practices, and each question may name an optional subtopic for grouped statistics.
 - Answer with an optional written reasoning. Questions can have one correct alternative or several; feedback appears in place, with the correct and selected alternatives expanded to their explanation and the rest collapsed. Alternatives are shuffled per session, original letters stay hidden until feedback or the eye toggle, and answers and explanations are selectable with http(s) links opening in the browser.
 - Select any text to **Define** a term, **Highlight** it for later, or **Ask** the AI about it using the passage, its question and your own message. An answer can be turned into a basic card with the question context above the front.
-- Highlights are painted in place and wait in the end review, where each one can become a concept or basic card or simply be kept. Kept highlights remain in Cards, where **Download all** saves every highlight as a plain-text file. Highlights are never sent to AnkiDroid.
+- Highlights are painted in place and wait in the end review, where each one can become a concept or basic card or simply be kept. **Suggest cards with AI** proposes up to six atomic cards from a highlight, one fact per card, so you can pick which ones to add. Kept highlights remain in Cards, where **Review highlights** walks them one at a time with the same card actions, and **Download all** saves every highlight as a plain-text file. Highlights are never sent to AnkiDroid.
 - Move between questions with the arrows beside the question number. Closing a session offers **Save for later**, and Home lists every paused session.
 - Check **I was distracted or read too fast** in the feedback to remove a new error card; uncheck it to restore the card. Check **I didn't know this** instead to count the answer as skipped and have the review ask for the missing concept.
 - Get a score and the number of terms looked up at the end of a session.
@@ -18,14 +18,17 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
   - concept cards such as `Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}`, with an acronym's full form in the Anki extra field;
   - basic question/answer cards for skipped questions.
 - Review cards show the skipped or unknown question in a structured panel with the correct answer in green, the reasoning you wrote, and a collapsible list of the other alternatives and their explanations.
+- The shared error-card review shows an estimated reading time for the card front (question and both answers), so a front that is too long can be shortened before export.
 - Skipped questions stay in the combined **Error and skipped** section of Cards after the session ends, so they can become cards later. They leave the section when converted into a card.
 - Re-test errors after 48 hours. A correct answer resolves the card but keeps the history.
 - Look up a selected term with an optional AI provider: OpenAI-compatible endpoints (OpenAI, Groq, OpenRouter, custom) or Gemini's native API, with a model list loaded from the provider. AI definitions appear in a read-only bubble and save automatically; acronyms also show what they stand for. Web lookup keeps the editable sheet. Or use DuckDuckGo/Wikipedia through a Custom Tab.
 - Export selected cards directly to AnkiDroid or share Anki-compatible files. Error and skipped cards can be reviewed all at once or by selection from Cards. Incomplete error cards can be selected to review them before export.
-- Open topic statistics for a per-subtopic accuracy and progress breakdown, a dashed least-squares trend line over the session history, and a weekly learning rate once the history spans a week. Share the whole statistics payload as JSON.
+- Cards has no checkboxes. Long-press any row to start selecting, then tap more rows; the subtitle counts the selection and the app-bar close clears it. The list does not shift when selection starts or grows.
+- **Delete selected** also removes selected skipped questions and highlights, even though they cannot be exported; their questions and any cards already made from a highlight stay.
+- Open topic statistics for a per-subtopic accuracy and progress breakdown, a weighted least-squares trend line over cumulative questions answered, and learning rates per 100 questions and per week. The topic header shows **Readiness**, the correct share of its last 100 answered questions. Long-press a subtopic to rename, merge or delete it, or long-press a completed session to delete a selection of sessions with their captured records. Share the whole statistics payload as JSON.
 - Give each topic its own AnkiDroid deck; topics without one use the default deck.
 - Export a complete JSON backup of practices, sessions, answers, cards and settings, and restore it on another install. The backup never contains the AI API key.
-- Sort topics and each topic's practices by name or recency, with the order remembered; archive topics without deleting their data. Start a mixed shuffled session from the **Shuffle** floating button.
+- Sort topics and each topic's practices by name or recency, with the order remembered; archive topics without deleting their data. Start a mixed shuffled session from the **Shuffle** floating button and choose how many questions to include (15 by default).
 - Material You wallpaper colors are on by default; they can be turned off in Settings.
 - A floating reminder after five minutes on the same question, then every five minutes. It resets when you move on.
 
@@ -112,7 +115,7 @@ flutter test
 dart run tool/docs/update_docs.dart --check
 ```
 
-The suite covers the importer and JSON schema (including `correctIndexes` and subtopics), scoring and the 48-hour rule, multi-answer scoring, distraction checked and unchecked after feedback, session arrows and paused sessions, review cards, the shared error-card review view, Gemini and OpenAI-compatible lookup, provider model lists, acronym expansion, AI review checks, six-field Anki error notes, Drift statistics and deletion cascades, per-subtopic stats, regression and learning-rate math, statistics export, generated database documentation, and the main widget flows. See [docs/testing.md](docs/testing.md) for the manual on-device checklist.
+The suite covers the importer and JSON schema (including `correctIndexes` and subtopics), scoring and the 48-hour rule, multi-answer scoring, distraction checked and unchecked after feedback, session arrows and paused sessions, review cards, the shared error-card review view, Gemini and OpenAI-compatible lookup, provider model lists, acronym expansion, AI review checks, six-field Anki error notes, Drift statistics and deletion cascades, per-subtopic stats and category management, readiness over the last 100 answered questions, session deletion cascades, weighted regression and learning-rate math, statistics export, generated database documentation, and the main widget flows. See [docs/testing.md](docs/testing.md) for the manual on-device checklist.
 
 ## Project layout
 

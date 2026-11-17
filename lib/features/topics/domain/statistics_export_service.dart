@@ -41,10 +41,11 @@ class StatisticsExportService {
     }
     final progress = await _practices.watchTopicProgress(topicId).first;
     final subtopics = await _practices.watchSubtopicStats(topicId).first;
-    final fit = fitProgressBySession([
-      for (final point in progress) point.score,
-    ]);
-    final learningRate = learningRatePercentagePointsPerWeek(progress);
+    final fit = fitProgressWeightedByQuestions(progress);
+    final learningRatePer100 = learningRatePercentagePointsPer100Questions(
+      progress,
+    );
+    final learningRatePerWeek = learningRatePercentagePointsPerWeek(progress);
     final hasSubtopics = subtopics.any((stat) => !stat.isUncategorized);
 
     return <String, dynamic>{
@@ -97,7 +98,8 @@ class StatisticsExportService {
         'regression': fit == null
             ? null
             : <String, dynamic>{'slope': fit.slope, 'intercept': fit.intercept},
-        'learningRatePercentagePointsPerWeek': learningRate,
+        'learningRatePercentagePointsPer100Questions': learningRatePer100,
+        'learningRatePercentagePointsPerWeek': learningRatePerWeek,
       },
     };
   }

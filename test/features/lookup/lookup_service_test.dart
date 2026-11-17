@@ -561,4 +561,167 @@ void main() {
       throwsA(isA<LookupException>()),
     );
   });
+
+  test('AI card suggestions send the highlight context and parse cards', () async {
+    await useAi();
+    String? userPrompt;
+    String? systemPrompt;
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final messages = body['messages'] as List<dynamic>;
+      systemPrompt =
+          (messages.first as Map<String, dynamic>)['content'] as String;
+      userPrompt = (messages.last as Map<String, dynamic>)['content'] as String;
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'content': jsonEncode({
+                  'cards': [
+                    {
+                      'front': '  What is a VPC?  ',
+                      'back': ' A private network ',
+                    },
+                    {'front': 'Who owns it?', 'back': 'The account owner'},
+                  ],
+                }),
+              },
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    final cards = await serviceWith(client).suggestAtomicCards(
+      highlight: 'A VPC is a private network owned by the account.',
+      questionContext: 'Which network isolates resources?',
+      topicName: 'Cloud',
+    );
+
+    expect(cards, hasLength(2));
+    expect(cards.first.front, 'What is a VPC?');
+    expect(cards.first.back, 'A private network');
+    expect(
+      userPrompt,
+      contains(
+        'Highlighted passage: A VPC is a private network owned by the account.',
+      ),
+    );
+    expect(
+      userPrompt,
+      contains('Question context: Which network isolates resources?'),
+    );
+    expect(userPrompt, contains('Topic: Cloud'));
+    expect(systemPrompt, contains('atomic'));
+    expect(systemPrompt, contains('at most 20 words'));
+  });
+
+  test('AI card suggestions tolerate fenced JSON', () async {
+    await useAi();
+    final client = MockClient(
+      (request) async => http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'content': '```json\n{"cards":[{"front":"Term","back":"Meaning"}]}\n```',
+              },
+            },
+          ],
+        }),
+        200,
+      ),
+    );
+
+    final cards = await serviceWith(client).suggestAtomicCards(
+      highlight: 'Term means meaning.',
+      questionContext: '',
+      topicName: '',
+    );
+
+    expect(cards, hasLength(1));
+    expect(cards.single.front, 'Term');
+    expect(cards.single.back, 'Meaning');
+  });
+
+  test(
+    'AI card suggestions drop empty and duplicate cards and cap at six',
+    () async {
+      await useAi();
+      final cards = [
+        {'front': 'A', 'back': 'One'},
+        {'front': '  ', 'back': 'Empty front'},
+        {'front': 'B', 'back': '  '},
+        {'front': 'a', 'back': 'one'},
+        {'front': 'C', 'back': 'Three'},
+        {'front': 'D', 'back': 'Four'},
+        {'front': 'E', 'back': 'Five'},
+        {'front': 'F', 'back': 'Six'},
+        {'front': 'G', 'back': 'Seven'},
+      ];
+      final client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({'cards': cards}),
+                },
+              },
+            ],
+          }),
+          200,
+        ),
+      );
+
+      final suggestions = await serviceWith(client).suggestAtomicCards(
+        highlight: 'Highlight',
+        questionContext: 'Question',
+        topicName: 'Topic',
+      );
+
+      expect(suggestions, hasLength(6));
+      expect(suggestions.map((card) => card.front), [
+        'A',
+        'C',
+        'D',
+        'E',
+        'F',
+        'G',
+      ]);
+    },
+  );
+
+  test('AI card suggestions need a saved API key', () async {
+    await harness.settings.save(
+      const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiModel: 'test-model',
+        aiBaseUrl: 'https://example.test/v1',
+      ),
+    );
+    var called = false;
+    final client = MockClient((request) async {
+      called = true;
+      return http.Response('{}', 200);
+    });
+
+    await expectLater(
+      serviceWith(client).suggestAtomicCards(
+        highlight: 'Highlight',
+        questionContext: 'Question',
+        topicName: 'Topic',
+      ),
+      throwsA(
+        isA<LookupException>().having(
+          (error) => error.message,
+          'message',
+          contains('API key'),
+        ),
+      ),
+    );
+    expect(called, isFalse);
+  });
 }

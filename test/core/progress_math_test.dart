@@ -3,94 +3,193 @@ import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/domain/progress_math.dart';
 
 void main() {
-  TopicProgressPoint point(int day, double score) {
+  TopicProgressPoint point({
+    required DateTime finishedAt,
+    required int correct,
+    required int total,
+    int sessionId = 0,
+  }) {
     return TopicProgressPoint(
-      sessionId: day + 1,
-      finishedAt: DateTime.utc(2026, 1, 1).add(Duration(days: day)),
+      sessionId: sessionId,
+      finishedAt: finishedAt,
       practiceName: 'Practice',
-      correct: (score * 10).round(),
-      total: 10,
+      correct: correct,
+      total: total,
     );
   }
 
-  group('fitProgressBySession', () {
-    test('a flat history has a zero slope', () {
-      final fit = fitProgressBySession(const [0.5, 0.5, 0.5]);
+  final jan1 = DateTime(2026, 1, 1, 10);
+  final jan2 = DateTime(2026, 1, 2, 10);
+  final jan5 = DateTime(2026, 1, 5, 10);
 
-      expect(fit, isNotNull);
-      expect(fit!.slope, 0);
-      expect(fit.valueAt(0), 0.5);
-      expect(fit.valueAt(2), 0.5);
+  group('weightedAverageScore', () {
+    test('weights session scores by the questions answered', () {
+      // A plain mean of the session percentages would report 75%.
+      final average = weightedAverageScore([
+        point(finishedAt: jan1, correct: 5, total: 10),
+        point(finishedAt: jan2, correct: 30, total: 30),
+      ]);
+
+      expect(average, isNotNull);
+      expect(average!, closeTo(35 / 40, 1e-9));
     });
 
-    test('an upward history has a positive slope', () {
-      final fit = fitProgressBySession(const [0.2, 0.4, 0.6]);
-
-      expect(fit, isNotNull);
-      expect(fit!.slope, closeTo(0.2, 1e-9));
-      expect(fit.intercept, closeTo(0.2, 1e-9));
-      expect(fit.valueAt(2), closeTo(0.6, 1e-9));
-    });
-
-    test('a downward history has a negative slope', () {
-      final fit = fitProgressBySession(const [0.9, 0.6, 0.3]);
-
-      expect(fit, isNotNull);
-      expect(fit!.slope, closeTo(-0.3, 1e-9));
-      expect(fit.valueAt(2), closeTo(0.3, 1e-9));
-    });
-
-    test('fewer than two points produce no line', () {
-      expect(fitProgressBySession(const []), isNull);
-      expect(fitProgressBySession(const [0.7]), isNull);
+    test('has no average without answered questions', () {
+      expect(weightedAverageScore(const []), isNull);
+      expect(
+        weightedAverageScore([point(finishedAt: jan1, correct: 0, total: 0)]),
+        isNull,
+      );
     });
   });
 
-  group('learningRatePercentagePointsPerWeek', () {
-    test('reports the average points gained per week', () {
+  group('fitProgressWeightedByQuestions', () {
+    test('fits score against cumulative questions with question weights', () {
+      final fit = fitProgressWeightedByQuestions([
+        point(finishedAt: jan1, correct: 5, total: 10),
+        point(finishedAt: jan2, correct: 30, total: 30),
+      ]);
+
+      expect(fit, isNotNull);
+      expect(fit!.slope, closeTo(1 / 60, 1e-9));
+      expect(fit.intercept, closeTo(1 / 3, 1e-9));
+      expect(fit.valueAt(10), closeTo(0.5, 1e-9));
+      expect(fit.valueAt(40), closeTo(1, 1e-9));
+    });
+
+    test('orders points by finish time before accumulating questions', () {
+      final late = point(
+        finishedAt: jan2,
+        correct: 30,
+        total: 30,
+        sessionId: 2,
+      );
+      final early = point(
+        finishedAt: jan1,
+        correct: 5,
+        total: 10,
+        sessionId: 1,
+      );
+
+      final fit = fitProgressWeightedByQuestions([late, early]);
+
+      expect(fit, isNotNull);
+      expect(fit!.slope, closeTo(1 / 60, 1e-9));
+    });
+
+    test('a flat history has a zero slope', () {
+      final fit = fitProgressWeightedByQuestions([
+        point(finishedAt: jan1, correct: 5, total: 10),
+        point(finishedAt: jan2, correct: 15, total: 30),
+      ]);
+
+      expect(fit, isNotNull);
+      expect(fit!.slope, closeTo(0, 1e-12));
+      expect(fit.valueAt(10), closeTo(0.5, 1e-12));
+      expect(fit.valueAt(40), closeTo(0.5, 1e-12));
+    });
+
+    test('fewer than two points produce no line', () {
+      expect(fitProgressWeightedByQuestions(const []), isNull);
+      expect(
+        fitProgressWeightedByQuestions([
+          point(finishedAt: jan1, correct: 5, total: 10),
+        ]),
+        isNull,
+      );
+    });
+
+    test('zero total weights produce no line', () {
+      final fit = fitProgressWeightedByQuestions([
+        point(finishedAt: jan1, correct: 0, total: 0),
+        point(finishedAt: jan2, correct: 0, total: 0),
+      ]);
+
+      expect(fit, isNull);
+    });
+  });
+
+  group('learning rates', () {
+    final points = [
+      point(finishedAt: jan1, correct: 5, total: 10),
+      point(finishedAt: jan2, correct: 30, total: 30),
+    ];
+
+    test('converts the weighted slope to points per 100 questions', () {
+      final rate = learningRatePercentagePointsPer100Questions(points);
+
+      expect(rate, isNotNull);
+      expect(rate!, closeTo(10000 / 60, 1e-9));
+    });
+
+    test('converts the weighted slope to points per week', () {
+      // Two active days and 40 answered questions: 20 questions per day.
+      final rate = learningRatePercentagePointsPerWeek(points);
+
+      expect(rate, isNotNull);
+      expect(rate!, closeTo((1 / 60) * 20 * 7 * 100, 1e-9));
+    });
+
+    test('two sessions on the same day use one active day', () {
       final rate = learningRatePercentagePointsPerWeek([
-        point(0, 0.2),
-        point(7, 0.4),
-        point(14, 0.6),
+        point(finishedAt: jan1, correct: 5, total: 10),
+        point(
+          finishedAt: jan1.add(const Duration(hours: 2)),
+          correct: 30,
+          total: 30,
+        ),
       ]);
 
       expect(rate, isNotNull);
-      expect(rate!, closeTo(20, 1e-9));
+      expect(rate!, closeTo((1 / 60) * 40 * 7 * 100, 1e-9));
+    });
+
+    test('needs a fit', () {
+      expect(
+        learningRatePercentagePointsPer100Questions([
+          point(finishedAt: jan1, correct: 5, total: 10),
+        ]),
+        isNull,
+      );
+      expect(
+        learningRatePercentagePointsPerWeek([
+          point(finishedAt: jan1, correct: 0, total: 0),
+          point(finishedAt: jan2, correct: 0, total: 0),
+        ]),
+        isNull,
+      );
     });
 
     test('reports a negative rate when scores fall', () {
       final rate = learningRatePercentagePointsPerWeek([
-        point(0, 0.8),
-        point(7, 0.6),
-        point(14, 0.4),
+        point(finishedAt: jan1, correct: 30, total: 30),
+        point(finishedAt: jan2, correct: 5, total: 10),
       ]);
 
       expect(rate, isNotNull);
-      expect(rate!, closeTo(-20, 1e-9));
+      expect(rate!, lessThan(0));
+    });
+  });
+
+  group('activeStudyDays', () {
+    test('counts distinct local calendar dates', () {
+      expect(
+        activeStudyDays([
+          point(finishedAt: jan1, correct: 1, total: 2),
+          point(
+            finishedAt: jan1.add(const Duration(hours: 8)),
+            correct: 1,
+            total: 2,
+          ),
+          point(finishedAt: jan2, correct: 1, total: 2),
+          point(finishedAt: jan5, correct: 1, total: 2),
+        ]),
+        3,
+      );
     });
 
-    test('needs at least one week of history', () {
-      final rate = learningRatePercentagePointsPerWeek([
-        point(0, 0.2),
-        point(3, 0.5),
-        point(6, 0.8),
-      ]);
-
-      expect(rate, isNull);
-    });
-
-    test('a single point has no rate', () {
-      expect(learningRatePercentagePointsPerWeek([point(0, 0.5)]), isNull);
-      expect(learningRatePercentagePointsPerWeek(const []), isNull);
-    });
-
-    test('the same timestamp twice has no measurable rate', () {
-      final rate = learningRatePercentagePointsPerWeek([
-        point(0, 0.2),
-        point(0, 0.8),
-      ]);
-
-      expect(rate, isNull);
+    test('is zero without sessions', () {
+      expect(activeStudyDays(const []), 0);
     });
   });
 }

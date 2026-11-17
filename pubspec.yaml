@@ -1,7 +1,7 @@
 name: question_practice
 description: "Offline-first question practice with error cards and Anki export."
 publish_to: 'none'
-version: 0.9.10+11
+version: 0.9.11+12
 
 environment:
   sdk: ^3.13.5

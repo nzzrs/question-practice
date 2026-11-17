@@ -4,13 +4,14 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_cards_review_page.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
+import '../review/highlight_review_page.dart';
 import '../review/skipped_question_view.dart';
 import 'domain/anki_note_builder.dart';
-import 'new_card_dialog.dart';
 
 enum _Filter { all, concepts, review, basic, highlights }
 
@@ -26,10 +27,67 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   final _selectedErrors = <int>{};
   final _selectedBasic = <int>{};
   final _selectedSkipped = <int>{};
+  final _selectedHighlights = <int>{};
+  bool _selectionActive = false;
   bool _initialized = false;
   bool _busy = false;
   bool _showExported = false;
   _Filter _filter = _Filter.all;
+
+  bool get _hasSelection =>
+      _selectedConcepts.isNotEmpty ||
+      _selectedErrors.isNotEmpty ||
+      _selectedBasic.isNotEmpty ||
+      _selectedSkipped.isNotEmpty ||
+      _selectedHighlights.isNotEmpty;
+
+  void _clearSelection() {
+    setState(() {
+      _selectionActive = false;
+      _selectedConcepts.clear();
+      _selectedErrors.clear();
+      _selectedBasic.clear();
+      _selectedSkipped.clear();
+      _selectedHighlights.clear();
+    });
+  }
+
+  /// Long-press: enter selection mode with the pressed row selected.
+  void _startSelection(Set<int> selection, int id) {
+    setState(() {
+      _selectionActive = true;
+      selection.add(id);
+    });
+  }
+
+  /// Tap while selection mode is active: toggle this row without moving others.
+  void _toggleSelection(Set<int> selection, int id) {
+    setState(() {
+      if (!selection.remove(id)) selection.add(id);
+      if (!_hasSelection) _selectionActive = false;
+    });
+  }
+
+  void _handleRowTap(
+    Set<int> selection,
+    int id,
+    VoidCallback preview, {
+    bool selectable = true,
+  }) {
+    if (_selectionActive) {
+      if (selectable) _toggleSelection(selection, id);
+      return;
+    }
+    preview();
+  }
+
+  void _handleRowLongPress(
+    Set<int> selection,
+    int id, {
+    bool selectable = true,
+  }) {
+    if (selectable) _startSelection(selection, id);
+  }
 
   ExportSelection _selection({
     required List<Concept> concepts,
@@ -124,6 +182,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final selectedSkipped = skipped
         .where((question) => _selectedSkipped.contains(question.id))
         .toList();
+    final selectedHighlights = highlights
+        .where((highlight) => _selectedHighlights.contains(highlight.id))
+        .toList();
     final selectableErrors = errors
         .where((card) => card.exportedAt == null)
         .toList();
@@ -135,14 +196,24 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     );
     final hasReviewSelection =
         selectedErrorCards.isNotEmpty || selectedSkipped.isNotEmpty;
+    final selectedCount =
+        selection.total + selectedSkipped.length + selectedHighlights.length;
 
     return AppPage(
       title: 'Cards',
-      subtitle: selection.total == 0
+      subtitle: selectedCount == 0
           ? 'Ready for AnkiDroid'
-          : '${selection.total} card${selection.total == 1 ? '' : 's'} selected',
+          : '$selectedCount card${selectedCount == 1 ? '' : 's'} selected',
       showBack: true,
       actions: [
+        if (_selectionActive)
+          M3EIconButton(
+            key: const ValueKey('clear-selection'),
+            variant: M3EIconButtonVariant.standard,
+            icon: const Icon(Icons.close),
+            tooltip: 'Clear selection',
+            onPressed: _clearSelection,
+          ),
         M3EIconButton(
           variant: M3EIconButtonVariant.standard,
           icon: const Icon(Icons.info_outline),
@@ -175,7 +246,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               icon: Icons.delete_outline,
               tooltip: 'Delete selected',
               isDestructive: true,
-              onPressed: selection.total == 0 ? null : _deleteSelected,
+              onPressed: selectedCount == 0 ? null : _deleteSelected,
             ),
           ],
         ),
@@ -218,8 +289,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                       .map((item) => item.id);
                   if (selectable.every(_selectedConcepts.contains)) {
                     _selectedConcepts.removeAll(selectable);
+                    if (!_hasSelection) _selectionActive = false;
                   } else {
                     _selectedConcepts.addAll(selectable);
+                    _selectionActive = true;
                   }
                 }),
               ),
@@ -228,20 +301,26 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               children: [
                 for (final concept in concepts)
                   _ConceptRow(
+                    key: ValueKey('concept-row-${concept.id}'),
                     concept: concept,
                     deckName: deckFor(concept.topicName),
                     selected: _selectedConcepts.contains(concept.id),
-                    onSelected: (value) => setState(() {
-                      if (value) {
-                        _selectedConcepts.add(concept.id);
-                      } else {
-                        _selectedConcepts.remove(concept.id);
-                      }
-                    }),
+                    onTap: () => _handleRowTap(
+                      _selectedConcepts,
+                      concept.id,
+                      () => _previewConcept(concept),
+                      selectable:
+                          concept.isExportable && concept.exportedAt == null,
+                    ),
+                    onLongPress: () => _handleRowLongPress(
+                      _selectedConcepts,
+                      concept.id,
+                      selectable:
+                          concept.isExportable && concept.exportedAt == null,
+                    ),
                     onComplete: concept.isExportable
                         ? null
                         : () => _editConcept(concept),
-                    onPreview: () => _previewConcept(concept),
                   ),
               ],
             ),
@@ -262,6 +341,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     _selectedSkipped.removeAll(
                       skipped.map((question) => question.id),
                     );
+                    if (!_hasSelection) _selectionActive = false;
                   } else {
                     _selectedErrors.addAll(
                       selectableErrors.map((card) => card.id),
@@ -269,6 +349,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     _selectedSkipped.addAll(
                       skipped.map((question) => question.id),
                     );
+                    _selectionActive = true;
                   }
                 }),
               ),
@@ -296,33 +377,37 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               children: [
                 for (final card in errors)
                   _ErrorRow(
+                    key: ValueKey('error-row-${card.id}'),
                     card: card,
                     deckName: deckFor(card.topicName),
                     selected: _selectedErrors.contains(card.id),
-                    onSelected: (value) => setState(() {
-                      if (value) {
-                        _selectedErrors.add(card.id);
-                      } else {
-                        _selectedErrors.remove(card.id);
-                      }
-                    }),
+                    onTap: () => _handleRowTap(
+                      _selectedErrors,
+                      card.id,
+                      () => _previewError(card),
+                      selectable: card.exportedAt == null,
+                    ),
+                    onLongPress: () => _handleRowLongPress(
+                      _selectedErrors,
+                      card.id,
+                      selectable: card.exportedAt == null,
+                    ),
                     onComplete: card.needsDetails
                         ? () => _reviewCards([card], const [])
                         : null,
-                    onPreview: () => _previewError(card),
                   ),
                 for (final question in skipped)
                   _SkippedRow(
+                    key: ValueKey('skipped-row-${question.id}'),
                     question: question,
                     selected: _selectedSkipped.contains(question.id),
-                    onSelected: (value) => setState(() {
-                      if (value) {
-                        _selectedSkipped.add(question.id);
-                      } else {
-                        _selectedSkipped.remove(question.id);
-                      }
-                    }),
-                    onPreview: () => _previewSkipped(question),
+                    onTap: () => _handleRowTap(
+                      _selectedSkipped,
+                      question.id,
+                      () => _previewSkipped(question),
+                    ),
+                    onLongPress: () =>
+                        _handleRowLongPress(_selectedSkipped, question.id),
                     onReview: () => _reviewCards(const [], [question]),
                   ),
               ],
@@ -344,8 +429,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                       .map((item) => item.id);
                   if (selectable.every(_selectedBasic.contains)) {
                     _selectedBasic.removeAll(selectable);
+                    if (!_hasSelection) _selectionActive = false;
                   } else {
                     _selectedBasic.addAll(selectable);
+                    _selectionActive = true;
                   }
                 }),
               ),
@@ -354,17 +441,21 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               children: [
                 for (final card in manuals)
                   _ManualRow(
+                    key: ValueKey('basic-row-${card.id}'),
                     card: card,
                     deckName: deckFor(card.topicName),
                     selected: _selectedBasic.contains(card.id),
-                    onSelected: (value) => setState(() {
-                      if (value) {
-                        _selectedBasic.add(card.id);
-                      } else {
-                        _selectedBasic.remove(card.id);
-                      }
-                    }),
-                    onPreview: () => _previewManual(card),
+                    onTap: () => _handleRowTap(
+                      _selectedBasic,
+                      card.id,
+                      () => _previewManual(card),
+                      selectable: card.exportedAt == null,
+                    ),
+                    onLongPress: () => _handleRowLongPress(
+                      _selectedBasic,
+                      card.id,
+                      selectable: card.exportedAt == null,
+                    ),
                   ),
               ],
             ),
@@ -389,13 +480,36 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 ),
               ),
             ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                M3EButton.tonal(
+                  key: const ValueKey('review-highlights'),
+                  onPressed: () => _reviewHighlights(highlights),
+                  icon: const Icon(Icons.rate_review_outlined),
+                  label: const Text('Review highlights'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             AppGroup(
               children: [
                 for (final highlight in highlights)
                   _HighlightRow(
+                    key: ValueKey('highlight-row-${highlight.id}'),
                     highlight: highlight,
-                    onMakeCard: () => _createCardFromHighlight(highlight),
-                    onDelete: () => _deleteHighlight(highlight),
+                    selected: _selectedHighlights.contains(highlight.id),
+                    onTap: () => _handleRowTap(
+                      _selectedHighlights,
+                      highlight.id,
+                      () => _reviewHighlights(
+                        highlights,
+                        initialHighlightId: highlight.id,
+                      ),
+                    ),
+                    onLongPress: () =>
+                        _handleRowLongPress(_selectedHighlights, highlight.id),
                   ),
               ],
             ),
@@ -516,7 +630,12 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final confirmed = await confirmDialog(
       context,
       title: 'Delete selected cards?',
-      message: 'Concepts and basic cards are removed permanently. Deleting an active error card also removes it from the 48-hour review queue.',
+      message:
+          'Concepts and basic cards are removed permanently. Deleting an '
+          'active error card also removes it from the 48-hour review queue. '
+          'Skipped questions are removed from the skipped queue; their '
+          'questions stay in the practice. Highlights are removed from this '
+          'list; cards already made from them stay.',
       confirmLabel: 'Delete',
       destructive: true,
     );
@@ -527,11 +646,16 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           conceptIds: _selectedConcepts.toList(),
           errorCardIds: _selectedErrors.toList(),
           manualCardIds: _selectedBasic.toList(),
+          skippedQuestionIds: _selectedSkipped.toList(),
+          highlightIds: _selectedHighlights.toList(),
         );
     setState(() {
+      _selectionActive = false;
       _selectedConcepts.clear();
       _selectedErrors.clear();
       _selectedBasic.clear();
+      _selectedSkipped.clear();
+      _selectedHighlights.clear();
     });
     if (mounted) await showSnack(context, 'Cards deleted.');
   }
@@ -662,6 +786,15 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _previewMeta([
         Pill(card.topicName),
         Pill('deck: ${_deckForTopic(card.topicName)}', tone: PillTone.primary),
+        Tooltip(
+          message: 'Estimated time to read the front',
+          child: Pill(
+            readingTimeLabel(
+              '${card.question} ${card.wrongAnswer} ${card.correctAnswer}',
+            ),
+            icon: Icons.schedule,
+          ),
+        ),
         Pill(
           card.needsDetails ? 'Needs notes' : 'Ready',
           tone: card.needsDetails ? PillTone.error : PillTone.success,
@@ -753,58 +886,20 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     return Wrap(spacing: 6, runSpacing: 4, children: children);
   }
 
-  Future<void> _createCardFromHighlight(StudyHighlight highlight) async {
-    final draft = await showNewCardDialog(
-      context,
-      title: 'Turn the highlight into a card',
-      contextText: highlight.context,
-      initialTerm: highlight.text,
-      initialQuestion: highlight.text,
-      initialKind: NewCardKind.concept,
+  Future<void> _reviewHighlights(
+    List<StudyHighlight> highlights, {
+    int? initialHighlightId,
+  }) async {
+    if (highlights.isEmpty) return;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        fullscreenDialog: true,
+        builder: (context) => HighlightReviewPage(
+          highlights: highlights,
+          initialHighlightId: initialHighlightId,
+        ),
+      ),
     );
-    if (draft == null || !mounted) return;
-    final service = ref.read(reviewServiceProvider);
-    int? manualCardId;
-    if (draft.kind == NewCardKind.concept) {
-      await service.createConcept(
-        sessionId: highlight.sessionId,
-        questionId: highlight.questionId,
-        term: draft.term,
-        definition: draft.definition,
-        context: highlight.context,
-        topicName: highlight.topicName,
-        source: ConceptSource.manual,
-      );
-    } else {
-      manualCardId = await service.createBasicCard(
-        sessionId: highlight.sessionId,
-        questionId: highlight.questionId,
-        question: draft.question,
-        answer: draft.answer,
-        context: highlight.context,
-        topicName: highlight.topicName,
-      );
-    }
-    await service.markHighlightConverted(
-      highlight.id,
-      manualCardId: manualCardId,
-    );
-    if (!mounted) return;
-    await showSnack(context, 'Card created from the highlight.');
-  }
-
-  Future<void> _deleteHighlight(StudyHighlight highlight) async {
-    final confirmed = await confirmDialog(
-      context,
-      title: 'Delete highlight?',
-      message:
-          'The saved phrase "${highlight.text}" is removed. Cards already made from it stay.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    );
-    if (!confirmed) return;
-    await ref.read(cardRepositoryProvider).deleteHighlight(highlight.id);
-    if (mounted) await showSnack(context, 'Highlight deleted.');
   }
 
   Future<void> _downloadHighlights(List<StudyHighlight> highlights) async {
@@ -975,99 +1070,152 @@ class _SelectAllButton extends StatelessWidget {
   }
 }
 
+/// One tappable row in Cards.
+///
+/// Selection is shown with a tint and a fixed-size trailing mark, never a
+/// checkbox. Long-press enters selection mode; a tap either previews the row or
+/// toggles its selection, depending on [CardsPage] state. Nothing here changes
+/// size when [selected] flips, so the list never shifts when more rows are
+/// selected.
+class _SelectableRow extends StatelessWidget {
+  const _SelectableRow({
+    required this.selected,
+    required this.onTap,
+    required this.onLongPress,
+    required this.child,
+    this.trailing,
+  });
+
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
+  final Widget child;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Material(
+      color: selected
+          ? theme.colorScheme.primary.withValues(alpha: 0.09)
+          : Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: child),
+              const SizedBox(width: 8),
+              _SelectionMark(selected: selected),
+              if (trailing != null) ...[const SizedBox(width: 2), trailing!],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Fixed-size selection state. The box keeps its size while unselected so the
+/// row never reflows when selection starts.
+class _SelectionMark extends StatelessWidget {
+  const _SelectionMark({required this.selected});
+
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return SizedBox(
+      width: 26,
+      height: 26,
+      child: selected
+          ? Icon(Icons.check_circle, size: 20, color: theme.colorScheme.primary)
+          : null,
+    );
+  }
+}
+
 class _ConceptRow extends StatelessWidget {
   const _ConceptRow({
     required this.concept,
     required this.deckName,
     required this.selected,
-    required this.onSelected,
-    required this.onPreview,
+    required this.onTap,
+    required this.onLongPress,
     this.onComplete,
+    super.key,
   });
 
   final Concept concept;
   final String deckName;
   final bool selected;
-  final ValueChanged<bool> onSelected;
-  final VoidCallback onPreview;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
   final VoidCallback? onComplete;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final disabled = !concept.isExportable || concept.exportedAt != null;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          M3ECheckbox(
-            value: selected,
-            onChanged: disabled ? null : (value) => onSelected(value ?? false),
-          ),
-          const SizedBox(width: 2),
-          Expanded(
-            child: InkWell(
-              onTap: onPreview,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Definition of ${concept.term}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.baseline.titleSmall,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      concept.isExportable
-                          ? concept.definition
-                          : 'Needs a definition before export.',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: concept.isExportable
-                            ? theme.colorScheme.onSurfaceVariant
-                            : theme.colorScheme.error,
-                      ),
-                    ),
-                    if (concept.extra.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'Stands for: ${concept.extra}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.typography.baseline.labelSmall.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        Pill(concept.topicName),
-                        Pill('deck: $deckName'),
-                        if (concept.exportedAt != null)
-                          const Pill('Exported', tone: PillTone.success),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (onComplete != null)
-            M3EIconButton(
+    return _SelectableRow(
+      selected: selected,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      trailing: onComplete == null
+          ? null
+          : M3EIconButton(
               variant: M3EIconButtonVariant.standard,
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Complete',
               onPressed: onComplete,
             ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Definition of ${concept.term}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.baseline.titleSmall,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            concept.isExportable
+                ? concept.definition
+                : 'Needs a definition before export.',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.baseline.bodySmall.copyWith(
+              color: concept.isExportable
+                  ? theme.colorScheme.onSurfaceVariant
+                  : theme.colorScheme.error,
+            ),
+          ),
+          if (concept.extra.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'Stands for: ${concept.extra}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.typography.baseline.labelSmall.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              Pill(concept.topicName),
+              Pill('deck: $deckName'),
+              if (concept.exportedAt != null)
+                const Pill('Exported', tone: PillTone.success),
+            ],
+          ),
         ],
       ),
     );
@@ -1079,84 +1227,68 @@ class _ErrorRow extends StatelessWidget {
     required this.card,
     required this.deckName,
     required this.selected,
-    required this.onSelected,
-    required this.onPreview,
+    required this.onTap,
+    required this.onLongPress,
     this.onComplete,
+    super.key,
   });
 
   final ErrorCard card;
   final String deckName;
   final bool selected;
-  final ValueChanged<bool> onSelected;
-  final VoidCallback onPreview;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
   final VoidCallback? onComplete;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final disabled = card.exportedAt != null;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          M3ECheckbox(
-            value: selected,
-            onChanged: disabled ? null : (value) => onSelected(value ?? false),
-          ),
-          const SizedBox(width: 2),
-          Expanded(
-            child: InkWell(
-              onTap: onPreview,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      card.question,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.baseline.titleSmall,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      card.needsDetails
-                          ? 'Needs bias and vaccine before export.'
-                          : 'You: ${card.wrongAnswer} · Correct: ${card.correctAnswer}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: card.needsDetails
-                            ? theme.colorScheme.error
-                            : theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        Pill(card.topicName),
-                        Pill('deck: $deckName'),
-                        if (card.isResolved)
-                          const Pill('Resolved', tone: PillTone.success),
-                        if (card.exportedAt != null) const Pill('Exported'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          if (onComplete != null)
-            M3EIconButton(
+    return _SelectableRow(
+      selected: selected,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      trailing: onComplete == null
+          ? null
+          : M3EIconButton(
               variant: M3EIconButtonVariant.standard,
               icon: const Icon(Icons.edit_outlined),
               tooltip: 'Complete',
               onPressed: onComplete,
             ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            card.question,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.baseline.titleSmall,
+          ),
+          const SizedBox(height: 2),
+          Text(
+            card.needsDetails
+                ? 'Needs bias and vaccine before export.'
+                : 'You: ${card.wrongAnswer} · Correct: ${card.correctAnswer}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.baseline.bodySmall.copyWith(
+              color: card.needsDetails
+                  ? theme.colorScheme.error
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              Pill(card.topicName),
+              Pill('deck: $deckName'),
+              if (card.isResolved)
+                const Pill('Resolved', tone: PillTone.success),
+              if (card.exportedAt != null) const Pill('Exported'),
+            ],
+          ),
         ],
       ),
     );
@@ -1168,68 +1300,51 @@ class _ManualRow extends StatelessWidget {
     required this.card,
     required this.deckName,
     required this.selected,
-    required this.onSelected,
-    required this.onPreview,
+    required this.onTap,
+    required this.onLongPress,
+    super.key,
   });
 
   final ManualCard card;
   final String deckName;
   final bool selected;
-  final ValueChanged<bool> onSelected;
-  final VoidCallback onPreview;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final disabled = card.exportedAt != null;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-      child: Row(
+    return _SelectableRow(
+      selected: selected,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          M3ECheckbox(
-            value: selected,
-            onChanged: disabled ? null : (value) => onSelected(value ?? false),
+          Text(
+            card.question,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.baseline.titleSmall,
           ),
-          const SizedBox(width: 2),
-          Expanded(
-            child: InkWell(
-              onTap: onPreview,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      card.question,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.baseline.titleSmall,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      card.answer,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        Pill(card.topicName),
-                        Pill('deck: $deckName'),
-                        if (card.exportedAt != null) const Pill('Exported'),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+          const SizedBox(height: 2),
+          Text(
+            card.answer,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.baseline.bodySmall.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              Pill(card.topicName),
+              Pill('deck: $deckName'),
+              if (card.exportedAt != null) const Pill('Exported'),
+            ],
           ),
         ],
       ),
@@ -1240,85 +1355,65 @@ class _ManualRow extends StatelessWidget {
 class _HighlightRow extends StatelessWidget {
   const _HighlightRow({
     required this.highlight,
-    required this.onMakeCard,
-    required this.onDelete,
+    required this.selected,
+    required this.onTap,
+    required this.onLongPress,
+    super.key,
   });
 
   final StudyHighlight highlight;
-  final VoidCallback onMakeCard;
-  final VoidCallback onDelete;
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-      child: Row(
+    return _SelectableRow(
+      selected: selected,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withValues(alpha: 0.14),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    highlight.text,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.typography.baseline.titleSmall.copyWith(
-                      height: 1.35,
-                    ),
-                  ),
-                ),
-                if (highlight.context.trim().isNotEmpty) ...[
-                  const SizedBox(height: 5),
-                  Text(
-                    highlight.context,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.typography.baseline.bodySmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 4,
-                  children: [
-                    const Pill('Highlight', tone: PillTone.primary),
-                    if (highlight.topicName.trim().isNotEmpty)
-                      Pill(highlight.topicName),
-                    if (highlight.isKept)
-                      const Pill('Kept', tone: PillTone.success),
-                    if (highlight.hasCard)
-                      const Pill('Card made', tone: PillTone.success),
-                  ],
-                ),
-              ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              highlight.text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.typography.baseline.titleSmall.copyWith(
+                height: 1.35,
+              ),
             ),
           ),
-          const SizedBox(width: 6),
-          if (!highlight.hasCard)
-            M3EIconButton(
-              variant: M3EIconButtonVariant.standard,
-              icon: const Icon(Icons.note_add_outlined),
-              tooltip: 'Make a card',
-              onPressed: onMakeCard,
+          if (highlight.context.trim().isNotEmpty) ...[
+            const SizedBox(height: 5),
+            Text(
+              highlight.context,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.typography.baseline.bodySmall.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          M3EIconButton(
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Delete highlight',
-            onPressed: onDelete,
+          ],
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              const Pill('Highlight', tone: PillTone.primary),
+              if (highlight.topicName.trim().isNotEmpty)
+                Pill(highlight.topicName),
+              if (highlight.isKept) const Pill('Kept', tone: PillTone.success),
+              if (highlight.hasCard)
+                const Pill('Card made', tone: PillTone.success),
+            ],
           ),
         ],
       ),
@@ -1330,91 +1425,73 @@ class _SkippedRow extends StatelessWidget {
   const _SkippedRow({
     required this.question,
     required this.selected,
-    required this.onSelected,
-    required this.onPreview,
+    required this.onTap,
+    required this.onLongPress,
     required this.onReview,
+    super.key,
   });
 
   final SkippedQuestion question;
   final bool selected;
-  final ValueChanged<bool> onSelected;
-  final VoidCallback onPreview;
+  final VoidCallback onTap;
+  final VoidCallback onLongPress;
   final VoidCallback onReview;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
-      child: Row(
+    return _SelectableRow(
+      selected: selected,
+      onTap: onTap,
+      onLongPress: onLongPress,
+      trailing: M3EIconButton(
+        variant: M3EIconButtonVariant.standard,
+        icon: const Icon(Icons.edit_outlined),
+        tooltip: 'Review skipped question',
+        onPressed: onReview,
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          M3ECheckbox(
-            value: selected,
-            onChanged: (value) => onSelected(value ?? false),
+          Text(
+            question.question,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.baseline.titleSmall,
           ),
-          const SizedBox(width: 2),
-          Expanded(
-            child: InkWell(
-              onTap: onPreview,
-              borderRadius: BorderRadius.circular(12),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      question.question,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.baseline.titleSmall,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Correct: ${question.correctAnswer}',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: AppSuccess.foreground(context),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    if (question.reasoning.trim().isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'You: ${question.reasoning}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.typography.baseline.bodySmall.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        Pill(
-                          question.unknown ? "I didn't know this" : 'Skipped',
-                          tone: question.unknown
-                              ? PillTone.secondary
-                              : PillTone.neutral,
-                        ),
-                        if (question.topicName.trim().isNotEmpty)
-                          Pill(question.topicName),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+          const SizedBox(height: 2),
+          Text(
+            'Correct: ${question.correctAnswer}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.typography.baseline.bodySmall.copyWith(
+              color: AppSuccess.foreground(context),
+              fontWeight: FontWeight.w600,
             ),
           ),
-          M3EIconButton(
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Review skipped question',
-            onPressed: onReview,
+          if (question.reasoning.trim().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              'You: ${question.reasoning}',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.typography.baseline.bodySmall.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              Pill(
+                question.unknown ? "I didn't know this" : 'Skipped',
+                tone: question.unknown ? PillTone.secondary : PillTone.neutral,
+              ),
+              if (question.topicName.trim().isNotEmpty)
+                Pill(question.topicName),
+            ],
           ),
         ],
       ),

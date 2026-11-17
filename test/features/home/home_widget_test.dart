@@ -315,6 +315,99 @@ void main() {
     );
   });
 
+  testWidgets(
+    'the shuffle sheet asks for a question count and defaults to 15',
+    (tester) async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      await harness.seedPractice(count: 20);
+
+      await pumpTestApp(tester, home: const HomePage(), harness: harness);
+      await tester.tap(
+        find.byWidgetPredicate(
+          (widget) =>
+              widget is M3EFab && widget.tooltip == 'Start shuffled practice',
+        ),
+      );
+      await pumpFrames(tester);
+
+      expect(find.text('Questions'), findsWidgets);
+      final field = tester.widget<M3ETextField>(
+        find.byKey(const ValueKey('shuffle-question-count')),
+      );
+      expect(field.label, 'Questions');
+      expect(field.controller!.text, '15');
+      expect(find.text('Start practice'), findsOneWidget);
+    },
+  );
+
+  testWidgets('a typed question count starts a session of that size', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(count: 3);
+
+    await pumpTestApp(tester, home: const HomePage(), harness: harness);
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is M3EFab && widget.tooltip == 'Start shuffled practice',
+      ),
+    );
+    await pumpFrames(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('shuffle-question-count')),
+      '1',
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.text('Start practice'));
+    await pumpFrames(tester);
+
+    expect(find.text('Question 1 of 1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an invalid question count does not start a session', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(count: 3);
+
+    await pumpTestApp(tester, home: const HomePage(), harness: harness);
+    await tester.tap(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is M3EFab && widget.tooltip == 'Start shuffled practice',
+      ),
+    );
+    await pumpFrames(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('shuffle-question-count')),
+      '0',
+    );
+    await pumpFrames(tester);
+    expect(find.text('Enter a whole number of at least 1.'), findsOneWidget);
+    await tester.tap(find.text('Start practice'));
+    await pumpFrames(tester);
+    expect(find.textContaining('Question 1 of'), findsNothing);
+    expect(find.text('Start practice'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('shuffle-question-count')),
+      '',
+    );
+    await pumpFrames(tester);
+    expect(find.text('Enter a whole number of at least 1.'), findsOneWidget);
+    await tester.tap(find.text('Start practice'));
+    await pumpFrames(tester);
+    expect(find.textContaining('Question 1 of'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('topic page shows progress stats and priority', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);

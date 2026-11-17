@@ -4,7 +4,7 @@ Questions is an offline Android app for practising questions and exporting study
 
 ## Home
 
-- Active topic cards show their practices, questions, accuracy and progress.
+- Active topic cards show their practices, questions, rolling accuracy and progress.
 - The **sort** icon beside **Topics** orders the list by **Name** or **Recency**, increasing or decreasing. The choice is remembered.
 - The **archive** icon beside it opens archived topics.
 - Long-press a topic to **Edit topic**, **Archive topic** or **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
@@ -31,7 +31,7 @@ Questions is an offline Android app for practising questions and exporting study
 
 ## Topic
 
-- The header shows the description, priority, AnkiDroid deck, accuracy, progress, correct answers, active errors and completed sessions.
+- The header shows the description, priority, AnkiDroid deck, rolling accuracy over the last five completed sessions, progress, correct answers, active errors and completed sessions.
 - The **insights** icon opens **Statistics**.
 - **Practices** lists each practice with its question count and last score. Tap one to start it.
 - The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order.
@@ -130,11 +130,16 @@ Review opens fullscreen.
 
 - A subtopic is an optional group inside a practice. Questions without one appear under **Uncategorized**.
 - Spelling and capitalisation define a group, so `Networking` and `networking` are separate.
-- **Statistics** is opened from the **insights** icon on a topic. It shows the latest, best and average score and the number of completed sessions.
-- **Progress over time** plots one point per completed session. The dashed **Trend** line shows the overall direction.
+- **Statistics** is opened from the **insights** icon on a topic. It shows the latest, best and average score and the number of completed sessions. The average is weighted by the number of questions in each session, so a long session counts more than a short one.
+- **Progress over time** plots one point per completed session. The dashed **Trend (questions)** line is a weighted fit of score against the total questions answered so far; sessions with more questions have more influence.
+- **Learning rate** reports the fit as percentage points per 100 answered questions and as percentage points per week. It appears as soon as two sessions give a usable fit, without waiting for a week of history.
 - **By subtopic** shows accuracy and progress for each group. It is hidden when no question has a subtopic.
-- **Learning rate** appears once the history spans at least one week and reports the average change per week.
-- The **share** icon exports the visible statistics as a JSON file. It includes the summary, progress points, per-subtopic figures and trend data.
+- Long-press a subtopic to select it. With one selected, the pencil renames it and the trash deletes it. With two or more, the merge icon combines them under one name.
+- **Rename** changes the name on every question in this topic in that category. Renaming **Uncategorized** gives those questions a name.
+- **Delete** removes the category but keeps every question; its questions move to **Uncategorized**. Deleting **Uncategorized** does nothing.
+- **Merge** asks for the name to keep, either one of the selected categories or a new name, and applies it to all of them. Other topics are not changed.
+- The **share** icon exports the visible statistics as a JSON file. It includes the summary, progress points, per-subtopic figures and trend data, with the weighted regression slope and intercept plus learning rates per 100 questions and per week.
+- A topic's header accuracy is a rolling figure over its five most recent completed sessions, weighted by the questions in each session. Shorter histories use every session they have.
 
 ## Lookup
 

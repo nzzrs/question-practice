@@ -211,6 +211,15 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     return (delete(sessions)..where((s) => s.id.equals(id))).go();
   }
 
+  /// Deletes the given completed sessions; in-progress rows stay untouched.
+  Future<int> deleteSessions(Iterable<int> ids) {
+    final values = ids.toSet().toList(growable: false);
+    if (values.isEmpty) return Future<int>.value(0);
+    return (delete(
+      sessions,
+    )..where((s) => s.id.isIn(values) & s.status.equals('completed'))).go();
+  }
+
   Stream<List<SessionRow>> watchCompletedSessions() {
     return (select(sessions)
           ..where((s) => s.status.equals('completed'))

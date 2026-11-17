@@ -60,7 +60,7 @@ class HelpPage extends StatelessWidget {
           number: '01',
           title: 'Home',
           points: [
-            'Topic cards show practices, questions, rolling accuracy and progress.',
+            'Topic cards show practices, questions, accuracy and progress.',
             'The sort icon orders topics by name or recency, in either direction.',
             'The archive icon lists archived topics. Long-press a topic to edit, archive or delete it.',
             'Paused sessions sit at the top with Resume and Discard.',
@@ -166,6 +166,8 @@ class HelpPage extends StatelessWidget {
             'A question can have an optional subtopic. Questions without one appear as Uncategorized.',
             'Statistics groups by subtopic with accuracy and progress for each group. Spelling and capitalisation define a group.',
             'The insights icon opens Statistics: latest, best, question-weighted average, progress over time and a weighted trend line over questions answered.',
+            "A topic's Readiness is the correct share of its last 100 answered questions, including wrong, skipped and I didn't know this answers.",
+            'Long-press a completed session to select it, tap more to toggle them, then delete the selected sessions with their answers, cards, highlights and skipped records.',
             'Learning rate shows percentage points per 100 questions and per week. It appears as soon as two sessions give a usable fit.',
             'Long-press a subtopic to select it. One selected category can be renamed or deleted; two or more can be merged.',
             'Renaming changes only this topic. Deleting keeps every question and moves it to Uncategorized. Merge picks one name for all selected categories.',

@@ -228,6 +228,13 @@ TopicSummary topicSummaryFromRow(TopicSummaryRow row) {
   );
 }
 
+TopicReadiness topicReadinessFromRow(TopicReadinessRow row) {
+  return TopicReadiness(
+    correctCount: row.correctCount,
+    answeredCount: row.answeredCount,
+  );
+}
+
 PracticeSummary practiceSummaryFromRow(PracticeSummaryRow row) {
   return PracticeSummary(
     practice: Practice(

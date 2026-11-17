@@ -23,6 +23,7 @@ class TopicStatsPage extends ConsumerStatefulWidget {
 class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
   bool _exporting = false;
   final Set<String> _selected = <String>{};
+  final Set<int> _selectedSessions = <int>{};
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +38,22 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
       title: 'Statistics',
       showBack: true,
       variant: M3EAppBarVariant.small,
-      actions: _selectionMode
+      actions: _sessionSelectionMode
+          ? [
+              M3EIconButton(
+                variant: M3EIconButtonVariant.standard,
+                icon: const Icon(Icons.close),
+                tooltip: 'Clear selection',
+                onPressed: _clearSessionSelection,
+              ),
+              M3EIconButton(
+                variant: M3EIconButtonVariant.standard,
+                icon: const Icon(Icons.delete_outline),
+                tooltip: 'Delete sessions',
+                onPressed: _deleteSelectedSessions,
+              ),
+            ]
+          : _selectionMode
           ? [
               M3EIconButton(
                 variant: M3EIconButtonVariant.standard,
@@ -145,10 +161,8 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
                   SectionTitle(
                     'By subtopic',
                     count: subtopics.length,
-                    supporting: _selectionMode
-                        ? '${_selected.length} selected · Tap another category to add it.'
-                        : 'Accuracy and progress for each question group. '
-                              'Long-press a category to rename, merge or delete it.',
+                    supporting:
+                        'Accuracy and progress for each question group.',
                   ),
                   AppGroup(
                     children: [
@@ -169,7 +183,15 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
                 AppGroup(
                   children: [
                     for (final point in ordered.reversed)
-                      _ProgressRow(point: point),
+                      _ProgressRow(
+                        key: ValueKey('session-row-${point.sessionId}'),
+                        point: point,
+                        selected: _selectedSessions.contains(point.sessionId),
+                        onTap: _sessionSelectionMode
+                            ? () => _toggleSession(point.sessionId)
+                            : null,
+                        onLongPress: () => _selectSession(point.sessionId),
+                      ),
                   ],
                 ),
               ],
@@ -182,13 +204,18 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
 
   bool get _selectionMode => _selected.isNotEmpty;
 
+  bool get _sessionSelectionMode => _selectedSessions.isNotEmpty;
+
   List<String> get _deletableSelected => [
     for (final subtopic in _selected)
       if (subtopic.trim().isNotEmpty) subtopic,
   ];
 
   void _selectSubtopic(String subtopic) {
-    setState(() => _selected.add(subtopic));
+    setState(() {
+      _selectedSessions.clear();
+      _selected.add(subtopic);
+    });
   }
 
   void _toggleSubtopic(String subtopic) {
@@ -200,6 +227,56 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
   void _clearSelection() {
     if (_selected.isEmpty || !mounted) return;
     setState(_selected.clear);
+  }
+
+  void _selectSession(int sessionId) {
+    setState(() {
+      _selected.clear();
+      _selectedSessions.add(sessionId);
+    });
+  }
+
+  void _toggleSession(int sessionId) {
+    setState(() {
+      if (!_selectedSessions.remove(sessionId)) {
+        _selectedSessions.add(sessionId);
+      }
+    });
+  }
+
+  void _clearSessionSelection() {
+    if (_selectedSessions.isEmpty || !mounted) return;
+    setState(_selectedSessions.clear);
+  }
+
+  Future<void> _deleteSelectedSessions() async {
+    final ids = _selectedSessions.toList(growable: false);
+    if (ids.isEmpty) return;
+    final confirmed = await confirmDialog(
+      context,
+      title: ids.length == 1 ? 'Delete session?' : 'Delete sessions?',
+      message:
+          'Deleting a completed session also removes its answers and any '
+          'cards, highlights and skipped records captured by that session. '
+          'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await ref.read(sessionRepositoryProvider).deleteSessions(ids);
+      _clearSessionSelection();
+      if (mounted) {
+        await showSnack(
+          context,
+          ids.length == 1 ? 'Session deleted.' : 'Sessions deleted.',
+        );
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not delete sessions: $error');
+      }
+    }
   }
 
   String _labelFor(String subtopic) {
@@ -915,9 +992,18 @@ class _SubtopicRow extends StatelessWidget {
 }
 
 class _ProgressRow extends StatelessWidget {
-  const _ProgressRow({required this.point});
+  const _ProgressRow({
+    required this.point,
+    this.selected = false,
+    this.onTap,
+    this.onLongPress,
+    super.key,
+  });
 
   final TopicProgressPoint point;
+  final bool selected;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -928,35 +1014,50 @@ class _ProgressRow extends StatelessWidget {
         : point.score < 0.5
         ? PillTone.error
         : PillTone.neutral;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Semantics(
+      container: true,
+      selected: selected,
+      button: true,
+      label: '${point.practiceName}, ${point.correct}/${point.total}',
+      child: Material(
+        color: selected
+            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.45)
+            : Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onLongPress,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+            child: Row(
               children: [
-                Text(
-                  point.practiceName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.typography.baseline.titleSmall,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  DateFormat.yMMMd().add_Hm().format(
-                    point.finishedAt.toLocal(),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        point.practiceName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.typography.baseline.titleSmall,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        DateFormat.yMMMd().add_Hm().format(
+                          point.finishedAt.toLocal(),
+                        ),
+                        style: theme.typography.baseline.labelSmall.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                  style: theme.typography.baseline.labelSmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
                 ),
+                const SizedBox(width: 10),
+                Pill('${point.correct}/${point.total} · $percent%', tone: tone),
               ],
             ),
           ),
-          const SizedBox(width: 10),
-          Pill('${point.correct}/${point.total} · $percent%', tone: tone),
-        ],
+        ),
       ),
     );
   }

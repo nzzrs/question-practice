@@ -121,30 +121,3 @@ double? learningRatePercentagePointsPerWeek(List<TopicProgressPoint> points) {
   if (questionsPerDay == 0) return null;
   return fit.slope * questionsPerDay * 7 * 100;
 }
-
-/// The most recent completed sessions, oldest first.
-List<TopicProgressPoint> recentCompletedSessions(
-  List<TopicProgressPoint> points, {
-  int window = 5,
-}) {
-  if (window < 1) {
-    throw ArgumentError.value(window, 'window', 'Must be at least one.');
-  }
-  final ordered = orderedProgressPoints(points);
-  if (ordered.length <= window) return ordered;
-  return ordered.sublist(ordered.length - window);
-}
-
-/// Accuracy over the most recent completed sessions, weighted by questions.
-double? rollingAccuracy(List<TopicProgressPoint> points, {int window = 5}) {
-  final recent = recentCompletedSessions(points, window: window);
-  if (recent.isEmpty) return null;
-  var answered = 0;
-  var correct = 0;
-  for (final point in recent) {
-    answered += point.total;
-    correct += point.correct;
-  }
-  if (answered == 0) return null;
-  return correct / answered;
-}

@@ -4,7 +4,7 @@ Questions is an offline Android app for practising questions and exporting study
 
 ## Home
 
-- Active topic cards show their practices, questions, rolling accuracy and progress.
+- Active topic cards show their practices, questions, accuracy and progress.
 - The **sort** icon beside **Topics** orders the list by **Name** or **Recency**, increasing or decreasing. The choice is remembered.
 - The **archive** icon beside it opens archived topics.
 - Long-press a topic to **Edit topic**, **Archive topic** or **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
@@ -31,7 +31,7 @@ Questions is an offline Android app for practising questions and exporting study
 
 ## Topic
 
-- The header shows the description, priority, AnkiDroid deck, rolling accuracy over the last five completed sessions, progress, correct answers, active errors and completed sessions.
+- The header shows the description, priority, AnkiDroid deck, readiness over the last 100 answered questions, progress, correct answers, active errors and completed sessions.
 - The **insights** icon opens **Statistics**.
 - **Practices** lists each practice with its question count and last score. Tap one to start it.
 - The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order.
@@ -141,7 +141,8 @@ Review opens fullscreen.
 - **Delete** removes the category but keeps every question; its questions move to **Uncategorized**. Deleting **Uncategorized** does nothing.
 - **Merge** asks for the name to keep, either one of the selected categories or a new name, and applies it to all of them. Other topics are not changed.
 - The **share** icon exports the visible statistics as a JSON file. It includes the summary, progress points, per-subtopic figures and trend data, with the weighted regression slope and intercept plus learning rates per 100 questions and per week.
-- A topic's header accuracy is a rolling figure over its five most recent completed sessions, weighted by the questions in each session. Shorter histories use every session they have.
+- A topic's header **Readiness** is the correct share of the last 100 answered questions in that topic, across completed sessions. Every attempt counts, including wrong, skipped and **I didn't know this** answers; questions left unanswered have no attempt and stay out. Shorter histories use every answer they have, and only the tail of the oldest session needed joins the window.
+- The **Sessions** list keeps one row per completed session. Long-press a row to start selecting sessions, then tap others to toggle them. The trash icon asks for confirmation and deletes the selected completed sessions together with their answers, cards, highlights and skipped records. Selection tints the row and uses the app bar, so the page does not move; category and session selection are separate modes.
 
 ## Lookup
 

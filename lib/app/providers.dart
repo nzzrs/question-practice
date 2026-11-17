@@ -100,6 +100,11 @@ final topicProgressProvider =
           ref.watch(topicRepositoryProvider).watchTopicProgress(topicId),
     );
 
+final topicReadinessProvider = StreamProvider.family<TopicReadiness, int>(
+  (ref, topicId) =>
+      ref.watch(topicRepositoryProvider).watchTopicReadiness(topicId),
+);
+
 final topicSubtopicStatsProvider =
     StreamProvider.family<List<SubtopicStat>, int>(
       (ref, topicId) =>

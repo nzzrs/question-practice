@@ -85,6 +85,11 @@ class PracticeRepository {
         );
   }
 
+  /// Readiness over the topic's latest answered questions.
+  Stream<TopicReadiness> watchTopicReadiness(int topicId) {
+    return _db.statsDao.watchTopicReadiness(topicId).map(topicReadinessFromRow);
+  }
+
   Stream<List<SubtopicStat>> watchSubtopicStats(int topicId) {
     return _db.statsDao
         .watchSubtopicStats(topicId)

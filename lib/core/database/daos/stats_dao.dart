@@ -186,6 +186,40 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
     );
   }
 
+  /// Correct and answered counts over a topic's latest attempts.
+  ///
+  /// The inner query keeps the newest [limit] attempts across every completed
+  /// session, so a partially needed oldest session contributes only its tail.
+  Stream<TopicReadinessRow> watchTopicReadiness(
+    int topicId, {
+    int limit = 100,
+  }) {
+    if (limit < 1) {
+      throw ArgumentError.value(limit, 'limit', 'Must be at least one.');
+    }
+    final query = customSelect(
+      '''
+      SELECT
+        COALESCE(SUM(CASE WHEN recent.is_correct = 1 THEN 1 ELSE 0 END), 0)
+          AS correct_count,
+        COUNT(*) AS answered_count
+      FROM (
+        SELECT a.is_correct AS is_correct
+        FROM attempts a
+        INNER JOIN sessions s ON s.id = a.session_id
+        INNER JOIN questions q ON q.id = a.question_id
+        INNER JOIN practices p ON p.id = q.practice_id
+        WHERE p.topic_id = ? AND s.status = 'completed'
+        ORDER BY a.answered_at DESC, a.id DESC
+        LIMIT ?
+      ) AS recent
+      ''',
+      variables: [Variable.withInt(topicId), Variable.withInt(limit)],
+      readsFrom: {attempts, sessions, questions, practices},
+    );
+    return query.watchSingle().map(TopicReadinessRow.fromRow);
+  }
+
   Stream<List<SubtopicStatRow>> watchSubtopicStats(int topicId) {
     final query = customSelect(
       '''
@@ -377,6 +411,23 @@ class TopicProgressRow {
   final String practiceName;
   final int correct;
   final int total;
+}
+
+class TopicReadinessRow {
+  const TopicReadinessRow({
+    required this.correctCount,
+    required this.answeredCount,
+  });
+
+  factory TopicReadinessRow.fromRow(QueryRow row) {
+    return TopicReadinessRow(
+      correctCount: row.read<int>('correct_count'),
+      answeredCount: row.read<int>('answered_count'),
+    );
+  }
+
+  final int correctCount;
+  final int answeredCount;
 }
 
 class SubtopicStatRow {

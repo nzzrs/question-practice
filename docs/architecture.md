@@ -201,16 +201,30 @@ view.
   named groups exist) and `trend` with `sessionCount`, `regression`
   (`slope`/`intercept`), `learningRatePercentagePointsPer100Questions` and
   `learningRatePercentagePointsPerWeek`. Rate keys are null without a fit.
-- A topic's hero accuracy is a rolling figure over its five most recent
-  completed sessions, weighted by questions answered. Shorter histories use
-  every session they have.
+- The **Sessions** list allows independent long-press selection. Selected rows
+  use a background tint and the app bar shows a clear action plus a trash
+  action; category and session selection clear each other. Deleting selected
+  sessions runs in one transaction and keeps in-progress sessions because the
+  list and delete query are limited to completed rows. Attempts, session
+  questions, error cards, skipped records, concepts, highlights and basic cards
+  cascade with a deleted session.
+- A topic's header **Readiness** is the correct share of its last 100 answered
+  attempts across completed sessions. The `watchTopicReadiness` inner query
+  orders attempts by `answered_at DESC, id DESC`, limits the window and joins
+  through sessions, questions and practices. Wrong, skipped and **I didn't know
+  this** attempts count because each recorded attempt is in the window;
+  questions left unanswered have no attempt. A short history uses all attempts.
+  When the window crosses a session boundary it keeps only the tail of the
+  oldest session needed. With no attempts the ring shows **—** and value zero.
 - See [Database reference](database.md#subtopics-end-to-end) for the full
   subtopic path from import to backup.
 
 Code: `lib/features/topics/topic_stats_page.dart`,
 `lib/features/topics/domain/statistics_export_service.dart`,
 `lib/core/domain/progress_math.dart`, `StatsDao.watchSubtopicStats`,
-`PracticeRepository.renameSubtopic/deleteSubtopics/mergeSubtopics`,
+`StatsDao.watchTopicReadiness`,
+`PracticeRepository.renameSubtopic/deleteSubtopics/mergeSubtopics/watchTopicReadiness`,
+`SessionRepository.deleteSessions`, `SessionDao.deleteSessions`,
 `TopicDao.setSubtopicForTopic`.
 
 ### Cards, Anki export and deck routing

@@ -192,44 +192,4 @@ void main() {
       expect(activeStudyDays(const []), 0);
     });
   });
-
-  group('rolling accuracy', () {
-    List<TopicProgressPoint> history(List<(int, int)> scores) {
-      return [
-        for (var index = 0; index < scores.length; index++)
-          point(
-            finishedAt: jan1.add(Duration(days: index)),
-            correct: scores[index].$1,
-            total: scores[index].$2,
-            sessionId: index + 1,
-          ),
-      ];
-    }
-
-    test('uses only the five most recent completed sessions', () {
-      final points = history([
-        (0, 100),
-        (5, 10),
-        (10, 20),
-        (15, 30),
-        (20, 40),
-        (25, 50),
-      ]);
-
-      expect(recentCompletedSessions(points), hasLength(5));
-      expect(rollingAccuracy(points), closeTo(75 / 150, 1e-9));
-    });
-
-    test('uses every session when fewer than five exist', () {
-      final points = history([(1, 2), (2, 2)]);
-
-      expect(recentCompletedSessions(points), hasLength(2));
-      expect(rollingAccuracy(points), closeTo(3 / 4, 1e-9));
-    });
-
-    test('has no accuracy without sessions', () {
-      expect(rollingAccuracy(const []), isNull);
-      expect(recentCompletedSessions(const []), isEmpty);
-    });
-  });
 }

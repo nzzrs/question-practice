@@ -4,6 +4,27 @@ import 'package:question_practice/features/practice/domain/session_service.dart'
 
 import '../helpers/test_harness.dart';
 
+Future<int> completeSession(
+  SessionService sessions,
+  int practiceId, {
+  int? answers,
+  bool Function(int index)? correct,
+}) async {
+  final start = await sessions.startPractice(practiceId);
+  final count = answers ?? start.items.length;
+  for (var index = 0; index < count; index++) {
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items[index],
+      selectedIndexes: [(correct?.call(index) ?? true) ? 0 : 1],
+      reasoning: '',
+      distracted: false,
+    );
+  }
+  await sessions.finishEarly(start: start, markSkipped: false);
+  return start.session.id;
+}
+
 void main() {
   late TestHarness harness;
   late SessionService sessions;
@@ -316,5 +337,311 @@ void main() {
     expect(summary.sessionCount, 0);
     expect(summary.answeredCount, 0);
     expect(summary.progress, 0);
+  });
+
+  test(
+    'readiness counts correct, wrong, skipped and unknown attempts',
+    () async {
+      final practice = await harness.seedPractice(count: 6);
+      final start = await sessions.startPractice(practice.practiceId);
+      await sessions.submitAnswer(
+        start: start,
+        item: start.items[0],
+        selectedIndexes: const [0],
+        reasoning: '',
+        distracted: false,
+      );
+      await sessions.submitAnswer(
+        start: start,
+        item: start.items[1],
+        selectedIndexes: const [1],
+        reasoning: '',
+        distracted: false,
+      );
+      await sessions.submitAnswer(
+        start: start,
+        item: start.items[2],
+        selectedIndexes: const [],
+        reasoning: '',
+        distracted: false,
+      );
+      await sessions.submitAnswer(
+        start: start,
+        item: start.items[3],
+        selectedIndexes: const [1],
+        reasoning: '',
+        distracted: false,
+      );
+      await sessions.setUnknown(
+        start: start,
+        item: start.items[3],
+        unknown: true,
+      );
+      await sessions.finishEarly(start: start, markSkipped: false);
+
+      final readiness = await harness.practices
+          .watchTopicReadiness(practice.topicId)
+          .first;
+      expect(readiness.answeredCount, 4);
+      expect(readiness.correctCount, 1);
+      expect(readiness.hasAnswers, isTrue);
+      expect(readiness.value, closeTo(0.25, 1e-9));
+    },
+  );
+
+  test('readiness ignores non-completed sessions', () async {
+    final practice = await harness.seedPractice(count: 2);
+    await completeSession(sessions, practice.practiceId);
+
+    final inProgress = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: inProgress,
+      item: inProgress.items.first,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+
+    final abandoned = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: abandoned,
+      item: abandoned.items.first,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await harness.sessions.abandonSession(abandoned.session.id);
+
+    final readiness = await harness.practices
+        .watchTopicReadiness(practice.topicId)
+        .first;
+    expect(readiness.answeredCount, 2);
+    expect(readiness.correctCount, 2);
+    expect(readiness.value, 1);
+  });
+
+  test('readiness uses every attempt when fewer than 100 exist', () async {
+    final practice = await harness.seedPractice(count: 2);
+    await completeSession(
+      sessions,
+      practice.practiceId,
+      answers: 2,
+      correct: (index) => index == 0,
+    );
+    harness.clock.advance(const Duration(hours: 1));
+    await completeSession(
+      sessions,
+      practice.practiceId,
+      answers: 1,
+      correct: (_) => true,
+    );
+
+    final readiness = await harness.practices
+        .watchTopicReadiness(practice.topicId)
+        .first;
+    expect(readiness.answeredCount, 3);
+    expect(readiness.correctCount, 2);
+    expect(readiness.value, closeTo(2 / 3, 1e-9));
+  });
+
+  test(
+    'readiness uses the last 100 attempts and the tail of the oldest session',
+    () async {
+      // 132 attempts across sessions of 40, 2 and 90 questions.
+      final practice = await harness.seedPractice(count: 132);
+      await completeSession(
+        sessions,
+        practice.practiceId,
+        answers: 40,
+        correct: (index) => index >= 32,
+      );
+      harness.clock.advance(const Duration(hours: 1));
+      await completeSession(
+        sessions,
+        practice.practiceId,
+        answers: 2,
+        correct: (_) => true,
+      );
+      harness.clock.advance(const Duration(hours: 1));
+      await completeSession(
+        sessions,
+        practice.practiceId,
+        answers: 90,
+        correct: (index) => index < 50,
+      );
+
+      final readiness = await harness.practices
+          .watchTopicReadiness(practice.topicId)
+          .first;
+      expect(readiness.answeredCount, 100);
+      expect(readiness.correctCount, 60);
+      expect(readiness.value, closeTo(0.6, 1e-9));
+    },
+  );
+
+  test('readiness is empty without completed attempts', () async {
+    final practice = await harness.seedPractice(count: 2);
+
+    final readiness = await harness.practices
+        .watchTopicReadiness(practice.topicId)
+        .first;
+    expect(readiness.answeredCount, 0);
+    expect(readiness.correctCount, 0);
+    expect(readiness.hasAnswers, isFalse);
+    expect(readiness.value, 0);
+  });
+
+  test('deleting selected sessions cascades their captured records', () async {
+    final practice = await harness.seedPractice(count: 4);
+    final questions = await harness.practices.questionsForPractice(
+      practice.practiceId,
+    );
+
+    final first = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: first,
+      item: first.items[0],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.submitAnswer(
+      start: first,
+      item: first.items[1],
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.submitAnswer(
+      start: first,
+      item: first.items[2],
+      selectedIndexes: const [],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.finishEarly(start: first, markSkipped: false);
+    await harness.cards.createConcept(
+      sessionId: first.session.id,
+      questionId: questions[0].id,
+      term: 'TCP',
+      definition: 'Transmission Control Protocol',
+      context: 'Context',
+      topicName: 'Topic',
+      source: ConceptSource.manual,
+      createdAt: harness.clock.now().toUtc(),
+    );
+    await harness.cards.createHighlight(
+      sessionId: first.session.id,
+      questionId: questions[0].id,
+      text: 'Highlighted phrase',
+      context: 'Context',
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+    await harness.cards.createManualCard(
+      sessionId: first.session.id,
+      questionId: questions[0].id,
+      question: 'Basic front',
+      answer: 'Basic back',
+      topicName: 'Topic',
+      createdAt: harness.clock.now().toUtc(),
+    );
+    harness.clock.advance(const Duration(hours: 1));
+
+    final second = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: second,
+      item: second.items[0],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.finishEarly(start: second, markSkipped: false);
+    harness.clock.advance(const Duration(hours: 1));
+
+    final kept = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: kept,
+      item: kept.items[0],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await sessions.finishEarly(start: kept, markSkipped: false);
+
+    final inProgress = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: inProgress,
+      item: inProgress.items[0],
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+
+    final deleted = await harness.sessions.deleteSessions([
+      first.session.id,
+      second.session.id,
+      inProgress.session.id,
+    ]);
+    expect(deleted, 2);
+
+    final sessionsRows = await harness.database
+        .select(harness.database.sessions)
+        .get();
+    expect(
+      sessionsRows
+          .where((row) => row.status == SessionStatus.completed.name)
+          .map((row) => row.id),
+      [kept.session.id],
+    );
+    expect(
+      await harness.sessions.sessionById(inProgress.session.id),
+      isNotNull,
+    );
+
+    final sessionQuestions = await harness.database
+        .select(harness.database.sessionQuestions)
+        .get();
+    expect(
+      sessionQuestions.where(
+        (row) =>
+            row.sessionId == first.session.id ||
+            row.sessionId == second.session.id,
+      ),
+      isEmpty,
+    );
+    final attempts = await harness.database
+        .select(harness.database.attempts)
+        .get();
+    expect(
+      attempts.where(
+        (row) =>
+            row.sessionId == first.session.id ||
+            row.sessionId == second.session.id,
+      ),
+      isEmpty,
+    );
+    expect(attempts, isNotEmpty);
+    expect(
+      await harness.database.select(harness.database.errorCards).get(),
+      isEmpty,
+    );
+    expect(
+      await harness.database.select(harness.database.skippedQuestions).get(),
+      isEmpty,
+    );
+    expect(
+      await harness.database.select(harness.database.concepts).get(),
+      isEmpty,
+    );
+    expect(
+      await harness.database.select(harness.database.highlights).get(),
+      isEmpty,
+    );
+    expect(
+      await harness.database.select(harness.database.manualCards).get(),
+      isEmpty,
+    );
   });
 }

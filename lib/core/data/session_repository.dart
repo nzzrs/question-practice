@@ -153,6 +153,17 @@ class SessionRepository {
 
   Future<void> discardSession(int id) => _db.sessionDao.deleteSession(id);
 
+  /// Deletes the given completed sessions in one transaction.
+  ///
+  /// Attempts, session questions, error cards, skipped records, concepts,
+  /// highlights and basic cards linked to those sessions cascade with them.
+  /// Rows belonging to in-progress or abandoned sessions are kept.
+  Future<int> deleteSessions(Iterable<int> ids) {
+    final values = ids.toSet();
+    if (values.isEmpty) return Future<int>.value(0);
+    return _db.transaction(() => _db.sessionDao.deleteSessions(values));
+  }
+
   Future<int> lookupCountForSession(int sessionId) {
     return _db.sessionDao.lookupCountForSession(sessionId);
   }

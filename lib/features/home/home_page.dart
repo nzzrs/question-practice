@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -227,19 +228,19 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   Future<void> _showShuffleOptions() async {
-    final start = await M3EBottomSheet.show<bool>(
+    final count = await M3EBottomSheet.show<int>(
       context,
       initialValue: M3EBottomSheetValue.expanded,
       builder: (context) => const _ShuffleOptionsSheet(),
     );
-    if (start == true && mounted) await _startMixed();
+    if (count != null && mounted) await _startMixed(count);
   }
 
-  Future<void> _startMixed() async {
+  Future<void> _startMixed(int count) async {
     setState(() => _starting = true);
     try {
       final start = ref.read(sessionServiceProvider);
-      final session = await start.startMixed();
+      final session = await start.startMixed(limit: count);
       if (!mounted) return;
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
@@ -425,12 +426,66 @@ class _QuickTile extends StatelessWidget {
   }
 }
 
-class _ShuffleOptionsSheet extends StatelessWidget {
+class _ShuffleOptionsSheet extends ConsumerStatefulWidget {
   const _ShuffleOptionsSheet();
+
+  @override
+  ConsumerState<_ShuffleOptionsSheet> createState() =>
+      _ShuffleOptionsSheetState();
+}
+
+class _ShuffleOptionsSheetState extends ConsumerState<_ShuffleOptionsSheet> {
+  static const _defaultCount = 15;
+  static const _invalidMessage = 'Enter a whole number of at least 1.';
+
+  final _count = TextEditingController(text: '$_defaultCount');
+  int? _chosen = _defaultCount;
+  String? _error;
+
+  @override
+  void dispose() {
+    _count.dispose();
+    super.dispose();
+  }
+
+  int? _parseCount(String raw) {
+    final value = int.tryParse(raw.trim());
+    return value == null || value <= 0 ? null : value;
+  }
+
+  void _onCountChanged(String raw) {
+    final parsed = _parseCount(raw);
+    setState(() {
+      _chosen = parsed;
+      _error = parsed == null ? _invalidMessage : null;
+    });
+  }
+
+  String _helperText(int? available) {
+    final chosen = _chosen;
+    if (available == null) {
+      return 'Only unsolved, unskipped questions are included. If you ask for '
+          'more than are available, the session includes all of them.';
+    }
+    if (chosen != null && chosen > available) {
+      return 'Only $available eligible '
+          '${available == 1 ? 'question is' : 'questions are'} available, so '
+          'the session will include all of them.';
+    }
+    return available == 1
+        ? '1 eligible question is available.'
+        : '$available eligible questions are available.';
+  }
+
+  void _start() {
+    final chosen = _chosen;
+    if (chosen != null) Navigator.of(context).pop(chosen);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final available = ref.watch(mixedEligibleCountProvider).value;
     return SafeArea(
       top: false,
       child: SingleChildScrollView(
@@ -460,6 +515,19 @@ class _ShuffleOptionsSheet extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 18),
+            M3ETextField(
+              key: const ValueKey('shuffle-question-count'),
+              controller: _count,
+              label: 'Questions',
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              errorText: _error,
+              supportingText: _helperText(available),
+              onChanged: _onCountChanged,
+              onSubmitted: (_) => _start(),
+            ),
+            const SizedBox(height: 18),
             const _ShuffleOption(
               icon: Icons.public,
               title: 'Every topic',
@@ -477,7 +545,7 @@ class _ShuffleOptionsSheet extends StatelessWidget {
             ),
             const SizedBox(height: 18),
             AppPrimaryButton(
-              onPressed: () => Navigator.of(context).pop(true),
+              onPressed: _chosen == null ? null : _start,
               label: 'Start practice',
               icon: Icons.play_arrow,
             ),

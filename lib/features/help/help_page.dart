@@ -193,9 +193,9 @@ class HelpPage extends StatelessWidget {
           number: '13',
           title: 'Shuffled practice',
           points: [
-            'Start shuffled practice uses questions from every topic.',
+            'Shuffled practice uses every topic and asks how many questions to include (default 15).',
             'It keeps only questions that are neither solved nor skipped, and shuffles questions and alternatives.',
-            'If no question is eligible, it says so instead of starting an empty session.',
+            'Asking for more includes all eligible questions; if none are eligible, it says so.',
             'A shuffled session can be saved for later like any other session.',
           ],
         ),

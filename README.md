@@ -25,7 +25,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Open topic statistics for a per-subtopic accuracy and progress breakdown, a dashed least-squares trend line over the session history, and a weekly learning rate once the history spans a week. Share the whole statistics payload as JSON.
 - Give each topic its own AnkiDroid deck; topics without one use the default deck.
 - Export a complete JSON backup of practices, sessions, answers, cards and settings, and restore it on another install. The backup never contains the AI API key.
-- Sort topics and each topic's practices by name or recency, with the order remembered; archive topics without deleting their data. Start a mixed shuffled session from the **Shuffle** floating button.
+- Sort topics and each topic's practices by name or recency, with the order remembered; archive topics without deleting their data. Start a mixed shuffled session from the **Shuffle** floating button and choose how many questions to include (15 by default).
 - Material You wallpaper colors are on by default; they can be turned off in Settings.
 - A floating reminder after five minutes on the same question, then every five minutes. It resets when you move on.
 

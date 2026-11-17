@@ -176,11 +176,13 @@ class SessionService {
     );
   }
 
-  Future<SessionStart> startMixed() async {
-    final progress = await _sessions.questionProgress();
-    final questions = (await _practices.allQuestions())
-        .where((question) => progress.countsForShuffledPractice(question.id))
-        .toList();
+  Future<SessionStart> startMixed({int? limit}) async {
+    if (limit != null && limit <= 0) {
+      throw const SessionException('The question count must be at least 1.');
+    }
+    final candidates = await _mixedCandidates();
+    final progress = candidates.progress;
+    final questions = candidates.questions;
     if (questions.isEmpty) {
       throw const SessionException(
         'No unsolved questions are left for shuffled practice.',
@@ -193,16 +195,19 @@ class SessionService {
       for (final practice in practices) practice.id: practice,
     };
     final shuffled = List<Question>.of(questions)..shuffle(_random);
+    final selected = limit == null
+        ? shuffled
+        : shuffled.take(limit).toList(growable: false);
     final session = await _sessions.startSession(
       practiceId: null,
       mode: SessionMode.mixed,
-      questions: shuffled,
+      questions: selected,
       startedAt: _clock.now().toUtc(),
     );
     return SessionStart(
       session: session,
       items: [
-        for (final question in shuffled)
+        for (final question in selected)
           _itemFor(
             question,
             topicName:
@@ -214,6 +219,21 @@ class SessionService {
       errorCards: const {},
       progress: progress,
     );
+  }
+
+  /// Number of questions shuffled practice can draw from right now.
+  Future<int> mixedEligibleCount() async {
+    final candidates = await _mixedCandidates();
+    return candidates.questions.length;
+  }
+
+  Future<({QuestionProgress progress, List<Question> questions})>
+  _mixedCandidates() async {
+    final progress = await _sessions.questionProgress();
+    final questions = (await _practices.allQuestions())
+        .where((question) => progress.countsForShuffledPractice(question.id))
+        .toList();
+    return (progress: progress, questions: questions);
   }
 
   Future<SessionStart> startPastErrors() async {

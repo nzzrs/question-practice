@@ -321,6 +321,77 @@ void main() {
     expect(start.items.map((item) => item.topicName).toSet(), {'A', 'B'});
   });
 
+  test('mixed session returns exactly the requested question limit', () async {
+    await harness.seedPractice(count: 5);
+
+    final start = await service.startMixed(limit: 3);
+
+    expect(start.session.mode, SessionMode.mixed);
+    expect(start.items, hasLength(3));
+    expect(start.session.total, 3);
+  });
+
+  test(
+    'mixed session includes every eligible question when limit is higher',
+    () async {
+      await harness.seedPractice(count: 2);
+
+      final start = await service.startMixed(limit: 15);
+
+      expect(start.items, hasLength(2));
+    },
+  );
+
+  test(
+    'a limited mixed session still excludes solved and skipped questions',
+    () async {
+      final practice = await harness.seedPractice(count: 4);
+      final first = await service.startPractice(practice.practiceId);
+      final solvedId = first.items[0].question.id;
+      final skippedId = first.items[1].question.id;
+      await service.submitAnswer(
+        start: first,
+        item: first.items[0],
+        selectedIndexes: const [0],
+        reasoning: '',
+        distracted: false,
+      );
+      await service.submitAnswer(
+        start: first,
+        item: first.items[1],
+        selectedIndexes: const [],
+        reasoning: '',
+        distracted: false,
+      );
+
+      final mixed = await service.startMixed(limit: 10);
+      final ids = [for (final item in mixed.items) item.question.id];
+
+      expect(ids, hasLength(2));
+      expect(ids, isNot(contains(solvedId)));
+      expect(ids, isNot(contains(skippedId)));
+    },
+  );
+
+  test('mixed session rejects a non-positive limit', () async {
+    await harness.seedPractice(count: 2);
+
+    await expectLater(
+      service.startMixed(limit: 0),
+      throwsA(
+        isA<SessionException>().having(
+          (error) => error.message,
+          'message',
+          contains('at least 1'),
+        ),
+      ),
+    );
+    await expectLater(
+      service.startMixed(limit: -3),
+      throwsA(isA<SessionException>()),
+    );
+  });
+
   test('summary counts distinct looked-up terms', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await service.startPractice(practice.practiceId);

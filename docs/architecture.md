@@ -261,11 +261,13 @@ Code: `lib/features/settings/settings_page.dart`,
   unexported cards, then the active topic list. The app bar opens Help and
   Settings. The section header sorts topics and opens archived topics (with a
   count badge when non-empty).
-- The Shuffle floating button opens **Start shuffled practice**, which explains
-  that the run uses every topic, keeps only questions that are neither solved
-  nor skipped, and shuffles questions and alternatives. If no question is
-  eligible it reports so instead of creating an empty session. The resulting
-  session is `mixed` and can be saved like any other.
+- The Shuffle floating button opens **Start shuffled practice**, which asks how
+  many questions to include (15 by default), explains that the run uses every
+  topic, keeps only questions that are neither solved nor skipped, and shuffles
+  questions and alternatives. A request larger than the eligible pool includes
+  every available question. If no question is eligible it reports so instead of
+  creating an empty session. The resulting session is `mixed` and can be saved
+  like any other.
 - A topic/practice long-press opens the options sheets; actions are destructive
   only after confirmation.
 

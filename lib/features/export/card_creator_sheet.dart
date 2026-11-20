@@ -70,31 +70,37 @@ class CardCreatorRequest {
   final int? skippedQuestionId;
 }
 
-/// Opens the shared card creator and returns the number of cards saved.
+/// Opens the shared card creator in a bottom sheet and returns the number of
+/// cards saved.
+///
+/// The sheet starts at [M3EBottomSheetValue.collapsed], so the error, note or
+/// skipped question it was opened from stays readable above it. Dragging the
+/// handle up gives the creator more room.
 Future<int> showCardCreator(
   BuildContext context, {
   required CardCreatorRequest request,
 }) async {
-  final created = await Navigator.of(context).push<int>(
-    MaterialPageRoute<int>(
-      fullscreenDialog: true,
-      builder: (context) => CardCreatorPage(request: request),
-    ),
+  final created = await M3EBottomSheet.show<int>(
+    context,
+    initialValue: M3EBottomSheetValue.collapsed,
+    builder: (context) => CardCreatorSheet(request: request),
   );
   return created ?? 0;
 }
 
 /// One creator for manual cards and optional AI suggestions.
 ///
-/// Manual entry never needs an AI provider. Cards are collected as drafts and
-/// saved together, so the learner can add several ideas little by little.
-class CardCreatorPage extends ConsumerStatefulWidget {
-  const CardCreatorPage({required this.request, super.key});
+/// Lives inside an [M3EBottomSheet], so the review surface behind it keeps the
+/// mistake visible while cards are written. Manual entry never needs an AI
+/// provider. Cards are collected as drafts and saved together, so the learner
+/// can add several ideas little by little.
+class CardCreatorSheet extends ConsumerStatefulWidget {
+  const CardCreatorSheet({required this.request, super.key});
 
   final CardCreatorRequest request;
 
   @override
-  ConsumerState<CardCreatorPage> createState() => _CardCreatorPageState();
+  ConsumerState<CardCreatorSheet> createState() => _CardCreatorSheetState();
 }
 
 sealed class _CardDraft {
@@ -142,8 +148,7 @@ class _AiSuggestion {
   }
 }
 
-class _CardCreatorPageState extends ConsumerState<CardCreatorPage> {
-  final _scroll = ScrollController();
+class _CardCreatorSheetState extends ConsumerState<CardCreatorSheet> {
   late final _front = TextEditingController(text: widget.request.initialFront);
   late final _back = TextEditingController(text: widget.request.initialBack);
   late final _term = TextEditingController(text: widget.request.initialTerm);
@@ -162,7 +167,6 @@ class _CardCreatorPageState extends ConsumerState<CardCreatorPage> {
 
   @override
   void dispose() {
-    _scroll.dispose();
     _front.dispose();
     _back.dispose();
     _term.dispose();
@@ -393,335 +397,504 @@ class _CardCreatorPageState extends ConsumerState<CardCreatorPage> {
     final request = widget.request;
     final hasKey = ref.watch(hasApiKeyProvider).value ?? false;
     final count = _drafts.length;
-    return AppPage(
-      title: request.title,
-      showBack: true,
-      scrollController: _scroll,
-      variant: M3EAppBarVariant.small,
-      bottomBar: AppActionDock(
-        child: AppPrimaryButton(
-          key: const ValueKey('creator-save'),
-          onPressed: count == 0 || _saving ? null : _save,
-          label: _saving
-              ? 'Saving…'
-              : 'Save $count card${count == 1 ? '' : 's'}',
-          icon: Icons.check,
-        ),
-      ),
-      children: [
-        if (request.questionContext.trim().isNotEmpty) ...[
-          TonalBox(
-            padding: const EdgeInsets.all(14),
-            child: Column(
+    final hasContext =
+        request.error != null ||
+        request.note != null ||
+        request.skippedQuestionId != null ||
+        request.questionContext.trim().isNotEmpty;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SingleChildScrollView(
+        key: const ValueKey('creator-scroll'),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'From the question',
-                  style: theme.typography.baseline.labelSmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      request.title,
+                      style: theme.typography.emphasized.titleLarge,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  request.questionContext.trim(),
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    height: 1.45,
-                  ),
+                M3EIconButton(
+                  key: const ValueKey('creator-close'),
+                  variant: M3EIconButtonVariant.standard,
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close card creator',
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
                 ),
-                if (request.topicName.trim().isNotEmpty ||
-                    request.subtopic.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      if (request.topicName.trim().isNotEmpty)
-                        Pill(request.topicName),
-                      if (request.subtopic.trim().isNotEmpty)
-                        Pill(request.subtopic, tone: PillTone.secondary),
-                    ],
-                  ),
-                ],
               ],
             ),
-          ),
-          const SizedBox(height: 20),
-        ],
-        Text('Card type', style: theme.typography.emphasized.titleSmall),
-        const SizedBox(height: 8),
-        M3ESegmentedButton<CardCreatorKind>(
-          key: const ValueKey('creator-kind'),
-          segments: const [
-            M3ESegment(value: CardCreatorKind.basic, label: 'Basic'),
-            M3ESegment(value: CardCreatorKind.concept, label: 'Concept'),
-          ],
-          selected: {_kind},
-          enabled: !_saving,
-          onSelectionChanged: (values) {
-            if (values.isNotEmpty) {
-              setState(() => _kind = values.first);
-            }
-          },
-        ),
-        const SizedBox(height: 16),
-        if (_kind == CardCreatorKind.basic) ...[
-          M3ETextField(
-            key: const ValueKey('creator-front'),
-            controller: _front,
-            label: 'Front',
-            placeholder: 'A short question',
-            minLines: 2,
-            maxLines: 4,
-            isRequired: true,
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 12),
-          M3ETextField(
-            key: const ValueKey('creator-back'),
-            controller: _back,
-            label: 'Back',
-            placeholder: 'One atomic answer',
-            minLines: 2,
-            maxLines: 4,
-            isRequired: true,
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Cognitive type',
-            style: theme.typography.baseline.labelSmall.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 6),
-          M3ETheme(
-            data: theme.copyWith(
-              chipTheme: theme.chipTheme.copyWith(height: 48),
-            ),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final type in const [
-                  CognitiveType.fact,
-                  CognitiveType.heuristic,
-                  CognitiveType.contrast,
-                ])
-                  M3EChip(
-                    key: ValueKey('creator-type-${type.name}'),
-                    type: M3EChipType.filter,
-                    label: type.label,
-                    selected: _cognitiveType == type,
-                    onPressed: _saving
-                        ? null
-                        : () => setState(() => _cognitiveType = type),
-                  ),
+            const SizedBox(height: 8),
+            if (hasContext) ...[
+              _CreatorContextRecap(request: request),
+              const SizedBox(height: 20),
+            ],
+            Text('Card type', style: theme.typography.emphasized.titleSmall),
+            const SizedBox(height: 8),
+            M3ESegmentedButton<CardCreatorKind>(
+              key: const ValueKey('creator-kind'),
+              segments: const [
+                M3ESegment(value: CardCreatorKind.basic, label: 'Basic'),
+                M3ESegment(value: CardCreatorKind.concept, label: 'Concept'),
               ],
+              selected: {_kind},
+              enabled: !_saving,
+              onSelectionChanged: (values) {
+                if (values.isNotEmpty) {
+                  setState(() => _kind = values.first);
+                }
+              },
             ),
-          ),
-          if (_cognitiveType == CognitiveType.heuristic) ...[
-            const SizedBox(height: 12),
-            TonalBox(
-              key: const ValueKey('creator-heuristic-template'),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Text(
-                'Heuristic template: "Given requirement X with restriction Y, '
-                'what rule applies?" → answer with one atomic rule.',
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  height: 1.45,
+            const SizedBox(height: 16),
+            if (_kind == CardCreatorKind.basic) ...[
+              M3ETextField(
+                key: const ValueKey('creator-front'),
+                controller: _front,
+                label: 'Front',
+                placeholder: 'A short question',
+                minLines: 2,
+                maxLines: 4,
+                isRequired: true,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              M3ETextField(
+                key: const ValueKey('creator-back'),
+                controller: _back,
+                label: 'Back',
+                placeholder: 'One atomic answer',
+                minLines: 2,
+                maxLines: 4,
+                isRequired: true,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'Cognitive type',
+                style: theme.typography.baseline.labelSmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ),
-          ],
-        ] else ...[
-          M3ETextField(
-            key: const ValueKey('creator-term'),
-            controller: _term,
-            label: 'Term',
-            isRequired: true,
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 12),
-          M3ETextField(
-            key: const ValueKey('creator-definition'),
-            controller: _definition,
-            label: 'Definition',
-            minLines: 2,
-            maxLines: 4,
-            isRequired: true,
-            onChanged: (_) => setState(() {}),
-          ),
-        ],
-        const SizedBox(height: 12),
-        _LitmusRow(
-          report: _currentReport,
-          badgeKey: const ValueKey('creator-litmus-current'),
-          detailKey: const ValueKey('creator-litmus-detail-current'),
-        ),
-        const SizedBox(height: 12),
-        M3EButton.tonal(
-          key: const ValueKey('creator-add'),
-          onPressed: _canAdd && !_saving ? _addDraft : null,
-          icon: const Icon(Icons.add_card),
-          label: const Text('Add card'),
-        ),
-        if (_drafts.isNotEmpty) ...[
-          const SizedBox(height: 24),
-          SectionTitle('Cards to save', count: _drafts.length),
-          AppGroup(
-            semanticsLabel: 'Cards waiting to be saved',
-            children: [
-              for (var index = 0; index < _drafts.length; index++)
-                _DraftRow(
-                  key: ValueKey('creator-draft-$index'),
-                  draft: _drafts[index],
-                  onRemove: _saving ? null : () => _removeDraft(index),
+              const SizedBox(height: 6),
+              M3ETheme(
+                data: theme.copyWith(
+                  chipTheme: theme.chipTheme.copyWith(height: 48),
                 ),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final type in const [
+                      CognitiveType.fact,
+                      CognitiveType.heuristic,
+                      CognitiveType.contrast,
+                    ])
+                      M3EChip(
+                        key: ValueKey('creator-type-${type.name}'),
+                        type: M3EChipType.filter,
+                        label: type.label,
+                        selected: _cognitiveType == type,
+                        onPressed: _saving
+                            ? null
+                            : () => setState(() => _cognitiveType = type),
+                      ),
+                  ],
+                ),
+              ),
+              if (_cognitiveType == CognitiveType.heuristic) ...[
+                const SizedBox(height: 12),
+                TonalBox(
+                  key: const ValueKey('creator-heuristic-template'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Text(
+                    'Heuristic template: "Given requirement X with restriction Y, '
+                    'what rule applies?" → answer with one atomic rule.',
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ],
+            ] else ...[
+              M3ETextField(
+                key: const ValueKey('creator-term'),
+                controller: _term,
+                label: 'Term',
+                isRequired: true,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              M3ETextField(
+                key: const ValueKey('creator-definition'),
+                controller: _definition,
+                label: 'Definition',
+                minLines: 2,
+                maxLines: 4,
+                isRequired: true,
+                onChanged: (_) => setState(() {}),
+              ),
+            ],
+            const SizedBox(height: 12),
+            _LitmusRow(
+              report: _currentReport,
+              badgeKey: const ValueKey('creator-litmus-current'),
+              detailKey: const ValueKey('creator-litmus-detail-current'),
+            ),
+            const SizedBox(height: 12),
+            M3EButton.tonal(
+              key: const ValueKey('creator-add'),
+              onPressed: _canAdd && !_saving ? _addDraft : null,
+              icon: const Icon(Icons.add_card),
+              label: const Text('Add card'),
+            ),
+            if (_drafts.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              SectionTitle('Cards to save', count: _drafts.length),
+              AppGroup(
+                semanticsLabel: 'Cards waiting to be saved',
+                children: [
+                  for (var index = 0; index < _drafts.length; index++)
+                    _DraftRow(
+                      key: ValueKey('creator-draft-$index'),
+                      draft: _drafts[index],
+                      onRemove: _saving ? null : () => _removeDraft(index),
+                    ),
+                ],
+              ),
+            ],
+            if (_hasAiContext) ...[
+              const SizedBox(height: 28),
+              SectionTitle(
+                'Suggest with AI',
+                supporting:
+                    'Optional. Write cards by hand above, or let the AI propose '
+                    'some to review.',
+              ),
+              if (!hasKey)
+                TonalBox(
+                  key: const ValueKey('creator-ai-unavailable'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Text(
+                    'AI is optional. Add an API key in Settings to suggest cards; '
+                    'manual cards work without one.',
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                )
+              else ...[
+                if (_aiLoading)
+                  TonalBox(
+                    key: const ValueKey('creator-ai-loading'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 18,
+                    ),
+                    child: Row(
+                      children: [
+                        const M3ELoadingIndicator(),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Text(
+                            'Suggesting cards…',
+                            style: theme.typography.baseline.bodyMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (_aiError != null) ...[
+                  TonalBox(
+                    key: const ValueKey('creator-ai-error'),
+                    color: theme.colorScheme.errorContainer,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _aiError!,
+                          style: theme.typography.baseline.bodyMedium.copyWith(
+                            color: theme.colorScheme.onErrorContainer,
+                            height: 1.4,
+                          ),
+                        ),
+                        if (_aiError!.toLowerCase().contains('settings')) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'Open Settings to add an AI provider and key.',
+                            style: theme.typography.baseline.labelSmall
+                                .copyWith(
+                                  color: theme.colorScheme.onErrorContainer,
+                                ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  M3EButton.tonal(
+                    key: const ValueKey('creator-ai-retry'),
+                    onPressed: _saving ? null : _loadAiSuggestions,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try again'),
+                  ),
+                ] else if (_suggestions == null)
+                  M3EButton.tonal(
+                    key: const ValueKey('creator-ai-suggest'),
+                    onPressed: _saving ? null : _loadAiSuggestions,
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                    label: const Text('Suggest with AI'),
+                  )
+                else if (_suggestions!.isEmpty)
+                  TonalBox(
+                    key: const ValueKey('creator-ai-empty'),
+                    child: Text(
+                      'The AI found no new cards here.',
+                      style: theme.typography.baseline.bodyMedium.copyWith(
+                        height: 1.45,
+                      ),
+                    ),
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var index = 0; index < _suggestions!.length; index++)
+                        _AiSuggestionTile(
+                          key: ValueKey('creator-ai-$index'),
+                          index: index,
+                          suggestion: _suggestions![index],
+                          onChanged: _saving
+                              ? null
+                              : (value) => setState(() {
+                                  _suggestions![index].selected = value;
+                                }),
+                          onTextChanged: () => setState(() {}),
+                        ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          M3EButton.text(
+                            key: const ValueKey('creator-ai-clear'),
+                            onPressed: _saving
+                                ? null
+                                : () => setState(() {
+                                    _retiredSuggestions.addAll(_suggestions!);
+                                    _suggestions = null;
+                                  }),
+                            child: const Text('Clear suggestions'),
+                          ),
+                          M3EButton.filled(
+                            key: const ValueKey('creator-ai-add'),
+                            onPressed:
+                                _saving ||
+                                    _suggestions!.every(
+                                      (item) => !item.selected,
+                                    )
+                                ? null
+                                : _addSelectedSuggestions,
+                            icon: const Icon(Icons.playlist_add),
+                            label: const Text('Add selected to list'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+              ],
+            ],
+            const SizedBox(height: 20),
+            AppPrimaryButton(
+              key: const ValueKey('creator-save'),
+              onPressed: count == 0 || _saving ? null : _save,
+              label: _saving
+                  ? 'Saving…'
+                  : 'Save $count card${count == 1 ? '' : 's'}',
+              icon: Icons.check,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CreatorContextRecap extends StatelessWidget {
+  const _CreatorContextRecap({required this.request});
+
+  final CardCreatorRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final error = request.error;
+    final note = request.note;
+    final topicPills = <Widget>[
+      if (request.topicName.trim().isNotEmpty) Pill(request.topicName),
+      if (request.subtopic.trim().isNotEmpty)
+        Pill(request.subtopic, tone: PillTone.secondary),
+    ];
+
+    final List<Widget> fields;
+    if (error != null) {
+      fields = [
+        _RecapLabel('From this error'),
+        const SizedBox(height: 4),
+        Text(
+          error.question.trim().isEmpty
+              ? request.questionContext.trim()
+              : error.question.trim(),
+          style: theme.typography.baseline.titleSmall.copyWith(height: 1.35),
+        ),
+        const SizedBox(height: 10),
+        _RecapField(
+          label: 'Wrong answer chosen',
+          value: error.wrongAnswer.trim(),
+          valueColor: theme.colorScheme.error,
+        ),
+        const SizedBox(height: 8),
+        _RecapField(label: 'Correct answer', value: error.correctAnswer.trim()),
+        if (error.card.mistakeKinds.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final kind in error.card.mistakeKinds)
+                Pill(kind.label, tone: PillTone.secondary),
             ],
           ),
         ],
-        if (_hasAiContext) ...[
-          const SizedBox(height: 28),
-          SectionTitle(
-            'Suggest with AI',
-            supporting:
-                'Optional. Write cards by hand above, or let the AI propose '
-                'some to review.',
+      ];
+    } else if (note != null) {
+      fields = [
+        _RecapLabel('From this note'),
+        const SizedBox(height: 4),
+        Text(
+          note.text.trim(),
+          style: theme.typography.baseline.titleSmall.copyWith(height: 1.35),
+        ),
+        if (request.questionContext.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _RecapField(
+            label: 'The question',
+            value: request.questionContext.trim(),
           ),
-          if (!hasKey)
-            TonalBox(
-              key: const ValueKey('creator-ai-unavailable'),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Text(
-                'AI is optional. Add an API key in Settings to suggest cards; '
-                'manual cards work without one.',
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.45,
-                ),
-              ),
-            )
-          else ...[
-            if (_aiLoading)
-              TonalBox(
-                key: const ValueKey('creator-ai-loading'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 18,
-                ),
-                child: Row(
-                  children: [
-                    const M3ELoadingIndicator(),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Text(
-                        'Suggesting cards…',
-                        style: theme.typography.baseline.bodyMedium,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else if (_aiError != null) ...[
-              TonalBox(
-                key: const ValueKey('creator-ai-error'),
-                color: theme.colorScheme.errorContainer,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _aiError!,
-                      style: theme.typography.baseline.bodyMedium.copyWith(
-                        color: theme.colorScheme.onErrorContainer,
-                        height: 1.4,
-                      ),
-                    ),
-                    if (_aiError!.toLowerCase().contains('settings')) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        'Open Settings to add an AI provider and key.',
-                        style: theme.typography.baseline.labelSmall.copyWith(
-                          color: theme.colorScheme.onErrorContainer,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              M3EButton.tonal(
-                key: const ValueKey('creator-ai-retry'),
-                onPressed: _saving ? null : _loadAiSuggestions,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Try again'),
-              ),
-            ] else if (_suggestions == null)
-              M3EButton.tonal(
-                key: const ValueKey('creator-ai-suggest'),
-                onPressed: _saving ? null : _loadAiSuggestions,
-                icon: const Icon(Icons.auto_awesome_outlined),
-                label: const Text('Suggest with AI'),
-              )
-            else if (_suggestions!.isEmpty)
-              TonalBox(
-                key: const ValueKey('creator-ai-empty'),
-                child: Text(
-                  'The AI found no new cards here.',
-                  style: theme.typography.baseline.bodyMedium.copyWith(
-                    height: 1.45,
-                  ),
-                ),
-              )
-            else
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (var index = 0; index < _suggestions!.length; index++)
-                    _AiSuggestionTile(
-                      key: ValueKey('creator-ai-$index'),
-                      index: index,
-                      suggestion: _suggestions![index],
-                      onChanged: _saving
-                          ? null
-                          : (value) => setState(() {
-                              _suggestions![index].selected = value;
-                            }),
-                      onTextChanged: () => setState(() {}),
-                    ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      M3EButton.text(
-                        key: const ValueKey('creator-ai-clear'),
-                        onPressed: _saving
-                            ? null
-                            : () => setState(() {
-                                _retiredSuggestions.addAll(_suggestions!);
-                                _suggestions = null;
-                              }),
-                        child: const Text('Clear suggestions'),
-                      ),
-                      M3EButton.filled(
-                        key: const ValueKey('creator-ai-add'),
-                        onPressed:
-                            _saving ||
-                                _suggestions!.every((item) => !item.selected)
-                            ? null
-                            : _addSelectedSuggestions,
-                        icon: const Icon(Icons.playlist_add),
-                        label: const Text('Add selected to list'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-          ],
         ],
-        const SizedBox(height: 24),
+      ];
+    } else if (request.skippedQuestionId != null) {
+      final prompt = request.questionContext.trim().isEmpty
+          ? request.initialFront.trim()
+          : request.questionContext.trim();
+      fields = [
+        _RecapLabel('Skipped question'),
+        const SizedBox(height: 4),
+        Text(
+          prompt,
+          style: theme.typography.baseline.titleSmall.copyWith(height: 1.35),
+        ),
+        if (request.initialBack.trim().isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _RecapField(
+            label: 'Correct answer',
+            value: request.initialBack.trim(),
+          ),
+        ],
+      ];
+    } else {
+      fields = [
+        _RecapLabel('From the question'),
+        const SizedBox(height: 4),
+        Text(
+          request.questionContext.trim(),
+          style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
+        ),
+      ];
+    }
+
+    return TonalBox(
+      key: const ValueKey('creator-context'),
+      padding: const EdgeInsets.all(14),
+      child: Semantics(
+        container: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ...fields,
+            if (topicPills.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Wrap(spacing: 6, runSpacing: 6, children: topicPills),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RecapLabel extends StatelessWidget {
+  const _RecapLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Text(
+      text,
+      style: theme.typography.baseline.labelSmall.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+class _RecapField extends StatelessWidget {
+  const _RecapField({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _RecapLabel(label),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: theme.typography.baseline.bodySmall.copyWith(
+            height: 1.4,
+            fontWeight: FontWeight.w600,
+            color: valueColor,
+          ),
+        ),
       ],
     );
   }

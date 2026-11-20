@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/ui/widgets.dart';
-import '../export/card_creator_page.dart';
+import '../export/card_creator_sheet.dart';
 import 'domain/lookup_service.dart';
 
 /// Opens a sheet that asks the configured AI about the selected passage.

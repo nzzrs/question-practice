@@ -6,7 +6,7 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_card_review_view.dart';
-import '../export/card_creator_page.dart';
+import '../export/card_creator_sheet.dart';
 import '../export/cards_page.dart';
 import 'domain/review_service.dart';
 import 'highlight_review_view.dart';

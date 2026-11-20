@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import '../export/card_creator_page.dart';
+import '../export/card_creator_sheet.dart';
 import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';

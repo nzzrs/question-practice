@@ -107,7 +107,7 @@ class HighlightReviewView extends StatelessWidget {
           TonalBox(
             key: const ValueKey('highlight-card-made'),
             child: Text(
-              'A card was already made from this note. The saved text '
+              'Cards were already made from this note. The saved text '
               'stays in Cards until you delete it.',
               style: theme.typography.baseline.bodySmall.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,

@@ -339,7 +339,7 @@ What is preserved on update:
 - A new question starts with no history.
 - A deleted question loses its attempts, session-question links, error cards and
   skipped-question records through the database cascade. Concept cards, basic
-  cards and highlights that referenced it remain, but their question link is
+  cards and notes that referenced it remain, but their question link is
   cleared. Statistics for its attempts disappear with them.
 - The practice stays in the same topic and keeps its done flag, while the
   practice content hash and import time are refreshed.

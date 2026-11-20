@@ -452,7 +452,7 @@ void main() {
     );
 
     expect(answer, 'It distributes traffic across several backends.');
-    expect(userPrompt, contains('Highlighted passage: load balancer'));
+    expect(userPrompt, contains('Selected passage: load balancer'));
     expect(
       userPrompt,
       contains('Learner question: What does this do in practice?'),
@@ -461,7 +461,7 @@ void main() {
       userPrompt,
       contains('Question context: Which component spreads requests?'),
     );
-    expect(systemPrompt, contains('highlighted passage'));
+    expect(systemPrompt, contains('selected passage'));
     expect(requestBody!.containsKey('response_format'), isFalse);
   });
 
@@ -562,7 +562,7 @@ void main() {
     );
   });
 
-  test('AI card suggestions send the highlight context and parse cards', () async {
+  test('AI card suggestions send the note context and parse cards', () async {
     await useAi();
     String? userPrompt;
     String? systemPrompt;
@@ -606,7 +606,7 @@ void main() {
     expect(
       userPrompt,
       contains(
-        'Highlighted passage: A VPC is a private network owned by the account.',
+        'Selected passage: A VPC is a private network owned by the account.',
       ),
     );
     expect(

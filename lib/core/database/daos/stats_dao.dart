@@ -30,7 +30,6 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         (SELECT COUNT(*) FROM error_cards WHERE status = 'active' AND details_completed_at IS NULL) AS incomplete_error_cards,
         (
           (SELECT COUNT(*) FROM concepts WHERE exported_at IS NULL AND definition <> '')
-          + (SELECT COUNT(*) FROM error_cards WHERE exported_at IS NULL AND details_completed_at IS NOT NULL)
           + (SELECT COUNT(*) FROM manual_cards WHERE exported_at IS NULL)
         ) AS unexported_cards,
         (SELECT id FROM sessions WHERE status = 'inProgress' ORDER BY started_at DESC LIMIT 1) AS in_progress_session_id,

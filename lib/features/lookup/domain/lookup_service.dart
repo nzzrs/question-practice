@@ -218,15 +218,15 @@ class LookupService {
       );
     }
     const systemPrompt =
-        "You answer a learner's question about a highlighted passage in a "
-        'study app. Use the highlighted passage, the question around it and '
+        "You answer a learner's question about a selected passage in a "
+        'study app. Use the selected passage, the question around it and '
         'the topic. Be accurate and concise: at most 90 words, plain text, no '
         'markdown. If the passage does not contain the answer, say so and give '
         'a short, grounded explanation.';
     final userPrompt =
         'Topic: $topicName\n'
         'Question context: $question\n'
-        'Highlighted passage: $passage\n'
+        'Selected passage: $passage\n'
         'Learner question: $ask';
     final content = await _requestAi(
       settings: settings,
@@ -313,7 +313,7 @@ class LookupService {
   }) async {
     final passage = highlight.trim();
     if (passage.isEmpty) {
-      throw const LookupException('Select a highlight first.');
+      throw const LookupException('Select a note first.');
     }
     final settings = await _settings.load();
     final apiKey = await _keyStore.readApiKey();
@@ -323,8 +323,8 @@ class LookupService {
       );
     }
     const systemPrompt =
-        'You turn one saved highlight from a study app into atomic cards with '
-        'a fixed archetype. Use the highlight, the question around it, the '
+        'You turn one saved note from a study app into atomic cards with '
+        'a fixed archetype. Use the note, the question around it, the '
         'topic and the subtopic. Return exactly one JSON object: '
         '{"cards":[{"type":"procedure|heuristic|fact","front":"...",'
         '"back":"..."}]}. Rules: classify every card honestly as procedure '
@@ -332,16 +332,16 @@ class LookupService {
         'or condition-action rule), or fact (one atomic verified fact); each '
         'card tests exactly ONE idea; at most 6 cards; the front is a short, '
         'specific prompt, never a paragraph, and must not restate the whole '
-        'highlight; the back is a concise atomic answer; front and back are at '
+        'note; the back is a concise atomic answer; front and back are at '
         'most 20 words each; do not produce generic definitions, summaries or '
         'essay-like paragraphs; no markdown; only ideas supported by the '
-        'highlight or its context; skip trivial or duplicate cards.';
+        'note or its context; skip trivial or duplicate cards.';
     final context = questionContext.trim();
     final userPrompt = [
       if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
       if (subtopic.trim().isNotEmpty) 'Subtopic: ${subtopic.trim()}',
       if (context.isNotEmpty) 'Question context: $context',
-      'Highlighted passage: $passage',
+      'Selected passage: $passage',
     ].join('\n');
     final cards = await _requestJsonCards(
       settings: settings,

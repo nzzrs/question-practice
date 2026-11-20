@@ -275,7 +275,7 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
       title: ids.length == 1 ? 'Delete session?' : 'Delete sessions?',
       message:
           'Deleting a completed session also removes its answers and any '
-          'cards, highlights and skipped records captured by that session. '
+          'cards, notes and skipped records captured by that session. '
           'This cannot be undone.',
       confirmLabel: 'Delete',
       destructive: true,

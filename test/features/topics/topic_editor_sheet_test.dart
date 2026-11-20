@@ -137,7 +137,7 @@ void main() {
 
       expect(find.text('Edit topic'), findsOneWidget);
       expect(find.byType(M3EDialog), findsNothing);
-      expect(find.byType(OptionTile), findsNWidgets(6));
+      expect(find.byType(OptionTile), findsNWidgets(8));
       expect(_tile('name'), findsOneWidget);
       expect(_tile('description'), findsOneWidget);
       expect(_tile('priority'), findsOneWidget);

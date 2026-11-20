@@ -319,8 +319,12 @@ void main() {
     expect(averageTile.caption, contains('Below minimum'));
     expect(bestTile.caption, contains('On track'));
 
+    // The harness clock is 1 Jan 2026 and the pace needs a fraction of a day,
+    // so the projection rounds up to 2 Jan 2026.
     expect(
-      find.textContaining('you will average the target score'),
+      find.text(
+        'At this rate, you will average the target score by Jan 2, 2026.',
+      ),
       findsOneWidget,
     );
   });

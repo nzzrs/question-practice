@@ -1,4 +1,3 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -6,13 +5,10 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import '../import/domain/import_models.dart';
-import 'domain/topic_edit_service.dart';
 import 'topic_editor_sheet.dart';
-import 'topic_update_preview_page.dart';
 
 /// Actions offered when a topic row is long-pressed.
-enum TopicAction { edit, downloadJson, updateJson, archive, unarchive, delete }
+enum TopicAction { edit, archive, unarchive, delete }
 
 /// Opens the topic options sheet and runs the chosen action.
 Future<void> showTopicActions(
@@ -29,10 +25,6 @@ Future<void> showTopicActions(
   switch (action) {
     case TopicAction.edit:
       await showEditTopicDialog(context, ref, summary.topic);
-    case TopicAction.downloadJson:
-      await _downloadTopicJson(context, ref, summary.topic.id);
-    case TopicAction.updateJson:
-      await _updateTopicFromJson(context, ref, summary.topic.id);
     case TopicAction.archive:
       await ref
           .read(topicRepositoryProvider)
@@ -46,101 +38,6 @@ Future<void> showTopicActions(
     case TopicAction.delete:
       await _deleteTopic(context, ref, summary);
   }
-}
-
-Future<void> _downloadTopicJson(
-  BuildContext context,
-  WidgetRef ref,
-  int topicId,
-) async {
-  try {
-    await ref.read(topicEditServiceProvider).shareTopicJson(topicId);
-  } on Object catch (error) {
-    if (context.mounted) {
-      await showSnack(context, 'Could not export the topic JSON: $error');
-    }
-  }
-}
-
-Future<void> _updateTopicFromJson(
-  BuildContext context,
-  WidgetRef ref,
-  int topicId,
-) async {
-  try {
-    final files = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['json', 'txt'],
-    );
-    if (files.isEmpty || !context.mounted) return;
-    final file = files.single;
-    final bytes = await file.readAsBytes();
-    final preview = await ref
-        .read(topicEditServiceProvider)
-        .previewUpdateBytes(bytes, fileName: file.name, topicId: topicId);
-    if (!context.mounted) return;
-    final applied = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(
-        builder: (context) => TopicUpdatePreviewPage(preview: preview),
-      ),
-    );
-    if (applied == true && context.mounted) {
-      await showSnack(
-        context,
-        'Topic updated: ${preview.newPracticeCount} new and '
-        '${preview.modifiedPracticeCount} changed practices, '
-        '${preview.newQuestionCount} new, '
-        '${preview.modifiedQuestionCount} modified and '
-        '${preview.deletedQuestionCount} deleted questions.',
-      );
-    }
-  } on ImportException catch (error) {
-    if (context.mounted) {
-      await _showIssues(context, error.issues);
-    }
-  } on TopicFileException catch (error) {
-    if (context.mounted) await showSnack(context, error.message);
-  } on Object catch (error) {
-    if (context.mounted) {
-      await showSnack(context, 'Could not read that file: $error');
-    }
-  }
-}
-
-Future<void> _showIssues(BuildContext context, List<ImportIssue> issues) async {
-  await M3EDialog.show<void>(
-    context,
-    dialog: M3EDialog(
-      title: 'Update file rejected',
-      content: SizedBox(
-        width: 520,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '${issues.length} problem${issues.length == 1 ? '' : 's'} '
-                'found. Nothing was changed.',
-              ),
-              const SizedBox(height: 12),
-              for (final issue in issues.take(20))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('${issue.displayPath}: ${issue.message}'),
-                ),
-              if (issues.length > 20) Text('…and ${issues.length - 20} more.'),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        M3EButton.filled(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Close'),
-        ),
-      ],
-    ),
-  );
 }
 
 Future<void> _deleteTopic(
@@ -235,20 +132,8 @@ class TopicOptionsSheet extends StatelessWidget {
               icon: Icons.edit_outlined,
               title: 'Edit topic',
               subtitle:
-                  'Change the name, description, priority, scores or deck',
+                  'Change the name, description, scores, deck or topic JSON',
               onTap: () => Navigator.of(context).pop(TopicAction.edit),
-            ),
-            OptionTile(
-              icon: Icons.download_outlined,
-              title: 'Download topic JSON',
-              subtitle: 'Every practice in this topic',
-              onTap: () => Navigator.of(context).pop(TopicAction.downloadJson),
-            ),
-            OptionTile(
-              icon: Icons.upload_file_outlined,
-              title: 'Update topic JSON',
-              subtitle: 'Add or modify practices and questions from a file',
-              onTap: () => Navigator.of(context).pop(TopicAction.updateJson),
             ),
             OptionTile(
               icon: topic.archived

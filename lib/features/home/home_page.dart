@@ -315,9 +315,13 @@ class _QuickActions extends StatelessWidget {
       value: cards?.toString() ?? '—',
       subtitle: stats == null
           ? 'Concepts, errors, basic cards, skipped and highlights'
-          : cards == 0
+          : cards == 0 && pending == 0
           ? 'Nothing waiting to export'
-          : '$cards cards ready to export',
+          : cards == 0
+          ? '$pending error${pending == 1 ? '' : 's'} to review'
+          : pending == 0
+          ? '$cards cards ready to export'
+          : '$cards cards ready · $pending errors to review',
       badge: pending > 0 ? '$pending pending' : null,
       tone: cards != null && cards > 0 ? PillTone.secondary : PillTone.neutral,
       onPressed: () => Navigator.of(

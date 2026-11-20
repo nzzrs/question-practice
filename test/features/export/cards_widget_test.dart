@@ -197,15 +197,14 @@ void main() {
 
     await tester.tap(find.text('Create cards'));
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
     expect(find.byKey(const ValueKey('creator-front')), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('creator-add')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.text('Save 1 card'));
     await pumpFrames(tester);
     await tester.tap(find.text('Save 1 card'));
     await pumpFrames(tester, frames: 24);
@@ -332,13 +331,10 @@ void main() {
     await tester.ensureVisible(create);
     await tester.tap(create);
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
 
     final suggest = find.byKey(const ValueKey('creator-ai-suggest'));
-    await tester.scrollUntilVisible(
-      suggest,
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(suggest);
     await pumpFrames(tester);
     await tester.tap(suggest);
     await pumpFrames(tester, frames: 24);
@@ -352,13 +348,11 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('creator-ai-add')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
@@ -452,6 +446,7 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('highlight-make-card')));
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
 
     expect(find.byKey(const ValueKey('creator-definition')), findsOneWidget);
     expect(find.byKey(const ValueKey('creator-front')), findsNothing);
@@ -463,7 +458,11 @@ void main() {
       'A private network.',
     );
     await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);

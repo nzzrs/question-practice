@@ -7,7 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import '../export/card_creator_page.dart';
+import '../export/card_creator_sheet.dart';
 import 'highlight_review_view.dart';
 
 /// Reviews saved highlights one at a time.

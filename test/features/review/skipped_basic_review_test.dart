@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:question_practice/features/export/card_creator_page.dart';
+import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/review/review_page.dart';
 
@@ -35,30 +35,27 @@ void main() {
     );
     await pumpFrames(tester);
 
-    await tester.scrollUntilVisible(
+    await tester.ensureVisible(
       find.byKey(const ValueKey('skipped-review-missing')),
-      200,
-      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     expect(find.text('What was missing?'), findsWidgets);
 
     await tester.tap(find.text('Create cards'));
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
 
-    expect(find.byType(CardCreatorPage), findsOneWidget);
+    expect(find.byType(CardCreatorSheet), findsOneWidget);
     expect(find.byKey(const ValueKey('creator-front')), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('creator-add')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     expect(find.text('Save 1 card'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('Save 1 card'));
+    await pumpFrames(tester);
     await tester.tap(find.text('Save 1 card'));
     await pumpFrames(tester, frames: 24);
 

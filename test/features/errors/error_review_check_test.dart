@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/ui/app_sections.dart';
 import 'package:question_practice/features/errors/error_card_review_view.dart';
+import 'package:question_practice/features/export/card_creator_sheet.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -113,6 +114,34 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
 
+    expect(find.byType(CardCreatorSheet), findsOneWidget);
+    expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
+    final context = find.byKey(const ValueKey('creator-context'));
+    expect(
+      find.descendant(of: context, matching: find.text('Wrong answer chosen')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: context, matching: find.text('Wrong 1')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: context, matching: find.text('Correct answer')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: context, matching: find.text('Correct 1')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: context,
+        matching: find.text('Confusion between 2 options'),
+      ),
+      findsOneWidget,
+    );
+    await expandCardCreatorSheet(tester);
+
     await tester.enterText(
       find.byKey(const ValueKey('creator-front')),
       'Which layer owns IP addresses?',
@@ -122,13 +151,11 @@ void main() {
       'The network layer owns addressing.',
     );
     await pumpFrames(tester);
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('creator-add')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
@@ -176,10 +203,9 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
-    await tester.scrollUntilVisible(
+    await expandCardCreatorSheet(tester);
+    await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
-      300,
-      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
@@ -212,11 +238,7 @@ void main() {
       ),
       findsWidgets,
     );
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('creator-ai-add')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);
@@ -253,10 +275,9 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
-    await tester.scrollUntilVisible(
+    await expandCardCreatorSheet(tester);
+    await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
-      300,
-      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
@@ -317,19 +338,14 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
-    await tester.scrollUntilVisible(
+    await expandCardCreatorSheet(tester);
+    await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
-      300,
-      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
     await pumpFrames(tester, frames: 24);
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('creator-ai-add')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);
@@ -374,12 +390,11 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
 
     expect(find.byKey(const ValueKey('creator-ai-suggest')), findsNothing);
-    await tester.scrollUntilVisible(
+    await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-unavailable')),
-      300,
-      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     expect(find.textContaining('Add an API key in Settings'), findsOneWidget);
@@ -411,21 +426,16 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
-    await tester.scrollUntilVisible(
+    await expandCardCreatorSheet(tester);
+    await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
-      300,
-      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
     await pumpFrames(tester, frames: 24);
 
     expect(find.byKey(const ValueKey('creator-ai-error')), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('creator-ai-retry')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-ai-retry')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-retry')));
     await pumpFrames(tester, frames: 24);

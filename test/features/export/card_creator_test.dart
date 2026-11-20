@@ -6,17 +6,19 @@ import 'package:http/testing.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
-import 'package:question_practice/features/export/card_creator_page.dart';
+import 'package:question_practice/features/export/card_creator_sheet.dart';
 
 import '../../helpers/test_harness.dart';
 
 void main() {
+  Future<void> openCreator(WidgetTester tester) async {
+    await tester.tap(find.text('Open creator'));
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
+  }
+
   Future<void> reveal(WidgetTester tester, Finder finder) async {
-    await tester.scrollUntilVisible(
-      finder,
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(finder);
     await pumpFrames(tester);
   }
 
@@ -65,8 +67,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Open creator'));
-    await pumpFrames(tester);
+    await openCreator(tester);
 
     expect(find.byKey(const ValueKey('creator-ai-unavailable')), findsNothing);
     expect(find.text('Save 0 cards'), findsOneWidget);
@@ -79,6 +80,7 @@ void main() {
       find.byKey(const ValueKey('creator-back')),
       'The network layer.',
     );
+    await reveal(tester, find.byKey(const ValueKey('creator-type-fact')));
     await tester.tap(find.byKey(const ValueKey('creator-type-fact')));
     await pumpFrames(tester);
     await reveal(tester, find.byKey(const ValueKey('creator-add')));
@@ -115,6 +117,7 @@ void main() {
     await pumpFrames(tester);
     expect(find.text('Save 1 card'), findsOneWidget);
 
+    await reveal(tester, find.text('Save 1 card'));
     await tester.tap(find.text('Save 1 card'));
     await pumpFrames(tester, frames: 24);
 
@@ -157,9 +160,9 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Open creator'));
-    await pumpFrames(tester);
+    await openCreator(tester);
 
+    await reveal(tester, find.text('Concept'));
     await tester.tap(find.text('Concept'));
     await pumpFrames(tester);
     await tester.enterText(find.byKey(const ValueKey('creator-term')), 'VPC');
@@ -171,6 +174,7 @@ void main() {
     await reveal(tester, find.byKey(const ValueKey('creator-add')));
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
+    await reveal(tester, find.text('Save 1 card'));
     await tester.tap(find.text('Save 1 card'));
     await pumpFrames(tester, frames: 24);
 
@@ -213,9 +217,9 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Open creator'));
-    await pumpFrames(tester);
+    await openCreator(tester);
 
+    await reveal(tester, find.byKey(const ValueKey('creator-type-heuristic')));
     await tester.tap(find.byKey(const ValueKey('creator-type-heuristic')));
     await tester.enterText(
       find.byKey(const ValueKey('creator-front')),
@@ -315,8 +319,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Open creator'));
-    await pumpFrames(tester);
+    await openCreator(tester);
 
     await reveal(tester, find.byKey(const ValueKey('creator-ai-suggest')));
     await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
@@ -332,6 +335,7 @@ void main() {
     );
     await pumpFrames(tester);
 
+    await reveal(tester, find.byKey(const ValueKey('creator-ai-select-0')));
     await tester.tap(find.byKey(const ValueKey('creator-ai-select-0')));
     await pumpFrames(tester);
     await reveal(tester, find.byKey(const ValueKey('creator-ai-add')));
@@ -339,6 +343,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Save 1 card'), findsOneWidget);
+    await reveal(tester, find.text('Save 1 card'));
     await tester.tap(find.text('Save 1 card'));
     await pumpFrames(tester, frames: 24);
 

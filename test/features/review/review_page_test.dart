@@ -301,19 +301,14 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
-    await tester.scrollUntilVisible(
+    await expandCardCreatorSheet(tester);
+    await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
-      300,
-      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
     await pumpFrames(tester, frames: 24);
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('creator-ai-add')),
-      300,
-      scrollable: find.byType(Scrollable).first,
-    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);

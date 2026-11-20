@@ -212,6 +212,17 @@ Future<void> pumpFrames(WidgetTester tester, {int frames = 12}) async {
   }
 }
 
+/// Expands the card creator sheet from its collapsed starting height.
+///
+/// The creator opens at half height so the review behind it stays readable.
+/// A drag on the handle gives the content its full height for interactions.
+Future<void> expandCardCreatorSheet(WidgetTester tester) async {
+  final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+  final start = Offset(size.width / 2, size.height / 2 + 20);
+  await tester.dragFrom(start, Offset(0, -(size.height * 0.55)));
+  await pumpFrames(tester);
+}
+
 Future<void> pumpTestApp(
   WidgetTester tester, {
   required Widget home,

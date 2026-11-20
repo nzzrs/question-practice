@@ -352,8 +352,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               'Error and skipped',
               count: errors.length + skipped.length,
               supporting:
-                  'Errors are reviewed into atomic cards. Skipped questions '
-                  'stay here until converted.',
+                  'Create cards turns errors and skipped answers into atomic '
+                  'cards, by hand or with optional AI suggestions.',
               trailing: _SelectAllButton(
                 allSelected: allReviewSelected,
                 onPressed: () => setState(() {
@@ -490,8 +490,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             SectionTitle(
               'Notes',
               count: highlights.length,
-              supporting:
-                  'Plain text only. Notes are never sent to AnkiDroid.',
+              supporting: 'Plain text only. Notes are never sent to AnkiDroid.',
               trailing: M3EButton.text(
                 onPressed: _busy ? null : () => _downloadHighlights(highlights),
                 child: const Row(
@@ -573,8 +572,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           'become Anki Basic cards with a front and a back. '
           'Cards are tagged topic::<topic> and subtopic::<subtopic> when a '
           'subtopic exists. '
-          'Errors are not exported directly: review them into atomic cards '
-          'first. Skipped questions stay in Cards until you convert them. '
+          'Errors are not exported directly: Create cards turns them into '
+          'atomic cards, by hand or with optional AI suggestions. Skipped '
+          'questions stay in Cards until you create cards from them. '
           'Notes are never sent to AnkiDroid; use Download all in the '
           'Notes section to save them as plain text. '
           'Each topic uses its own deck; topics without one use the default '

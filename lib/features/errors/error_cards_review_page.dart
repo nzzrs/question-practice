@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import '../export/new_card_dialog.dart';
+import '../export/card_creator_page.dart';
 import 'error_card_review_view.dart';
 import '../review/skipped_question_view.dart';
 
@@ -89,44 +89,26 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
     _advance();
   }
 
-  Future<void> _makeSkippedCard(_SkippedStep step) async {
+  Future<void> _createSkippedCards(_SkippedStep step) async {
+    if (_busy) return;
     final question = step.question;
-    final draft = await showNewCardDialog(
-      context,
-      title: 'Turn this skipped question into a card',
-      contextText: question.question,
-      initialTerm: '',
-      initialQuestion: question.question,
-      initialAnswer: question.correctAnswer,
-      initialKind: NewCardKind.basic,
-    );
-    if (draft == null || !mounted) return;
     setState(() => _busy = true);
     try {
-      final service = ref.read(reviewServiceProvider);
-      if (draft.kind == NewCardKind.concept) {
-        await service.createConcept(
+      final created = await showCardCreator(
+        context,
+        request: CardCreatorRequest(
+          title: 'Create cards',
           sessionId: question.sessionId,
           questionId: question.questionId,
-          term: draft.term,
-          definition: draft.definition,
-          context: question.question,
+          questionContext: question.question,
           topicName: question.topicName,
-          source: ConceptSource.manual,
+          initialFront: question.question,
+          initialBack: question.correctAnswer,
           skippedQuestionId: question.id,
-        );
-      } else {
-        await service.createBasicCard(
-          sessionId: question.sessionId,
-          questionId: question.questionId,
-          question: draft.question,
-          answer: draft.answer,
-          context: question.question,
-          topicName: question.topicName,
-          skippedQuestionId: question.id,
-        );
-      }
-      _saved++;
+        ),
+      );
+      if (!mounted || created == 0) return;
+      _saved += created;
       _advance();
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -219,15 +201,15 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
                           case _ErrorStep():
                             _advance();
                           case _SkippedStep():
-                            _makeSkippedCard(step);
+                            _createSkippedCards(step);
                         }
                       },
                 label: _busy
                     ? 'Saving…'
                     : isSkipped
-                    ? 'Make a card'
+                    ? 'Create cards'
                     : 'Continue',
-                icon: isSkipped ? Icons.style_outlined : Icons.arrow_forward,
+                icon: isSkipped ? Icons.add_card : Icons.arrow_forward,
               ),
             ),
             const SizedBox(width: 8),
@@ -278,11 +260,26 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
                 unknown: question.unknown,
               ),
               const SizedBox(height: 18),
-              Text(
-                'Make a concept or basic card, or skip to leave it in the queue.',
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.4,
+              TonalBox(
+                key: const ValueKey('skipped-review-missing'),
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'What was missing?',
+                      style: theme.typography.emphasized.titleSmall,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Create cards from the right answer, or skip to leave '
+                      'it in the queue.',
+                      style: theme.typography.baseline.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

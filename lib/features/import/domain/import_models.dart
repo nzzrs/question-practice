@@ -27,12 +27,36 @@ class ImportTopic {
     required this.description,
     required this.priority,
     required this.practices,
+    this.hasDescription = true,
+    this.hasPriority = true,
+    this.hasMinimumScore = true,
+    this.hasTargetScore = true,
+    this.minimumScore = 70,
+    this.targetScore = 80,
   });
 
   final String name;
   final String description;
   final int? priority;
   final List<ImportPractice> practices;
+
+  /// Whether the file named `description`, as opposed to omitting it.
+  final bool hasDescription;
+
+  /// Whether the file named `priority`, as opposed to omitting it.
+  final bool hasPriority;
+
+  /// Whether the file named an integer `minimumScore`.
+  final bool hasMinimumScore;
+
+  /// Whether the file named an integer `targetScore`.
+  final bool hasTargetScore;
+
+  /// Percentage below which a score counts as failing the topic.
+  final int minimumScore;
+
+  /// Percentage at which a score counts as meeting the topic goal.
+  final int targetScore;
 }
 
 class ImportPractice {

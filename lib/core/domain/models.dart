@@ -221,6 +221,33 @@ class QuestionDraft {
   final String sourceId;
 }
 
+/// One practice from a topic update file and how it maps to stored rows.
+@immutable
+class TopicPracticeUpdate {
+  const TopicPracticeUpdate({
+    required this.name,
+    required this.description,
+    required this.questions,
+    required this.deletedQuestionIds,
+    required this.contentHash,
+    this.existingPracticeId,
+    this.changed = true,
+  });
+
+  /// The stored practice this row updates, or null for a new practice.
+  final int? existingPracticeId;
+  final String name;
+  final String description;
+  final List<PracticeQuestionUpdate> questions;
+  final List<int> deletedQuestionIds;
+  final String contentHash;
+
+  /// Whether an existing practice needs any write; new practices always do.
+  final bool changed;
+
+  bool get isNew => existingPracticeId == null;
+}
+
 /// One question from an update file, at its new position in the practice.
 @immutable
 class PracticeQuestionUpdate {

@@ -74,6 +74,7 @@ void main() {
     TestHarness harness,
     Question question, {
     String text = 'managed service',
+    String subtopic = '',
   }) {
     return harness.cards.createHighlight(
       sessionId: null,
@@ -82,6 +83,7 @@ void main() {
       context: question.prompt,
       topicName: 'Topic',
       practiceName: 'Practice',
+      subtopic: subtopic,
       createdAt: harness.clock.now().toUtc(),
     );
   }
@@ -99,14 +101,22 @@ void main() {
     );
   }
 
-  Future<int> seedBasic(TestHarness harness, Question question) {
+  Future<int> seedBasic(
+    TestHarness harness,
+    Question question, {
+    String questionText = 'What is a VPC?',
+    CognitiveType cognitiveType = CognitiveType.fact,
+    String subtopic = '',
+  }) {
     return harness.cards.createManualCard(
       sessionId: null,
       questionId: question.id,
-      question: 'What is a VPC?',
+      question: questionText,
       answer: 'A private network.',
       context: question.prompt,
       topicName: 'Topic',
+      cognitiveType: cognitiveType,
+      subtopic: subtopic,
       createdAt: harness.clock.now().toUtc(),
     );
   }
@@ -249,7 +259,7 @@ void main() {
     expect(find.text('Review highlights'), findsOneWidget);
   });
 
-  testWidgets('AI suggests atomic cards from a highlight and adds them', (
+  testWidgets('AI suggests grouped atomic cards and saves their type', (
     tester,
   ) async {
     final client = MockClient(
@@ -260,8 +270,21 @@ void main() {
               'message': {
                 'content': jsonEncode({
                   'cards': [
-                    {'front': 'What is a VPC?', 'back': 'A private network'},
-                    {'front': 'Who owns it?', 'back': 'The account owner'},
+                    {
+                      'type': 'heuristic',
+                      'front': 'Given a VPC with a private subnet, what rule applies?',
+                      'back': 'Traffic stays inside the VPC.',
+                    },
+                    {
+                      'type': 'fact',
+                      'front': 'What is a VPC?',
+                      'back': 'A private network',
+                    },
+                    {
+                      'type': 'fact',
+                      'front': 'Is a VPC public?',
+                      'back': 'No, it is private.',
+                    },
                   ],
                 }),
               },
@@ -287,6 +310,7 @@ void main() {
       harness,
       question,
       text: 'A VPC is a private network owned by the account.',
+      subtopic: 'Networking',
     );
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
@@ -302,29 +326,49 @@ void main() {
     await pumpFrames(tester, frames: 24);
 
     expect(find.text('Suggested cards with AI'), findsOneWidget);
-    expect(find.text('What is a VPC?'), findsOneWidget);
-    expect(find.text('Who owns it?'), findsOneWidget);
-    expect(find.text('Add 2 cards'), findsOneWidget);
+    expect(find.text('Procedures & rules'), findsOneWidget);
+    expect(find.text('Atomic facts'), findsOneWidget);
+    expect(find.text('Heuristic'), findsOneWidget);
+    expect(find.text('Fact'), findsNWidgets(2));
+    expect(find.text('Ready'), findsNWidgets(2));
+    expect(
+      find.textContaining('Can be answered with yes or no'),
+      findsOneWidget,
+    );
+    expect(find.text('Add 3 cards'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Add 2 cards'));
-    await tester.tap(find.text('Add 2 cards'));
+    await tester.ensureVisible(find.text('Add 3 cards'));
+    await tester.tap(find.text('Add 3 cards'));
     await pumpFrames(tester, frames: 24);
 
     final manuals = await tester.runAsync(
       () => harness.cards.watchManualCards().first,
     );
-    expect(manuals, hasLength(2));
+    expect(manuals, hasLength(3));
     expect(
       manuals!.map((card) => card.question),
-      containsAll(['What is a VPC?', 'Who owns it?']),
+      containsAll([
+        'Given a VPC with a private subnet, what rule applies?',
+        'What is a VPC?',
+        'Is a VPC public?',
+      ]),
     );
+    expect(
+      manuals.map((card) => card.cognitiveType),
+      containsAll([CognitiveType.heuristic, CognitiveType.fact]),
+    );
+    expect(
+      manuals.where((card) => card.cognitiveType == CognitiveType.heuristic),
+      hasLength(1),
+    );
+    expect(manuals.every((card) => card.subtopic == 'Networking'), isTrue);
     expect(manuals.first.context, question.prompt);
     final highlights = await tester.runAsync(
       () => harness.cards.watchHighlights().first,
     );
     expect(highlights!.single.hasCard, isTrue);
     expect(
-      find.textContaining('2 cards added from the highlight'),
+      find.textContaining('3 cards added from the highlight'),
       findsOneWidget,
     );
   });
@@ -352,7 +396,7 @@ void main() {
     expect(find.text('managed service'), findsOneWidget);
     expect(find.text('From the question'), findsOneWidget);
     expect(find.text('Suggest cards with AI'), findsOneWidget);
-    expect(find.text('Turn into a card'), findsOneWidget);
+    expect(find.text('Make concept card'), findsOneWidget);
     expect(find.text('Keep for later'), findsOneWidget);
     expect(find.text('Keep & done'), findsOneWidget);
     expect(find.text('Delete highlight'), findsOneWidget);
@@ -369,6 +413,152 @@ void main() {
     expect(find.text('Review the highlight'), findsOneWidget);
   });
 
+  testWidgets('highlight card action offers only a concept card', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final highlightId = await seedHighlight(
+      harness,
+      question,
+      subtopic: 'Networking',
+    );
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    final row = find.byKey(ValueKey('highlight-row-$highlightId'));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await pumpFrames(tester);
+
+    await tester.tap(find.byKey(const ValueKey('highlight-make-card')));
+    await pumpFrames(tester);
+
+    expect(find.text('Turn the highlight into a concept card'), findsOneWidget);
+    expect(find.byKey(const ValueKey('new-card-definition')), findsOneWidget);
+    expect(find.byKey(const ValueKey('new-card-question')), findsNothing);
+    expect(find.text('Basic card'), findsNothing);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('new-card-definition')),
+      'A private network.',
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.text('Create'));
+    await pumpFrames(tester, frames: 24);
+
+    final concepts = await tester.runAsync(
+      () => harness.cards.watchConcepts().first,
+    );
+    expect(concepts, hasLength(1));
+    expect(concepts!.single.term, 'managed service');
+    expect(concepts.single.subtopic, 'Networking');
+    final manuals = await tester.runAsync(
+      () => harness.cards.watchManualCards().first,
+    );
+    expect(manuals, isEmpty);
+    final highlights = await tester.runAsync(
+      () => harness.cards.watchHighlights().first,
+    );
+    expect(highlights!.single.hasCard, isTrue);
+  });
+
+  testWidgets('cognitive filters show only matching card types', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final factId = await seedBasic(
+      harness,
+      question,
+      questionText: 'Fact card',
+      cognitiveType: CognitiveType.fact,
+    );
+    final heuristicId = await seedBasic(
+      harness,
+      question,
+      questionText: 'Heuristic card',
+      cognitiveType: CognitiveType.heuristic,
+    );
+    final contrastId = await seedBasic(
+      harness,
+      question,
+      questionText: 'Contrast card',
+      cognitiveType: CognitiveType.contrast,
+    );
+    final conceptId = await seedConcept(harness, question);
+    final errorId = await seedError(harness, question, complete: true);
+    final skippedId = await seedSkipped(harness, question);
+    final highlightId = await seedHighlight(harness, question);
+
+    Future<void> choose(String filter) async {
+      await tester.tap(find.byKey(ValueKey('cards-filter-$filter')));
+      await pumpFrames(tester);
+    }
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+
+    expect(find.byKey(ValueKey('basic-row-$factId')), findsOneWidget);
+    expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsOneWidget);
+    expect(find.byKey(ValueKey('basic-row-$contrastId')), findsOneWidget);
+    expect(find.byKey(ValueKey('concept-row-$conceptId')), findsOneWidget);
+    expect(find.byKey(ValueKey('error-row-$errorId')), findsOneWidget);
+    expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsOneWidget);
+    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsOneWidget);
+
+    await choose('facts');
+    expect(find.byKey(ValueKey('basic-row-$factId')), findsOneWidget);
+    expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsNothing);
+    expect(find.byKey(ValueKey('basic-row-$contrastId')), findsNothing);
+    expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
+    expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
+    expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsNothing);
+    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsNothing);
+
+    await choose('heuristics');
+    expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsOneWidget);
+    expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
+
+    await choose('contrasts');
+    expect(find.byKey(ValueKey('basic-row-$contrastId')), findsOneWidget);
+    expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
+
+    await choose('concepts');
+    expect(find.byKey(ValueKey('concept-row-$conceptId')), findsOneWidget);
+    expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
+    expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsNothing);
+    expect(find.byKey(ValueKey('basic-row-$contrastId')), findsNothing);
+    expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
+    expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsNothing);
+    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsNothing);
+
+    await choose('errors');
+    expect(find.byKey(ValueKey('error-row-$errorId')), findsOneWidget);
+    expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsOneWidget);
+    expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
+    expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
+
+    await choose('highlights');
+    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsOneWidget);
+    expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
+    expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
+
+    await choose('all');
+    expect(find.byKey(ValueKey('basic-row-$factId')), findsOneWidget);
+    expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsOneWidget);
+    expect(find.byKey(ValueKey('basic-row-$contrastId')), findsOneWidget);
+    expect(find.byKey(ValueKey('concept-row-$conceptId')), findsOneWidget);
+    expect(find.byKey(ValueKey('error-row-$errorId')), findsOneWidget);
+    expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsOneWidget);
+    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsOneWidget);
+  });
+
   testWidgets('long-press selects a concept row', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
@@ -383,7 +573,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
-    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
 
@@ -401,7 +591,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
-    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.text('1 selected · review to export'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
 
@@ -419,7 +609,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
-    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
 
@@ -437,7 +627,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
-    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.text('1 selected · review to export'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
 
@@ -455,7 +645,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
-    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.text('1 selected · review to export'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
     expect(find.text('Review the highlight'), findsNothing);
   });
@@ -477,7 +667,7 @@ void main() {
     await tester.longPress(row);
     await pumpFrames(tester);
 
-    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.text('1 selected · review to export'), findsOneWidget);
     final export = tester.widget<AppPrimaryButton>(
       find.widgetWithText(AppPrimaryButton, 'Export to AnkiDroid'),
     );
@@ -556,7 +746,7 @@ void main() {
     await tester.tap(second);
     await pumpFrames(tester);
 
-    expect(find.text('2 cards selected'), findsOneWidget);
+    expect(find.text('2 selected · review to export'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.delete_outline));
     await pumpFrames(tester);
@@ -594,11 +784,11 @@ void main() {
     await tester.longPress(first);
     await pumpFrames(tester);
     expect(tester.getTopLeft(first).dy, before);
-    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.text('1 selected · review to export'), findsOneWidget);
 
     await tester.tap(second);
     await pumpFrames(tester);
-    expect(find.text('2 cards selected'), findsOneWidget);
+    expect(find.text('2 selected · review to export'), findsOneWidget);
     expect(tester.getTopLeft(first).dy, before);
     expect(tester.getTopLeft(second).dy, greaterThan(before));
   });

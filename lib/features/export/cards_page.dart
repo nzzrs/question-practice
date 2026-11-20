@@ -13,7 +13,7 @@ import '../review/highlight_review_page.dart';
 import '../review/skipped_question_view.dart';
 import 'domain/anki_note_builder.dart';
 
-enum _Filter { all, concepts, review, basic, highlights }
+enum _Filter { all, facts, heuristics, contrasts, concepts, errors, highlights }
 
 class CardsPage extends ConsumerStatefulWidget {
   const CardsPage({super.key});
@@ -91,15 +91,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
   ExportSelection _selection({
     required List<Concept> concepts,
-    required List<ErrorCard> errors,
     required List<ManualCard> manuals,
   }) {
     return ExportSelection(
       concepts: concepts
           .where((item) => _selectedConcepts.contains(item.id))
-          .toList(),
-      errorCards: errors
-          .where((item) => _selectedErrors.contains(item.id))
           .toList(),
       manualCards: manuals
           .where((item) => _selectedBasic.contains(item.id))
@@ -145,6 +141,21 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         ? allManuals
         : allManuals.where((item) => item.exportedAt == null).toList();
 
+    final showConcepts = _filter == _Filter.all || _filter == _Filter.concepts;
+    final showErrors = _filter == _Filter.all || _filter == _Filter.errors;
+    final showHighlights =
+        _filter == _Filter.all || _filter == _Filter.highlights;
+    final manualType = switch (_filter) {
+      _Filter.facts => CognitiveType.fact,
+      _Filter.heuristics => CognitiveType.heuristic,
+      _Filter.contrasts => CognitiveType.contrast,
+      _ => null,
+    };
+    final showManuals = _filter == _Filter.all || manualType != null;
+    final visibleManuals = manualType == null
+        ? manuals
+        : manuals.where((item) => item.cognitiveType == manualType).toList();
+
     if (!_initialized &&
         conceptsAsync.hasValue &&
         errorsAsync.hasValue &&
@@ -165,11 +176,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       );
     }
 
-    final selection = _selection(
-      concepts: concepts,
-      errors: errors,
-      manuals: manuals,
-    );
+    final selection = _selection(concepts: concepts, manuals: manuals);
     final loading =
         conceptsAsync.isLoading ||
         errorsAsync.isLoading ||
@@ -191,19 +198,33 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final allReviewSelected =
         selectableErrors.every((card) => _selectedErrors.contains(card.id)) &&
         skipped.every((question) => _selectedSkipped.contains(question.id));
-    final hasIncompleteSelected = selectedErrorCards.any(
-      (card) => card.needsDetails,
-    );
     final hasReviewSelection =
         selectedErrorCards.isNotEmpty || selectedSkipped.isNotEmpty;
     final selectedCount =
-        selection.total + selectedSkipped.length + selectedHighlights.length;
+        selection.total +
+        selectedErrorCards.length +
+        selectedSkipped.length +
+        selectedHighlights.length;
+    final hasVisibleRows =
+        (showConcepts && concepts.isNotEmpty) ||
+        (showErrors && (errors.isNotEmpty || skipped.isNotEmpty)) ||
+        (showManuals && visibleManuals.isNotEmpty) ||
+        (showHighlights && highlights.isNotEmpty);
+    final hasAnyRows =
+        concepts.isNotEmpty ||
+        errors.isNotEmpty ||
+        manuals.isNotEmpty ||
+        skipped.isNotEmpty ||
+        highlights.isNotEmpty;
+    final subtitle = selectedCount == 0
+        ? 'Ready for AnkiDroid'
+        : selection.total == 0
+        ? '$selectedCount selected · review to export'
+        : '$selectedCount selected';
 
     return AppPage(
       title: 'Cards',
-      subtitle: selectedCount == 0
-          ? 'Ready for AnkiDroid'
-          : '$selectedCount card${selectedCount == 1 ? '' : 's'} selected',
+      subtitle: subtitle,
       showBack: true,
       actions: [
         if (_selectionActive)
@@ -226,8 +247,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           children: [
             Expanded(
               child: AppPrimaryButton(
-                onPressed:
-                    _busy || selection.total == 0 || hasIncompleteSelected
+                onPressed: _busy || selection.total == 0
                     ? null
                     : () => _export(selection),
                 label: _busy ? 'Exporting…' : 'Export to AnkiDroid',
@@ -238,7 +258,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             AppDockIconButton(
               icon: Icons.ios_share,
               tooltip: 'Share as files',
-              onPressed: _busy || selection.total == 0 || hasIncompleteSelected
+              onPressed: _busy || selection.total == 0
                   ? null
                   : () => _share(selection),
             ),
@@ -270,11 +290,12 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             child: Center(child: M3ELoadingIndicator()),
           )
         else ...[
-          if ((_filter == _Filter.all || _filter == _Filter.concepts) &&
-              concepts.isNotEmpty) ...[
+          if (showConcepts && concepts.isNotEmpty) ...[
             SectionTitle(
               'Concepts',
               count: concepts.length,
+              supporting:
+                  'Anki Cloze · tags topic::<slug> and subtopic::<slug>',
               trailing: _SelectAllButton(
                 allSelected: concepts
                     .where(
@@ -326,11 +347,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             const SizedBox(height: 28),
           ],
-          if ((_filter == _Filter.all || _filter == _Filter.review) &&
-              (errors.isNotEmpty || skipped.isNotEmpty)) ...[
+          if (showErrors && (errors.isNotEmpty || skipped.isNotEmpty)) ...[
             SectionTitle(
               'Error and skipped',
               count: errors.length + skipped.length,
+              supporting:
+                  'Errors are reviewed into atomic cards. Skipped questions '
+                  'stay here until converted.',
               trailing: _SelectAllButton(
                 allSelected: allReviewSelected,
                 onPressed: () => setState(() {
@@ -414,17 +437,19 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             const SizedBox(height: 28),
           ],
-          if ((_filter == _Filter.all || _filter == _Filter.basic) &&
-              manuals.isNotEmpty) ...[
+          if (showManuals && visibleManuals.isNotEmpty) ...[
             SectionTitle(
               'Basic cards',
-              count: manuals.length,
+              count: visibleManuals.length,
+              supporting:
+                  'Anki Basic · front and back · tags topic::<slug> and '
+                  'subtopic::<slug>',
               trailing: _SelectAllButton(
-                allSelected: manuals
+                allSelected: visibleManuals
                     .where((item) => item.exportedAt == null)
                     .every((item) => _selectedBasic.contains(item.id)),
                 onPressed: () => setState(() {
-                  final selectable = manuals
+                  final selectable = visibleManuals
                       .where((item) => item.exportedAt == null)
                       .map((item) => item.id);
                   if (selectable.every(_selectedBasic.contains)) {
@@ -439,7 +464,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             AppGroup(
               children: [
-                for (final card in manuals)
+                for (final card in visibleManuals)
                   _ManualRow(
                     key: ValueKey('basic-row-${card.id}'),
                     card: card,
@@ -461,8 +486,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             const SizedBox(height: 28),
           ],
-          if ((_filter == _Filter.all || _filter == _Filter.highlights) &&
-              highlights.isNotEmpty) ...[
+          if (showHighlights && highlights.isNotEmpty) ...[
             SectionTitle(
               'Highlights',
               count: highlights.length,
@@ -515,16 +539,19 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             const SizedBox(height: 28),
           ],
-          if (!loading &&
-              concepts.isEmpty &&
-              errors.isEmpty &&
-              manuals.isEmpty &&
-              skipped.isEmpty &&
-              highlights.isEmpty)
+          if (!loading && !hasAnyRows)
             const EmptyState(
               icon: Icons.style_outlined,
               title: 'No cards to export',
-              message: 'Review a session to create error cards, or define a term to save a concept.',
+              message:
+                  'Review a session to turn errors and skipped questions into '
+                  'cards, or define a term to save a concept.',
+            )
+          else if (!loading && !hasVisibleRows)
+            const EmptyState(
+              icon: Icons.filter_alt_off_outlined,
+              title: 'Nothing in this view',
+              message: 'Choose All to see every card again.',
             ),
           if (loading)
             const Padding(
@@ -542,10 +569,16 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       dialog: M3EDialog(
         title: 'What goes to Anki',
         content: const Text(
-          'Concepts become cloze cards, error cards have six fields, and basic cards are front/back. '
-          'Skipped questions stay here until you make a card from them. '
-          'Highlights are never sent to AnkiDroid; use Download all in the Highlights section to save them as plain text. '
-          'Each topic uses its own deck; topics without one use the default deck from Settings.',
+          'Concepts become Anki Cloze cards. Facts, heuristics and contrasts '
+          'become Anki Basic cards with a front and a back. '
+          'Cards are tagged topic::<topic> and subtopic::<subtopic> when a '
+          'subtopic exists. '
+          'Errors are not exported directly: review them into atomic cards '
+          'first. Skipped questions stay in Cards until you convert them. '
+          'Highlights are never sent to AnkiDroid; use Download all in the '
+          'Highlights section to save them as plain text. '
+          'Each topic uses its own deck; topics without one use the default '
+          'deck from Settings.',
         ),
         actions: [
           M3EButton.filled(
@@ -589,7 +622,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       if (mounted) {
         await _statusDialog(
           title: 'Cloze note type missing',
-          message: 'AnkiDroid has no Cloze note type. Create one in AnkiDroid, then retry. Error and basic note types are created automatically.',
+          message: 'AnkiDroid has no Cloze note type. Create one in AnkiDroid, then retry. The Basic note type is created automatically.',
         );
       }
       return;
@@ -631,7 +664,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       context,
       title: 'Delete selected cards?',
       message:
-          'Concepts and basic cards are removed permanently. Deleting an '
+          'Concepts, facts, heuristics and contrasts are removed permanently. Deleting an '
           'active error card also removes it from the 48-hour review queue. '
           'Skipped questions are removed from the skipped queue; their '
           'questions stay in the practice. Highlights are removed from this '
@@ -729,6 +762,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       practiceName: card.practiceName,
       sessionId: card.sessionId,
       questionId: card.questionId,
+      subtopic: card.subtopic,
       anchor: anchor,
     );
   }
@@ -736,7 +770,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   Future<void> _previewConcept(Concept concept) {
     return _previewDialog('Concept preview', [
       _previewMeta([
+        const Pill('Concept', tone: PillTone.primary),
         Pill(concept.topicName),
+        if (concept.subtopic.trim().isNotEmpty)
+          Pill('subtopic: ${concept.subtopic.trim()}'),
         Pill(
           'deck: ${_deckForTopic(concept.topicName)}',
           tone: PillTone.primary,
@@ -916,9 +953,12 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   }
 
   Future<void> _previewManual(ManualCard card) {
-    return _previewDialog('Basic card preview', [
+    return _previewDialog('Card preview', [
       _previewMeta([
+        Pill(card.cognitiveType.label, tone: PillTone.secondary),
         Pill(card.topicName),
+        if (card.subtopic.trim().isNotEmpty)
+          Pill('subtopic: ${card.subtopic.trim()}'),
         Pill('deck: ${_deckForTopic(card.topicName)}', tone: PillTone.primary),
       ]),
       const SizedBox(height: 14),
@@ -1032,19 +1072,23 @@ class _FilterBar extends StatelessWidget {
       runSpacing: 8,
       children: [
         for (final entry in const [
-          (_Filter.all, 'All'),
-          (_Filter.concepts, 'Concepts'),
-          (_Filter.review, 'Errors & skipped'),
-          (_Filter.basic, 'Basic'),
-          (_Filter.highlights, 'Highlights'),
+          (_Filter.all, 'All', 'all'),
+          (_Filter.facts, 'Facts', 'facts'),
+          (_Filter.heuristics, 'Heuristics', 'heuristics'),
+          (_Filter.contrasts, 'Contrasts', 'contrasts'),
+          (_Filter.concepts, 'Concepts', 'concepts'),
+          (_Filter.errors, 'Errors & skipped', 'errors'),
+          (_Filter.highlights, 'Highlights', 'highlights'),
         ])
           M3EChip(
+            key: ValueKey('cards-filter-${entry.$3}'),
             type: M3EChipType.filter,
             label: entry.$2,
             selected: filter == entry.$1,
             onPressed: () => onFilter(entry.$1),
           ),
         M3EChip(
+          key: const ValueKey('cards-filter-show-exported'),
           type: M3EChipType.filter,
           label: showExported ? 'Hide exported' : 'Show exported',
           selected: showExported,
@@ -1210,7 +1254,10 @@ class _ConceptRow extends StatelessWidget {
             spacing: 6,
             runSpacing: 4,
             children: [
+              const Pill('Concept', tone: PillTone.primary),
               Pill(concept.topicName),
+              if (concept.subtopic.trim().isNotEmpty)
+                Pill('subtopic: ${concept.subtopic.trim()}'),
               Pill('deck: $deckName'),
               if (concept.exportedAt != null)
                 const Pill('Exported', tone: PillTone.success),
@@ -1341,7 +1388,10 @@ class _ManualRow extends StatelessWidget {
             spacing: 6,
             runSpacing: 4,
             children: [
+              Pill(card.cognitiveType.label, tone: PillTone.secondary),
               Pill(card.topicName),
+              if (card.subtopic.trim().isNotEmpty)
+                Pill('subtopic: ${card.subtopic.trim()}'),
               Pill('deck: $deckName'),
               if (card.exportedAt != null) const Pill('Exported'),
             ],

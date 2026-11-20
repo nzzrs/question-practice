@@ -8,6 +8,12 @@ class Topics extends Table {
   IntColumn get priority => integer().nullable()();
   TextColumn get ankiDeck => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+
+  /// Percentage below which a score counts as failing this topic.
+  IntColumn get minimumScore => integer().withDefault(const Constant(70))();
+
+  /// Percentage at which a score counts as meeting the topic goal.
+  IntColumn get targetScore => integer().withDefault(const Constant(80))();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
 }
 
@@ -88,6 +94,9 @@ class Attempts extends Table {
   TextColumn get reasoning => text().withDefault(const Constant(''))();
   BoolColumn get distracted => boolean().withDefault(const Constant(false))();
   BoolColumn get unknown => boolean().withDefault(const Constant(false))();
+
+  /// Quick classifications chosen after a wrong answer.
+  TextColumn get mistakeKindsJson => text().withDefault(const Constant('[]'))();
   BoolColumn get isCorrect => boolean()();
   DateTimeColumn get answeredAt => dateTime()();
 
@@ -117,6 +126,9 @@ class Concepts extends Table {
   TextColumn get extra => text().withDefault(const Constant(''))();
   TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
+
+  /// Optional grouping inside the topic, copied from the source question.
+  TextColumn get subtopic => text().withDefault(const Constant(''))();
   TextColumn get source => text()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get exportedAt => dateTime().nullable()();
@@ -148,6 +160,16 @@ class ErrorCards extends Table {
   TextColumn get bias => text().withDefault(const Constant(''))();
   TextColumn get vaccine => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
+
+  /// Cognitive shape of the card generated from this error.
+  TextColumn get cognitiveType =>
+      text().withDefault(const Constant('contrast'))();
+
+  /// Optional grouping inside the topic, copied from the source question.
+  TextColumn get subtopic => text().withDefault(const Constant(''))();
+
+  /// Quick classifications chosen after the wrong answer.
+  TextColumn get mistakeKindsJson => text().withDefault(const Constant('[]'))();
   TextColumn get practiceName => text().withDefault(const Constant(''))();
   TextColumn get status => text()();
   DateTimeColumn get createdAt => dateTime()();
@@ -178,6 +200,12 @@ class ManualCards extends Table {
   /// Optional source passage shown above the question on the card front.
   TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
+
+  /// Cognitive shape of the card: fact, heuristic, contrast or concept.
+  TextColumn get cognitiveType => text().withDefault(const Constant('fact'))();
+
+  /// Optional grouping inside the topic, copied from the source question.
+  TextColumn get subtopic => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get exportedAt => dateTime().nullable()();
 }
@@ -228,6 +256,7 @@ class Highlights extends Table {
   TextColumn get phrase => text()();
   TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
+  TextColumn get subtopic => text().withDefault(const Constant(''))();
   TextColumn get practiceName => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get keptAt => dateTime().nullable()();

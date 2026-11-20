@@ -30,7 +30,6 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         (SELECT COUNT(*) FROM error_cards WHERE status = 'active' AND details_completed_at IS NULL) AS incomplete_error_cards,
         (
           (SELECT COUNT(*) FROM concepts WHERE exported_at IS NULL AND definition <> '')
-          + (SELECT COUNT(*) FROM error_cards WHERE exported_at IS NULL AND details_completed_at IS NOT NULL)
           + (SELECT COUNT(*) FROM manual_cards WHERE exported_at IS NULL)
         ) AS unexported_cards,
         (SELECT id FROM sessions WHERE status = 'inProgress' ORDER BY started_at DESC LIMIT 1) AS in_progress_session_id,
@@ -67,6 +66,8 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         t.priority AS topic_priority,
         t.anki_deck AS topic_anki_deck,
         t.created_at AS topic_created_at,
+        t.minimum_score AS topic_minimum_score,
+        t.target_score AS topic_target_score,
         t.archived AS topic_archived,
         (SELECT COUNT(*) FROM practices p WHERE p.topic_id = t.id) AS practice_count,
         (
@@ -330,6 +331,8 @@ class TopicSummaryRow {
     required this.topicPriority,
     required this.topicAnkiDeck,
     required this.topicCreatedAt,
+    required this.topicMinimumScore,
+    required this.topicTargetScore,
     required this.topicArchived,
     required this.practiceCount,
     required this.questionCount,
@@ -352,6 +355,8 @@ class TopicSummaryRow {
       topicPriority: row.read<int?>('topic_priority'),
       topicAnkiDeck: row.read<String?>('topic_anki_deck'),
       topicCreatedAt: row.read<DateTime>('topic_created_at').toUtc(),
+      topicMinimumScore: row.read<int>('topic_minimum_score'),
+      topicTargetScore: row.read<int>('topic_target_score'),
       topicArchived: row.read<bool>('topic_archived'),
       practiceCount: row.read<int>('practice_count'),
       questionCount: row.read<int>('question_count'),
@@ -373,6 +378,8 @@ class TopicSummaryRow {
   final int? topicPriority;
   final String? topicAnkiDeck;
   final DateTime topicCreatedAt;
+  final int topicMinimumScore;
+  final int topicTargetScore;
   final bool topicArchived;
   final int practiceCount;
   final int questionCount;

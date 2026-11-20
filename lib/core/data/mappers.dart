@@ -33,6 +33,8 @@ Topic topicFromRow(TopicRow row) {
     priority: row.priority,
     ankiDeck: row.ankiDeck,
     createdAt: row.createdAt.toUtc(),
+    minimumScore: row.minimumScore,
+    targetScore: row.targetScore,
     archived: row.archived,
   );
 }
@@ -108,6 +110,7 @@ Attempt attemptFromRow(AttemptRow row) {
     unknown: row.unknown,
     isCorrect: row.isCorrect,
     answeredAt: row.answeredAt.toUtc(),
+    mistakeKinds: mistakeKindsFromJson(row.mistakeKindsJson),
   );
 }
 
@@ -121,6 +124,7 @@ Concept conceptFromRow(ConceptRow row) {
     extra: row.extra,
     context: row.context,
     topicName: row.topicName,
+    subtopic: row.subtopic,
     source: ConceptSource.values.byName(row.source),
     createdAt: row.createdAt.toUtc(),
     exportedAt: row.exportedAt?.toUtc(),
@@ -150,6 +154,9 @@ ErrorCard errorCardFromRow(ErrorCardRow row) {
     detailsCompletedAt: row.detailsCompletedAt?.toUtc(),
     resolvedAt: row.resolvedAt?.toUtc(),
     exportedAt: row.exportedAt?.toUtc(),
+    cognitiveType: CognitiveType.fromName(row.cognitiveType),
+    subtopic: row.subtopic,
+    mistakeKinds: mistakeKindsFromJson(row.mistakeKindsJson),
   );
 }
 
@@ -164,6 +171,8 @@ ManualCard manualCardFromRow(ManualCardRow row) {
     topicName: row.topicName,
     createdAt: row.createdAt.toUtc(),
     exportedAt: row.exportedAt?.toUtc(),
+    cognitiveType: CognitiveType.fromName(row.cognitiveType),
+    subtopic: row.subtopic,
   );
 }
 
@@ -200,6 +209,7 @@ StudyHighlight highlightFromRow(HighlightRow row) {
     keptAt: row.keptAt?.toUtc(),
     cardCreatedAt: row.cardCreatedAt?.toUtc(),
     manualCardId: row.manualCardId,
+    subtopic: row.subtopic,
   );
 }
 
@@ -212,6 +222,8 @@ TopicSummary topicSummaryFromRow(TopicSummaryRow row) {
       priority: row.topicPriority,
       ankiDeck: row.topicAnkiDeck,
       createdAt: row.topicCreatedAt,
+      minimumScore: row.topicMinimumScore,
+      targetScore: row.topicTargetScore,
       archived: row.topicArchived,
     ),
     practiceCount: row.practiceCount,

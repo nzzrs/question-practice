@@ -110,6 +110,8 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     required String description,
     required int? priority,
     String? ankiDeck,
+    int minimumScore = 70,
+    int targetScore = 80,
     required DateTime createdAt,
   }) {
     return into(topics).insert(
@@ -118,6 +120,8 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
         description: Value(description),
         priority: Value(priority),
         ankiDeck: Value(ankiDeck),
+        minimumScore: Value(minimumScore),
+        targetScore: Value(targetScore),
         createdAt: createdAt,
       ),
     );
@@ -257,12 +261,32 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     await (delete(topics)..where((t) => t.id.equals(id))).go();
   }
 
+  /// Writes only the topic fields supplied by an update file.
+  Future<void> updateTopicDetails({
+    required int id,
+    Value<String> description = const Value.absent(),
+    Value<int?> priority = const Value.absent(),
+    Value<int> minimumScore = const Value.absent(),
+    Value<int> targetScore = const Value.absent(),
+  }) {
+    return (update(topics)..where((t) => t.id.equals(id))).write(
+      TopicsCompanion(
+        description: description,
+        priority: priority,
+        minimumScore: minimumScore,
+        targetScore: targetScore,
+      ),
+    );
+  }
+
   Future<void> updateTopic({
     required int id,
     required String name,
     required String description,
     required int? priority,
     required String? ankiDeck,
+    required int minimumScore,
+    required int targetScore,
   }) {
     return (update(topics)..where((t) => t.id.equals(id))).write(
       TopicsCompanion(
@@ -270,6 +294,8 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
         description: Value(description),
         priority: Value(priority),
         ankiDeck: Value(ankiDeck),
+        minimumScore: Value(minimumScore),
+        targetScore: Value(targetScore),
       ),
     );
   }

@@ -6,7 +6,6 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../export/new_card_dialog.dart';
-import '../lookup/domain/lookup_service.dart';
 import 'error_card_review_view.dart';
 import '../review/skipped_question_view.dart';
 
@@ -45,14 +44,11 @@ class _SkippedStep extends _ReviewStep {
 }
 
 class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
-  final _bias = TextEditingController();
-  final _vaccine = TextEditingController();
   final _scroll = ScrollController();
   late final List<_ReviewStep> _steps = [
     for (final card in widget.cards) _ErrorStep(card),
     for (final question in widget.skippedQuestions) _SkippedStep(question),
   ];
-  final _checks = <int, ReviewCheckResult>{};
   final _edits = <int, ErrorCardContent>{};
   int _index = 0;
   int _saved = 0;
@@ -60,31 +56,12 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
   bool _finished = false;
 
   @override
-  void initState() {
-    super.initState();
-    _prepareStep();
-  }
-
-  @override
   void dispose() {
-    _bias.dispose();
-    _vaccine.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
   _ReviewStep? get _step => _index < _steps.length ? _steps[_index] : null;
-
-  void _prepareStep() {
-    final step = _step;
-    if (step is _ErrorStep) {
-      _bias.text = step.card.bias;
-      _vaccine.text = step.card.vaccine;
-    } else {
-      _bias.clear();
-      _vaccine.clear();
-    }
-  }
 
   void _advance() {
     if (_index + 1 >= _steps.length) {
@@ -92,19 +69,13 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
       ref.invalidate(homeStatsProvider);
       return;
     }
-    setState(() {
-      _index++;
-      _prepareStep();
-    });
+    setState(() => _index++);
     _resetScroll();
   }
 
   void _goBack() {
     if (_index == 0) return;
-    setState(() {
-      _index--;
-      _prepareStep();
-    });
+    setState(() => _index--);
     _resetScroll();
   }
 
@@ -112,28 +83,10 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
-  Future<void> _saveError(_ErrorStep step) async {
-    if (_bias.text.trim().isEmpty || _vaccine.text.trim().isEmpty) {
-      await showSnack(
-        context,
-        'Write both the flawed assumption and the prevention note.',
-      );
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await ref
-          .read(reviewServiceProvider)
-          .saveErrorDetails(
-            cardId: step.card.id,
-            bias: _bias.text,
-            vaccine: _vaccine.text,
-          );
-      _saved++;
-      _advance();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  void _cardsAdded(int count) {
+    if (!mounted || count <= 0) return;
+    setState(() => _saved += count);
+    _advance();
   }
 
   Future<void> _makeSkippedCard(_SkippedStep step) async {
@@ -264,7 +217,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
                     : () {
                         switch (step) {
                           case _ErrorStep():
-                            _saveError(step);
+                            _advance();
                           case _SkippedStep():
                             _makeSkippedCard(step);
                         }
@@ -273,8 +226,8 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
                     ? 'Saving…'
                     : isSkipped
                     ? 'Make a card'
-                    : 'Save',
-                icon: isSkipped ? Icons.style_outlined : Icons.check,
+                    : 'Continue',
+                icon: isSkipped ? Icons.style_outlined : Icons.arrow_forward,
               ),
             ),
             const SizedBox(width: 8),
@@ -306,14 +259,10 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
         switch (step) {
           _ErrorStep(:final card) => ErrorCardReviewView(
             card: card,
-            bias: _bias,
-            vaccine: _vaccine,
             editedContent: _edits[card.id],
-            checkResult: _checks[card.id],
             onContentChanged: (content) =>
                 setState(() => _edits[card.id] = content),
-            onCheckResult: (result) =>
-                setState(() => _checks[card.id] = result),
+            onCardsAdded: _cardsAdded,
           ),
           _SkippedStep(:final question) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,

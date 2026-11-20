@@ -59,14 +59,6 @@ class ExportService {
         message: 'Select at least one card.',
       );
     }
-    if (selection.errorCards.any((card) => card.needsDetails)) {
-      return const ExportOutcome(
-        success: false,
-        added: 0,
-        failed: 0,
-        message: 'Complete the selected error cards before export.',
-      );
-    }
     final status = await _gateway.status();
     if (!status.installed) {
       return const ExportOutcome(
@@ -120,7 +112,6 @@ class ExportService {
     if (success) {
       await _cards.markExported(
         conceptIds: selection.conceptIds.toList(),
-        errorCardIds: selection.errorCardIds.toList(),
         manualCardIds: selection.manualCardIds.toList(),
         exportedAt: _clock.now().toUtc(),
       );
@@ -148,13 +139,6 @@ class ExportService {
         p.join(directory.path, 'question-practice-concepts-$stamp.txt'),
       );
       await file.writeAsString(files.concepts);
-      result.add(file);
-    }
-    if (files.hasErrors) {
-      final file = File(
-        p.join(directory.path, 'question-practice-errors-$stamp.tsv'),
-      );
-      await file.writeAsString(files.errors);
       result.add(file);
     }
     if (files.hasBasic) {

@@ -19,6 +19,8 @@ enum _ExitChoice { save, discard }
 
 enum _FinishChoice { leaveUnanswered, markSkipped }
 
+enum _HighlightAction { define, ask, delete }
+
 class SessionPage extends ConsumerStatefulWidget {
   const SessionPage({required this.start, super.key});
 
@@ -30,25 +32,22 @@ class SessionPage extends ConsumerStatefulWidget {
 
 class _SessionPageState extends ConsumerState<SessionPage>
     with WidgetsBindingObserver {
-  final _reasoning = TextEditingController();
   late SessionStart _start;
   SessionQuestionItem? _item;
   int _index = 0;
   final _selectedIndexes = <int>{};
-  final _highlights = <int, Set<String>>{};
+  final _highlights = <int, List<StudyHighlight>>{};
+  final _mistakeKinds = <MistakeKind>{};
   bool _submitted = false;
   bool _submitting = false;
+  bool _mistakeBusy = false;
   bool _distracted = false;
   bool _unknown = false;
-  bool _reasoningOpen = false;
   bool _showOriginalLetters = false;
   AnswerOutcome? _outcome;
   SessionSummary? _summary;
   int _questionMinutes = 0;
   Timer? _questionTimer;
-  Timer? _reasoningSaveTimer;
-  Future<void>? _reasoningSaveFuture;
-  String _savedReasoning = '';
   FloatingToastHandle? _toast;
 
   @override
@@ -72,17 +71,20 @@ class _SessionPageState extends ConsumerState<SessionPage>
 
   Future<void> _loadHighlights() async {
     try {
-      final highlights = await ref
-          .read(cardRepositoryProvider)
-          .highlightsForSession(_start.session.id);
+      final repository = ref.read(cardRepositoryProvider);
+      final byQuestion = <int, List<StudyHighlight>>{};
+      final loaded = <int>{};
+      for (final item in _start.items) {
+        final questionId = item.question.id;
+        if (!loaded.add(questionId)) continue;
+        final highlights = await repository.highlightsForQuestion(questionId);
+        if (highlights.isNotEmpty) byQuestion[questionId] = highlights;
+      }
       if (!mounted) return;
       setState(() {
-        _highlights.clear();
-        for (final highlight in highlights) {
-          final questionId = highlight.questionId;
-          if (questionId == null) continue;
-          (_highlights[questionId] ??= <String>{}).add(highlight.text);
-        }
+        _highlights
+          ..clear()
+          ..addAll(byQuestion);
       });
     } on Object catch (error) {
       if (mounted) {
@@ -91,12 +93,35 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
   }
 
+  List<String> _highlightTexts(int questionId) => [
+    for (final highlight in _highlights[questionId] ?? const <StudyHighlight>[])
+      highlight.text,
+  ];
+
+  Future<void> _reloadHighlights(int questionId) async {
+    final highlights = await ref
+        .read(cardRepositoryProvider)
+        .highlightsForQuestion(questionId);
+    if (!mounted) return;
+    setState(() {
+      if (highlights.isEmpty) {
+        _highlights.remove(questionId);
+      } else {
+        _highlights[questionId] = highlights;
+      }
+    });
+  }
+
   Future<void> _addHighlight(String selection, Rect? anchor) async {
     final item = _item;
     if (item == null) return;
     final text = selection.trim();
     if (text.isEmpty) return;
-    if (_highlights[item.question.id]?.contains(text) ?? false) {
+    final lowered = text.toLowerCase();
+    final existing = _highlights[item.question.id] ?? const <StudyHighlight>[];
+    if (existing.any(
+      (highlight) => highlight.text.trim().toLowerCase() == lowered,
+    )) {
       await showSnack(context, 'That phrase is already highlighted.');
       return;
     }
@@ -110,12 +135,12 @@ class _SessionPageState extends ConsumerState<SessionPage>
             context: item.question.prompt,
             topicName: item.topicName,
             practiceName: item.practiceName,
+            subtopic: item.question.subtopic,
             createdAt: ref.read(clockProvider).now().toUtc(),
           );
       if (!mounted) return;
-      setState(() {
-        (_highlights[item.question.id] ??= <String>{}).add(text);
-      });
+      await _reloadHighlights(item.question.id);
+      if (!mounted) return;
       await showSnack(context, 'Highlight saved. It is ready in the review.');
     } on Object catch (error) {
       if (mounted) {
@@ -124,13 +149,74 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
   }
 
+  Future<void> _deleteHighlight(int questionId, String phrase) async {
+    final lowered = phrase.trim().toLowerCase();
+    final matches = [
+      for (final highlight
+          in _highlights[questionId] ?? const <StudyHighlight>[])
+        if (highlight.text.trim().toLowerCase() == lowered) highlight,
+    ];
+    if (matches.isEmpty) return;
+    try {
+      await ref.read(cardRepositoryProvider).deleteHighlights([
+        for (final highlight in matches) highlight.id,
+      ]);
+      if (!mounted) return;
+      final removed = {for (final highlight in matches) highlight.id};
+      setState(() {
+        final remaining = [
+          for (final highlight
+              in _highlights[questionId] ?? const <StudyHighlight>[])
+            if (!removed.contains(highlight.id)) highlight,
+        ];
+        if (remaining.isEmpty) {
+          _highlights.remove(questionId);
+        } else {
+          _highlights[questionId] = remaining;
+        }
+      });
+      await showSnack(context, 'Highlight deleted.');
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not delete the highlight: $error');
+      }
+    }
+  }
+
+  Future<void> _openHighlightActions(String phrase) async {
+    final item = _item;
+    if (item == null) return;
+    var aiAvailable = ref.read(hasApiKeyProvider).value;
+    if (aiAvailable == null) {
+      try {
+        aiAvailable = await ref.read(hasApiKeyProvider.future);
+      } on Object {
+        aiAvailable = false;
+      }
+    }
+    if (!mounted) return;
+    final action = await M3EBottomSheet.show<_HighlightAction>(
+      context,
+      initialValue: M3EBottomSheetValue.expanded,
+      builder: (context) =>
+          _HighlightActionsSheet(phrase: phrase, showAsk: aiAvailable ?? false),
+    );
+    if (action == null || !mounted) return;
+    switch (action) {
+      case _HighlightAction.define:
+        await _openLookup(phrase, null);
+      case _HighlightAction.ask:
+        await _openAsk(phrase, null);
+      case _HighlightAction.delete:
+        await _deleteHighlight(item.question.id, phrase);
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _questionTimer?.cancel();
-    _reasoningSaveTimer?.cancel();
     _toast?.dismiss();
-    _reasoning.dispose();
     unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     super.dispose();
   }
@@ -182,14 +268,11 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final item = _start.items.isEmpty ? null : _start.items[_index];
     _item = item;
     _selectedIndexes.clear();
-    _reasoningSaveTimer?.cancel();
-    _reasoning.clear();
-    _savedReasoning = '';
+    _mistakeKinds.clear();
     _outcome = null;
     _submitted = false;
     _distracted = false;
     _unknown = false;
-    _reasoningOpen = false;
     if (item == null) {
       _restartQuestionTimer();
       return;
@@ -200,20 +283,16 @@ class _SessionPageState extends ConsumerState<SessionPage>
       return;
     }
     _selectedIndexes.addAll(attempt.selectedIndexes);
-    _reasoning.text = attempt.reasoning;
-    _savedReasoning = attempt.reasoning.trim();
     _submitted = true;
     _distracted = attempt.distracted;
     _unknown = attempt.unknown;
-    _reasoningOpen = attempt.reasoning.trim().isNotEmpty;
+    _mistakeKinds.addAll(attempt.mistakeKinds);
     _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
     _restartQuestionTimer();
   }
 
   Future<void> _goTo(int index) async {
     if (index < 0 || index >= _start.items.length || index == _index) return;
-    await _persistReasoning();
-    if (!mounted) return;
     setState(() {
       _index = index;
       _loadQuestionState();
@@ -235,15 +314,16 @@ class _SessionPageState extends ConsumerState<SessionPage>
             start: _start,
             item: item,
             selectedIndexes: skip ? const [] : _selectedIndexes.toList(),
-            reasoning: _reasoning.text,
+            reasoning: '',
             distracted: false,
           );
       if (!mounted) return;
       setState(() {
         _submitted = true;
         _outcome = outcome;
-        _savedReasoning = _reasoning.text.trim();
-        _reasoningOpen = _reasoning.text.trim().isNotEmpty;
+        _mistakeKinds
+          ..clear()
+          ..addAll(outcome.attempt.mistakeKinds);
         if (outcome.summary != null) _summary = outcome.summary;
       });
       _questionTimer?.cancel();
@@ -275,57 +355,45 @@ class _SessionPageState extends ConsumerState<SessionPage>
         );
   }
 
-  void _onReasoningChanged(String _) {
-    if (!_submitted) return;
-    _reasoningSaveTimer?.cancel();
-    _reasoningSaveTimer = Timer(const Duration(milliseconds: 600), () {
-      if (mounted) unawaited(_persistReasoning());
-    });
-  }
-
-  /// Saves the reasoning of an answered question, including late notes.
-  Future<void> _persistReasoning() async {
-    _reasoningSaveTimer?.cancel();
-    while (mounted) {
-      final inFlight = _reasoningSaveFuture;
-      if (inFlight != null) {
-        await inFlight;
-        continue;
-      }
-      final item = _item;
-      if (!_submitted || item == null) return;
-      final text = _reasoning.text.trim();
-      if (text == _savedReasoning) return;
-      final save = _saveReasoning(item, text);
-      _reasoningSaveFuture = save;
-      var saved = false;
-      try {
-        saved = await save;
-      } finally {
-        if (identical(_reasoningSaveFuture, save)) {
-          _reasoningSaveFuture = null;
-        }
-      }
-      if (!saved) return;
+  Future<void> _setMistakeKind(MistakeKind kind, bool selected) async {
+    final item = _item;
+    if (item == null || _mistakeBusy) return;
+    final previous = {..._mistakeKinds};
+    final next = {..._mistakeKinds};
+    if (selected) {
+      next.add(kind);
+    } else {
+      next.remove(kind);
     }
-  }
-
-  Future<bool> _saveReasoning(SessionQuestionItem item, String text) async {
+    setState(() {
+      _mistakeKinds
+        ..clear()
+        ..addAll(next);
+      _mistakeBusy = true;
+    });
     try {
       final attempt = await ref
           .read(sessionServiceProvider)
-          .updateReasoning(start: _start, item: item, reasoning: text);
-      if (!mounted) return false;
+          .setMistakeKinds(start: _start, item: item, kinds: next);
+      if (!mounted) return;
       _start.attempts[item.question.id] = attempt;
       setState(() {
-        _savedReasoning = attempt.reasoning.trim();
+        _mistakeKinds
+          ..clear()
+          ..addAll(attempt.mistakeKinds);
         _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
       });
       ref.invalidate(dueErrorsProvider);
-      return true;
     } on SessionException catch (error) {
-      if (mounted) await showSnack(context, error.message);
-      return false;
+      if (!mounted) return;
+      setState(() {
+        _mistakeKinds
+          ..clear()
+          ..addAll(previous);
+      });
+      await showSnack(context, error.message);
+    } finally {
+      if (mounted) setState(() => _mistakeBusy = false);
     }
   }
 
@@ -341,6 +409,9 @@ class _SessionPageState extends ConsumerState<SessionPage>
       _start.attempts[item.question.id] = attempt;
       setState(() {
         _distracted = attempt.distracted;
+        _mistakeKinds
+          ..clear()
+          ..addAll(attempt.mistakeKinds);
         _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
       });
       ref.invalidate(dueErrorsProvider);
@@ -364,6 +435,9 @@ class _SessionPageState extends ConsumerState<SessionPage>
       setState(() {
         _unknown = attempt.unknown;
         _distracted = attempt.distracted;
+        _mistakeKinds
+          ..clear()
+          ..addAll(attempt.mistakeKinds);
         _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
       });
       ref.invalidate(dueErrorsProvider);
@@ -375,8 +449,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _next() async {
-    await _persistReasoning();
-    if (!mounted) return;
     if (_summary != null && _index >= _start.items.length - 1) {
       _openSummary(_summary!);
       return;
@@ -401,8 +473,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
 
   Future<void> _finishEarly() async {
     if (_submitting) return;
-    await _persistReasoning();
-    if (!mounted) return;
     final unanswered = _start.pendingUnanswered.length;
     if (unanswered <= 0) {
       final summary =
@@ -487,8 +557,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _requestExit() async {
-    await _persistReasoning();
-    if (!mounted) return;
     if (_summary != null) {
       _openSummary(_summary!);
       return;
@@ -536,6 +604,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
       practiceName: item.practiceName,
       sessionId: _start.session.id,
       questionId: item.question.id,
+      subtopic: item.question.subtopic,
       anchor: anchor,
     );
   }
@@ -555,6 +624,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
       practiceName: item.practiceName,
       sessionId: _start.session.id,
       questionId: item.question.id,
+      subtopic: item.question.subtopic,
     );
   }
 
@@ -665,8 +735,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   onOpenUrl: _openUrl,
                   onHighlight: _addHighlight,
                   onAsk: _openAsk,
-                  highlights:
-                      _highlights[item.question.id]?.toList() ?? const [],
+                  onHighlightTap: _openHighlightActions,
+                  highlights: _highlightTexts(item.question.id),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -712,8 +782,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
                       onOpenUrl: _openUrl,
                       onHighlight: _addHighlight,
                       onAsk: _openAsk,
-                      highlights:
-                          _highlights[item.question.id]?.toList() ?? const [],
+                      onHighlightTap: _openHighlightActions,
+                      highlights: _highlightTexts(item.question.id),
                       onPressed: _submitted
                           ? null
                           : () => setState(() {
@@ -728,16 +798,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
                     ),
                   ),
                 const SizedBox(height: 6),
-                if (!_submitted)
-                  _ReasoningSection(
-                    open: _reasoningOpen,
-                    title: 'Add reasoning (optional)',
-                    supportingText: 'Useful when reviewing an error later.',
-                    placeholder: 'What led you to this answer?',
-                    controller: _reasoning,
-                    onToggle: () =>
-                        setState(() => _reasoningOpen = !_reasoningOpen),
-                  ),
                 if (_submitted) ...[
                   const SizedBox(height: 16),
                   _FeedbackStatus(
@@ -762,6 +822,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
                           ),
                           onDefine: _openLookup,
                           onOpenUrl: _openUrl,
+                          onHighlight: _addHighlight,
+                          onAsk: _openAsk,
+                          onHighlightTap: _openHighlightActions,
+                          highlights: _highlightTexts(item.question.id),
                         ),
                       ],
                     ),
@@ -776,19 +840,15 @@ class _SessionPageState extends ConsumerState<SessionPage>
                       onUnknownChanged: _submitting ? null : _setUnknown,
                     ),
                   ],
-                  const SizedBox(height: 12),
-                  _ReasoningSection(
-                    open: _reasoningOpen,
-                    title: 'Your reasoning (optional)',
-                    supportingText: _savedReasoning.isEmpty
-                        ? 'You can still note what led to your answer.'
-                        : 'Saved automatically.',
-                    placeholder: 'What led you to this answer?',
-                    controller: _reasoning,
-                    onChanged: _onReasoningChanged,
-                    onToggle: () =>
-                        setState(() => _reasoningOpen = !_reasoningOpen),
-                  ),
+                  if (!_outcome!.attempt.isSkipped &&
+                      !_outcome!.attempt.isCorrect) ...[
+                    const SizedBox(height: 12),
+                    _MistakeChips(
+                      selected: _mistakeKinds,
+                      busy: _mistakeBusy,
+                      onToggle: _setMistakeKind,
+                    ),
+                  ],
                 ],
               ],
             ),
@@ -1019,24 +1079,16 @@ class _QuestionPickerRow extends StatelessWidget {
   }
 }
 
-class _ReasoningSection extends StatelessWidget {
-  const _ReasoningSection({
-    required this.open,
-    required this.title,
-    required this.supportingText,
-    required this.placeholder,
-    required this.controller,
+class _MistakeChips extends StatelessWidget {
+  const _MistakeChips({
+    required this.selected,
+    required this.busy,
     required this.onToggle,
-    this.onChanged,
   });
 
-  final bool open;
-  final String title;
-  final String supportingText;
-  final String placeholder;
-  final TextEditingController controller;
-  final VoidCallback onToggle;
-  final ValueChanged<String>? onChanged;
+  final Set<MistakeKind> selected;
+  final bool busy;
+  final void Function(MistakeKind kind, bool selected) onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -1044,50 +1096,96 @@ class _ReasoningSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Material(
-          color: theme.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(20),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onToggle,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
+        Text(
+          'What went wrong? Optional, feeds the card generator.',
+          style: theme.typography.baseline.labelSmall.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 8),
+        M3ETheme(
+          data: theme.copyWith(chipTheme: theme.chipTheme.copyWith(height: 48)),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final kind in MistakeKind.values)
+                M3EChip(
+                  type: M3EChipType.filter,
+                  label: kind.label,
+                  selected: selected.contains(kind),
+                  onPressed: busy
+                      ? null
+                      : () => onToggle(kind, !selected.contains(kind)),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HighlightActionsSheet extends StatelessWidget {
+  const _HighlightActionsSheet({required this.phrase, required this.showAsk});
+
+  final String phrase;
+  final bool showAsk;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    Icons.edit_note,
-                    size: 20,
-                    color: theme.colorScheme.onSurfaceVariant,
+                  Text(
+                    phrase,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.emphasized.titleLarge,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: theme.typography.baseline.bodyMedium,
+                  const SizedBox(height: 4),
+                  Text(
+                    'Saved highlight',
+                    style: theme.typography.baseline.labelSmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
-                  ),
-                  Icon(
-                    open ? Icons.expand_less : Icons.expand_more,
-                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ],
               ),
             ),
-          ),
+            OptionTile(
+              icon: Icons.menu_book_outlined,
+              title: 'Define',
+              subtitle: 'Look up this phrase',
+              onTap: () => Navigator.of(context).pop(_HighlightAction.define),
+            ),
+            if (showAsk)
+              OptionTile(
+                icon: Icons.auto_awesome_outlined,
+                title: 'Ask',
+                subtitle: 'Ask the configured AI about this passage',
+                onTap: () => Navigator.of(context).pop(_HighlightAction.ask),
+              ),
+            OptionTile(
+              icon: Icons.delete_outline,
+              title: 'Delete highlight',
+              subtitle: 'Remove it everywhere for this question',
+              destructive: true,
+              onTap: () => Navigator.of(context).pop(_HighlightAction.delete),
+            ),
+          ],
         ),
-        if (open) ...[
-          const SizedBox(height: 10),
-          M3ETextField(
-            controller: controller,
-            label: 'Your reasoning',
-            placeholder: placeholder,
-            minLines: 2,
-            maxLines: 5,
-            supportingText: supportingText,
-            onChanged: onChanged,
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
@@ -1278,6 +1376,7 @@ class _OptionCard extends StatefulWidget {
     required this.onOpenUrl,
     required this.onHighlight,
     required this.onAsk,
+    required this.onHighlightTap,
     required this.highlights,
     required this.onPressed,
     super.key,
@@ -1295,6 +1394,7 @@ class _OptionCard extends StatefulWidget {
   final ValueChanged<String> onOpenUrl;
   final Future<void> Function(String selection, Rect? anchor) onHighlight;
   final Future<void> Function(String selection, Rect? anchor) onAsk;
+  final ValueChanged<String> onHighlightTap;
   final List<String> highlights;
   final VoidCallback? onPressed;
 
@@ -1464,6 +1564,7 @@ class _OptionCardState extends State<_OptionCard> {
                           onOpenUrl: widget.onOpenUrl,
                           onHighlight: widget.onHighlight,
                           onAsk: widget.onAsk,
+                          onHighlightTap: widget.onHighlightTap,
                           highlights: widget.highlights,
                         ),
                         if (widget.submitted &&
@@ -1480,6 +1581,7 @@ class _OptionCardState extends State<_OptionCard> {
                             onOpenUrl: widget.onOpenUrl,
                             onHighlight: widget.onHighlight,
                             onAsk: widget.onAsk,
+                            onHighlightTap: widget.onHighlightTap,
                             highlights: widget.highlights,
                           ),
                         ],

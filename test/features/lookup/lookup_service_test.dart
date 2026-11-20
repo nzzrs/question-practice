@@ -594,7 +594,7 @@ void main() {
       );
     });
 
-    final cards = await serviceWith(client).suggestAtomicCards(
+    final cards = await serviceWith(client).suggestArchetypeCards(
       highlight: 'A VPC is a private network owned by the account.',
       questionContext: 'Which network isolates resources?',
       topicName: 'Cloud',
@@ -635,7 +635,7 @@ void main() {
       ),
     );
 
-    final cards = await serviceWith(client).suggestAtomicCards(
+    final cards = await serviceWith(client).suggestArchetypeCards(
       highlight: 'Term means meaning.',
       questionContext: '',
       topicName: '',
@@ -676,7 +676,7 @@ void main() {
         ),
       );
 
-      final suggestions = await serviceWith(client).suggestAtomicCards(
+      final suggestions = await serviceWith(client).suggestArchetypeCards(
         highlight: 'Highlight',
         questionContext: 'Question',
         topicName: 'Topic',
@@ -709,7 +709,7 @@ void main() {
     });
 
     await expectLater(
-      serviceWith(client).suggestAtomicCards(
+      serviceWith(client).suggestArchetypeCards(
         highlight: 'Highlight',
         questionContext: 'Question',
         topicName: 'Topic',

@@ -13,6 +13,7 @@ class SelectableLinkifiedText extends StatefulWidget {
     required this.onOpenUrl,
     this.onHighlight,
     this.onAsk,
+    this.onHighlightTap,
     this.highlights = const [],
     this.selectable = true,
     super.key,
@@ -29,6 +30,9 @@ class SelectableLinkifiedText extends StatefulWidget {
   /// Asks the configured AI about the selected phrase.
   final Future<void> Function(String selection, Rect? anchor)? onAsk;
 
+  /// Called with the saved phrase when a painted highlight is tapped.
+  final ValueChanged<String>? onHighlightTap;
+
   /// Phrases painted with a highlight background inside [text].
   final List<String> highlights;
   final bool selectable;
@@ -40,7 +44,8 @@ class SelectableLinkifiedText extends StatefulWidget {
 
 class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   static final _urlPattern = RegExp(r'https?://[^\s<>"`]+');
-  final _recognizers = <TapGestureRecognizer>[];
+  final _urlRecognizers = <TapGestureRecognizer>[];
+  final _highlightHits = <_HighlightHit>[];
   String _selectedText = '';
 
   @override
@@ -52,7 +57,11 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   @override
   void didUpdateWidget(SelectableLinkifiedText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text) _syncRecognizers();
+    if (oldWidget.text != widget.text ||
+        !_sameHighlights(oldWidget.highlights, widget.highlights) ||
+        oldWidget.onHighlightTap != widget.onHighlightTap) {
+      _syncRecognizers();
+    }
   }
 
   @override
@@ -62,10 +71,14 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   }
 
   void _disposeRecognizers() {
-    for (final recognizer in _recognizers) {
+    for (final recognizer in _urlRecognizers) {
       recognizer.dispose();
     }
-    _recognizers.clear();
+    _urlRecognizers.clear();
+    for (final hit in _highlightHits) {
+      hit.recognizer?.dispose();
+    }
+    _highlightHits.clear();
   }
 
   void _syncRecognizers() {
@@ -74,8 +87,36 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
       final url = match.group(0)!;
       final recognizer = TapGestureRecognizer()
         ..onTap = () => widget.onOpenUrl(url);
-      _recognizers.add(recognizer);
+      _urlRecognizers.add(recognizer);
     }
+    final onTap = widget.onHighlightTap;
+    final haystack = widget.text.toLowerCase();
+    for (final highlight in widget.highlights) {
+      final needle = highlight.trim().toLowerCase();
+      if (needle.isEmpty) continue;
+      var from = 0;
+      while (from < haystack.length) {
+        final index = haystack.indexOf(needle, from);
+        if (index < 0) break;
+        final end = index + needle.length;
+        TapGestureRecognizer? recognizer;
+        if (onTap != null) {
+          final phrase = widget.text.substring(index, end);
+          recognizer = TapGestureRecognizer()..onTap = () => onTap(phrase);
+        }
+        _highlightHits.add(_HighlightHit(index, end, recognizer));
+        from = end;
+      }
+    }
+  }
+
+  static bool _sameHighlights(List<String> a, List<String> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var index = 0; index < a.length; index++) {
+      if (a[index] != b[index]) return false;
+    }
+    return true;
   }
 
   @override
@@ -104,9 +145,10 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
       final urlIndex = urlRanges.indexWhere(
         (range) => range.$1 <= start && end <= range.$2,
       );
-      final highlighted = highlightRanges.any(
-        (range) => range.$1 <= start && end <= range.$2,
+      final highlightIndex = _highlightHits.indexWhere(
+        (hit) => hit.start <= start && end <= hit.end,
       );
+      final highlighted = highlightIndex >= 0;
       TextStyle? style;
       if (urlIndex >= 0) {
         style = widget.style.copyWith(
@@ -120,15 +162,14 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
           backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.18),
         );
       }
-      spans.add(
-        TextSpan(
-          text: chunk,
-          style: style,
-          recognizer: urlIndex >= 0 && urlIndex < _recognizers.length
-              ? _recognizers[urlIndex]
-              : null,
-        ),
-      );
+      final TapGestureRecognizer? recognizer = urlIndex >= 0
+          ? (urlIndex < _urlRecognizers.length
+                ? _urlRecognizers[urlIndex]
+                : null)
+          : (highlightIndex >= 0
+                ? _highlightHits[highlightIndex].recognizer
+                : null);
+      spans.add(TextSpan(text: chunk, style: style, recognizer: recognizer));
     }
 
     final textWidget = Text.rich(
@@ -207,19 +248,9 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   }
 
   List<(int, int)> _highlightRanges() {
-    final haystack = widget.text.toLowerCase();
-    final ranges = <(int, int)>[];
-    for (final highlight in widget.highlights) {
-      final needle = highlight.trim().toLowerCase();
-      if (needle.isEmpty) continue;
-      var from = 0;
-      while (from < haystack.length) {
-        final index = haystack.indexOf(needle, from);
-        if (index < 0) break;
-        ranges.add((index, index + needle.length));
-        from = index + needle.length;
-      }
-    }
+    final ranges = <(int, int)>[
+      for (final hit in _highlightHits) (hit.start, hit.end),
+    ];
     ranges.sort((a, b) => a.$1.compareTo(b.$1));
     final merged = <(int, int)>[];
     for (final range in ranges) {
@@ -231,4 +262,12 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
     }
     return merged;
   }
+}
+
+class _HighlightHit {
+  const _HighlightHit(this.start, this.end, this.recognizer);
+
+  final int start;
+  final int end;
+  final TapGestureRecognizer? recognizer;
 }

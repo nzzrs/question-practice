@@ -35,6 +35,10 @@ Finder _nameField() => find.byKey(const ValueKey('topic-editor-name'));
 Finder _descriptionField() =>
     find.byKey(const ValueKey('topic-editor-description'));
 Finder _priorityField() => find.byKey(const ValueKey('topic-editor-priority'));
+Finder _minimumScoreField() =>
+    find.byKey(const ValueKey('topic-editor-minimum-score'));
+Finder _targetScoreField() =>
+    find.byKey(const ValueKey('topic-editor-target-score'));
 Finder _deckField() => find.byKey(const ValueKey('topic-editor-deck'));
 Finder _saveButton() => find.byKey(const ValueKey('topic-editor-save'));
 Finder _tile(String field) => find.byKey(ValueKey('topic-editor-tile-$field'));
@@ -133,10 +137,12 @@ void main() {
 
       expect(find.text('Edit topic'), findsOneWidget);
       expect(find.byType(M3EDialog), findsNothing);
-      expect(find.byType(OptionTile), findsNWidgets(4));
+      expect(find.byType(OptionTile), findsNWidgets(6));
       expect(_tile('name'), findsOneWidget);
       expect(_tile('description'), findsOneWidget);
       expect(_tile('priority'), findsOneWidget);
+      expect(_tile('minimumScore'), findsOneWidget);
+      expect(_tile('targetScore'), findsOneWidget);
       expect(_tile('deck'), findsOneWidget);
 
       expect(
@@ -158,9 +164,19 @@ void main() {
         findsOneWidget,
       );
       expect(
+        find.descendant(of: _tile('minimumScore'), matching: find.text('70%')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: _tile('targetScore'), matching: find.text('80%')),
+        findsOneWidget,
+      );
+      expect(
         find.descendant(of: _tile('deck'), matching: find.text('Cloud deck')),
         findsOneWidget,
       );
+      expect(find.text('Minimum approval score'), findsOneWidget);
+      expect(find.text('Target score'), findsOneWidget);
       expect(find.text('AnkiDroid deck'), findsOneWidget);
       expect(find.text('Browse decks'), findsNothing);
 
@@ -176,6 +192,22 @@ void main() {
 
       await _tapTileHeader(tester, 'description', 'Description');
       expect(_descriptionField(), findsNothing);
+
+      await _openField(tester, 'minimumScore', 'Minimum approval score');
+      expect(_minimumScoreField(), findsOneWidget);
+      expect(
+        tester.widget<M3ETextField>(_minimumScoreField()).controller!.text,
+        '70',
+      );
+      expect(find.textContaining('shown in red'), findsOneWidget);
+
+      await _openField(tester, 'targetScore', 'Target score');
+      expect(_targetScoreField(), findsOneWidget);
+      expect(
+        tester.widget<M3ETextField>(_targetScoreField()).controller!.text,
+        '80',
+      );
+      expect(find.textContaining('shown in green'), findsOneWidget);
 
       await _openField(tester, 'deck', 'AnkiDroid deck');
       expect(_deckField(), findsOneWidget);
@@ -525,4 +557,115 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('saves minimum and target score thresholds', (tester) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    await _openField(tester, 'minimumScore', 'Minimum approval score');
+    await _enter(tester, _minimumScoreField(), '60');
+    await _openField(tester, 'targetScore', 'Target score');
+    await _enter(tester, _targetScoreField(), '90');
+
+    await tester.tap(_saveButton());
+    await pumpFrames(tester);
+
+    expect(find.byType(TopicEditorSheet), findsNothing);
+    final stored = await harness.practices.topicById(seeded.topicId);
+    expect(stored!.minimumScore, 60);
+    expect(stored.targetScore, 90);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('validates score ranges and target at least minimum', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    await _openField(tester, 'minimumScore', 'Minimum approval score');
+    await _enter(tester, _minimumScoreField(), '101');
+    await _tapTileHeader(tester, 'minimumScore', 'Minimum approval score');
+    expect(_minimumScoreField(), findsNothing);
+    await tester.tap(_saveButton());
+    await pumpFrames(tester);
+    expect(find.text('Use a number from 0 to 100.'), findsOneWidget);
+    expect(_minimumScoreField(), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+
+    await _enter(tester, _minimumScoreField(), '80');
+    await _openField(tester, 'targetScore', 'Target score');
+    await _enter(tester, _targetScoreField(), '70');
+    await tester.tap(_saveButton());
+    await pumpFrames(tester);
+    expect(
+      find.text('Target must be at least the minimum score.'),
+      findsOneWidget,
+    );
+    expect(_targetScoreField(), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+
+    final stored = await harness.practices.topicById(seeded.topicId);
+    expect(stored!.minimumScore, 70);
+    expect(stored.targetScore, 80);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('an edited score marks the sheet dirty', (tester) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    await _openField(tester, 'targetScore', 'Target score');
+    await _enter(tester, _targetScoreField(), '90');
+    await tester.binding.handlePopRoute();
+    await pumpFrames(tester);
+    expect(find.text('Discard changes?'), findsOneWidget);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+
+    await tester.tap(find.text('Discard'));
+    await pumpFrames(tester);
+    expect(find.byType(TopicEditorSheet), findsNothing);
+    final stored = await harness.practices.topicById(seeded.topicId);
+    expect(stored!.targetScore, 80);
+    expect(tester.takeException(), isNull);
+  });
 }

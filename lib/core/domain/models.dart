@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:meta/meta.dart';
 
 enum SessionMode { practice, mixed, pastErrors }
@@ -14,6 +16,69 @@ enum WebEngine { duckDuckGo, wikipedia }
 
 enum AiProvider { openai, groq, openRouter, gemini, custom }
 
+/// The cognitive shape a card tests.
+enum CognitiveType {
+  fact('Fact'),
+  heuristic('Heuristic'),
+  contrast('Contrast'),
+  concept('Concept');
+
+  const CognitiveType(this.label);
+
+  final String label;
+
+  static CognitiveType fromName(String? value) {
+    for (final type in values) {
+      if (type.name == value) return type;
+    }
+    return CognitiveType.fact;
+  }
+}
+
+/// A one-tap classification of why an answer was wrong.
+enum MistakeKind {
+  forgottenFact('Forgotten fact'),
+  confusion('Confusion between 2 options'),
+  misinterpretation('Misinterpretation'),
+  distraction('Distraction');
+
+  const MistakeKind(this.label);
+
+  final String label;
+
+  static MistakeKind? fromName(String? value) {
+    for (final kind in values) {
+      if (kind.name == value) return kind;
+    }
+    return null;
+  }
+}
+
+/// Why a mistake happened, in a stable order.
+List<MistakeKind> mistakeKindsFromJson(String value) {
+  final parsed = <MistakeKind>[];
+  try {
+    final decoded = jsonDecode(value);
+    if (decoded is List) {
+      for (final item in decoded) {
+        final kind = item is String ? MistakeKind.fromName(item) : null;
+        if (kind != null && !parsed.contains(kind)) parsed.add(kind);
+      }
+    }
+  } on FormatException {
+    return parsed;
+  }
+  return parsed;
+}
+
+String mistakeKindsToJson(Iterable<MistakeKind> kinds) {
+  final values = <String>[
+    for (final kind in MistakeKind.values)
+      if (kinds.contains(kind)) kind.name,
+  ];
+  return jsonEncode(values);
+}
+
 @immutable
 class Topic {
   const Topic({
@@ -23,6 +88,8 @@ class Topic {
     required this.priority,
     required this.ankiDeck,
     required this.createdAt,
+    this.minimumScore = 70,
+    this.targetScore = 80,
     this.archived = false,
   });
 
@@ -33,6 +100,12 @@ class Topic {
   final String? ankiDeck;
   final DateTime createdAt;
 
+  /// Percentage below which a score counts as failing this topic.
+  final int minimumScore;
+
+  /// Percentage at which a score counts as meeting the topic goal.
+  final int targetScore;
+
   /// Archived topics keep all their data but stay out of the normal list.
   final bool archived;
 
@@ -41,6 +114,8 @@ class Topic {
     String? description,
     int? priority,
     String? ankiDeck,
+    int? minimumScore,
+    int? targetScore,
     bool? archived,
     bool clearPriority = false,
     bool clearAnkiDeck = false,
@@ -52,6 +127,8 @@ class Topic {
       priority: clearPriority ? null : (priority ?? this.priority),
       ankiDeck: clearAnkiDeck ? null : (ankiDeck ?? this.ankiDeck),
       createdAt: createdAt,
+      minimumScore: minimumScore ?? this.minimumScore,
+      targetScore: targetScore ?? this.targetScore,
       archived: archived ?? this.archived,
     );
   }
@@ -144,6 +221,33 @@ class QuestionDraft {
   final String sourceId;
 }
 
+/// One practice from a topic update file and how it maps to stored rows.
+@immutable
+class TopicPracticeUpdate {
+  const TopicPracticeUpdate({
+    required this.name,
+    required this.description,
+    required this.questions,
+    required this.deletedQuestionIds,
+    required this.contentHash,
+    this.existingPracticeId,
+    this.changed = true,
+  });
+
+  /// The stored practice this row updates, or null for a new practice.
+  final int? existingPracticeId;
+  final String name;
+  final String description;
+  final List<PracticeQuestionUpdate> questions;
+  final List<int> deletedQuestionIds;
+  final String contentHash;
+
+  /// Whether an existing practice needs any write; new practices always do.
+  final bool changed;
+
+  bool get isNew => existingPracticeId == null;
+}
+
 /// One question from an update file, at its new position in the practice.
 @immutable
 class PracticeQuestionUpdate {
@@ -215,6 +319,7 @@ class Attempt {
     required this.unknown,
     required this.isCorrect,
     required this.answeredAt,
+    this.mistakeKinds = const [],
   });
 
   final int id;
@@ -230,6 +335,9 @@ class Attempt {
   final bool unknown;
   final bool isCorrect;
   final DateTime answeredAt;
+
+  /// One-tap classifications chosen after a wrong answer.
+  final List<MistakeKind> mistakeKinds;
 
   bool get isSkipped => selectedIndexes.isEmpty || unknown;
   int? get selectedIndex =>
@@ -389,6 +497,7 @@ class Concept {
     required this.source,
     required this.createdAt,
     required this.exportedAt,
+    this.subtopic = '',
   });
 
   final int id;
@@ -401,6 +510,9 @@ class Concept {
   final String extra;
   final String context;
   final String topicName;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
   final ConceptSource source;
   final DateTime createdAt;
   final DateTime? exportedAt;
@@ -418,6 +530,7 @@ class Concept {
       extra: extra ?? this.extra,
       context: context,
       topicName: topicName,
+      subtopic: subtopic,
       source: source,
       createdAt: createdAt,
       exportedAt: exportedAt ?? this.exportedAt,
@@ -449,6 +562,9 @@ class ErrorCard {
     required this.detailsCompletedAt,
     required this.resolvedAt,
     required this.exportedAt,
+    this.cognitiveType = CognitiveType.contrast,
+    this.subtopic = '',
+    this.mistakeKinds = const [],
   });
 
   final int id;
@@ -472,6 +588,15 @@ class ErrorCard {
   final DateTime? detailsCompletedAt;
   final DateTime? resolvedAt;
   final DateTime? exportedAt;
+
+  /// Cognitive shape of the card generated from this error.
+  final CognitiveType cognitiveType;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
+
+  /// Quick classifications chosen after the wrong answer.
+  final List<MistakeKind> mistakeKinds;
 
   bool get isResolved => status == ErrorCardStatus.resolved;
   bool get needsDetails => detailsCompletedAt == null;
@@ -505,6 +630,8 @@ class ManualCard {
     required this.exportedAt,
     this.questionId,
     this.context = '',
+    this.cognitiveType = CognitiveType.fact,
+    this.subtopic = '',
   });
 
   final int id;
@@ -518,6 +645,12 @@ class ManualCard {
   final String topicName;
   final DateTime createdAt;
   final DateTime? exportedAt;
+
+  /// Cognitive shape of the card: fact, heuristic, contrast or concept.
+  final CognitiveType cognitiveType;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
 }
 
 @immutable
@@ -580,6 +713,7 @@ class StudyHighlight {
     required this.keptAt,
     required this.cardCreatedAt,
     required this.manualCardId,
+    this.subtopic = '',
   });
 
   final int id;
@@ -594,6 +728,9 @@ class StudyHighlight {
   final DateTime? cardCreatedAt;
   final int? manualCardId;
 
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
+
   bool get isKept => keptAt != null;
   bool get hasCard => cardCreatedAt != null;
   bool get needsReview => !isKept && !hasCard;
@@ -602,10 +739,15 @@ class StudyHighlight {
 /// One atomic front/back card proposed by the AI for a saved highlight.
 @immutable
 class SuggestedCard {
-  const SuggestedCard({required this.front, required this.back});
+  const SuggestedCard({
+    required this.front,
+    required this.back,
+    this.cognitiveType = CognitiveType.fact,
+  });
 
   final String front;
   final String back;
+  final CognitiveType cognitiveType;
 }
 
 @immutable

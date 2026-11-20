@@ -88,6 +88,8 @@ class ImportService {
             name: topic.name,
             description: topic.description,
             priority: topic.priority,
+            minimumScore: topic.minimumScore,
+            targetScore: topic.targetScore,
             createdAt: now,
           );
           topicsCreated++;
@@ -181,6 +183,32 @@ class ImportService {
           ImportIssue(
             path: '$topicPath/priority',
             message: 'Priority must be between 1 and 5.',
+          ),
+        );
+      }
+      final minimumScore = rawTopic['minimumScore'] as int? ?? 70;
+      final targetScore = rawTopic['targetScore'] as int? ?? 80;
+      if (minimumScore < 0 || minimumScore > 100) {
+        issues.add(
+          ImportIssue(
+            path: '$topicPath/minimumScore',
+            message: 'The minimum score must be between 0 and 100.',
+          ),
+        );
+      }
+      if (targetScore < 0 || targetScore > 100) {
+        issues.add(
+          ImportIssue(
+            path: '$topicPath/targetScore',
+            message: 'The target score must be between 0 and 100.',
+          ),
+        );
+      }
+      if (targetScore < minimumScore) {
+        issues.add(
+          ImportIssue(
+            path: '$topicPath/targetScore',
+            message: 'The target score must be at least the minimum score.',
           ),
         );
       }
@@ -316,6 +344,12 @@ class ImportService {
           name: topicName,
           description: (rawTopic['description'] as String? ?? '').trim(),
           priority: priority,
+          hasDescription: rawTopic.containsKey('description'),
+          hasPriority: rawTopic.containsKey('priority'),
+          hasMinimumScore: rawTopic['minimumScore'] is int,
+          hasTargetScore: rawTopic['targetScore'] is int,
+          minimumScore: minimumScore,
+          targetScore: targetScore,
           practices: practices,
         ),
       );
@@ -361,7 +395,7 @@ class ImportService {
       final existingTopic = await _repository.findTopicByName(topic.name);
       if (existingTopic == null) continue;
       notes.add(
-        'Topic "${topic.name}" already exists; its description and priority will be kept.',
+        'Topic "${topic.name}" already exists; its description, priority and score thresholds will be kept.',
       );
       for (final practice in topic.practices) {
         final exact = await _repository.findPracticeByHash(

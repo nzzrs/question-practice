@@ -162,6 +162,13 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     );
   }
 
+  /// Marks the details step complete without touching the legacy notes.
+  Future<void> completeErrorCardDetails(int id, DateTime completedAt) {
+    return (update(errorCards)..where((e) => e.id.equals(id))).write(
+      ErrorCardsCompanion(detailsCompletedAt: Value(completedAt)),
+    );
+  }
+
   Future<void> updateErrorCardContent(
     int id, {
     required String question,
@@ -182,6 +189,12 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   Future<void> updateErrorCardReasoning(int id, String reasoning) {
     return (update(errorCards)..where((e) => e.id.equals(id))).write(
       ErrorCardsCompanion(reasoning: Value(reasoning)),
+    );
+  }
+
+  Future<void> updateErrorCardMistakeKinds(int id, String mistakeKindsJson) {
+    return (update(errorCards)..where((e) => e.id.equals(id))).write(
+      ErrorCardsCompanion(mistakeKindsJson: Value(mistakeKindsJson)),
     );
   }
 
@@ -314,6 +327,17 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   Future<List<HighlightRow>> highlightsForSession(int sessionId) {
     return (select(highlights)
           ..where((h) => h.sessionId.equals(sessionId))
+          ..orderBy([(h) => OrderingTerm.asc(h.id)]))
+        .get();
+  }
+
+  /// Highlights saved for a question in any session.
+  ///
+  /// A highlight belongs to the question, so it keeps showing whenever that
+  /// question is practised again, not only in the session that saved it.
+  Future<List<HighlightRow>> highlightsForQuestion(int questionId) {
+    return (select(highlights)
+          ..where((h) => h.questionId.equals(questionId))
           ..orderBy([(h) => OrderingTerm.asc(h.id)]))
         .get();
   }

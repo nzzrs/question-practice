@@ -3,13 +3,13 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/domain/models.dart';
-import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../../app/providers.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
+import '../review/domain/card_litmus.dart';
 import 'error_card_content.dart';
 import 'error_card_content_editor_page.dart';
 
@@ -18,36 +18,28 @@ export 'error_card_content.dart';
 /// Shared error-card study view used by session review and the Cards screen.
 ///
 /// The question, answers, reasoning and explanations are selectable so a term
-/// can be defined exactly as it can during practice.
+/// can be defined exactly as it can during practice. The learner turns the
+/// error into atomic Basic cards instead of writing bias and vaccine notes.
 class ErrorCardReviewView extends ConsumerStatefulWidget {
   const ErrorCardReviewView({
     required this.card,
-    required this.bias,
-    required this.vaccine,
     this.editedContent,
-    this.checkResult,
     this.onContentChanged,
-    this.onCheckResult,
+    this.onCardsAdded,
     super.key,
   });
 
   final ErrorCard card;
-  final TextEditingController bias;
-  final TextEditingController vaccine;
 
   /// Question and options already shortened by the learner for this card.
   final ErrorCardContent? editedContent;
-
-  /// The AI verdict for this card, kept by the page so it survives stepping
-  /// away and back to the same card.
-  final ReviewCheckResult? checkResult;
 
   /// Reports a saved edit so the page can keep showing it when the learner
   /// returns to this card.
   final ValueChanged<ErrorCardContent>? onContentChanged;
 
-  /// Reports a new AI verdict for this card.
-  final ValueChanged<ReviewCheckResult>? onCheckResult;
+  /// Reports how many atomic cards were added so the page can advance.
+  final ValueChanged<int>? onCardsAdded;
 
   @override
   ConsumerState<ErrorCardReviewView> createState() =>
@@ -56,6 +48,11 @@ class ErrorCardReviewView extends ConsumerStatefulWidget {
 
 class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
   ErrorCardContent? _localContent;
+  List<SuggestedCard>? _suggestions;
+  final _selectedSuggestions = <int>{};
+  String? _suggestionError;
+  bool _loadingSuggestions = false;
+  bool _savingSuggestions = false;
 
   ErrorCardContent get _content =>
       widget.editedContent ??
@@ -80,7 +77,14 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.card.id != widget.card.id) {
       _localContent = null;
+      _resetSuggestions();
     }
+  }
+
+  void _resetSuggestions() {
+    _suggestions = null;
+    _selectedSuggestions.clear();
+    _suggestionError = null;
   }
 
   Future<void> _editContent() async {
@@ -90,9 +94,82 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
       current: _content,
     );
     if (updated == null || !mounted) return;
-    setState(() => _localContent = updated);
+    setState(() {
+      _localContent = updated;
+      _resetSuggestions();
+    });
     widget.onContentChanged?.call(updated);
     await showSnack(context, 'Card content updated.');
+  }
+
+  Future<void> _breakdown() async {
+    if (_loadingSuggestions || _savingSuggestions) return;
+    setState(() {
+      _loadingSuggestions = true;
+      _resetSuggestions();
+    });
+    try {
+      final card = widget.card;
+      final cards = await ref
+          .read(lookupServiceProvider)
+          .breakdownErrorCard(
+            question: _question,
+            wrongAnswer: _answersFor(card.wrongIndexes),
+            correctAnswer: _answersFor(card.correctIndexes),
+            reasoning: card.reasoning,
+            explanation: _content.explanation,
+            topicName: card.topicName,
+            subtopic: card.subtopic,
+            mistakeKinds: card.mistakeKinds,
+          );
+      if (!mounted) return;
+      setState(() {
+        _suggestions = cards;
+        _selectedSuggestions.addAll([
+          for (var index = 0; index < cards.length; index++) index,
+        ]);
+      });
+    } on LookupException catch (error) {
+      if (!mounted) return;
+      setState(() => _suggestionError = error.message);
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _suggestionError = 'Could not break down the error: $error',
+      );
+    } finally {
+      if (mounted) setState(() => _loadingSuggestions = false);
+    }
+  }
+
+  Future<void> _addSelected() async {
+    final suggestions = _suggestions;
+    if (suggestions == null || _selectedSuggestions.isEmpty) return;
+    if (_savingSuggestions) return;
+    final chosen = [
+      for (final index in _selectedSuggestions.toList()..sort())
+        suggestions[index],
+    ];
+    setState(() => _savingSuggestions = true);
+    try {
+      final added = await ref
+          .read(reviewServiceProvider)
+          .createErrorBreakdownCards(card: widget.card, cards: chosen);
+      if (!mounted) return;
+      setState(() => _resetSuggestions());
+      final report = widget.onCardsAdded;
+      if (report != null) {
+        report(added);
+      } else {
+        await showSnack(context, '$added card${added == 1 ? '' : 's'} added.');
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not add the cards: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _savingSuggestions = false);
+    }
   }
 
   @override
@@ -113,6 +190,7 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
         practiceName: card.practiceName,
         sessionId: card.sessionId,
         questionId: card.questionId,
+        subtopic: card.subtopic,
         anchor: anchor,
       );
     }
@@ -163,17 +241,6 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Tooltip(
-                message: 'Estimated time to read the front',
-                child: Pill(
-                  key: const ValueKey('error-card-reading-time'),
-                  readingTimeLabel(
-                    [_question, wrongAnswer, correctAnswer].join(' '),
-                  ),
-                  icon: Icons.schedule,
-                ),
-              ),
               const SizedBox(height: 12),
               _AnswerBox(
                 label: 'Wrong answer chosen',
@@ -213,9 +280,17 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
                   onAsk: ask,
                 ),
               ],
-              if (card.topicName.isNotEmpty) ...[
+              if (card.topicName.isNotEmpty || card.subtopic.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                Pill(card.topicName),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    if (card.topicName.isNotEmpty) Pill(card.topicName),
+                    if (card.subtopic.isNotEmpty)
+                      Pill(card.subtopic, tone: PillTone.secondary),
+                  ],
+                ),
               ],
             ],
           ),
@@ -256,244 +331,299 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
             ],
           ),
         ),
-        const SizedBox(height: 18),
-        _PromptField(
-          prompt: 'What was the flawed assumption in your reasoning?',
-          label: 'Flawed assumption (bias)',
-          hint: 'The belief that led you to the wrong answer.',
-          controller: widget.bias,
-        ),
-        const SizedBox(height: 14),
-        _PromptField(
-          prompt: 'What do you need to know to prevent that error?',
-          label: 'Vaccine (rule / protocol)',
-          hint: 'The rule or check you will use next time.',
-          controller: widget.vaccine,
-        ),
-        const SizedBox(height: 10),
-        _ReviewCheck(
-          question: _question,
-          correctAnswer: correctAnswer,
-          wrongAnswer: wrongAnswer,
-          reasoning: card.reasoning,
-          bias: widget.bias,
-          vaccine: widget.vaccine,
-          result: widget.checkResult,
-          onResult: widget.onCheckResult,
+        const SizedBox(height: 22),
+        _AtomicCardsSection(
+          suggestions: _suggestions,
+          selected: _selectedSuggestions,
+          error: _suggestionError,
+          loading: _loadingSuggestions,
+          saving: _savingSuggestions,
+          onBreakdown: _breakdown,
+          onAdd: _addSelected,
+          onSelectionChanged: (index, selected) => setState(() {
+            if (selected) {
+              _selectedSuggestions.add(index);
+            } else {
+              _selectedSuggestions.remove(index);
+            }
+          }),
         ),
       ],
     );
   }
 }
 
-class _ReviewCheck extends ConsumerStatefulWidget {
-  const _ReviewCheck({
-    required this.question,
-    required this.correctAnswer,
-    required this.wrongAnswer,
-    required this.reasoning,
-    required this.bias,
-    required this.vaccine,
-    this.result,
-    this.onResult,
+class _AtomicCardsSection extends StatelessWidget {
+  const _AtomicCardsSection({
+    required this.suggestions,
+    required this.selected,
+    required this.error,
+    required this.loading,
+    required this.saving,
+    required this.onBreakdown,
+    required this.onAdd,
+    required this.onSelectionChanged,
   });
 
-  final String question;
-  final String correctAnswer;
-  final String wrongAnswer;
-  final String reasoning;
-  final TextEditingController bias;
-  final TextEditingController vaccine;
-
-  /// Verdict owned by the review page, so it belongs to this card only.
-  final ReviewCheckResult? result;
-  final ValueChanged<ReviewCheckResult>? onResult;
-
-  @override
-  ConsumerState<_ReviewCheck> createState() => _ReviewCheckState();
-}
-
-class _ReviewCheckState extends ConsumerState<_ReviewCheck> {
-  ReviewCheckResult? _localResult;
-  bool _busy = false;
-
-  ReviewCheckResult? get _result => widget.result ?? _localResult;
-
-  Future<void> _check() async {
-    final bias = widget.bias.text.trim();
-    final vaccine = widget.vaccine.text.trim();
-    if (bias.isEmpty || vaccine.isEmpty) {
-      await showSnack(
-        context,
-        'Write both the flawed assumption and the prevention note first.',
-      );
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      final result = await ref
-          .read(lookupServiceProvider)
-          .checkErrorNotes(
-            question: widget.question,
-            correctAnswer: widget.correctAnswer,
-            wrongAnswer: widget.wrongAnswer,
-            reasoning: widget.reasoning,
-            bias: bias,
-            vaccine: vaccine,
-          );
-      if (!mounted) return;
-      final report = widget.onResult;
-      if (report == null) {
-        setState(() => _localResult = result);
-      } else {
-        report(result);
-      }
-    } on LookupException catch (error) {
-      if (mounted) await showSnack(context, error.message);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
+  final List<SuggestedCard>? suggestions;
+  final Set<int> selected;
+  final String? error;
+  final bool loading;
+  final bool saving;
+  final VoidCallback onBreakdown;
+  final VoidCallback onAdd;
+  final void Function(int index, bool selected) onSelectionChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final result = _result;
+    final cards = suggestions;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Align(
-          alignment: Alignment.centerLeft,
-          child: M3EButton.text(
-            key: const ValueKey('error-review-check'),
-            onPressed: _busy ? null : _check,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.fact_check_outlined, size: 18),
-                const SizedBox(width: 8),
-                Text(_busy ? 'Checking…' : 'Check with AI'),
-              ],
-            ),
+        Text(
+          'Break this error into atomic cards',
+          style: theme.typography.emphasized.titleSmall,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'One idea per card. The AI proposes a contrast and a rule; choose '
+          'the ones to save.',
+          style: theme.typography.baseline.bodySmall.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.4,
           ),
         ),
-        if (result != null) ...[
-          const SizedBox(height: 8),
+        const SizedBox(height: 12),
+        if (loading)
           TonalBox(
-            key: const ValueKey('error-review-check-result'),
-            color: result.consistent
-                ? AppSuccess.container(context)
-                : theme.colorScheme.errorContainer,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            key: const ValueKey('error-breakdown-loading'),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  result.consistent
-                      ? Icons.check_circle_outline
-                      : Icons.warning_amber_outlined,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
+                const M3ELoadingIndicator(),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(
-                    result.feedback,
-                    style: theme.typography.baseline.bodySmall.copyWith(
-                      height: 1.35,
-                    ),
+                    'Breaking the error down…',
+                    style: theme.typography.baseline.bodyMedium,
                   ),
                 ),
               ],
             ),
-          ),
-          if (result.biasSuggestion.isNotEmpty ||
-              result.vaccineSuggestion.isNotEmpty) ...[
-            const SizedBox(height: 10),
-            TonalBox(
-              key: const ValueKey('error-review-suggestions'),
-              padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Suggestions',
-                    style: theme.typography.baseline.labelMedium.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (result.biasSuggestion.isNotEmpty)
-                    _SuggestionRow(
-                      label: 'Flawed assumption',
-                      text: result.biasSuggestion,
-                      onUse: () => widget.bias
-                        ..text = result.biasSuggestion
-                        ..selection = TextSelection.collapsed(
-                          offset: result.biasSuggestion.length,
-                        ),
-                    ),
-                  if (result.vaccineSuggestion.isNotEmpty)
-                    _SuggestionRow(
-                      label: 'Vaccine',
-                      text: result.vaccineSuggestion,
-                      onUse: () => widget.vaccine
-                        ..text = result.vaccineSuggestion
-                        ..selection = TextSelection.collapsed(
-                          offset: result.vaccineSuggestion.length,
-                        ),
-                    ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ],
-    );
-  }
-}
-
-class _SuggestionRow extends StatelessWidget {
-  const _SuggestionRow({
-    required this.label,
-    required this.text,
-    required this.onUse,
-  });
-
-  final String label;
-  final String text;
-  final VoidCallback onUse;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
+          )
+        else if (error != null) ...[
+          TonalBox(
+            key: const ValueKey('error-breakdown-error'),
+            color: theme.colorScheme.errorContainer,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
-                  style: theme.typography.baseline.labelSmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  error!,
+                  style: theme.typography.baseline.bodyMedium.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                    height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  text,
-                  style: theme.typography.baseline.bodySmall.copyWith(
-                    height: 1.35,
+                if (error!.toLowerCase().contains('settings')) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Open Settings to add an AI provider and key.',
+                    style: theme.typography.baseline.labelSmall.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: 6),
-          M3EButton.text(onPressed: onUse, child: const Text('Use')),
+          const SizedBox(height: 10),
+          M3EButton.tonal(
+            key: const ValueKey('error-breakdown-retry'),
+            onPressed: saving ? null : onBreakdown,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
+          ),
+        ] else if (cards == null)
+          M3EButton.tonal(
+            key: const ValueKey('error-breakdown-ai'),
+            onPressed: onBreakdown,
+            icon: const Icon(Icons.auto_awesome_outlined),
+            label: const Text('Break into atomic cards (AI)'),
+          )
+        else if (cards.isEmpty) ...[
+          TonalBox(
+            key: const ValueKey('error-breakdown-empty'),
+            child: Text(
+              'The AI found no atomic cards for this error.',
+              style: theme.typography.baseline.bodyMedium.copyWith(height: 1.4),
+            ),
+          ),
+          const SizedBox(height: 10),
+          M3EButton.tonal(
+            key: const ValueKey('error-breakdown-retry'),
+            onPressed: saving ? null : onBreakdown,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Try again'),
+          ),
+        ] else ...[
+          if (cards.any(
+            (card) => card.cognitiveType == CognitiveType.heuristic,
+          )) ...[
+            TonalBox(
+              key: const ValueKey('error-heuristic-template'),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Text(
+                'Heuristic template: "Given requirement X with restriction Y, '
+                'what rule applies?" → answer with one atomic rule.',
+                style: theme.typography.baseline.bodySmall.copyWith(
+                  height: 1.45,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+          for (var index = 0; index < cards.length; index++)
+            _SuggestionTile(
+              key: ValueKey('error-suggestion-$index'),
+              index: index,
+              suggestion: cards[index],
+              report: checkCardLitmus(
+                front: cards[index].front,
+                back: cards[index].back,
+                cognitiveType: cards[index].cognitiveType,
+              ),
+              selected: selected.contains(index),
+              onChanged: saving
+                  ? null
+                  : (value) => onSelectionChanged(index, value),
+            ),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              M3EButton.text(
+                key: const ValueKey('error-breakdown-retry'),
+                onPressed: saving ? null : onBreakdown,
+                child: const Text('Try again'),
+              ),
+              M3EButton.filled(
+                key: const ValueKey('error-add-cards'),
+                onPressed: saving || selected.isEmpty ? null : onAdd,
+                icon: const Icon(Icons.add),
+                label: Text(
+                  saving
+                      ? 'Adding…'
+                      : 'Add ${selected.length} card${selected.length == 1 ? '' : 's'}',
+                ),
+              ),
+            ],
+          ),
         ],
+      ],
+    );
+  }
+}
+
+class _SuggestionTile extends StatelessWidget {
+  const _SuggestionTile({
+    required this.index,
+    required this.suggestion,
+    required this.report,
+    required this.selected,
+    required this.onChanged,
+    super.key,
+  });
+
+  final int index;
+  final SuggestedCard suggestion;
+  final LitmusReport report;
+  final bool selected;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final clean = report.isClean;
+    final qualityLabel = clean ? 'Ready' : 'Check quality';
+    final qualityDetail = clean
+        ? 'Passes the card quality checks'
+        : report.detail;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TonalBox(
+        padding: const EdgeInsets.fromLTRB(8, 8, 12, 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            M3ECheckbox(
+              value: selected,
+              semanticLabel: 'Select ${suggestion.cognitiveType.label} card',
+              onChanged: onChanged == null
+                  ? null
+                  : (value) => onChanged!(value ?? false),
+            ),
+            const SizedBox(width: 2),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Pill(
+                        key: ValueKey('error-type-badge-$index'),
+                        suggestion.cognitiveType.label,
+                        tone: PillTone.primary,
+                      ),
+                      Tooltip(
+                        message: qualityDetail,
+                        child: Pill(
+                          key: ValueKey('error-litmus-badge-$index'),
+                          qualityLabel,
+                          tone: clean ? PillTone.success : PillTone.error,
+                          icon: clean
+                              ? Icons.check_circle_outline
+                              : Icons.warning_amber_outlined,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    suggestion.front,
+                    style: theme.typography.baseline.titleSmall.copyWith(
+                      height: 1.35,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    suggestion.back,
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                  if (!clean) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      report.detail,
+                      key: ValueKey('error-litmus-detail-$index'),
+                      style: theme.typography.baseline.labelSmall.copyWith(
+                        color: theme.colorScheme.error,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -707,42 +837,6 @@ class _AlternativeExplanationState extends State<_AlternativeExplanation> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class _PromptField extends StatelessWidget {
-  const _PromptField({
-    required this.prompt,
-    required this.label,
-    required this.hint,
-    required this.controller,
-  });
-
-  final String prompt;
-  final String label;
-  final String hint;
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          prompt,
-          style: theme.typography.baseline.titleSmall.copyWith(height: 1.35),
-        ),
-        const SizedBox(height: 8),
-        M3ETextField(
-          controller: controller,
-          label: label,
-          placeholder: hint,
-          minLines: 2,
-          maxLines: 5,
-        ),
-      ],
     );
   }
 }

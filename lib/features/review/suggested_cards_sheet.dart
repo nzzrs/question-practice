@@ -6,10 +6,11 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/domain/lookup_service.dart';
+import 'domain/card_litmus.dart';
 
 /// Opens the shared AI suggestion sheet for [highlight].
 ///
-/// Returns the number of basic cards added, or zero when the learner closes
+/// Returns the number of atomic cards added, or zero when the learner closes
 /// the sheet without adding any. A snackbar reports the count so both the
 /// end-of-session review and Cards behave the same way.
 Future<int> suggestCardsFromHighlight(
@@ -65,10 +66,11 @@ class _SuggestedCardsSheetState extends ConsumerState<SuggestedCardsSheet> {
     try {
       final cards = await ref
           .read(lookupServiceProvider)
-          .suggestAtomicCards(
+          .suggestArchetypeCards(
             highlight: widget.highlight.text,
             questionContext: widget.highlight.context,
             topicName: widget.highlight.topicName,
+            subtopic: widget.highlight.subtopic,
           );
       if (!mounted) return;
       setState(() {
@@ -86,6 +88,15 @@ class _SuggestedCardsSheetState extends ConsumerState<SuggestedCardsSheet> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  List<int> _indexesFor(CognitiveType type) {
+    final cards = _cards;
+    if (cards == null) return const [];
+    return [
+      for (var index = 0; index < cards.length; index++)
+        if (cards[index].cognitiveType == type) index,
+    ];
   }
 
   Future<void> _addSelected() async {
@@ -106,6 +117,8 @@ class _SuggestedCardsSheetState extends ConsumerState<SuggestedCardsSheet> {
           answer: suggestion.back,
           context: widget.highlight.context,
           topicName: widget.highlight.topicName,
+          cognitiveType: suggestion.cognitiveType,
+          subtopic: widget.highlight.subtopic,
         );
         firstCardId ??= id;
         added++;
@@ -198,21 +211,34 @@ class _SuggestedCardsSheetState extends ConsumerState<SuggestedCardsSheet> {
                 label: const Text('Try again'),
               ),
             ] else ...[
-              for (var index = 0; index < _cards!.length; index++)
-                _SuggestionTile(
-                  key: ValueKey('suggested-card-$index'),
-                  card: _cards![index],
-                  selected: _selected.contains(index),
-                  onChanged: _saving
-                      ? null
-                      : (value) => setState(() {
-                          if (value) {
-                            _selected.add(index);
-                          } else {
-                            _selected.remove(index);
-                          }
-                        }),
-                ),
+              for (final type in const [
+                CognitiveType.heuristic,
+                CognitiveType.fact,
+                CognitiveType.contrast,
+                CognitiveType.concept,
+              ])
+                if (_indexesFor(type).isNotEmpty) ...[
+                  _SuggestionGroupHeading(
+                    label: _groupLabel(type),
+                    count: _indexesFor(type).length,
+                    type: type,
+                  ),
+                  for (final index in _indexesFor(type))
+                    _SuggestionTile(
+                      key: ValueKey('suggested-card-$index'),
+                      card: _cards![index],
+                      selected: _selected.contains(index),
+                      onChanged: _saving
+                          ? null
+                          : (value) => setState(() {
+                              if (value) {
+                                _selected.add(index);
+                              } else {
+                                _selected.remove(index);
+                              }
+                            }),
+                    ),
+                ],
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -246,6 +272,98 @@ class _SuggestedCardsSheetState extends ConsumerState<SuggestedCardsSheet> {
   }
 }
 
+class _SuggestionGroupHeading extends StatelessWidget {
+  const _SuggestionGroupHeading({
+    required this.label,
+    required this.count,
+    required this.type,
+  });
+
+  final String label;
+  final int count;
+  final CognitiveType type;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      key: ValueKey('suggested-group-${type.name}'),
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(label, style: theme.typography.emphasized.titleSmall),
+          ),
+          Text(
+            '$count',
+            style: theme.typography.baseline.labelMedium.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _groupLabel(CognitiveType type) => switch (type) {
+  CognitiveType.heuristic => 'Procedures & rules',
+  CognitiveType.fact => 'Atomic facts',
+  CognitiveType.contrast => 'Contrasts',
+  CognitiveType.concept => 'Concepts',
+};
+
+class _QualityBadge extends StatelessWidget {
+  const _QualityBadge({required this.report});
+
+  final LitmusReport report;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    if (report.isClean) {
+      return const Pill(
+        'Ready',
+        tone: PillTone.success,
+        icon: Icons.check_circle_outline,
+      );
+    }
+    return Tooltip(
+      message: report.detail,
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 240),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.tertiaryContainer,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.warning_amber_outlined,
+              size: 13,
+              color: theme.colorScheme.onTertiaryContainer,
+            ),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                report.detail,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.typography.baseline.labelSmall.copyWith(
+                  color: theme.colorScheme.onTertiaryContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _SuggestionTile extends StatelessWidget {
   const _SuggestionTile({
     required this.card,
@@ -261,6 +379,11 @@ class _SuggestionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final litmus = checkCardLitmus(
+      front: card.front,
+      back: card.back,
+      cognitiveType: card.cognitiveType,
+    );
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TonalBox(
@@ -292,6 +415,15 @@ class _SuggestionTile extends StatelessWidget {
                       color: theme.colorScheme.onSurfaceVariant,
                       height: 1.4,
                     ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      Pill(card.cognitiveType.label),
+                      _QualityBadge(report: litmus),
+                    ],
                   ),
                 ],
               ),

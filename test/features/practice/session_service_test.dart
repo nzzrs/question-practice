@@ -392,6 +392,54 @@ void main() {
     );
   });
 
+  test('mistake kinds persist to the attempt and its error card', () async {
+    final practice = await harness.seedPractice(count: 1);
+    final start = await service.startPractice(practice.practiceId);
+    final item = start.items.single;
+    await service.submitAnswer(
+      start: start,
+      item: item,
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: false,
+    );
+
+    final updated = await service.setMistakeKinds(
+      start: start,
+      item: item,
+      kinds: const [MistakeKind.confusion, MistakeKind.forgottenFact],
+    );
+    expect(updated.mistakeKinds, const [
+      MistakeKind.forgottenFact,
+      MistakeKind.confusion,
+    ]);
+
+    final attempt = await harness.sessions.attemptForQuestion(
+      start.session.id,
+      item.question.id,
+    );
+    expect(attempt!.mistakeKinds, const [
+      MistakeKind.forgottenFact,
+      MistakeKind.confusion,
+    ]);
+    final card = await harness.cards.activeErrorForQuestion(item.question.id);
+    expect(card!.mistakeKinds, const [
+      MistakeKind.forgottenFact,
+      MistakeKind.confusion,
+    ]);
+
+    final cleared = await service.setMistakeKinds(
+      start: start,
+      item: item,
+      kinds: const [MistakeKind.distraction],
+    );
+    expect(cleared.mistakeKinds, const [MistakeKind.distraction]);
+    final clearedCard = await harness.cards.activeErrorForQuestion(
+      item.question.id,
+    );
+    expect(clearedCard!.mistakeKinds, const [MistakeKind.distraction]);
+  });
+
   test('summary counts distinct looked-up terms', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await service.startPractice(practice.practiceId);

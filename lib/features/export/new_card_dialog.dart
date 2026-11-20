@@ -32,6 +32,7 @@ Future<NewCardDraft?> showNewCardDialog(
   String initialQuestion = '',
   String initialAnswer = '',
   NewCardKind initialKind = NewCardKind.basic,
+  NewCardKind? lockedKind,
   String title = 'Make a card',
 }) {
   return M3EDialog.show<NewCardDraft>(
@@ -43,6 +44,7 @@ Future<NewCardDraft?> showNewCardDialog(
       initialQuestion: initialQuestion,
       initialAnswer: initialAnswer,
       initialKind: initialKind,
+      lockedKind: lockedKind,
     ),
   );
 }
@@ -55,6 +57,7 @@ class _NewCardDialog extends StatefulWidget {
     required this.initialQuestion,
     required this.initialAnswer,
     required this.initialKind,
+    this.lockedKind,
   });
 
   final String title;
@@ -63,6 +66,7 @@ class _NewCardDialog extends StatefulWidget {
   final String initialQuestion;
   final String initialAnswer;
   final NewCardKind initialKind;
+  final NewCardKind? lockedKind;
 
   @override
   State<_NewCardDialog> createState() => _NewCardDialogState();
@@ -73,7 +77,7 @@ class _NewCardDialogState extends State<_NewCardDialog> {
   late final _definition = TextEditingController();
   late final _question = TextEditingController(text: widget.initialQuestion);
   late final _answer = TextEditingController(text: widget.initialAnswer);
-  late NewCardKind _kind = widget.initialKind;
+  late NewCardKind _kind = widget.lockedKind ?? widget.initialKind;
 
   @override
   void dispose() {
@@ -129,19 +133,21 @@ class _NewCardDialogState extends State<_NewCardDialog> {
                 ),
                 const SizedBox(height: 16),
               ],
-              M3ESegmentedButton<NewCardKind>(
-                segments: const [
-                  M3ESegment(value: NewCardKind.basic, label: 'Basic card'),
-                  M3ESegment(value: NewCardKind.concept, label: 'Concept'),
-                ],
-                selected: {_kind},
-                onSelectionChanged: (values) {
-                  if (values.isNotEmpty) {
-                    setState(() => _kind = values.first);
-                  }
-                },
-              ),
-              const SizedBox(height: 16),
+              if (widget.lockedKind == null) ...[
+                M3ESegmentedButton<NewCardKind>(
+                  segments: const [
+                    M3ESegment(value: NewCardKind.basic, label: 'Basic card'),
+                    M3ESegment(value: NewCardKind.concept, label: 'Concept'),
+                  ],
+                  selected: {_kind},
+                  onSelectionChanged: (values) {
+                    if (values.isNotEmpty) {
+                      setState(() => _kind = values.first);
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
               if (_kind == NewCardKind.concept) ...[
                 M3ETextField(
                   key: const ValueKey('new-card-term'),

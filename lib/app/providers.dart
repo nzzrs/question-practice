@@ -22,6 +22,7 @@ import '../features/practice/domain/session_service.dart';
 import '../features/practice_edit/domain/practice_edit_service.dart';
 import '../features/review/domain/review_service.dart';
 import '../features/topics/domain/statistics_export_service.dart';
+import '../features/topics/domain/topic_edit_service.dart';
 
 final databaseProvider = Provider<AppDatabase>(
   (ref) => throw UnimplementedError('databaseProvider must be overridden'),
@@ -241,6 +242,14 @@ final exportServiceProvider = Provider<ExportService>(
 
 final practiceEditServiceProvider = Provider<PracticeEditService>(
   (ref) => PracticeEditService(
+    practices: ref.watch(topicRepositoryProvider),
+    importService: ref.watch(importServiceProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final topicEditServiceProvider = Provider<TopicEditService>(
+  (ref) => TopicEditService(
     practices: ref.watch(topicRepositoryProvider),
     importService: ref.watch(importServiceProvider),
     clock: ref.watch(clockProvider),

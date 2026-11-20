@@ -131,6 +131,10 @@ class SessionRepository {
     return _db.sessionDao.updateAttemptReasoning(id, reasoning);
   }
 
+  Future<void> updateAttemptMistakeKinds(int id, String mistakeKindsJson) {
+    return _db.sessionDao.updateAttemptMistakeKinds(id, mistakeKindsJson);
+  }
+
   Future<void> completeSession({
     required int id,
     required int total,

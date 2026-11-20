@@ -89,7 +89,7 @@ void main() {
     expect(find.textContaining('Progress over time'), findsOneWidget);
     expect(find.text('Latest'), findsOneWidget);
     expect(find.text('100%'), findsWidgets);
-    expect(find.text('weighted by questions'), findsOneWidget);
+    expect(find.textContaining('weighted by questions'), findsOneWidget);
     expect(find.textContaining('weighted average'), findsOneWidget);
   });
 

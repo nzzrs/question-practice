@@ -7,7 +7,6 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_card_review_view.dart';
 import '../export/cards_page.dart';
-import '../lookup/domain/lookup_service.dart';
 import 'domain/review_service.dart';
 import 'highlight_card_actions.dart';
 import 'highlight_review_view.dart';
@@ -34,13 +33,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   bool _busy = false;
   bool _finished = false;
 
-  final _bias = TextEditingController();
-  final _vaccine = TextEditingController();
   final _term = TextEditingController();
   final _definition = TextEditingController();
   final _newQuestion = TextEditingController();
   final _newAnswer = TextEditingController();
-  final _checks = <int, ReviewCheckResult>{};
   final _edits = <int, ErrorCardContent>{};
   final _scroll = ScrollController();
   _Missing _missing = _Missing.concept;
@@ -53,8 +49,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   @override
   void dispose() {
-    _bias.dispose();
-    _vaccine.dispose();
     _term.dispose();
     _definition.dispose();
     _newQuestion.dispose();
@@ -86,20 +80,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   void _prepareStep() {
     final step = _step;
     _missing = _Missing.concept;
-    _bias.clear();
-    _vaccine.clear();
     _term.clear();
     _definition.clear();
     _newQuestion.clear();
     _newAnswer.clear();
-    switch (step) {
-      case ErrorReviewStep(:final card):
-        _bias.text = card.bias;
-        _vaccine.text = card.vaccine;
-      case ConceptDefinitionStep(:final concept):
-        _definition.text = concept.definition;
-      default:
-        break;
+    if (step is ConceptDefinitionStep) {
+      _definition.text = step.concept.definition;
     }
   }
 
@@ -129,30 +115,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   void _resetScroll() {
     if (_scroll.hasClients) _scroll.jumpTo(0);
-  }
-
-  Future<void> _saveError(ErrorReviewStep step) async {
-    if (_bias.text.trim().isEmpty || _vaccine.text.trim().isEmpty) {
-      await showSnack(
-        context,
-        'Write both the flawed assumption and the prevention note.',
-      );
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await ref
-          .read(reviewServiceProvider)
-          .saveErrorDetails(
-            cardId: step.card.id,
-            bias: _bias.text,
-            vaccine: _vaccine.text,
-          );
-      _created++;
-      _advance();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   Future<void> _saveSkipped(SkippedReviewStep step) async {
@@ -364,7 +326,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     : () {
                         switch (step) {
                           case ErrorReviewStep():
-                            _saveError(step);
+                            _advance();
                           case SkippedReviewStep():
                             _saveSkipped(step);
                           case ConceptDefinitionStep():
@@ -377,8 +339,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     ? 'Saving…'
                     : step is HighlightReviewStep
                     ? 'Keep & save'
+                    : step is ErrorReviewStep
+                    ? 'Continue'
                     : 'Save',
-                icon: Icons.check,
+                icon: step is ErrorReviewStep
+                    ? Icons.arrow_forward
+                    : Icons.check,
               ),
             ),
             const SizedBox(width: 8),
@@ -404,14 +370,14 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         switch (step) {
           ErrorReviewStep(:final card) => ErrorCardReviewView(
             card: card,
-            bias: _bias,
-            vaccine: _vaccine,
             editedContent: _edits[card.id],
-            checkResult: _checks[card.id],
             onContentChanged: (content) =>
                 setState(() => _edits[card.id] = content),
-            onCheckResult: (result) =>
-                setState(() => _checks[card.id] = result),
+            onCardsAdded: (count) {
+              if (!mounted) return;
+              setState(() => _created += count);
+              _advance();
+            },
           ),
           SkippedReviewStep(
             :final question,

@@ -170,6 +170,10 @@ class CardRepository {
     );
   }
 
+  Future<void> completeErrorCardDetails(int id, DateTime completedAt) {
+    return _db.cardDao.completeErrorCardDetails(id, completedAt);
+  }
+
   Future<void> updateErrorCardContent({
     required int id,
     required String question,

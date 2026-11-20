@@ -15,8 +15,7 @@ void main() {
   Future<ErrorCard> createError(
     TestHarness harness, {
     required Question question,
-    String? bias,
-    String? vaccine,
+    bool completed = false,
   }) async {
     final id = await harness.cards.createErrorCard(
       questionId: question.id,
@@ -30,18 +29,32 @@ void main() {
       alternativeExplanations: question.alternativeExplanations,
       topicName: 'Topic',
       practiceName: 'Practice',
+      subtopic: 'Sub',
       lastWrongAt: harness.clock.now().toUtc(),
       dueAfter: const Duration(hours: 48),
     );
-    if (bias != null && vaccine != null) {
-      await harness.cards.updateErrorCardDetails(
-        id: id,
-        bias: bias,
-        vaccine: vaccine,
-        completedAt: harness.clock.now().toUtc(),
+    if (completed) {
+      await harness.cards.completeErrorCardDetails(
+        id,
+        harness.clock.now().toUtc(),
       );
     }
     return (await harness.cards.errorCardById(id))!;
+  }
+
+  http.Response aiResponse(List<Map<String, String>> cards) {
+    return http.Response(
+      jsonEncode({
+        'choices': [
+          {
+            'message': {
+              'content': jsonEncode({'cards': cards}),
+            },
+          },
+        ],
+      }),
+      200,
+    );
   }
 
   testWidgets('cards review opens full screen with a clear exit', (
@@ -97,12 +110,7 @@ void main() {
       final question = (await harness.practices.questionsForPractice(
         seeded.practiceId,
       )).single;
-      await createError(
-        harness,
-        question: question,
-        bias: 'Bias',
-        vaccine: 'Rule',
-      );
+      await createError(harness, question: question, completed: true);
 
       await pumpTestApp(tester, home: const CardsPage(), harness: harness);
       expect(find.text('Review selected'), findsOneWidget);
@@ -124,33 +132,18 @@ void main() {
     },
   );
 
-  testWidgets('the AI check belongs to its card, not the review page', (
+  testWidgets('adding atomic cards completes the error and advances', (
     tester,
   ) async {
-    var calls = 0;
-    final client = MockClient((request) async {
-      calls++;
-      final feedback = calls == 1
-          ? 'First card verdict.'
-          : 'Second card verdict.';
-      return http.Response(
-        jsonEncode({
-          'choices': [
-            {
-              'message': {
-                'content': jsonEncode({
-                  'consistent': true,
-                  'feedback': feedback,
-                  'bias': '',
-                  'vaccine': '',
-                }),
-              },
-            },
-          ],
-        }),
-        200,
-      );
-    });
+    final client = MockClient(
+      (_) async => aiResponse([
+        {
+          'type': 'contrast',
+          'front': 'Which layer owns IP addresses?',
+          'back': 'The network layer owns addressing.',
+        },
+      ]),
+    );
     final harness = TestHarness(httpClient: client);
     addTearDown(harness.close);
     await harness.settings.save(
@@ -165,18 +158,8 @@ void main() {
     final questions = await harness.practices.questionsForPractice(
       seeded.practiceId,
     );
-    final first = await createError(
-      harness,
-      question: questions[0],
-      bias: 'First bias',
-      vaccine: 'First rule',
-    );
-    final second = await createError(
-      harness,
-      question: questions[1],
-      bias: 'Second bias',
-      vaccine: 'Second rule',
-    );
+    final first = await createError(harness, question: questions[0]);
+    final second = await createError(harness, question: questions[1]);
 
     await pumpTestApp(
       tester,
@@ -184,29 +167,32 @@ void main() {
       harness: harness,
     );
 
-    await tester.ensureVisible(find.text('Check with AI'));
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('error-breakdown-ai')),
+    );
     await pumpFrames(tester);
-    await tester.tap(find.text('Check with AI'));
+    await tester.tap(find.byKey(const ValueKey('error-breakdown-ai')));
     await pumpFrames(tester, frames: 24);
-    expect(find.text('First card verdict.'), findsOneWidget);
-
-    await tester.tap(find.text('Skip'));
+    await tester.ensureVisible(find.byKey(const ValueKey('error-add-cards')));
     await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('error-add-cards')));
+    await pumpFrames(tester, frames: 24);
+
     expect(find.text('Item 2 of 2'), findsOneWidget);
-    expect(find.text('First card verdict.'), findsNothing);
-
-    await tester.ensureVisible(find.text('Check with AI'));
-    await pumpFrames(tester);
-    await tester.tap(find.text('Check with AI'));
-    await pumpFrames(tester, frames: 24);
-    expect(find.text('Second card verdict.'), findsOneWidget);
-    expect(find.text('First card verdict.'), findsNothing);
-
-    await tester.tap(find.text('Previous'));
-    await pumpFrames(tester);
-    expect(find.text('Item 1 of 2'), findsOneWidget);
-    expect(find.text('First card verdict.'), findsOneWidget);
-    expect(find.text('Second card verdict.'), findsNothing);
+    final completed = await tester.runAsync(
+      () => harness.cards.errorCardById(first.id),
+    );
+    expect(completed!.needsDetails, isFalse);
+    final untouched = await tester.runAsync(
+      () => harness.cards.errorCardById(second.id),
+    );
+    expect(untouched!.needsDetails, isTrue);
+    final cards = await tester.runAsync(
+      () => harness.cards.watchManualCards().first,
+    );
+    expect(cards, hasLength(1));
+    expect(cards!.single.subtopic, 'Sub');
+    expect(cards.single.cognitiveType, CognitiveType.contrast);
   });
 
   testWidgets('the question and options can be shortened before saving', (
@@ -221,8 +207,7 @@ void main() {
     final card = await createError(
       harness,
       question: question,
-      bias: 'Bias',
-      vaccine: 'Rule',
+      completed: true,
     );
 
     await pumpTestApp(

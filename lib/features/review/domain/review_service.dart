@@ -154,6 +154,37 @@ class ReviewService {
     );
   }
 
+  /// Marks the card's details step complete, leaving the old bias and vaccine
+  /// notes untouched for cards created before atomic breakdowns.
+  Future<void> completeErrorDetails(int cardId) {
+    return _cards.completeErrorCardDetails(cardId, _clock.now().toUtc());
+  }
+
+  /// Creates the selected atomic cards for [card] and completes its details.
+  ///
+  /// Each [SuggestedCard] becomes one Basic card carrying the error's topic,
+  /// subtopic and cognitive type. Returns the number of cards created.
+  Future<int> createErrorBreakdownCards({
+    required ErrorCard card,
+    required Iterable<SuggestedCard> cards,
+  }) async {
+    var added = 0;
+    for (final suggestion in cards) {
+      await createBasicCard(
+        sessionId: card.sessionId,
+        questionId: card.questionId,
+        question: suggestion.front,
+        answer: suggestion.back,
+        topicName: card.topicName,
+        subtopic: card.subtopic,
+        cognitiveType: suggestion.cognitiveType,
+      );
+      added++;
+    }
+    await completeErrorDetails(card.id);
+    return added;
+  }
+
   /// Saves a shortened question, its options and their explanations without
   /// changing the card's link to the original practice question or its
   /// correct/wrong indexes.

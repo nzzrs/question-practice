@@ -162,6 +162,13 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     );
   }
 
+  /// Marks the details step complete without touching the legacy notes.
+  Future<void> completeErrorCardDetails(int id, DateTime completedAt) {
+    return (update(errorCards)..where((e) => e.id.equals(id))).write(
+      ErrorCardsCompanion(detailsCompletedAt: Value(completedAt)),
+    );
+  }
+
   Future<void> updateErrorCardContent(
     int id, {
     required String question,

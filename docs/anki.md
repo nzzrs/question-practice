@@ -33,7 +33,7 @@ Routing uses the topic name captured on each card: concept cards use the topic c
 | AnkiDroid's Cloze type | existing `Text` and `Back Extra` fields | Concept cards and definitions |
 | `Basic` | `Front`, `Back` | Facts, heuristics, contrasts, skipped-question cards and Ask answers |
 
-The app no longer creates or writes a custom error note type. An error is a review record that is broken into atomic Basic cards before export. The old `Question Practice: Error v2` model is no longer required, created or written.
+The app no longer creates or writes a custom error note type. An error is a review record that is turned into atomic Basic cards with **Create cards** before export. The old `Question Practice: Error v2` model is no longer required, created or written.
 
 Basic cards use the note type named exactly **`Basic`**, with the two fields `Front` and `Back`. If that note type is missing, the app creates it through AnkiDroid's `addNewBasicModel` before adding notes; it does not use `Basic (and reversed card)` or another variant.
 
@@ -63,17 +63,17 @@ the definition bubble in the app.
 
 The end-of-session review and the Cards screen show the mistake, the chosen wrong answer, the correct answer, your reasoning and the explanation. There are no free-text bias or vaccine fields and no "Check with AI" button.
 
-**Break into atomic cards (AI)** proposes at most two Basic cards:
+**Create cards** sits inside the error review and opens the card creator. Manual entry adds cards one at a time and works offline without AI, so error review no longer depends on an AI provider. **Suggest with AI** is optional and proposes at most two Basic cards:
 
 - a **contrast** card that asks you to distinguish the chosen wrong option from the correct one;
 - a **heuristic** card whose front follows the mandatory template
   `Given requirement X with restriction Y, what rule applies?` and whose back is the atomic rule.
 
-Every proposal carries a live quality badge. The Litmus check flags a binary
+Every suggestion carries a live quality badge. The Litmus check flags a binary
 front (one answerable with yes/no), a front longer than 30 words, syntactic
 clues that give the answer away, and a heuristic front that does not use the
-rule template. You choose which proposals to add; they become Basic cards and
-the error is marked reviewed. Errors are never sent to Anki directly.
+rule template. You choose which cards to save; they become Basic cards and the
+error is marked reviewed. Errors are never sent to Anki directly.
 
 ## Tags
 
@@ -93,10 +93,10 @@ become `-`). The `subtopic::` tag is omitted when the card has no subtopic.
 
 Only selected, complete cards are sent. Concepts need a definition. Manual
 cards (facts, heuristics and contrasts) are always exportable Basic cards.
-Error records and skipped questions are not exported directly: review an error
-into atomic cards first and convert a skipped question into a concept or basic
-card. The Cards screen previews every card and lets you deselect or delete items
-first.
+Error records and skipped questions are not exported directly: turn an error
+into atomic cards with **Create cards** first and convert a skipped question
+into a concept or basic card. The Cards screen previews every card and lets you
+deselect or delete items first.
 
 After a successful import the app broadcasts `com.ichi2.anki.DO_SYNC` so AnkiDroid can sync in the background.
 
@@ -128,7 +128,7 @@ On a connected Android device with AnkiDroid installed:
    - contrast and heuristic notes use the `Basic` note type;
    - the `topic::` and `subtopic::` tags are present.
 5. Set the Cloud topic to a separate deck with **Edit topic → AnkiDroid deck** (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck. Open **Edit practice** and confirm it has no deck row; deck selection is topic-level only.
-6. Import a multi-answer question, answer it wrong, open the review and confirm **Break into atomic cards (AI)** proposes a contrast and/or heuristic with Litmus badges.
+6. Import a multi-answer question, answer it wrong, open the review and confirm **Create cards** adds a card manually without AI, while **Suggest with AI** proposes a contrast and/or heuristic with Litmus badges.
 7. Confirm no `Question Practice: Error v2` model is created in AnkiDroid.
 8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
 9. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.

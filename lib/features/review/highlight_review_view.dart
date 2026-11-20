@@ -95,7 +95,7 @@ class HighlightReviewView extends StatelessWidget {
         const SizedBox(height: 20),
         if (showCardActions) ...[
           Text(
-            'Turn it into a card, or keep it for later.',
+            'Make a concept card, suggest atomic cards, or keep it for later.',
             style: theme.typography.emphasized.titleSmall,
           ),
           const SizedBox(height: 12),
@@ -107,7 +107,7 @@ class HighlightReviewView extends StatelessWidget {
                 key: const ValueKey('highlight-make-card'),
                 onPressed: onMakeCard,
                 icon: const Icon(Icons.style_outlined),
-                label: const Text('Turn into a card'),
+                label: const Text('Make concept card'),
               ),
               M3EButton.tonal(
                 key: const ValueKey('highlight-suggest-cards'),

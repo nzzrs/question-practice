@@ -17,6 +17,7 @@ Future<void> showAskAboutSelection(
   required String practiceName,
   required int? sessionId,
   required int? questionId,
+  String subtopic = '',
 }) {
   return M3EBottomSheet.show<void>(
     context,
@@ -28,6 +29,7 @@ Future<void> showAskAboutSelection(
       practiceName: practiceName,
       sessionId: sessionId,
       questionId: questionId,
+      subtopic: subtopic,
     ),
   );
 }
@@ -40,6 +42,7 @@ class AskSheet extends ConsumerStatefulWidget {
     required this.practiceName,
     required this.sessionId,
     required this.questionId,
+    this.subtopic = '',
     super.key,
   });
 
@@ -49,6 +52,7 @@ class AskSheet extends ConsumerStatefulWidget {
   final String practiceName;
   final int? sessionId;
   final int? questionId;
+  final String subtopic;
 
   @override
   ConsumerState<AskSheet> createState() => _AskSheetState();
@@ -120,6 +124,7 @@ class _AskSheetState extends ConsumerState<AskSheet> {
           definition: draft.definition,
           context: widget.question,
           topicName: widget.topicName,
+          subtopic: widget.subtopic,
           source: ConceptSource.manual,
         );
       } else {
@@ -130,6 +135,8 @@ class _AskSheetState extends ConsumerState<AskSheet> {
           answer: draft.answer,
           context: widget.question,
           topicName: widget.topicName,
+          subtopic: widget.subtopic,
+          cognitiveType: CognitiveType.fact,
         );
       }
       if (!mounted) return;

@@ -58,6 +58,15 @@ void main() {
       ]),
     );
     expect(texts.any((text) => text.contains('Review highlights')), isTrue);
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'Facts, heuristics and contrasts use the Basic note type',
+        ),
+      ),
+      isTrue,
+    );
+    expect(texts.any((text) => text.contains('Error v2')), isFalse);
     expect(texts.any((text) => text.contains('shuffle button')), isFalse);
     expect(
       texts.any((text) => text.contains('A quiet loop for practice')),

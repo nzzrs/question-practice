@@ -9,6 +9,8 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/progress_math.dart';
+import '../../core/domain/score_band.dart';
+import '../../core/ui/score_band_style.dart';
 import '../../core/ui/widgets.dart';
 
 class TopicStatsPage extends ConsumerStatefulWidget {
@@ -138,6 +140,9 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
               ordered,
             );
             final hasSubtopics = subtopics.any((stat) => !stat.isUncategorized);
+            final topic = summary.value?.topic;
+            final minimumScore = topic?.minimumScore ?? 70;
+            final targetScore = topic?.targetScore ?? 80;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -148,6 +153,8 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
                   best: best,
                   learningRatePer100: learningRatePer100,
                   learningRatePerWeek: learningRatePerWeek,
+                  minimumScore: minimumScore,
+                  targetScore: targetScore,
                 ),
                 const SizedBox(height: 24),
                 SectionTitle(
@@ -155,7 +162,12 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
                   count: ordered.length,
                   supporting: 'Each point is one completed session.',
                 ),
-                _ProgressChart(points: ordered, trendValues: trendValues),
+                _ProgressChart(
+                  points: ordered,
+                  trendValues: trendValues,
+                  minimumScore: minimumScore,
+                  targetScore: targetScore,
+                ),
                 if (hasSubtopics) ...[
                   const SizedBox(height: 24),
                   SectionTitle(
@@ -169,6 +181,8 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
                       for (final stat in subtopics)
                         _SubtopicRow(
                           stat: stat,
+                          minimumScore: minimumScore,
+                          targetScore: targetScore,
                           selected: _selected.contains(stat.subtopic),
                           onTap: _selectionMode
                               ? () => _toggleSubtopic(stat.subtopic)
@@ -186,6 +200,8 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
                       _ProgressRow(
                         key: ValueKey('session-row-${point.sessionId}'),
                         point: point,
+                        minimumScore: minimumScore,
+                        targetScore: targetScore,
                         selected: _selectedSessions.contains(point.sessionId),
                         onTap: _sessionSelectionMode
                             ? () => _toggleSession(point.sessionId)
@@ -542,12 +558,16 @@ class _TrendHero extends StatelessWidget {
     required this.best,
     required this.learningRatePer100,
     required this.learningRatePerWeek,
+    required this.minimumScore,
+    required this.targetScore,
   });
 
   final List<TopicProgressPoint> points;
   final TopicProgressPoint latest;
   final double average;
   final double best;
+  final int minimumScore;
+  final int targetScore;
 
   /// Percentage points per 100 answered questions, or null without a fit.
   final double? learningRatePer100;
@@ -558,8 +578,23 @@ class _TrendHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final strong = latest.score > 0.8;
     final rate = learningRatePer100;
+    final latestPercent = (latest.score * 100).round();
+    final latestBand = scoreBandFor(
+      latest.score,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
+    );
+    final averageBand = scoreBandFor(
+      average,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
+    );
+    final bestBand = scoreBandFor(
+      best,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
+    );
     return TonalBox(
       padding: const EdgeInsets.all(18),
       child: Column(
@@ -569,11 +604,11 @@ class _TrendHero extends StatelessWidget {
             children: [
               ScoreRing(
                 value: latest.score,
-                label: '${(latest.score * 100).round()}%',
+                label: '$latestPercent%',
                 caption: 'Latest',
                 size: 112,
                 strokeWidth: 11,
-                color: strong ? AppSuccess.foreground(context) : null,
+                color: scoreBandColor(context, latestBand),
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -583,6 +618,19 @@ class _TrendHero extends StatelessWidget {
                     Text(
                       _trendLabel(points),
                       style: theme.typography.emphasized.titleMedium,
+                    ),
+                    const SizedBox(height: 4),
+                    Semantics(
+                      label: scoreSemanticsLabel(
+                        subject: 'Latest score',
+                        percent: latestPercent,
+                        band: latestBand,
+                      ),
+                      excludeSemantics: true,
+                      child: Pill(
+                        scoreBandLabel(latestBand),
+                        tone: scoreBandPillTone(latestBand),
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -611,8 +659,10 @@ class _TrendHero extends StatelessWidget {
                 child: MetricTile(
                   label: 'Average',
                   value: '${(average * 100).round()}%',
-                  caption: 'weighted by questions',
+                  caption:
+                      '${scoreBandLabel(averageBand)} · weighted by questions',
                   icon: Icons.timeline,
+                  tone: scoreBandMetricTone(averageBand),
                 ),
               ),
               const SizedBox(width: 8),
@@ -620,8 +670,9 @@ class _TrendHero extends StatelessWidget {
                 child: MetricTile(
                   label: 'Best',
                   value: '${(best * 100).round()}%',
+                  caption: '${scoreBandLabel(bestBand)} · target $targetScore%',
                   icon: Icons.emoji_events_outlined,
-                  tone: best > 0.8 ? MetricTone.success : MetricTone.neutral,
+                  tone: scoreBandMetricTone(bestBand),
                 ),
               ),
             ],
@@ -642,6 +693,18 @@ class _TrendHero extends StatelessWidget {
                   : MetricTone.neutral,
             ),
           ],
+          const SizedBox(height: 10),
+          Text(
+            targetProjectionSentence(
+              average: average,
+              targetScore: targetScore,
+              percentagePointsPerWeek: learningRatePerWeek,
+            ),
+            style: theme.typography.baseline.bodySmall.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
         ],
       ),
     );
@@ -666,10 +729,17 @@ class _TrendHero extends StatelessWidget {
 }
 
 class _ProgressChart extends StatelessWidget {
-  const _ProgressChart({required this.points, required this.trendValues});
+  const _ProgressChart({
+    required this.points,
+    required this.trendValues,
+    required this.minimumScore,
+    required this.targetScore,
+  });
 
   final List<TopicProgressPoint> points;
   final List<double> trendValues;
+  final int minimumScore;
+  final int targetScore;
 
   @override
   Widget build(BuildContext context) {
@@ -687,6 +757,8 @@ class _ProgressChart extends StatelessWidget {
               painter: _ProgressPainter(
                 points: points,
                 trendValues: trendValues,
+                minimumScore: minimumScore,
+                targetScore: targetScore,
                 lineColor: theme.colorScheme.primary,
                 trendColor: trendColor,
                 gridColor: theme.colorScheme.outlineVariant.withValues(
@@ -766,6 +838,8 @@ class _ProgressPainter extends CustomPainter {
   _ProgressPainter({
     required this.points,
     required this.trendValues,
+    required this.minimumScore,
+    required this.targetScore,
     required this.lineColor,
     required this.trendColor,
     required this.gridColor,
@@ -777,6 +851,8 @@ class _ProgressPainter extends CustomPainter {
 
   final List<TopicProgressPoint> points;
   final List<double> trendValues;
+  final int minimumScore;
+  final int targetScore;
   final Color lineColor;
   final Color trendColor;
   final Color gridColor;
@@ -860,11 +936,16 @@ class _ProgressPainter extends CustomPainter {
 
     for (var index = 0; index < count; index++) {
       final score = points[index].score;
-      final color = score > 0.8
-          ? successColor
-          : score < 0.5
-          ? errorColor
-          : lineColor;
+      final band = scoreBandFor(
+        score,
+        minimumScore: minimumScore,
+        targetScore: targetScore,
+      );
+      final color = switch (band) {
+        ScoreBand.targetMet => successColor,
+        ScoreBand.onTrack => lineColor,
+        ScoreBand.belowMinimum => errorColor,
+      };
       final point = Offset(xFor(index), yFor(score));
       canvas.drawCircle(point, 4.5, Paint()..color = color);
     }
@@ -904,6 +985,8 @@ class _ProgressPainter extends CustomPainter {
   bool shouldRepaint(_ProgressPainter oldDelegate) {
     return oldDelegate.points != points ||
         oldDelegate.trendValues != trendValues ||
+        oldDelegate.minimumScore != minimumScore ||
+        oldDelegate.targetScore != targetScore ||
         oldDelegate.lineColor != lineColor ||
         oldDelegate.trendColor != trendColor ||
         oldDelegate.gridColor != gridColor ||
@@ -915,12 +998,16 @@ class _ProgressPainter extends CustomPainter {
 class _SubtopicRow extends StatelessWidget {
   const _SubtopicRow({
     required this.stat,
+    required this.minimumScore,
+    required this.targetScore,
     this.selected = false,
     this.onTap,
     this.onLongPress,
   });
 
   final SubtopicStat stat;
+  final int minimumScore;
+  final int targetScore;
   final bool selected;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -929,13 +1016,14 @@ class _SubtopicRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final accuracy = (stat.accuracy * 100).round();
-    final tone = stat.answeredCount == 0
-        ? PillTone.neutral
-        : stat.accuracy > 0.8
-        ? PillTone.success
-        : stat.accuracy < 0.5
-        ? PillTone.error
-        : PillTone.neutral;
+    final band = stat.answeredCount == 0
+        ? null
+        : scoreBandFor(
+            stat.accuracy,
+            minimumScore: minimumScore,
+            targetScore: targetScore,
+          );
+    final tone = band == null ? PillTone.neutral : scoreBandPillTone(band);
     final content = Padding(
       padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
       child: Column(
@@ -960,7 +1048,17 @@ class _SubtopicRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Pill('$accuracy% accuracy', tone: tone),
+              Semantics(
+                label: band == null
+                    ? '${stat.label}: no answers yet'
+                    : scoreSemanticsLabel(
+                        subject: '${stat.label} accuracy',
+                        percent: accuracy,
+                        band: band,
+                      ),
+                excludeSemantics: true,
+                child: Pill('$accuracy% accuracy', tone: tone),
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -994,6 +1092,8 @@ class _SubtopicRow extends StatelessWidget {
 class _ProgressRow extends StatelessWidget {
   const _ProgressRow({
     required this.point,
+    required this.minimumScore,
+    required this.targetScore,
     this.selected = false,
     this.onTap,
     this.onLongPress,
@@ -1001,6 +1101,8 @@ class _ProgressRow extends StatelessWidget {
   });
 
   final TopicProgressPoint point;
+  final int minimumScore;
+  final int targetScore;
   final bool selected;
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
@@ -1009,11 +1111,11 @@ class _ProgressRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final percent = (point.score * 100).round();
-    final tone = point.score > 0.8
-        ? PillTone.success
-        : point.score < 0.5
-        ? PillTone.error
-        : PillTone.neutral;
+    final band = scoreBandFor(
+      point.score,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
+    );
     return Semantics(
       container: true,
       selected: selected,
@@ -1053,7 +1155,18 @@ class _ProgressRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Pill('${point.correct}/${point.total} · $percent%', tone: tone),
+                Semantics(
+                  label: scoreSemanticsLabel(
+                    subject: '${point.practiceName} score',
+                    percent: percent,
+                    band: band,
+                  ),
+                  excludeSemantics: true,
+                  child: Pill(
+                    '${point.correct}/${point.total} · $percent%',
+                    tone: scoreBandPillTone(band),
+                  ),
+                ),
               ],
             ),
           ),

@@ -262,4 +262,91 @@ void main() {
       throwsA(isA<ImportException>()),
     );
   });
+
+  test('score thresholds default to 70 and 80 when missing or null', () async {
+    final payload = jsonDecode(sample) as Map<String, dynamic>;
+    final topics = payload['topics'] as List<dynamic>;
+    final first = topics.first as Map<String, dynamic>;
+    final second = topics[1] as Map<String, dynamic>;
+    first.remove('minimumScore');
+    first.remove('targetScore');
+    second['minimumScore'] = null;
+    second['targetScore'] = null;
+
+    final preview = await service.previewText(
+      jsonEncode(payload),
+      fileName: 'defaults.json',
+    );
+    expect(preview.topics[0].minimumScore, 70);
+    expect(preview.topics[0].targetScore, 80);
+    expect(preview.topics[0].hasMinimumScore, isFalse);
+    expect(preview.topics[1].minimumScore, 70);
+    expect(preview.topics[1].targetScore, 80);
+    expect(preview.topics[1].hasMinimumScore, isFalse);
+
+    await service.import(preview);
+    final stored = await harness.practices.findTopicByName(
+      preview.topics.first.name,
+    );
+    expect(stored!.minimumScore, 70);
+    expect(stored.targetScore, 80);
+  });
+
+  test('imports topic score thresholds', () async {
+    final payload = jsonDecode(sample) as Map<String, dynamic>;
+    final topics = payload['topics'] as List<dynamic>;
+    final first = topics.first as Map<String, dynamic>;
+    first['minimumScore'] = 55;
+    first['targetScore'] = 92;
+
+    final preview = await service.previewText(
+      jsonEncode(payload),
+      fileName: 'thresholds.json',
+    );
+    expect(preview.topics.first.minimumScore, 55);
+    expect(preview.topics.first.targetScore, 92);
+    expect(preview.topics.first.hasMinimumScore, isTrue);
+
+    await service.import(preview);
+    final stored = await harness.practices.findTopicByName(
+      preview.topics.first.name,
+    );
+    expect(stored!.minimumScore, 55);
+    expect(stored.targetScore, 92);
+  });
+
+  test('rejects a target score below the minimum', () async {
+    final payload = jsonDecode(sample) as Map<String, dynamic>;
+    final topics = payload['topics'] as List<dynamic>;
+    final first = topics.first as Map<String, dynamic>;
+    first['minimumScore'] = 90;
+    first['targetScore'] = 80;
+
+    await expectLater(
+      service.previewText(jsonEncode(payload), fileName: 'scores.json'),
+      throwsA(
+        isA<ImportException>().having(
+          (error) => error.issues.any(
+            (issue) =>
+                issue.path.endsWith('/targetScore') &&
+                issue.message.contains('at least the minimum'),
+          ),
+          'has threshold error',
+          isTrue,
+        ),
+      ),
+    );
+  });
+
+  test('rejects a score threshold outside 0 to 100', () async {
+    final payload = jsonDecode(sample) as Map<String, dynamic>;
+    final topics = payload['topics'] as List<dynamic>;
+    final first = topics.first as Map<String, dynamic>;
+    first['minimumScore'] = 101;
+
+    await expectLater(
+      service.previewText(jsonEncode(payload), fileName: 'scores.json'),
+      throwsA(isA<ImportException>()),
+    );
+  });
 }

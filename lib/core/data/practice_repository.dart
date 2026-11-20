@@ -127,6 +127,11 @@ class PracticeRepository {
     return rows.map(practiceFromRow).toList();
   }
 
+  Future<List<Practice>> practicesForTopic(int topicId) async {
+    final rows = await _db.topicDao.practicesForTopic(topicId);
+    return rows.map(practiceFromRow).toList();
+  }
+
   Future<Question?> questionById(int id) async {
     final row = await _db.topicDao.questionById(id);
     return row == null ? null : questionFromRow(row);
@@ -295,54 +300,155 @@ class PracticeRepository {
     required String contentHash,
     required DateTime importedAt,
   }) {
-    return _db.transaction(() async {
-      final practice = await _db.topicDao.practiceById(practiceId);
-      if (practice == null) {
-        throw StateError('This practice no longer exists.');
-      }
-      for (final id in deletedQuestionIds) {
-        await _db.topicDao.deleteQuestion(id);
-      }
-      final inserted = <QuestionsCompanion>[];
-      for (final update in questions) {
-        final question = update.question;
-        final existingId = update.existingQuestionId;
-        if (existingId == null) {
-          inserted.add(
-            QuestionsCompanion.insert(
-              practiceId: practiceId,
-              prompt: question.prompt,
-              alternativesJson: encodeStringList(question.alternatives),
-              correctIndexesJson: Value(encodeIntList(question.correctIndexes)),
-              explanation: question.explanation,
-              alternativeExplanationsJson: encodeStringList(
-                question.alternativeExplanations,
-              ),
-              position: update.position,
-              subtopic: Value(_normalizeSubtopic(question.subtopic)),
-            ),
-          );
-          continue;
-        }
-        await _db.topicDao.updateQuestion(
-          id: existingId,
-          prompt: question.prompt,
-          alternatives: question.alternatives,
-          correctIndexes: question.correctIndexes,
-          explanation: question.explanation,
-          alternativeExplanations: question.alternativeExplanations,
-          position: update.position,
-          subtopic: _normalizeSubtopic(question.subtopic),
-        );
-      }
-      if (inserted.isNotEmpty) {
-        await _db.topicDao.insertQuestions(inserted);
-      }
-      await _db.topicDao.updatePracticeContent(
-        id: practiceId,
+    return _db.transaction(
+      () => _applyPracticeUpdate(
+        practiceId: practiceId,
+        questions: questions,
+        deletedQuestionIds: deletedQuestionIds,
         contentHash: contentHash,
         importedAt: importedAt,
+        description: null,
+      ),
+    );
+  }
+
+  Future<void> _applyPracticeUpdate({
+    required int practiceId,
+    required List<PracticeQuestionUpdate> questions,
+    required List<int> deletedQuestionIds,
+    required String contentHash,
+    required DateTime importedAt,
+    String? description,
+  }) async {
+    final practice = await _db.topicDao.practiceById(practiceId);
+    if (practice == null) {
+      throw StateError('This practice no longer exists.');
+    }
+    for (final id in deletedQuestionIds) {
+      await _db.topicDao.deleteQuestion(id);
+    }
+    final inserted = <QuestionsCompanion>[];
+    for (final update in questions) {
+      final question = update.question;
+      final existingId = update.existingQuestionId;
+      if (existingId == null) {
+        inserted.add(
+          QuestionsCompanion.insert(
+            practiceId: practiceId,
+            prompt: question.prompt,
+            alternativesJson: encodeStringList(question.alternatives),
+            correctIndexesJson: Value(encodeIntList(question.correctIndexes)),
+            explanation: question.explanation,
+            alternativeExplanationsJson: encodeStringList(
+              question.alternativeExplanations,
+            ),
+            position: update.position,
+            subtopic: Value(_normalizeSubtopic(question.subtopic)),
+          ),
+        );
+        continue;
+      }
+      await _db.topicDao.updateQuestion(
+        id: existingId,
+        prompt: question.prompt,
+        alternatives: question.alternatives,
+        correctIndexes: question.correctIndexes,
+        explanation: question.explanation,
+        alternativeExplanations: question.alternativeExplanations,
+        position: update.position,
+        subtopic: _normalizeSubtopic(question.subtopic),
       );
+    }
+    if (inserted.isNotEmpty) {
+      await _db.topicDao.insertQuestions(inserted);
+    }
+    if (description != null && description != practice.description) {
+      await _db.topicDao.updatePracticeDescription(practiceId, description);
+    }
+    await _db.topicDao.updatePracticeContent(
+      id: practiceId,
+      contentHash: contentHash,
+      importedAt: importedAt,
+    );
+  }
+
+  /// Applies a whole topic update in one transaction.
+  ///
+  /// Practices absent from the file are never touched. Existing practices keep
+  /// the ids of matched questions; new practices and questions are inserted.
+  Future<void> applyTopicUpdate({
+    required int topicId,
+    required String? description,
+    required bool updatePriority,
+    required int? priority,
+    required int? minimumScore,
+    required int? targetScore,
+    required List<TopicPracticeUpdate> practices,
+    required DateTime importedAt,
+  }) {
+    return _db.transaction(() async {
+      final topic = await _db.topicDao.topicById(topicId);
+      if (topic == null) {
+        throw StateError('This topic no longer exists.');
+      }
+      await _db.topicDao.updateTopicDetails(
+        id: topicId,
+        description: description == null
+            ? const Value.absent()
+            : Value(description),
+        priority: updatePriority ? Value(priority) : const Value.absent(),
+        minimumScore: minimumScore == null
+            ? const Value.absent()
+            : Value(minimumScore),
+        targetScore: targetScore == null
+            ? const Value.absent()
+            : Value(targetScore),
+      );
+      for (final update in practices) {
+        final existingId = update.existingPracticeId;
+        if (existingId == null) {
+          final practiceId = await _db.topicDao.insertPractice(
+            topicId: topicId,
+            name: update.name,
+            description: update.description,
+            contentHash: update.contentHash,
+            importedAt: importedAt,
+          );
+          await _db.topicDao.insertQuestions([
+            for (var index = 0; index < update.questions.length; index++)
+              QuestionsCompanion.insert(
+                practiceId: practiceId,
+                prompt: update.questions[index].question.prompt,
+                alternativesJson: encodeStringList(
+                  update.questions[index].question.alternatives,
+                ),
+                correctIndexesJson: Value(
+                  encodeIntList(
+                    update.questions[index].question.correctIndexes,
+                  ),
+                ),
+                explanation: update.questions[index].question.explanation,
+                alternativeExplanationsJson: encodeStringList(
+                  update.questions[index].question.alternativeExplanations,
+                ),
+                position: update.questions[index].position,
+                subtopic: Value(
+                  _normalizeSubtopic(update.questions[index].question.subtopic),
+                ),
+              ),
+          ]);
+          continue;
+        }
+        if (!update.changed) continue;
+        await _applyPracticeUpdate(
+          practiceId: existingId,
+          questions: update.questions,
+          deletedQuestionIds: update.deletedQuestionIds,
+          contentHash: update.contentHash,
+          importedAt: importedAt,
+          description: update.description,
+        );
+      }
     });
   }
 

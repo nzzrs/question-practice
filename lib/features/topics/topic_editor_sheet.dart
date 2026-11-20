@@ -11,7 +11,14 @@ import '../../core/ui/widgets.dart';
 import 'anki_deck_picker.dart';
 
 /// The editable field a topic editor tile expands.
-enum _TopicField { name, description, priority, deck }
+enum _TopicField {
+  name,
+  description,
+  priority,
+  minimumScore,
+  targetScore,
+  deck,
+}
 
 /// Tracks unsaved edits in a [TopicEditorSheet].
 ///
@@ -66,6 +73,8 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
   final _name = TextEditingController();
   final _description = TextEditingController();
   final _priority = TextEditingController();
+  final _minimumScore = TextEditingController();
+  final _targetScore = TextEditingController();
   final _deck = TextEditingController();
 
   bool _loading = true;
@@ -77,10 +86,14 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
   String _initialName = '';
   String _initialDescription = '';
   String _initialPriority = '';
+  String _initialMinimumScore = '';
+  String _initialTargetScore = '';
   String _initialDeck = '';
 
   String? _nameError;
   String? _priorityError;
+  String? _minimumScoreError;
+  String? _targetScoreError;
 
   @override
   void initState() {
@@ -88,6 +101,8 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
     _name.addListener(_onFieldChanged);
     _description.addListener(_onFieldChanged);
     _priority.addListener(_onFieldChanged);
+    _minimumScore.addListener(_onFieldChanged);
+    _targetScore.addListener(_onFieldChanged);
     _deck.addListener(_onFieldChanged);
     unawaited(_load());
   }
@@ -97,6 +112,8 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
     _name.dispose();
     _description.dispose();
     _priority.dispose();
+    _minimumScore.dispose();
+    _targetScore.dispose();
     _deck.dispose();
     super.dispose();
   }
@@ -106,6 +123,8 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       (_name.text != _initialName ||
           _description.text != _initialDescription ||
           _priority.text != _initialPriority ||
+          _minimumScore.text != _initialMinimumScore ||
+          _targetScore.text != _initialTargetScore ||
           _deck.text != _initialDeck);
 
   void _onFieldChanged() {
@@ -127,12 +146,16 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       _name.text = current.name;
       _description.text = current.description;
       _priority.text = current.priority?.toString() ?? '';
+      _minimumScore.text = current.minimumScore.toString();
+      _targetScore.text = current.targetScore.toString();
       _deck.text = current.ankiDeck ?? '';
       setState(() {
         _topicName = current.name;
         _initialName = current.name;
         _initialDescription = current.description;
         _initialPriority = current.priority?.toString() ?? '';
+        _initialMinimumScore = current.minimumScore.toString();
+        _initialTargetScore = current.targetScore.toString();
         _initialDeck = current.ankiDeck ?? '';
         _loading = false;
         _loadError = null;
@@ -174,21 +197,47 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
     final parsedPriority = priorityText.isEmpty
         ? null
         : int.tryParse(priorityText);
+    final minimumText = _minimumScore.text.trim();
+    final targetText = _targetScore.text.trim();
+    final parsedMinimum = int.tryParse(minimumText);
+    final parsedTarget = int.tryParse(targetText);
     final nameError = name.isEmpty ? 'Name is required.' : null;
     final priorityError =
         priorityText.isNotEmpty &&
             (parsedPriority == null || parsedPriority < 1 || parsedPriority > 5)
         ? 'Use a number from 1 to 5.'
         : null;
-    if (nameError != null || priorityError != null) {
+    final minimumError =
+        parsedMinimum == null || parsedMinimum < 0 || parsedMinimum > 100
+        ? 'Use a number from 0 to 100.'
+        : null;
+    var targetError =
+        parsedTarget == null || parsedTarget < 0 || parsedTarget > 100
+        ? 'Use a number from 0 to 100.'
+        : null;
+    if (minimumError == null &&
+        targetError == null &&
+        parsedTarget! < parsedMinimum!) {
+      targetError = 'Target must be at least the minimum score.';
+    }
+    if (nameError != null ||
+        priorityError != null ||
+        minimumError != null ||
+        targetError != null) {
       setState(() {
         _nameError = nameError;
         _priorityError = priorityError;
-        // Show the message next to the field that needs attention.
+        _minimumScoreError = minimumError;
+        _targetScoreError = targetError;
+        // Show the message next to the first field that needs attention.
         if (nameError != null) {
           _expanded = _TopicField.name;
         } else if (priorityError != null) {
           _expanded = _TopicField.priority;
+        } else if (minimumError != null) {
+          _expanded = _TopicField.minimumScore;
+        } else if (targetError != null) {
+          _expanded = _TopicField.targetScore;
         }
       });
       return;
@@ -198,6 +247,8 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       _saving = true;
       _nameError = null;
       _priorityError = null;
+      _minimumScoreError = null;
+      _targetScoreError = null;
     });
     _syncGuard();
     try {
@@ -209,8 +260,8 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
             description: _description.text.trim(),
             priority: parsedPriority,
             ankiDeck: _deck.text.trim().isEmpty ? null : _deck.text.trim(),
-            minimumScore: widget.topic.minimumScore,
-            targetScore: widget.topic.targetScore,
+            minimumScore: parsedMinimum!,
+            targetScore: parsedTarget!,
           );
       if (mounted) Navigator.of(context).pop(true);
     } on Object catch (error) {
@@ -252,6 +303,10 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       _ => '$text of 5',
     };
   }
+
+  String get _minimumScoreValue => '${_minimumScore.text.trim()}%';
+
+  String get _targetScoreValue => '${_targetScore.text.trim()}%';
 
   String get _deckValue => _deck.text.trim().isEmpty
       ? 'Default deck from Settings'
@@ -415,6 +470,66 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
             _HelperText(
               '1 is the highest priority, 5 is the lowest. '
               'Leave blank when order does not matter.',
+            ),
+          ],
+        ),
+      ),
+      _fieldTile(
+        field: _TopicField.minimumScore,
+        icon: Icons.flag_circle_outlined,
+        title: 'Minimum approval score',
+        value: _minimumScoreValue,
+        editor: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            M3ETextField(
+              key: const ValueKey('topic-editor-minimum-score'),
+              controller: _minimumScore,
+              label: 'Minimum (%)',
+              placeholder: '70',
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              errorText: _minimumScoreError,
+              onChanged: (_) {
+                if (_minimumScoreError != null) {
+                  setState(() => _minimumScoreError = null);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            const _HelperText(
+              'A score below this is shown in red. From here up to the target '
+              'it uses the normal color.',
+            ),
+          ],
+        ),
+      ),
+      _fieldTile(
+        field: _TopicField.targetScore,
+        icon: Icons.gps_fixed,
+        title: 'Target score',
+        value: _targetScoreValue,
+        editor: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            M3ETextField(
+              key: const ValueKey('topic-editor-target-score'),
+              controller: _targetScore,
+              label: 'Target (%)',
+              placeholder: '80',
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              errorText: _targetScoreError,
+              onChanged: (_) {
+                if (_targetScoreError != null) {
+                  setState(() => _targetScoreError = null);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+            const _HelperText(
+              'Scores at or above the target are shown in green. The target '
+              'must be at least the minimum score.',
             ),
           ],
         ),

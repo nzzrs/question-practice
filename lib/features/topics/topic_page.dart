@@ -7,6 +7,8 @@ import '../../core/data/practice_repository.dart';
 import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
+import '../../core/domain/score_band.dart';
+import '../../core/ui/score_band_style.dart';
 import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../practice/domain/session_service.dart';
@@ -123,7 +125,12 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                   ),
                 ],
                 const SizedBox(height: 20),
-                _TopicHero(summary: data, readiness: readiness.value),
+                _TopicHero(
+                  summary: data,
+                  readiness: readiness.value,
+                  minimumScore: data.topic.minimumScore,
+                  targetScore: data.topic.targetScore,
+                ),
                 const SizedBox(height: 24),
                 SectionTitle(
                   'Practices',
@@ -163,7 +170,11 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                                   ? Icons.play_circle_outline
                                   : Icons.play_arrow_outlined,
                             ),
-                            trailing: _PracticeTrailing(summary: practice),
+                            trailing: _PracticeTrailing(
+                              summary: practice,
+                              minimumScore: data.topic.minimumScore,
+                              targetScore: data.topic.targetScore,
+                            ),
                             onTap: _starting
                                 ? null
                                 : () => _openPractice(practice),
@@ -384,10 +395,17 @@ class _TopicPageState extends ConsumerState<TopicPage> {
 }
 
 class _TopicHero extends StatelessWidget {
-  const _TopicHero({required this.summary, required this.readiness});
+  const _TopicHero({
+    required this.summary,
+    required this.readiness,
+    required this.minimumScore,
+    required this.targetScore,
+  });
 
   final TopicSummary summary;
   final TopicReadiness? readiness;
+  final int minimumScore;
+  final int targetScore;
 
   @override
   Widget build(BuildContext context) {
@@ -396,6 +414,13 @@ class _TopicHero extends StatelessWidget {
     final readinessLabel = hasAnswers
         ? '${(readiness!.value * 100).round()}%'
         : '—';
+    final band = hasAnswers
+        ? scoreBandFor(
+            readiness!.value,
+            minimumScore: minimumScore,
+            targetScore: targetScore,
+          )
+        : null;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -407,12 +432,33 @@ class _TopicHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              ScoreRing(
-                value: hasAnswers ? readiness!.value : 0,
-                label: readinessLabel,
-                caption: 'Readiness',
-                size: 132,
-                strokeWidth: 11,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ScoreRing(
+                    value: hasAnswers ? readiness!.value : 0,
+                    label: readinessLabel,
+                    caption: 'Readiness',
+                    size: 132,
+                    strokeWidth: 11,
+                    color: band == null ? null : scoreBandColor(context, band),
+                  ),
+                  if (band != null) ...[
+                    const SizedBox(height: 6),
+                    Semantics(
+                      label: scoreSemanticsLabel(
+                        subject: 'Readiness',
+                        percent: (readiness!.value * 100).round(),
+                        band: band,
+                      ),
+                      excludeSemantics: true,
+                      child: Pill(
+                        scoreBandLabel(band),
+                        tone: scoreBandPillTone(band),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -477,14 +523,27 @@ class _TopicHero extends StatelessWidget {
 }
 
 class _PracticeTrailing extends StatelessWidget {
-  const _PracticeTrailing({required this.summary});
+  const _PracticeTrailing({
+    required this.summary,
+    required this.minimumScore,
+    required this.targetScore,
+  });
 
   final PracticeSummary summary;
+  final int minimumScore;
+  final int targetScore;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final score = summary.lastScore;
+    final band = score == null
+        ? null
+        : scoreBandFor(
+            score,
+            minimumScore: minimumScore,
+            targetScore: targetScore,
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
@@ -505,9 +564,17 @@ class _PracticeTrailing extends StatelessWidget {
         ),
         if (score != null) ...[
           const SizedBox(height: 2),
-          Pill(
-            '${(score * 100).round()}%',
-            tone: score >= 0.7 ? PillTone.success : PillTone.error,
+          Semantics(
+            label: scoreSemanticsLabel(
+              subject: 'Last score',
+              percent: (score * 100).round(),
+              band: band!,
+            ),
+            excludeSemantics: true,
+            child: Pill(
+              '${(score * 100).round()}%',
+              tone: scoreBandPillTone(band),
+            ),
           ),
         ],
         if (summary.practice.isDone) ...[

@@ -202,7 +202,7 @@ void main() {
     expect(find.text('managed service'), findsOneWidget);
     expect(find.text('From the question'), findsOneWidget);
     expect(find.text('Create cards'), findsOneWidget);
-    expect(find.text('Suggest cards with AI'), findsOneWidget);
+    expect(find.text('Suggest with AI'), findsOneWidget);
     expect(find.text('Keep & save'), findsOneWidget);
   });
 

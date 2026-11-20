@@ -32,10 +32,10 @@ void main() {
 
     await tester.longPress(find.text('Cloud'));
     await pumpFrames(tester);
-    expect(find.byType(OptionTile), findsNWidgets(5));
+    expect(find.byType(OptionTile), findsNWidgets(3));
     expect(find.text('Edit topic'), findsOneWidget);
-    expect(find.text('Download topic JSON'), findsOneWidget);
-    expect(find.text('Update topic JSON'), findsOneWidget);
+    expect(find.text('Download topic JSON'), findsNothing);
+    expect(find.text('Update topic JSON'), findsNothing);
     expect(find.text('Archive topic'), findsOneWidget);
     expect(find.text('Delete topic'), findsOneWidget);
 
@@ -84,8 +84,10 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Edit topic'), findsOneWidget);
-    expect(find.byType(OptionTile), findsNWidgets(6));
+    expect(find.byType(OptionTile), findsNWidgets(8));
     expect(find.text('AnkiDroid deck'), findsOneWidget);
+    expect(find.text('Download topic JSON'), findsOneWidget);
+    expect(find.text('Update topic JSON'), findsOneWidget);
     expect(find.text('Browse decks'), findsNothing);
     await tester.tap(find.text('AnkiDroid deck'));
     await pumpFrames(tester);

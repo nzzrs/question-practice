@@ -113,6 +113,7 @@ void main() {
     expect(gateway.importedNotes, hasLength(1));
     expect(
       gateway.importedNotes.first.fields.first,
+      '[Cloud fundamentals] '
       'Definition of {{c1::GCP}}: {{c2::Google Cloud Platform}}',
     );
     expect(await harness.cards.watchConcepts().first, isEmpty);

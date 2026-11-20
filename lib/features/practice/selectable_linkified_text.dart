@@ -224,7 +224,7 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
               ),
             if (selected.isNotEmpty && widget.onHighlight != null)
               ContextMenuButtonItem(
-                label: 'Highlight',
+                label: 'Save as note',
                 onPressed: () {
                   state.hideToolbar();
                   unawaited(

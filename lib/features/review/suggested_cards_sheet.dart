@@ -26,7 +26,7 @@ Future<int> suggestCardsFromHighlight(
   if (count > 0 && context.mounted) {
     await showSnack(
       context,
-      '$count card${count == 1 ? '' : 's'} added from the highlight.',
+      '$count card${count == 1 ? '' : 's'} added from the note.',
     );
   }
   return count;
@@ -198,7 +198,7 @@ class _SuggestedCardsSheetState extends ConsumerState<SuggestedCardsSheet> {
               TonalBox(
                 key: const ValueKey('suggested-cards-empty'),
                 child: Text(
-                  'The AI found no new cards in this highlight.',
+                  'The AI found no new cards in this note.',
                   style: theme.typography.baseline.bodyMedium.copyWith(
                     height: 1.45,
                   ),

@@ -45,7 +45,7 @@ void main() {
         'Feedback and error cards',
         'Past errors',
         'Cards',
-        'Highlights',
+        'Notes',
         'AnkiDroid export',
         'Practice JSON',
         'Subtopics and statistics',
@@ -57,7 +57,7 @@ void main() {
         'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection.',
       ]),
     );
-    expect(texts.any((text) => text.contains('Review highlights')), isTrue);
+    expect(texts.any((text) => text.contains('Review notes')), isTrue);
     expect(
       texts.any(
         (text) => text.contains(

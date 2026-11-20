@@ -253,10 +253,10 @@ void main() {
     await seedHighlight(harness, question);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    expect(find.textContaining('Highlights ·'), findsOneWidget);
+    expect(find.textContaining('Notes ·'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
     expect(find.text('Download all'), findsOneWidget);
-    expect(find.text('Review highlights'), findsOneWidget);
+    expect(find.text('Review notes'), findsOneWidget);
   });
 
   testWidgets('AI suggests grouped atomic cards and saves their type', (
@@ -368,7 +368,7 @@ void main() {
     );
     expect(highlights!.single.hasCard, isTrue);
     expect(
-      find.textContaining('3 cards added from the highlight'),
+      find.textContaining('3 cards added from the note'),
       findsOneWidget,
     );
   });
@@ -381,10 +381,10 @@ void main() {
     final highlightId = await seedHighlight(harness, question);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    expect(find.text('Review highlights'), findsOneWidget);
+    expect(find.text('Review notes'), findsOneWidget);
     expect(find.byTooltip('Suggest cards with AI'), findsNothing);
     expect(find.byTooltip('Make a card'), findsNothing);
-    expect(find.byTooltip('Delete highlight'), findsNothing);
+    expect(find.byTooltip('Delete note'), findsNothing);
 
     final row = find.byKey(ValueKey('highlight-row-$highlightId'));
     await tester.ensureVisible(row);
@@ -392,25 +392,25 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Item 1 of 1'), findsOneWidget);
-    expect(find.text('Review the highlight'), findsOneWidget);
+    expect(find.text('Review the note'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
     expect(find.text('From the question'), findsOneWidget);
-    expect(find.text('Suggest cards with AI'), findsOneWidget);
-    expect(find.text('Make concept card'), findsOneWidget);
+    expect(find.text('Suggest with AI'), findsOneWidget);
+    expect(find.text('Create cards'), findsOneWidget);
     expect(find.text('Keep for later'), findsOneWidget);
     expect(find.text('Keep & done'), findsOneWidget);
-    expect(find.text('Delete highlight'), findsOneWidget);
+    expect(find.text('Delete note'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('highlight-delete')));
     await pumpFrames(tester);
-    expect(find.text('Delete highlight?'), findsOneWidget);
+    expect(find.text('Delete note?'), findsOneWidget);
     expect(
       find.textContaining('Cards already made from it stay'),
       findsOneWidget,
     );
     await tester.tap(find.text('Cancel'));
     await pumpFrames(tester);
-    expect(find.text('Review the highlight'), findsOneWidget);
+    expect(find.text('Review the note'), findsOneWidget);
   });
 
   testWidgets('highlight card action offers only a concept card', (
@@ -435,7 +435,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('highlight-make-card')));
     await pumpFrames(tester);
 
-    expect(find.text('Turn the highlight into a concept card'), findsOneWidget);
+    expect(find.text('Turn the note into a concept card'), findsOneWidget);
     expect(find.byKey(const ValueKey('new-card-definition')), findsOneWidget);
     expect(find.byKey(const ValueKey('new-card-question')), findsNothing);
     expect(find.text('Basic card'), findsNothing);
@@ -544,7 +544,7 @@ void main() {
     expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
     expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
 
-    await choose('highlights');
+    await choose('notes');
     expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsOneWidget);
     expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
     expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
@@ -647,7 +647,7 @@ void main() {
     expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
     expect(find.text('1 selected · review to export'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
-    expect(find.text('Review the highlight'), findsNothing);
+    expect(find.text('Review the note'), findsNothing);
   });
 
   testWidgets('selected skipped questions enable delete without export', (

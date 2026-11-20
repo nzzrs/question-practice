@@ -20,7 +20,7 @@ Future<int> convertHighlightToCard(
 ) async {
   final draft = await showNewCardDialog(
     context,
-    title: 'Turn the highlight into a concept card',
+    title: 'Turn the note into a concept card',
     contextText: highlight.context,
     initialTerm: highlight.text,
     initialKind: NewCardKind.concept,
@@ -40,7 +40,7 @@ Future<int> convertHighlightToCard(
   );
   await service.markHighlightConverted(highlight.id);
   if (context.mounted) {
-    await showSnack(context, 'Concept card created from the highlight.');
+    await showSnack(context, 'Concept card created from the note.');
   }
   return 1;
 }

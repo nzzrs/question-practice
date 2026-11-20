@@ -165,9 +165,9 @@ class ExportService {
 
   /// Serializes saved highlights as human-readable plain text.
   String highlightsText(List<StudyHighlight> highlights) {
-    final buffer = StringBuffer('Question Practice highlights\n');
+    final buffer = StringBuffer('Question Practice notes\n');
     buffer.writeln(
-      '${highlights.length} highlight${highlights.length == 1 ? '' : 's'}',
+      '${highlights.length} note${highlights.length == 1 ? '' : 's'}',
     );
     for (final highlight in highlights) {
       buffer.writeln();
@@ -194,13 +194,13 @@ class ExportService {
     final directory = await getTemporaryDirectory();
     final stamp = DateFormat('yyyyMMdd-HHmm').format(_clock.now());
     final file = File(
-      p.join(directory.path, 'question-practice-highlights-$stamp.txt'),
+      p.join(directory.path, 'question-practice-notes-$stamp.txt'),
     );
     await file.writeAsString(highlightsText(highlights));
     await SharePlus.instance.share(
       ShareParams(
-        subject: 'Question Practice highlights',
-        text: 'Saved highlights from Question Practice.',
+        subject: 'Question Practice notes',
+        text: 'Saved notes from Question Practice.',
         files: [XFile(file.path)],
       ),
     );

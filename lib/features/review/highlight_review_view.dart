@@ -44,7 +44,7 @@ class HighlightReviewView extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 6,
                 children: [
-                  const Pill('Highlight', tone: PillTone.primary),
+                  const Pill('Note', tone: PillTone.primary),
                   if (highlight.topicName.trim().isNotEmpty)
                     Pill(highlight.topicName),
                   if (highlight.practiceName.trim().isNotEmpty)
@@ -95,7 +95,7 @@ class HighlightReviewView extends StatelessWidget {
         const SizedBox(height: 20),
         if (showCardActions) ...[
           Text(
-            'Make a concept card, suggest atomic cards, or keep it for later.',
+            'Create cards for this note, or keep it for later.',
             style: theme.typography.emphasized.titleSmall,
           ),
           const SizedBox(height: 12),
@@ -107,13 +107,13 @@ class HighlightReviewView extends StatelessWidget {
                 key: const ValueKey('highlight-make-card'),
                 onPressed: onMakeCard,
                 icon: const Icon(Icons.style_outlined),
-                label: const Text('Make concept card'),
+                label: const Text('Create cards'),
               ),
               M3EButton.tonal(
                 key: const ValueKey('highlight-suggest-cards'),
                 onPressed: onSuggestCards,
                 icon: const Icon(Icons.auto_awesome),
-                label: const Text('Suggest cards with AI'),
+                label: const Text('Suggest with AI'),
               ),
             ],
           ),
@@ -121,7 +121,7 @@ class HighlightReviewView extends StatelessWidget {
           TonalBox(
             key: const ValueKey('highlight-card-made'),
             child: Text(
-              'A card was already made from this highlight. The saved phrase '
+              'A card was already made from this note. The saved text '
               'stays in Cards until you delete it.',
               style: theme.typography.baseline.bodySmall.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -162,7 +162,7 @@ class HighlightReviewView extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Delete highlight',
+                        'Delete note',
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ],

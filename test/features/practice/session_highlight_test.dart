@@ -51,12 +51,12 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Define'), findsOneWidget);
-    expect(find.text('Delete highlight'), findsOneWidget);
+    expect(find.text('Delete note'), findsOneWidget);
 
-    await tester.tap(find.text('Delete highlight'));
+    await tester.tap(find.text('Delete note'));
     await pumpFrames(tester);
 
-    expect(find.text('Highlight deleted.'), findsOneWidget);
+    expect(find.text('Note deleted.'), findsOneWidget);
     expect(
       await harness.cards.highlightsForQuestion(item.question.id),
       isEmpty,

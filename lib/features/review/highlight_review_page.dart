@@ -22,7 +22,7 @@ class HighlightReviewPage extends ConsumerStatefulWidget {
   const HighlightReviewPage({
     required this.highlights,
     this.initialHighlightId,
-    this.title = 'Review highlights',
+    this.title = 'Review notes',
     super.key,
   });
 
@@ -133,9 +133,9 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     if (_busy) return;
     final confirmed = await confirmDialog(
       context,
-      title: 'Delete highlight?',
+      title: 'Delete note?',
       message:
-          'The saved phrase "${highlight.text}" is removed from Cards. '
+          'The saved note "${highlight.text}" is removed from Cards. '
           'Cards already made from it stay.',
       confirmLabel: 'Delete',
       destructive: true,
@@ -176,7 +176,7 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     if (_finished || highlights.isEmpty) {
       final changed = _kept > 0 || _cards > 0;
       return AppPage(
-        title: 'Highlights reviewed',
+        title: 'Notes reviewed',
         focus: true,
         onBack: () => Navigator.of(context).pop(true),
         scrollController: _scroll,
@@ -187,8 +187,8 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
           const SizedBox(height: 16),
           Text(
             highlights.isEmpty && !changed
-                ? 'No highlights to review'
-                : 'Highlight review complete',
+                ? 'No notes to review'
+                : 'Note review complete',
             textAlign: TextAlign.center,
             style: theme.typography.emphasized.headlineSmall,
           ),
@@ -197,11 +197,11 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
             changed
                 ? [
                     if (_kept > 0)
-                      '$_kept highlight${_kept == 1 ? '' : 's'} kept',
+                      '$_kept note${_kept == 1 ? '' : 's'} kept',
                     if (_cards > 0)
                       '$_cards card${_cards == 1 ? '' : 's'} created',
                   ].join(' and ')
-                : 'No highlights were changed.',
+                : 'No notes were changed.',
             textAlign: TextAlign.center,
             style: theme.typography.baseline.bodyMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -282,7 +282,7 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
         LinearScore(value: (index + 1) / highlights.length),
         const SizedBox(height: 22),
         Text(
-          'Review the highlight',
+          'Review the note',
           style: theme.typography.emphasized.headlineSmall,
         ),
         const SizedBox(height: 16),

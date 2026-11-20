@@ -269,7 +269,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           Text(
             _created == 0 && _kept == 0
                 ? 'No card details were saved.'
-                : '${[if (_created > 0) '$_created card${_created == 1 ? '' : 's'} completed or created', if (_kept > 0) '$_kept highlight${_kept == 1 ? '' : 's'} kept'].join(' and ')}. You can finish missing details later in Cards.',
+                : '${[if (_created > 0) '$_created card${_created == 1 ? '' : 's'} completed or created', if (_kept > 0) '$_kept note${_kept == 1 ? '' : 's'} kept'].join(' and ')}. You can finish missing details later in Cards.',
             textAlign: TextAlign.center,
             style: theme.typography.baseline.bodyMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -303,7 +303,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       ErrorReviewStep() => 'Analyse the error',
       SkippedReviewStep() => 'What was missing?',
       ConceptDefinitionStep() => 'Complete the concept',
-      HighlightReviewStep() => 'Keep this highlight?',
+      HighlightReviewStep() => 'Keep this note?',
     };
     return AppPage(
       title: 'Review',

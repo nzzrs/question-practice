@@ -82,7 +82,7 @@ class BackupInfo {
       buffer.write(', $skippedQuestions skipped questions');
     }
     if (highlights > 0) {
-      buffer.write(', $highlights highlights');
+      buffer.write(', $highlights notes');
     }
     return buffer.toString();
   }

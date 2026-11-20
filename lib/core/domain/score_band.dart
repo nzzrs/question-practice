@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 /// How a score compares with a topic's minimum approval and target scores.
 enum ScoreBand {
   /// Below the minimum approval score: the learner should revisit it.
@@ -40,31 +42,16 @@ double? weeksToTarget({
   return (targetScore - averagePercent) / percentagePointsPerWeek;
 }
 
-/// Natural English for a span of weeks: days-free and never false precision.
-///
-/// Under a week reads as `less than a week`; whole weeks up to eight are used
-/// directly. Longer spans switch to months, keeping one decimal only when the
-/// month figure is not whole.
-String formatWeeksToTarget(double weeks) {
-  if (weeks < 1) return 'less than a week';
-  if (weeks <= 8) {
-    final roundedWeeks = weeks.round();
-    return roundedWeeks <= 1 ? '1 week' : '$roundedWeeks weeks';
-  }
-  final months = weeks / (365.25 / 12 / 7);
-  final roundedMonths = (months * 10).round() / 10;
-  if (roundedMonths == roundedMonths.roundToDouble()) {
-    final whole = roundedMonths.round();
-    return whole <= 1 ? '1 month' : '$whole months';
-  }
-  return '${roundedMonths.toStringAsFixed(1)} months';
-}
-
 /// Sentence shown under the learning rate for the topic's target score.
+///
+/// [now] is the page's clock, so the projected date stays deterministic in
+/// tests. Whole days are rounded up: a pace that needs a fraction of a day
+/// still lands on the next date rather than today.
 String targetProjectionSentence({
   required double average,
   required int targetScore,
   required double? percentagePointsPerWeek,
+  required DateTime now,
 }) {
   final weeks = weeksToTarget(
     average: average,
@@ -75,8 +62,9 @@ String targetProjectionSentence({
   if (weeks == null) {
     return 'At this rate, the target score is not yet in reach.';
   }
-  return 'At this rate, you will average the target score in '
-      '${formatWeeksToTarget(weeks)}.';
+  final days = (weeks * 7).ceil();
+  final date = DateFormat.yMMMd().format(now.add(Duration(days: days)));
+  return 'At this rate, you will average the target score by $date.';
 }
 
 /// Short label that names a band without relying on its color.

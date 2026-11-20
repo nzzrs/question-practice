@@ -63,8 +63,8 @@ void main() {
     await tester.tap(find.text('Skip'));
     await pumpFrames(tester);
 
-    expect(find.text('Highlight review complete'), findsOneWidget);
-    expect(find.text('No highlights were changed.'), findsOneWidget);
+    expect(find.text('Note review complete'), findsOneWidget);
+    expect(find.text('No notes were changed.'), findsOneWidget);
     expect(find.text('Done'), findsOneWidget);
   });
 
@@ -88,8 +88,8 @@ void main() {
     await tester.tap(find.text('Keep & done'));
     await pumpFrames(tester, frames: 24);
 
-    expect(find.text('Highlight review complete'), findsOneWidget);
-    expect(find.text('1 highlight kept'), findsOneWidget);
+    expect(find.text('Note review complete'), findsOneWidget);
+    expect(find.text('1 note kept'), findsOneWidget);
     final saved = await tester.runAsync(
       () => harness.cards.watchHighlights().first,
     );
@@ -134,7 +134,7 @@ void main() {
     expect(find.text('second highlight'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('highlight-delete')));
     await pumpFrames(tester);
-    expect(find.text('Delete highlight?'), findsOneWidget);
+    expect(find.text('Delete note?'), findsOneWidget);
     await tester.tap(find.text('Delete'));
     await pumpFrames(tester, frames: 24);
 

@@ -465,7 +465,7 @@ void main() {
     expect(find.text('Delete sessions?'), findsOneWidget);
     expect(find.textContaining('also removes its answers'), findsOneWidget);
     expect(
-      find.textContaining('cards, highlights and skipped records'),
+      find.textContaining('cards, notes and skipped records'),
       findsOneWidget,
     );
     await tester.tap(find.text('Delete'));

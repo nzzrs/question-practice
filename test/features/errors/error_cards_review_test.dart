@@ -168,14 +168,30 @@ void main() {
     );
 
     await tester.ensureVisible(
-      find.byKey(const ValueKey('error-breakdown-ai')),
+      find.byKey(const ValueKey('error-create-cards')),
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-breakdown-ai')));
-    await pumpFrames(tester, frames: 24);
-    await tester.ensureVisible(find.byKey(const ValueKey('error-add-cards')));
+    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-add-cards')));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-suggest')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
+    await pumpFrames(tester, frames: 24);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-add')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
     expect(find.text('Item 2 of 2'), findsOneWidget);

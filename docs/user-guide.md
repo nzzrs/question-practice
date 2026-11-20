@@ -10,7 +10,7 @@ Questions is an offline Android app for practising questions and exporting study
 - Long-press a topic to **Edit topic**, **Archive topic** or **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
 - **Session in progress** cards sit at the top. Each has **Resume** and **Discard**. Several sessions can stay paused at once.
 - **Review past errors** opens the 48-hour error queue.
-- **Cards** opens concepts, error and skipped cards, basic cards and highlights.
+- **Cards** opens concepts, error and skipped cards, basic cards and notes.
 - The **Shuffle** floating button opens **Start shuffled practice**.
 - **Import** adds practices from a file. The help icon opens **How to use it**; the settings icon opens **Settings**.
 
@@ -18,7 +18,7 @@ Questions is an offline Android app for practising questions and exporting study
 
 1. Tap **Import**.
 2. Choose a `.json` file or a `.txt` file containing JSON.
-3. Check the preview: file name, topic and question counts, contents and duplicate notes.
+3. Check the preview: file name, topic and question counts, contents and duplicate warnings.
 4. Tap **Import**.
 
 - The whole file is validated first. A broken file shows the JSON path or line and column, and imports nothing.
@@ -39,7 +39,8 @@ Questions is an offline Android app for practising questions and exporting study
 - A practice marked done keeps a **Done** tag.
 - **Edit practice** offers **Rename**, **Edit description**, **Download practice JSON** and **Update practice JSON**.
 - **Split into two** needs an even number of questions. It replaces the practice with Slice A and Slice B, and removes the original practice's sessions and cards.
-- **Edit topic** is in the topic long-press menu. It changes the name, description, priority and AnkiDroid deck.
+- **Edit topic** is in the topic long-press menu. It changes the name, description, priority, AnkiDroid deck, minimum approval score and target score, and offers **Download topic JSON** and **Update topic JSON**.
+- The topic long-press menu groups **Edit topic**, **Archive topic**/**Unarchive topic** and **Delete topic**, like the practice menu.
 - Decks are set per topic. There is no per-practice deck.
 
 ## Practice
@@ -53,12 +54,12 @@ Questions is an offline Android app for practising questions and exporting study
 - **Finish practice** asks whether unanswered questions should be left out of the score or marked skipped.
 - Close offers **Cancel**, **Discard** and **Save for later**. Saved sessions wait on Home.
 - A banner appears after 5, 10, 15… minutes on the same question. It resets when the question changes and pauses in the background.
-- Select text to **Define** a term, **Ask** about it or save it as a **Highlight**. Questions, answers and explanations all support highlights. http(s) links open in the browser.
+- Select text to **Define** a term, **Ask** about it or **Save as note**. Questions, answers and explanations all support notes. http(s) links open in the browser.
 
 ## Check and feedback
 
 - A wrong answer creates an error record with the question, your answer, the correct answer and the explanation.
-- After a wrong answer, one-tap chips classify the mistake: **Forgotten fact**, **Confusion between 2 options**, **Misinterpretation** or **Distraction**. You can pick more than one; the choice feeds the card generator.
+- After a wrong answer, one-tap chips classify the mistake: **Forgotten fact**, **Confusion between 2 options**, **Misinterpretation** or **Distraction**. You can pick more than one; the choice feeds the card creator.
 - **I was distracted or read too fast** removes the new error card. Uncheck it to restore the card.
 - **I didn't know this** counts as skipped and creates no error card.
 - Skipped questions create no error card. The review asks what was missing.
@@ -75,12 +76,14 @@ Questions is an offline Android app for practising questions and exporting study
 Review opens fullscreen.
 
 - **Wrong questions** show your wrong answer, the correct answer and the explanations.
-- **Break into atomic cards (AI)** proposes up to two cards: a contrast between your choice and the correct option, and a condition-action heuristic written as "Given requirement X with restriction Y, what rule applies?". Each proposal has a Litmus badge that warns about binary questions, fronts over 30 words or syntactic clues. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
+- **Create cards** sits inside the error review and opens the card creator. Manual entry adds cards one at a time and works offline without AI. **Suggest with AI** is optional: it proposes at most two cards, a contrast between your choice and the correct option and/or a condition-action heuristic written as "Given requirement X with restriction Y, what rule applies?".
+- Suggestions carry a Litmus quality badge that warns about binary questions, fronts over 30 words, syntactic clues or a heuristic front that does not use the rule template. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
 - **Skipped questions** ask **What was missing here?**.
   - **A concept** creates a concept card from a term and definition.
   - **Another question** creates a basic card from a question and answer.
+- **Create cards** also sits inside the skipped review and opens the same creator for the concept or basic card. Manual entry adds one card at a time; AI is not required.
 - **Concepts without a definition** get a definition field.
-- **Highlights** from the session can be kept or turned into a concept card. **Suggest cards with AI** classifies proposals as procedures/rules or atomic facts; check the ones to add.
+- **Notes** from the session can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one by one; **Suggest with AI** classifies up to six proposals as procedures/rules or atomic facts. Check the ones to add.
 - **Skip** leaves a step for later. Missing card details can be finished from **Cards**.
 
 ## Past errors
@@ -94,38 +97,39 @@ Review opens fullscreen.
 
 ## Cards
 
-- Cognitive filters: **All**, **Facts**, **Heuristics**, **Contrasts** and **Concepts**. Separate entries show **Errors & skipped** and **Highlights**. **Show exported** or **Hide exported** controls finished cards.
+- Cognitive filters: **All**, **Facts**, **Heuristics**, **Contrasts** and **Concepts**. Separate entries show **Errors & skipped** and **Notes**. **Show exported** or **Hide exported** controls finished cards.
 - Cards has no checkboxes. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. The subtitle counts the selection and rows keep their positions.
 - **Review all** sits above the error and skipped section; **Review selected** appears while cards are selected.
-- **Complete** finishes a missing concept definition; an error is completed by breaking it into atomic cards or skipping it.
-- Tap a card to preview it. Tapping a highlight opens the highlight review at that highlight. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations, and **Break into atomic cards (AI)** creates the cards to export.
+- **Complete** finishes a missing concept definition; an error is completed by adding cards with **Create cards** or skipping it.
+- Tap a card to preview it. Tapping a note opens the note review at that note. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations, and **Create cards** creates the cards to export. An error preview is titled **Error preview**.
 - **Export to AnkiDroid** sends the selected cards to AnkiDroid.
 - **Share as files** creates Anki-compatible text files.
-- **Delete selected** removes the chosen cards, skipped questions and highlights. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a highlight removes only the saved phrase; cards already made from it stay.
-- Errors are never exported directly: review them into atomic cards first. Concepts without a definition block export until completed. Skipped questions and highlights cannot be exported, but they can still be selected and deleted.
+- **Delete selected** removes the chosen cards, skipped questions and notes. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a note removes only the saved phrase; cards already made from it stay.
+- Errors are never exported directly: review them into atomic cards with **Create cards** first. Concepts without a definition block export until completed. Skipped questions and notes cannot be exported, but they can still be selected and deleted.
 
-## Highlights
+## Notes
 
-- Select any question, answer or explanation text during practice and choose **Highlight**. The phrase is painted in place and belongs to the question, so it appears whenever that question is practised again.
-- Tap a painted highlight to **Define**, **Ask** or **Delete highlight**. Deleting is immediate and asks no confirmation.
-- Highlights stay in **Cards** and can be reviewed one at a time from **Review highlights** or by tapping one.
-- **Make concept card** creates a concept card. **Suggest cards with AI** classifies up to six proposals as procedures/rules or atomic facts; check the ones to add.
-- A highlight with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete highlight** removes only the saved phrase.
-- **Download all** saves highlights as plain text.
-- Highlights are never sent to AnkiDroid.
+- Select any question, answer or explanation text during practice and choose **Save as note**. The phrase is painted in place and belongs to the question, so it appears whenever that question is practised again.
+- Tap a painted note to **Define**, **Ask** or **Delete note**. Deleting is immediate and asks no confirmation.
+- Notes stay in **Cards** and can be reviewed one at a time from **Review notes** or by tapping one.
+- **Create cards** sits inside the note review and opens the card creator. Manual entry adds cards one at a time and works without AI. **Suggest with AI** is optional and classifies up to six proposals as procedures/rules or atomic facts; check the ones to add.
+- A note with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete note** removes only the saved phrase.
+- **Download all** saves notes as plain text.
+- Notes are never sent to AnkiDroid.
 
 ## AnkiDroid export
 
 - **Export to AnkiDroid** needs AnkiDroid installed, its API enabled and storage permission granted.
 - Concepts use the **Cloze** note type. Facts, heuristics and contrasts use the standard **Basic** note type, created automatically if missing. There is no custom error note type.
-- Notes carry hierarchical `topic::<topic>` and `subtopic::<subtopic>` tags. Concept fronts also show `[Topic / Subtopic]`.
+- Exported Anki notes carry hierarchical `topic::<topic>` and `subtopic::<subtopic>` tags. Concept fronts also show `[Topic / Subtopic]`.
 - Each topic can use its own deck. A topic without a deck uses the default deck from **Settings**.
 - Set a topic's deck with **Edit topic → AnkiDroid deck**. **Browse decks** lists live deck names; a typed name is created on export.
-- **Share as files** writes Anki-compatible text files. File export cannot encode a deck and never includes highlights.
+- **Share as files** writes Anki-compatible text files. File export cannot encode a deck and never includes notes.
 
 ## Topic and practice JSON
 
-- **Edit topic** offers **Download topic JSON** and **Update topic JSON** for the whole topic, separate from the per-practice options. A topic file contains every practice in the topic. Updating creates new practices and questions, modifies matched ones and deletes questions missing from the file; practices absent from the file are left untouched.
+- **Download topic JSON** and **Update topic JSON** live inside **Edit topic** and cover the whole topic, separate from the per-practice options. The topic menu itself groups **Edit topic**, **Archive**/**Unarchive** and **Delete** only.
+- A topic file contains every practice in the topic. Updating creates new practices and questions, modifies matched ones and deletes questions missing from the file; practices absent from the file are left untouched.
 - Long-press a practice and choose **Edit practice → Download practice JSON** to share one practice in the import format.
 - The file contains the topic and practice names, descriptions and every question, with `sourceId` on each question and `subtopic` only when set. It never contains a deck.
 - **Update practice JSON** reads an edited file and shows a preview: new, modified, unchanged and deleted questions, with the affected prompts.
@@ -141,7 +145,7 @@ Review opens fullscreen.
 - **Statistics** is opened from the **insights** icon on a topic. It shows the latest, best and average score and the number of completed sessions. The average is weighted by the number of questions in each session, so a long session counts more than a short one.
 - **Progress over time** plots one point per completed session. The dashed **Trend (questions)** line is a weighted fit of score against the total questions answered so far; sessions with more questions have more influence.
 - **Learning rate** reports the fit as percentage points per 100 answered questions and as percentage points per week. It appears as soon as two sessions give a usable fit, without waiting for a week of history.
-- Below it, a projection says when the current pace would bring the weighted average to the target score, or that the target is already reached or not in reach at this rate.
+- Below it, a projection says when the current pace would bring the weighted average to the target score: **At this rate, you will average the target score by <date>.** It also reports when the target is already reached or not in reach at this rate.
 - **By subtopic** shows accuracy and progress for each group. It is hidden when no question has a subtopic.
 - Long-press a subtopic to select it. With one selected, the pencil renames it and the trash deletes it. With two or more, the merge icon combines them under one name.
 - **Rename** changes the name on every question in this topic in that category. Renaming **Uncategorized** gives those questions a name.
@@ -149,7 +153,7 @@ Review opens fullscreen.
 - **Merge** asks for the name to keep, either one of the selected categories or a new name, and applies it to all of them. Other topics are not changed.
 - The **share** icon exports the visible statistics as a JSON file. It includes the summary, progress points, per-subtopic figures and trend data, with the weighted regression slope and intercept plus learning rates per 100 questions and per week.
 - A topic's header **Readiness** is the correct share of the last 100 answered questions in that topic, across completed sessions. Every attempt counts, including wrong, skipped and **I didn't know this** answers; questions left unanswered have no attempt and stay out. Shorter histories use every answer they have, and only the tail of the oldest session needed joins the window.
-- The **Sessions** list keeps one row per completed session. Long-press a row to start selecting sessions, then tap others to toggle them. The trash icon asks for confirmation and deletes the selected completed sessions together with their answers, cards, highlights and skipped records. Selection tints the row and uses the app bar, so the page does not move; category and session selection are separate modes.
+- The **Sessions** list keeps one row per completed session. Long-press a row to start selecting sessions, then tap others to toggle them. The trash icon asks for confirmation and deletes the selected completed sessions together with their answers, cards, notes and skipped records. Selection tints the row and uses the app bar, so the page does not move; category and session selection are separate modes.
 
 ## Lookup
 
@@ -169,7 +173,7 @@ Review opens fullscreen.
 
 ## Backup and restore
 
-- **Export backup** shares one JSON file with topics (including score bands), practices, questions, subtopics, sessions, answers, mistake classifications, cards, skipped questions, highlights and settings.
+- **Export backup** shares one JSON file with topics (including score bands), practices, questions, subtopics, sessions, answers, mistake classifications, cards, skipped questions, notes and settings.
 - **Restore backup** validates the file before replacing all local data in one step. An empty, damaged or incompatible file leaves the current data untouched.
 - A restore does not merge: the backup becomes the complete state.
 - A backup is not a practice JSON file. Use **Import** or **Update practice JSON** for practice content.
@@ -177,15 +181,15 @@ Review opens fullscreen.
 
 ## Data and privacy
 
-- Practices, answers, cards, statistics and settings are stored locally on the device.
+- Practices, answers, cards, notes, statistics and settings are stored locally on the device.
 - The AI API key is stored in Android secure storage and is never exported.
 - The app works offline and sends no analytics.
-- **Erase all data** removes practices, sessions, cards, settings and the saved key. Restore and erase cannot be undone.
+- **Erase all data** removes practices, sessions, cards, notes, settings and the saved key. Restore and erase cannot be undone.
 - For the developer data map, see [Database reference](database.md).
 
 ## Archived topics
 
-- **Archive topic** hides a topic from Home and keeps its practices, questions, sessions, cards, statistics and deck.
+- **Archive topic** hides a topic from Home and keeps its practices, questions, sessions, cards, notes, statistics and deck.
 - The **archive** icon beside **Topics** opens the archived list.
 - Tap an archived topic to **Unarchive topic**, **Edit topic** or **Delete topic**.
 - Unarchive returns it to Home with its data intact. Deleting an archived topic is permanent, like deleting an active topic.

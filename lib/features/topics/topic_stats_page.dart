@@ -30,6 +30,7 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final now = ref.watch(clockProvider).now();
     final summary = ref.watch(topicSummaryProvider(widget.topicId));
     final progress = ref.watch(topicProgressProvider(widget.topicId));
     final subtopics =
@@ -155,6 +156,7 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
                   learningRatePerWeek: learningRatePerWeek,
                   minimumScore: minimumScore,
                   targetScore: targetScore,
+                  now: now,
                 ),
                 const SizedBox(height: 24),
                 SectionTitle(
@@ -273,7 +275,7 @@ class _TopicStatsPageState extends ConsumerState<TopicStatsPage> {
       title: ids.length == 1 ? 'Delete session?' : 'Delete sessions?',
       message:
           'Deleting a completed session also removes its answers and any '
-          'cards, highlights and skipped records captured by that session. '
+          'cards, notes and skipped records captured by that session. '
           'This cannot be undone.',
       confirmLabel: 'Delete',
       destructive: true,
@@ -560,6 +562,7 @@ class _TrendHero extends StatelessWidget {
     required this.learningRatePerWeek,
     required this.minimumScore,
     required this.targetScore,
+    required this.now,
   });
 
   final List<TopicProgressPoint> points;
@@ -568,6 +571,9 @@ class _TrendHero extends StatelessWidget {
   final double best;
   final int minimumScore;
   final int targetScore;
+
+  /// The page's clock, used to date the target projection.
+  final DateTime now;
 
   /// Percentage points per 100 answered questions, or null without a fit.
   final double? learningRatePer100;
@@ -699,6 +705,7 @@ class _TrendHero extends StatelessWidget {
               average: average,
               targetScore: targetScore,
               percentagePointsPerWeek: learningRatePerWeek,
+              now: now,
             ),
             style: theme.typography.baseline.bodySmall.copyWith(
               color: theme.colorScheme.onSurfaceVariant,

@@ -88,7 +88,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
       });
     } on Object catch (error) {
       if (mounted) {
-        await showSnack(context, 'Could not load highlights: $error');
+        await showSnack(context, 'Could not load notes: $error');
       }
     }
   }
@@ -122,7 +122,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     if (existing.any(
       (highlight) => highlight.text.trim().toLowerCase() == lowered,
     )) {
-      await showSnack(context, 'That phrase is already highlighted.');
+      await showSnack(context, 'That phrase is already saved as a note.');
       return;
     }
     try {
@@ -141,10 +141,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
       if (!mounted) return;
       await _reloadHighlights(item.question.id);
       if (!mounted) return;
-      await showSnack(context, 'Highlight saved. It is ready in the review.');
+      await showSnack(context, 'Note saved. It is ready in the review.');
     } on Object catch (error) {
       if (mounted) {
-        await showSnack(context, 'Could not save the highlight: $error');
+        await showSnack(context, 'Could not save the note: $error');
       }
     }
   }
@@ -175,10 +175,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
           _highlights[questionId] = remaining;
         }
       });
-      await showSnack(context, 'Highlight deleted.');
+      await showSnack(context, 'Note deleted.');
     } on Object catch (error) {
       if (mounted) {
-        await showSnack(context, 'Could not delete the highlight: $error');
+        await showSnack(context, 'Could not delete the note: $error');
       }
     }
   }
@@ -1155,7 +1155,7 @@ class _HighlightActionsSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Saved highlight',
+                    'Saved note',
                     style: theme.typography.baseline.labelSmall.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -1178,7 +1178,7 @@ class _HighlightActionsSheet extends StatelessWidget {
               ),
             OptionTile(
               icon: Icons.delete_outline,
-              title: 'Delete highlight',
+              title: 'Delete note',
               subtitle: 'Remove it everywhere for this question',
               destructive: true,
               onTap: () => Navigator.of(context).pop(_HighlightAction.delete),

@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
-import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_cards_review_page.dart';
 import '../lookup/lookup_actions.dart';
@@ -352,8 +351,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               'Error and skipped',
               count: errors.length + skipped.length,
               supporting:
-                  'Errors are reviewed into atomic cards. Skipped questions '
-                  'stay here until converted.',
+                  'Create cards turns errors and skipped answers into atomic '
+                  'cards, by hand or with optional AI suggestions.',
               trailing: _SelectAllButton(
                 allSelected: allReviewSelected,
                 onPressed: () => setState(() {
@@ -488,10 +487,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           ],
           if (showHighlights && highlights.isNotEmpty) ...[
             SectionTitle(
-              'Highlights',
+              'Notes',
               count: highlights.length,
-              supporting:
-                  'Plain text only. Highlights are never sent to AnkiDroid.',
+              supporting: 'Plain text only. Notes are never sent to AnkiDroid.',
               trailing: M3EButton.text(
                 onPressed: _busy ? null : () => _downloadHighlights(highlights),
                 child: const Row(
@@ -512,7 +510,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                   key: const ValueKey('review-highlights'),
                   onPressed: () => _reviewHighlights(highlights),
                   icon: const Icon(Icons.rate_review_outlined),
-                  label: const Text('Review highlights'),
+                  label: const Text('Review notes'),
                 ),
               ],
             ),
@@ -573,10 +571,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           'become Anki Basic cards with a front and a back. '
           'Cards are tagged topic::<topic> and subtopic::<subtopic> when a '
           'subtopic exists. '
-          'Errors are not exported directly: review them into atomic cards '
-          'first. Skipped questions stay in Cards until you convert them. '
-          'Highlights are never sent to AnkiDroid; use Download all in the '
-          'Highlights section to save them as plain text. '
+          'Errors are not exported directly: Create cards turns them into '
+          'atomic cards, by hand or with optional AI suggestions. Skipped '
+          'questions stay in Cards until you create cards from them. '
+          'Notes are never sent to AnkiDroid; use Download all in the '
+          'Notes section to save them as plain text. '
           'Each topic uses its own deck; topics without one use the default '
           'deck from Settings.',
         ),
@@ -667,7 +666,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           'Concepts, facts, heuristics and contrasts are removed permanently. Deleting an '
           'active error card also removes it from the 48-hour review queue. '
           'Skipped questions are removed from the skipped queue; their '
-          'questions stay in the practice. Highlights are removed from this '
+          'questions stay in the practice. Notes are removed from this '
           'list; cards already made from them stay.',
       confirmLabel: 'Delete',
       destructive: true,
@@ -819,23 +818,15 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   Future<void> _previewError(ErrorCard card) {
     void define(String term, Rect? anchor) => _defineTerm(term, anchor, card);
     void openUrl(String value) => openStudyUrl(context, ref, value);
-    return _previewDialog('Error card preview', [
+    return _previewDialog('Error preview', [
       _previewMeta([
         Pill(card.topicName),
         Pill('deck: ${_deckForTopic(card.topicName)}', tone: PillTone.primary),
-        Tooltip(
-          message: 'Estimated time to read the front',
-          child: Pill(
-            readingTimeLabel(
-              '${card.question} ${card.wrongAnswer} ${card.correctAnswer}',
-            ),
-            icon: Icons.schedule,
-          ),
-        ),
         Pill(
-          card.needsDetails ? 'Needs notes' : 'Ready',
+          card.needsDetails ? 'Needs review' : 'Reviewed',
           tone: card.needsDetails ? PillTone.error : PillTone.success,
         ),
+        for (final kind in card.mistakeKinds) Pill(kind.label),
       ]),
       const SizedBox(height: 14),
       TonalBox(
@@ -875,16 +866,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         const SizedBox(height: 10),
         _PreviewNote(label: 'Your reasoning', text: card.reasoning),
       ],
-      const SizedBox(height: 10),
-      _PreviewNote(
-        label: 'Flawed assumption',
-        text: card.bias.isEmpty ? '— needs notes —' : card.bias,
-      ),
-      const SizedBox(height: 8),
-      _PreviewNote(
-        label: 'Vaccine',
-        text: card.vaccine.isEmpty ? '— needs notes —' : card.vaccine,
-      ),
       if (card.explanation.trim().isNotEmpty) ...[
         const SizedBox(height: 8),
         _PreviewNote(label: 'Why this answer', text: card.explanation),
@@ -945,7 +926,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       await ref.read(exportServiceProvider).shareHighlights(highlights);
     } on Object catch (error) {
       if (mounted) {
-        await showSnack(context, 'Could not share highlights: $error');
+        await showSnack(context, 'Could not share notes: $error');
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -1078,7 +1059,7 @@ class _FilterBar extends StatelessWidget {
           (_Filter.contrasts, 'Contrasts', 'contrasts'),
           (_Filter.concepts, 'Concepts', 'concepts'),
           (_Filter.errors, 'Errors & skipped', 'errors'),
-          (_Filter.highlights, 'Highlights', 'highlights'),
+          (_Filter.highlights, 'Notes', 'notes'),
         ])
           M3EChip(
             key: ValueKey('cards-filter-${entry.$3}'),
@@ -1298,8 +1279,8 @@ class _ErrorRow extends StatelessWidget {
           ? null
           : M3EIconButton(
               variant: M3EIconButtonVariant.standard,
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Complete',
+              icon: const Icon(Icons.add_card),
+              tooltip: 'Create cards',
               onPressed: onComplete,
             ),
       child: Column(
@@ -1314,7 +1295,7 @@ class _ErrorRow extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             card.needsDetails
-                ? 'Needs bias and vaccine before export.'
+                ? 'Needs review. Create cards to export.'
                 : 'You: ${card.wrongAnswer} · Correct: ${card.correctAnswer}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -1457,7 +1438,7 @@ class _HighlightRow extends StatelessWidget {
             spacing: 6,
             runSpacing: 4,
             children: [
-              const Pill('Highlight', tone: PillTone.primary),
+              const Pill('Note', tone: PillTone.primary),
               if (highlight.topicName.trim().isNotEmpty)
                 Pill(highlight.topicName),
               if (highlight.isKept) const Pill('Kept', tone: PillTone.success),

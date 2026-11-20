@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
@@ -8,7 +9,10 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
+import '../import/domain/import_models.dart';
 import 'anki_deck_picker.dart';
+import 'domain/topic_edit_service.dart';
+import 'topic_update_preview_page.dart';
 
 /// The editable field a topic editor tile expands.
 enum _TopicField {
@@ -79,6 +83,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
 
   bool _loading = true;
   bool _saving = false;
+  bool _jsonBusy = false;
   Object? _loadError;
   _TopicField? _expanded;
 
@@ -133,8 +138,10 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
     _syncGuard();
   }
 
+  bool get _busy => _saving || _jsonBusy;
+
   void _syncGuard() {
-    widget.guard.update(dirty: _dirty, saving: _saving);
+    widget.guard.update(dirty: _dirty, saving: _busy);
   }
 
   Future<void> _load() async {
@@ -181,7 +188,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
   }
 
   Future<void> _requestClose() async {
-    if (_saving) return;
+    if (_busy) return;
     if (!_dirty) {
       Navigator.of(context).pop(false);
       return;
@@ -191,7 +198,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
   }
 
   Future<void> _save() async {
-    if (_saving) return;
+    if (_busy) return;
     final name = _name.text.trim();
     final priorityText = _priority.text.trim();
     final parsedPriority = priorityText.isEmpty
@@ -282,8 +289,131 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
     setState(() => _deck.text = selected);
   }
 
+  /// Shares the topic as a JSON file without leaving the editor.
+  Future<void> _downloadJson() async {
+    if (_busy) return;
+    setState(() => _jsonBusy = true);
+    _syncGuard();
+    try {
+      await ref.read(topicEditServiceProvider).shareTopicJson(widget.topic.id);
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not export the topic JSON: $error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _jsonBusy = false);
+        _syncGuard();
+      }
+    }
+  }
+
+  /// Replaces the stored topic from a JSON file and reloads the fields.
+  ///
+  /// Unsaved edits are never discarded silently: the sheet asks first, and the
+  /// save and JSON actions stay disabled while the preview or file picker runs.
+  Future<void> _updateFromJson() async {
+    if (_busy) return;
+    if (_dirty) {
+      final confirmed = await confirmDialog(
+        context,
+        title: 'Replace this topic?',
+        message:
+            'Updating from a file applies the topic as it is saved now. '
+            'Unsaved edits in this sheet will be lost.',
+        confirmLabel: 'Update from file',
+      );
+      if (!confirmed || !mounted) return;
+    }
+    setState(() => _jsonBusy = true);
+    _syncGuard();
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['json', 'txt'],
+      );
+      if (files.isEmpty) return;
+      final file = files.single;
+      final bytes = await file.readAsBytes();
+      final preview = await ref
+          .read(topicEditServiceProvider)
+          .previewUpdateBytes(
+            bytes,
+            fileName: file.name,
+            topicId: widget.topic.id,
+          );
+      if (!mounted) return;
+      final applied = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (context) => TopicUpdatePreviewPage(preview: preview),
+        ),
+      );
+      if (applied != true || !mounted) return;
+      await _load();
+      if (!mounted) return;
+      await showSnack(
+        context,
+        'Topic updated: ${preview.newPracticeCount} new and '
+        '${preview.modifiedPracticeCount} changed practices, '
+        '${preview.newQuestionCount} new, '
+        '${preview.modifiedQuestionCount} modified and '
+        '${preview.deletedQuestionCount} deleted questions.',
+      );
+    } on ImportException catch (error) {
+      if (mounted) await _showIssues(error.issues);
+    } on TopicFileException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not read that file: $error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _jsonBusy = false);
+        _syncGuard();
+      }
+    }
+  }
+
+  Future<void> _showIssues(List<ImportIssue> issues) async {
+    await M3EDialog.show<void>(
+      context,
+      dialog: M3EDialog(
+        title: 'Update file rejected',
+        content: SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${issues.length} problem${issues.length == 1 ? '' : 's'} '
+                  'found. Nothing was changed.',
+                ),
+                const SizedBox(height: 12),
+                for (final issue in issues.take(20))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text('${issue.displayPath}: ${issue.message}'),
+                  ),
+                if (issues.length > 20)
+                  Text('…and ${issues.length - 20} more.'),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          M3EButton.filled(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _toggle(_TopicField field) {
-    if (_saving) return;
+    if (_busy) return;
     setState(() => _expanded = _expanded == field ? null : field);
   }
 
@@ -358,14 +488,14 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
                   children: [
                     M3EButton.text(
                       key: const ValueKey('topic-editor-cancel'),
-                      onPressed: _saving ? null : _requestClose,
+                      onPressed: _busy ? null : _requestClose,
                       child: const Text('Cancel'),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: M3EButton.filled(
                         key: const ValueKey('topic-editor-save'),
-                        onPressed: _saving || _loading || _loadError != null
+                        onPressed: _busy || _loading || _loadError != null
                             ? null
                             : _save,
                         icon: _saving ? null : const Icon(Icons.check),
@@ -553,13 +683,30 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
             Align(
               alignment: Alignment.centerLeft,
               child: M3EButton.tonal(
-                onPressed: _saving ? null : _browseDecks,
+                onPressed: _busy ? null : _browseDecks,
                 icon: const Icon(Icons.style_outlined),
                 label: const Text('Browse decks'),
               ),
             ),
           ],
         ),
+      ),
+      const SizedBox(height: 14),
+      const _GroupLabel('Topic JSON'),
+      OptionTile(
+        key: const ValueKey('topic-editor-download-json'),
+        icon: Icons.download_outlined,
+        title: 'Download topic JSON',
+        subtitle: 'Share every practice in this topic as a file',
+        onTap: _busy ? null : _downloadJson,
+      ),
+      const SizedBox(height: 8),
+      OptionTile(
+        key: const ValueKey('topic-editor-update-json'),
+        icon: Icons.upload_file_outlined,
+        title: 'Update topic JSON',
+        subtitle: 'Add or modify practices and questions from a file',
+        onTap: _busy ? null : _updateFromJson,
       ),
     ];
   }
@@ -578,8 +725,31 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       title: title,
       subtitle: value,
       expanded: expanded,
-      onTap: _saving ? null : () => _toggle(field),
+      onTap: _busy ? null : () => _toggle(field),
       details: expanded ? editor : null,
+    );
+  }
+}
+
+/// Small section heading that separates the JSON actions from the fields.
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+      child: Text(
+        text.toUpperCase(),
+        style: theme.typography.baseline.labelSmall.copyWith(
+          color: theme.colorScheme.primary,
+          letterSpacing: 0.8,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }

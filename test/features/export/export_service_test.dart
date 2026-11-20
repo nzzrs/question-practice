@@ -202,7 +202,7 @@ void main() {
       ),
     ]);
 
-    expect(text, contains('Question Practice highlights'));
+    expect(text, contains('Question Practice notes'));
     expect(text, contains('# Cloud'));
     expect(text, contains('managed service'));
     expect(text, contains('Context: Which platform is fully managed?'));

@@ -339,7 +339,7 @@ What is preserved on update:
 - A new question starts with no history.
 - A deleted question loses its attempts, session-question links, error cards and
   skipped-question records through the database cascade. Concept cards, basic
-  cards and highlights that referenced it remain, but their question link is
+  cards and notes that referenced it remain, but their question link is
   cleared. Statistics for its attempts disappear with them.
 - The practice stays in the same topic and keeps its done flag, while the
   practice content hash and import time are refreshed.
@@ -353,10 +353,10 @@ have changed.
 
 ### Downloading and updating a topic
 
-Long-press a topic and choose **Download topic JSON**. The file contains one
-topic with every practice in it, using the same format above plus the topic's
-`minimumScore` and `targetScore`. **Update topic JSON** validates the whole file
-first, then:
+Long-press a topic and choose **Edit topic → Download topic JSON**. The file
+contains one topic with every practice in it, using the same format above plus
+the topic's `minimumScore` and `targetScore`. **Update topic JSON**, next to the
+download action, validates the whole file first, then:
 
 - a practice whose name matches a stored practice is updated question by
   question with the same `sourceId` then prompt matching used by a practice

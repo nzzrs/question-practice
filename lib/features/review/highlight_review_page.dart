@@ -7,9 +7,8 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import 'highlight_card_actions.dart';
+import '../export/card_creator_page.dart';
 import 'highlight_review_view.dart';
-import 'suggested_cards_sheet.dart';
 
 /// Reviews saved highlights one at a time.
 ///
@@ -22,7 +21,7 @@ class HighlightReviewPage extends ConsumerStatefulWidget {
   const HighlightReviewPage({
     required this.highlights,
     this.initialHighlightId,
-    this.title = 'Review highlights',
+    this.title = 'Review notes',
     super.key,
   });
 
@@ -95,47 +94,38 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     }
   }
 
-  Future<void> _makeCard(
+  Future<void> _createCards(
     StudyHighlight highlight,
     int index,
     int length,
   ) async {
     if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final created = await convertHighlightToCard(context, ref, highlight);
-      if (!mounted || created == 0) return;
-      _cards += created;
-      _advanceFrom(index, length);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _suggestCards(
-    StudyHighlight highlight,
-    int index,
-    int length,
-  ) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final added = await suggestCardsFromHighlight(context, highlight);
-      if (!mounted || added == 0) return;
-      _cards += added;
-      _advanceFrom(index, length);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final created = await showCardCreator(
+      context,
+      request: CardCreatorRequest(
+        title: 'Create cards',
+        sessionId: highlight.sessionId,
+        questionId: highlight.questionId,
+        questionContext: highlight.context,
+        topicName: highlight.topicName,
+        subtopic: highlight.subtopic,
+        initialKind: CardCreatorKind.concept,
+        initialTerm: highlight.text,
+        note: highlight,
+      ),
+    );
+    if (!mounted || created == 0) return;
+    _cards += created;
+    _advanceFrom(index, length);
   }
 
   Future<void> _deleteHighlight(StudyHighlight highlight, int length) async {
     if (_busy) return;
     final confirmed = await confirmDialog(
       context,
-      title: 'Delete highlight?',
+      title: 'Delete note?',
       message:
-          'The saved phrase "${highlight.text}" is removed from Cards. '
+          'The saved note "${highlight.text}" is removed from Cards. '
           'Cards already made from it stay.',
       confirmLabel: 'Delete',
       destructive: true,
@@ -176,7 +166,7 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     if (_finished || highlights.isEmpty) {
       final changed = _kept > 0 || _cards > 0;
       return AppPage(
-        title: 'Highlights reviewed',
+        title: 'Notes reviewed',
         focus: true,
         onBack: () => Navigator.of(context).pop(true),
         scrollController: _scroll,
@@ -187,8 +177,8 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
           const SizedBox(height: 16),
           Text(
             highlights.isEmpty && !changed
-                ? 'No highlights to review'
-                : 'Highlight review complete',
+                ? 'No notes to review'
+                : 'Note review complete',
             textAlign: TextAlign.center,
             style: theme.typography.emphasized.headlineSmall,
           ),
@@ -196,12 +186,11 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
           Text(
             changed
                 ? [
-                    if (_kept > 0)
-                      '$_kept highlight${_kept == 1 ? '' : 's'} kept',
+                    if (_kept > 0) '$_kept note${_kept == 1 ? '' : 's'} kept',
                     if (_cards > 0)
                       '$_cards card${_cards == 1 ? '' : 's'} created',
                   ].join(' and ')
-                : 'No highlights were changed.',
+                : 'No notes were changed.',
             textAlign: TextAlign.center,
             style: theme.typography.baseline.bodyMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
@@ -282,16 +271,15 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
         LinearScore(value: (index + 1) / highlights.length),
         const SizedBox(height: 22),
         Text(
-          'Review the highlight',
+          'Review the note',
           style: theme.typography.emphasized.headlineSmall,
         ),
         const SizedBox(height: 16),
         HighlightReviewView(
           key: ValueKey('highlight-review-${highlight.id}'),
           highlight: highlight,
-          onMakeCard: () => _makeCard(highlight, index, highlights.length),
-          onSuggestCards: () =>
-              _suggestCards(highlight, index, highlights.length),
+          onCreateCards: () =>
+              _createCards(highlight, index, highlights.length),
           onKeep: highlight.isKept
               ? null
               : () => _keep(highlight, index, highlights.length),

@@ -100,33 +100,16 @@ void main() {
     });
   });
 
-  group('formatWeeksToTarget', () {
-    test('uses natural English for short spans', () {
-      expect(formatWeeksToTarget(0.4), 'less than a week');
-      expect(formatWeeksToTarget(0.9), 'less than a week');
-      expect(formatWeeksToTarget(1), '1 week');
-      expect(formatWeeksToTarget(1.4), '1 week');
-      expect(formatWeeksToTarget(2), '2 weeks');
-      expect(formatWeeksToTarget(3.2), '3 weeks');
-      expect(formatWeeksToTarget(8), '8 weeks');
-    });
-
-    test('switches to months beyond eight weeks', () {
-      expect(formatWeeksToTarget(8.4), '1.9 months');
-      expect(formatWeeksToTarget(9), '2.1 months');
-      expect(formatWeeksToTarget(8.7), '2 months');
-      expect(formatWeeksToTarget(17.4), '4 months');
-      expect(formatWeeksToTarget(20), '4.6 months');
-    });
-  });
-
   group('targetProjectionSentence', () {
+    final now = DateTime(2026, 11, 20);
+
     test('names an already reached target', () {
       expect(
         targetProjectionSentence(
           average: 0.82,
           targetScore: 80,
           percentagePointsPerWeek: null,
+          now: now,
         ),
         'The target score is already reached.',
       );
@@ -138,35 +121,42 @@ void main() {
           average: 0.5,
           targetScore: 80,
           percentagePointsPerWeek: -1,
+          now: now,
         ),
         'At this rate, the target score is not yet in reach.',
       );
     });
 
-    test('states the weeks or months at the current pace', () {
+    test('projects the target score onto a readable date', () {
       expect(
         targetProjectionSentence(
           average: 0.5,
           targetScore: 80,
           percentagePointsPerWeek: 5,
+          now: now,
         ),
-        'At this rate, you will average the target score in 6 weeks.',
-      );
-      expect(
-        targetProjectionSentence(
-          average: 0.5,
-          targetScore: 80,
-          percentagePointsPerWeek: 50,
-        ),
-        'At this rate, you will average the target score in less than a week.',
+        'At this rate, you will average the target score by Jan 1, 2027.',
       );
       expect(
         targetProjectionSentence(
           average: 0.5,
           targetScore: 80,
           percentagePointsPerWeek: 2,
+          now: now,
         ),
-        'At this rate, you will average the target score in 3.4 months.',
+        'At this rate, you will average the target score by Mar 5, 2027.',
+      );
+    });
+
+    test('rounds a partial day up to the next date', () {
+      expect(
+        targetProjectionSentence(
+          average: 0.5,
+          targetScore: 80,
+          percentagePointsPerWeek: 50,
+          now: now,
+        ),
+        'At this rate, you will average the target score by Nov 25, 2026.',
       );
     });
   });

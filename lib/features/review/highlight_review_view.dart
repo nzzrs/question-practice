@@ -7,23 +7,21 @@ import '../../core/ui/widgets.dart';
 /// Shared reading surface for one saved highlight.
 ///
 /// The end-of-session review and the Cards highlight review render the same
-/// content: the highlighted phrase, the question it came from, its topic and
-/// practice, and the card-making actions. Card-making actions disappear once a
-/// card exists. [onKeep] and [onDelete] are optional so each surface can offer
-/// only the actions its navigation already provides.
+/// content: the note, the question it came from, its topic and practice, and
+/// the create action. The create action disappears once a card exists.
+/// [onKeep] and [onDelete] are optional so each surface can offer only the
+/// actions its navigation already provides.
 class HighlightReviewView extends StatelessWidget {
   const HighlightReviewView({
     required this.highlight,
-    required this.onMakeCard,
-    required this.onSuggestCards,
+    required this.onCreateCards,
     this.onKeep,
     this.onDelete,
     super.key,
   });
 
   final StudyHighlight highlight;
-  final VoidCallback onMakeCard;
-  final VoidCallback onSuggestCards;
+  final VoidCallback onCreateCards;
   final VoidCallback? onKeep;
   final VoidCallback? onDelete;
 
@@ -44,7 +42,7 @@ class HighlightReviewView extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 6,
                 children: [
-                  const Pill('Highlight', tone: PillTone.primary),
+                  const Pill('Note', tone: PillTone.primary),
                   if (highlight.topicName.trim().isNotEmpty)
                     Pill(highlight.topicName),
                   if (highlight.practiceName.trim().isNotEmpty)
@@ -95,33 +93,21 @@ class HighlightReviewView extends StatelessWidget {
         const SizedBox(height: 20),
         if (showCardActions) ...[
           Text(
-            'Make a concept card, suggest atomic cards, or keep it for later.',
+            'Create cards for this note, or keep it for later.',
             style: theme.typography.emphasized.titleSmall,
           ),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              M3EButton.tonal(
-                key: const ValueKey('highlight-make-card'),
-                onPressed: onMakeCard,
-                icon: const Icon(Icons.style_outlined),
-                label: const Text('Make concept card'),
-              ),
-              M3EButton.tonal(
-                key: const ValueKey('highlight-suggest-cards'),
-                onPressed: onSuggestCards,
-                icon: const Icon(Icons.auto_awesome),
-                label: const Text('Suggest cards with AI'),
-              ),
-            ],
+          M3EButton.tonal(
+            key: const ValueKey('highlight-make-card'),
+            onPressed: onCreateCards,
+            icon: const Icon(Icons.add_card),
+            label: const Text('Create cards'),
           ),
         ] else
           TonalBox(
             key: const ValueKey('highlight-card-made'),
             child: Text(
-              'A card was already made from this highlight. The saved phrase '
+              'Cards were already made from this note. The saved text '
               'stays in Cards until you delete it.',
               style: theme.typography.baseline.bodySmall.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -162,7 +148,7 @@ class HighlightReviewView extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        'Delete highlight',
+                        'Delete note',
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ],

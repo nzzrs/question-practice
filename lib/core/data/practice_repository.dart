@@ -162,6 +162,8 @@ class PracticeRepository {
     required String description,
     required int? priority,
     String? ankiDeck,
+    int minimumScore = 70,
+    int targetScore = 80,
     required DateTime createdAt,
   }) {
     return _db.topicDao.insertTopic(
@@ -169,6 +171,8 @@ class PracticeRepository {
       description: description,
       priority: priority,
       ankiDeck: ankiDeck,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
       createdAt: createdAt,
     );
   }
@@ -482,6 +486,8 @@ class PracticeRepository {
     required String description,
     required int? priority,
     String? ankiDeck,
+    int minimumScore = 70,
+    int targetScore = 80,
   }) {
     return _db.topicDao.updateTopic(
       id: id,
@@ -489,6 +495,8 @@ class PracticeRepository {
       description: description,
       priority: priority,
       ankiDeck: ankiDeck,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
     );
   }
 

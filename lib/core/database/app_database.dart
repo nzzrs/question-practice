@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -92,6 +92,18 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 10) {
         await migrator.addColumn(questions, questions.subtopic);
+      }
+      if (from < 11) {
+        await migrator.addColumn(topics, topics.minimumScore);
+        await migrator.addColumn(topics, topics.targetScore);
+        await migrator.addColumn(attempts, attempts.mistakeKindsJson);
+        await migrator.addColumn(concepts, concepts.subtopic);
+        await migrator.addColumn(errorCards, errorCards.cognitiveType);
+        await migrator.addColumn(errorCards, errorCards.subtopic);
+        await migrator.addColumn(errorCards, errorCards.mistakeKindsJson);
+        await migrator.addColumn(manualCards, manualCards.cognitiveType);
+        await migrator.addColumn(manualCards, manualCards.subtopic);
+        await migrator.addColumn(highlights, highlights.subtopic);
       }
     },
     beforeOpen: (details) async {

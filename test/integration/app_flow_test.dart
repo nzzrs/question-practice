@@ -99,7 +99,6 @@ void main() {
     );
 
     final concepts = await harness.cards.watchConcepts().first;
-    final errors = await harness.cards.watchErrorCards().first;
     final export = ExportService(
       gateway: gateway,
       cards: harness.cards,
@@ -108,15 +107,15 @@ void main() {
     );
     final outcome = await export.exportToAnki(
       deckName: 'Question Practice',
-      selection: ExportSelection(concepts: concepts, errorCards: errors),
+      selection: ExportSelection(concepts: concepts),
     );
     expect(outcome.success, isTrue);
-    expect(gateway.importedNotes, hasLength(2));
+    expect(gateway.importedNotes, hasLength(1));
     expect(
       gateway.importedNotes.first.fields.first,
       'Definition of {{c1::GCP}}: {{c2::Google Cloud Platform}}',
     );
     expect(await harness.cards.watchConcepts().first, isEmpty);
-    expect(await harness.cards.watchErrorCards().first, isEmpty);
+    expect(await harness.cards.watchErrorCards().first, isNotEmpty);
   });
 }

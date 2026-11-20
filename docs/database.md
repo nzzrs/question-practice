@@ -21,7 +21,7 @@ land without regenerated documentation.
 ## Tables, columns and indexes
 
 <!-- BEGIN GENERATED: database -->
-Current schema version: **10** (`AppDatabase.schemaVersion`).
+Current schema version: **11** (`AppDatabase.schemaVersion`).
 
 Table names below are the SQL names Drift creates. Every column, default, reference, cascade, primary key, unique key and index is read from `lib/core/database/tables.dart` and `app_database.dart`; the feature/model/repository notes come from the documented mapping in `tool/docs/update_docs.dart`.
 
@@ -43,6 +43,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `priority` | INTEGER | NULL | — | — | — |
 | `anki_deck` | TEXT | NULL | — | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
+| `minimum_score` | INTEGER | NOT NULL | `70` | — | — |
+| `target_score` | INTEGER | NOT NULL | `80` | — | — |
 | `archived` | INTEGER (boolean) | NOT NULL | `false` | — | — |
 
 **Keys and indexes**
@@ -160,6 +162,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `reasoning` | TEXT | NOT NULL | `''` | — | — |
 | `distracted` | INTEGER (boolean) | NOT NULL | `false` | — | — |
 | `unknown` | INTEGER (boolean) | NOT NULL | `false` | — | — |
+| `mistake_kinds_json` | TEXT | NOT NULL | `'[]'` | — | — |
 | `is_correct` | INTEGER (boolean) | NOT NULL | — | — | — |
 | `answered_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 
@@ -188,6 +191,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `extra` | TEXT | NOT NULL | `''` | — | — |
 | `context` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
+| `subtopic` | TEXT | NOT NULL | `''` | — | — |
 | `source` | TEXT | NOT NULL | — | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 | `exported_at` | INTEGER (DateTime) | NULL | — | — | — |
@@ -221,6 +225,9 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `bias` | TEXT | NOT NULL | `''` | — | — |
 | `vaccine` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
+| `cognitive_type` | TEXT | NOT NULL | `'contrast'` | — | — |
+| `subtopic` | TEXT | NOT NULL | `''` | — | — |
+| `mistake_kinds_json` | TEXT | NOT NULL | `'[]'` | — | — |
 | `practice_name` | TEXT | NOT NULL | `''` | — | — |
 | `status` | TEXT | NOT NULL | — | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
@@ -256,6 +263,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `answer` | TEXT | NOT NULL | — | — | — |
 | `context` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
+| `cognitive_type` | TEXT | NOT NULL | `'fact'` | — | — |
+| `subtopic` | TEXT | NOT NULL | `''` | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 | `exported_at` | INTEGER (DateTime) | NULL | — | — | — |
 
@@ -312,6 +321,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `phrase` | TEXT | NOT NULL | — | — | — |
 | `context` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
+| `subtopic` | TEXT | NOT NULL | `''` | — | — |
 | `practice_name` | TEXT | NOT NULL | `''` | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 | `kept_at` | INTEGER (DateTime) | NULL | — | — | — |
@@ -455,7 +465,7 @@ The AI API key is not in this table. It lives in Android secure storage through
 ## Migration history
 
 <!-- BEGIN GENERATED: migrations -->
-Current schema version: **10**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
+Current schema version: **11**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
 
 | Version | Changes |
 |---|---|
@@ -469,8 +479,9 @@ Current schema version: **10**. Migration steps are read from `AppDatabase.migra
 | 8 | Created table `highlights`. |
 | 9 | Added `archived` to `topics`. |
 | 10 | Added `subtopic` to `questions`. |
+| 11 | Added `minimum_score` to `topics`. Added `target_score` to `topics`. Added `mistake_kinds_json` to `attempts`. Added `subtopic` to `concepts`. Added `cognitive_type` to `error_cards`. Added `subtopic` to `error_cards`. Added `mistake_kinds_json` to `error_cards`. Added `cognitive_type` to `manual_cards`. Added `subtopic` to `manual_cards`. Added `subtopic` to `highlights`. |
 
-The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 10.
+The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 11.
 <!-- END GENERATED: migrations -->
 
 ## Backup coverage

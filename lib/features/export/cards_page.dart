@@ -91,15 +91,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
   ExportSelection _selection({
     required List<Concept> concepts,
-    required List<ErrorCard> errors,
     required List<ManualCard> manuals,
   }) {
     return ExportSelection(
       concepts: concepts
           .where((item) => _selectedConcepts.contains(item.id))
-          .toList(),
-      errorCards: errors
-          .where((item) => _selectedErrors.contains(item.id))
           .toList(),
       manualCards: manuals
           .where((item) => _selectedBasic.contains(item.id))
@@ -165,11 +161,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       );
     }
 
-    final selection = _selection(
-      concepts: concepts,
-      errors: errors,
-      manuals: manuals,
-    );
+    final selection = _selection(concepts: concepts, manuals: manuals);
     final loading =
         conceptsAsync.isLoading ||
         errorsAsync.isLoading ||
@@ -197,7 +189,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final hasReviewSelection =
         selectedErrorCards.isNotEmpty || selectedSkipped.isNotEmpty;
     final selectedCount =
-        selection.total + selectedSkipped.length + selectedHighlights.length;
+        selection.total +
+        selectedErrorCards.length +
+        selectedSkipped.length +
+        selectedHighlights.length;
 
     return AppPage(
       title: 'Cards',

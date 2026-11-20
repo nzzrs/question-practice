@@ -201,6 +201,7 @@ class ReviewService {
     required String topicName,
     required ConceptSource source,
     int? skippedQuestionId,
+    String subtopic = '',
   }) async {
     final id = await _cards.createConcept(
       sessionId: sessionId,
@@ -210,6 +211,7 @@ class ReviewService {
       extra: extra.trim(),
       context: context,
       topicName: topicName,
+      subtopic: subtopic,
       source: source,
       createdAt: _clock.now().toUtc(),
     );
@@ -231,6 +233,8 @@ class ReviewService {
     int? questionId,
     String context = '',
     int? skippedQuestionId,
+    String subtopic = '',
+    CognitiveType cognitiveType = CognitiveType.fact,
   }) async {
     final id = await _cards.createManualCard(
       sessionId: sessionId,
@@ -239,6 +243,8 @@ class ReviewService {
       answer: answer.trim(),
       context: context.trim(),
       topicName: topicName,
+      subtopic: subtopic,
+      cognitiveType: cognitiveType,
       createdAt: _clock.now().toUtc(),
     );
     if (skippedQuestionId != null) {

@@ -185,6 +185,12 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     );
   }
 
+  Future<void> updateErrorCardMistakeKinds(int id, String mistakeKindsJson) {
+    return (update(errorCards)..where((e) => e.id.equals(id))).write(
+      ErrorCardsCompanion(mistakeKindsJson: Value(mistakeKindsJson)),
+    );
+  }
+
   Future<void> touchWrongError({
     required int id,
     required List<int> wrongIndexes,
@@ -314,6 +320,17 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   Future<List<HighlightRow>> highlightsForSession(int sessionId) {
     return (select(highlights)
           ..where((h) => h.sessionId.equals(sessionId))
+          ..orderBy([(h) => OrderingTerm.asc(h.id)]))
+        .get();
+  }
+
+  /// Highlights saved for a question in any session.
+  ///
+  /// A highlight belongs to the question, so it keeps showing whenever that
+  /// question is practised again, not only in the session that saved it.
+  Future<List<HighlightRow>> highlightsForQuestion(int questionId) {
+    return (select(highlights)
+          ..where((h) => h.questionId.equals(questionId))
           ..orderBy([(h) => OrderingTerm.asc(h.id)]))
         .get();
   }

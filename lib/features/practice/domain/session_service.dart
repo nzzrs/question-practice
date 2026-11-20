@@ -378,6 +378,7 @@ class SessionService {
           alternativeExplanations: item.question.alternativeExplanations,
           topicName: item.topicName,
           practiceName: item.practiceName,
+          subtopic: item.question.subtopic,
           lastWrongAt: now,
           dueAfter: errorReviewDelay,
         );
@@ -459,6 +460,42 @@ class SessionService {
     return updated ?? attempt;
   }
 
+  /// Stores the one-tap mistake classifications for an answered question.
+  Future<Attempt> setMistakeKinds({
+    required SessionStart start,
+    required SessionQuestionItem item,
+    required Iterable<MistakeKind> kinds,
+  }) async {
+    final attempt = await _sessions.attemptForQuestion(
+      start.session.id,
+      item.question.id,
+    );
+    if (attempt == null) {
+      throw const SessionException('This question has no answer to update.');
+    }
+    final ordered = <MistakeKind>[
+      for (final kind in MistakeKind.values)
+        if (kinds.contains(kind)) kind,
+    ];
+    if (ordered.length == attempt.mistakeKinds.length &&
+        ordered.every(attempt.mistakeKinds.contains)) {
+      return attempt;
+    }
+    await _sessions.updateAttemptMistakeKinds(
+      attempt.id,
+      mistakeKindsToJson(ordered),
+    );
+    final card = await _cards.activeErrorForQuestion(item.question.id);
+    if (card != null && card.sessionId == start.session.id) {
+      await _cards.updateErrorCardMistakeKinds(card.id, ordered);
+    }
+    final updated = await _sessions.attemptForQuestion(
+      start.session.id,
+      item.question.id,
+    );
+    return updated ?? attempt;
+  }
+
   Future<Attempt> setDistracted({
     required SessionStart start,
     required SessionQuestionItem item,
@@ -503,6 +540,7 @@ class SessionService {
           alternativeExplanations: item.question.alternativeExplanations,
           topicName: item.topicName,
           practiceName: item.practiceName,
+          subtopic: item.question.subtopic,
           lastWrongAt: now,
           dueAfter: errorReviewDelay,
         );
@@ -573,6 +611,7 @@ class SessionService {
           alternativeExplanations: item.question.alternativeExplanations,
           topicName: item.topicName,
           practiceName: item.practiceName,
+          subtopic: item.question.subtopic,
           lastWrongAt: now,
           dueAfter: errorReviewDelay,
         );

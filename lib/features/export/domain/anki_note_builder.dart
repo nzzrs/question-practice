@@ -3,38 +3,31 @@ import 'dart:convert';
 import '../../../core/domain/models.dart';
 import '../../../core/platform/anki_gateway.dart';
 
+/// Cards chosen for one export. Error cards are no longer exported directly:
+/// the review screen turns them into atomic basic cards first.
 class ExportSelection {
   const ExportSelection({
     this.concepts = const [],
-    this.errorCards = const [],
     this.manualCards = const [],
   });
 
   final List<Concept> concepts;
-  final List<ErrorCard> errorCards;
   final List<ManualCard> manualCards;
 
-  int get total => concepts.length + errorCards.length + manualCards.length;
+  int get total => concepts.length + manualCards.length;
   bool get isEmpty => total == 0;
 
   Iterable<int> get conceptIds => concepts.map((concept) => concept.id);
-  Iterable<int> get errorCardIds => errorCards.map((card) => card.id);
   Iterable<int> get manualCardIds => manualCards.map((card) => card.id);
 }
 
 class ExportFiles {
-  const ExportFiles({
-    required this.concepts,
-    required this.errors,
-    required this.basic,
-  });
+  const ExportFiles({required this.concepts, required this.basic});
 
   final String concepts;
-  final String errors;
   final String basic;
 
   bool get hasConcepts => concepts.isNotEmpty;
-  bool get hasErrors => errors.isNotEmpty;
   bool get hasBasic => basic.isNotEmpty;
 }
 
@@ -43,15 +36,27 @@ class AnkiNoteBuilder {
 
   static const _html = HtmlEscape(HtmlEscapeMode.element);
 
-  String conceptCloze(String term, String definition) {
+  /// Builds a cloze card whose front names the topic and subtopic.
+  String conceptCloze(
+    String term,
+    String definition, {
+    String topicName = '',
+    String subtopic = '',
+  }) {
     final safeTerm = _escapeCloze(term);
     final safeDefinition = _escapeCloze(definition);
-    return 'Definition of {{c1::$safeTerm}}: {{c2::$safeDefinition}}';
+    final context = _contextPrefix(topicName, subtopic);
+    return '${context}Definition of {{c1::$safeTerm}}: {{c2::$safeDefinition}}';
   }
 
   List<String> conceptFields(Concept concept) {
     return [
-      conceptCloze(concept.term, concept.definition),
+      conceptCloze(
+        concept.term,
+        concept.definition,
+        topicName: concept.topicName,
+        subtopic: concept.subtopic,
+      ),
       html(concept.extra),
     ];
   }
@@ -83,27 +88,14 @@ class AnkiNoteBuilder {
           model: AnkiModel.concept,
           deckName: deckFor(concept.topicName),
           fields: conceptFields(concept),
-          tags: _tags(concept.topicName),
-        ),
-      for (final card in selection.errorCards)
-        AnkiNote(
-          model: AnkiModel.error,
-          deckName: deckFor(card.topicName),
-          fields: [
-            html(card.question),
-            _answers(card.wrongAnswers),
-            _answers(card.correctAnswers),
-            html(card.bias),
-            html(card.vaccine),
-            _errorExplanation(card),
-          ],
-          tags: _tags(card.topicName),
+          tags: _tags(concept.topicName, concept.subtopic),
         ),
       for (final card in selection.manualCards)
         AnkiNote(
           model: AnkiModel.basic,
           deckName: deckFor(card.topicName),
           fields: [html(card.question), html(card.answer)],
+          tags: _tags(card.topicName, card.subtopic),
         ),
     ];
   }
@@ -114,22 +106,19 @@ class AnkiNoteBuilder {
         for (final concept in selection.concepts)
           conceptFields(concept).join('\t'),
       ].join('\n'),
-      errors: [
-        for (final card in selection.errorCards)
-          [
-            html(card.question),
-            _answers(card.wrongAnswers),
-            _answers(card.correctAnswers),
-            html(card.bias),
-            html(card.vaccine),
-            _errorExplanation(card),
-          ].join('\t'),
-      ].join('\n'),
       basic: [
         for (final card in selection.manualCards)
           [html(card.question), html(card.answer)].join('\t'),
       ].join('\n'),
     );
+  }
+
+  String _contextPrefix(String topicName, String subtopic) {
+    final topic = topicName.trim();
+    final sub = subtopic.trim();
+    if (topic.isEmpty && sub.isEmpty) return '';
+    if (topic.isNotEmpty && sub.isNotEmpty) return '[$topic / $sub] ';
+    return '[${topic.isEmpty ? sub : topic}] ';
   }
 
   String _escapeCloze(String value) {
@@ -139,30 +128,20 @@ class AnkiNoteBuilder {
         .replaceAll('::', ': :');
   }
 
-  String _answers(List<String> answers) {
-    return answers.map(html).join('<br>');
+  /// Hierarchical Anki tags derived from the simulator structure.
+  List<String> _tags(String topicName, String subtopic) {
+    return [
+      'question-practice',
+      if (_slug(topicName).isNotEmpty) 'topic::${_slug(topicName)}',
+      if (_slug(subtopic).isNotEmpty) 'subtopic::${_slug(subtopic)}',
+    ];
   }
 
-  String _errorExplanation(ErrorCard card) {
-    final parts = <String>[];
-    if (card.explanation.trim().isNotEmpty) {
-      parts.add(html(card.explanation));
-    }
-    for (final index in card.wrongIndexes) {
-      if (card.correctIndexes.contains(index)) continue;
-      if (index < 0 || index >= card.alternativeExplanations.length) continue;
-      final explanation = card.alternativeExplanations[index].trim();
-      if (explanation.isNotEmpty) parts.add(html(explanation));
-    }
-    return parts.join('<br><br>');
-  }
-
-  List<String> _tags(String topicName) {
-    final slug = topicName
+  String _slug(String value) {
+    return value
         .trim()
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
-    return ['question-practice', if (slug.isNotEmpty) 'topic-$slug'];
   }
 }

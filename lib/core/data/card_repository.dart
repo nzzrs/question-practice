@@ -86,6 +86,7 @@ class CardRepository {
     required String topicName,
     required ConceptSource source,
     required DateTime createdAt,
+    String subtopic = '',
   }) {
     return _db.cardDao.insertConcept(
       ConceptsCompanion.insert(
@@ -96,6 +97,7 @@ class CardRepository {
         extra: Value(extra),
         context: Value(context),
         topicName: Value(topicName),
+        subtopic: Value(subtopic),
         source: source.name,
         createdAt: createdAt,
       ),
@@ -124,6 +126,9 @@ class CardRepository {
     required String practiceName,
     required DateTime lastWrongAt,
     required Duration dueAfter,
+    String subtopic = '',
+    CognitiveType cognitiveType = CognitiveType.contrast,
+    List<MistakeKind> mistakeKinds = const [],
   }) {
     return _db.cardDao.insertErrorCard(
       ErrorCardsCompanion.insert(
@@ -140,6 +145,9 @@ class CardRepository {
         ),
         topicName: Value(topicName),
         practiceName: Value(practiceName),
+        cognitiveType: Value(cognitiveType.name),
+        subtopic: Value(subtopic),
+        mistakeKindsJson: Value(mistakeKindsToJson(mistakeKinds)),
         status: ErrorCardStatus.active.name,
         createdAt: lastWrongAt,
         lastWrongAt: lastWrongAt,
@@ -182,6 +190,16 @@ class CardRepository {
     return _db.cardDao.updateErrorCardReasoning(id, reasoning);
   }
 
+  Future<void> updateErrorCardMistakeKinds(
+    int id,
+    List<MistakeKind> mistakeKinds,
+  ) {
+    return _db.cardDao.updateErrorCardMistakeKinds(
+      id,
+      mistakeKindsToJson(mistakeKinds),
+    );
+  }
+
   Future<void> touchWrongError({
     required int id,
     required List<int> wrongIndexes,
@@ -214,6 +232,8 @@ class CardRepository {
     required DateTime createdAt,
     int? questionId,
     String context = '',
+    String subtopic = '',
+    CognitiveType cognitiveType = CognitiveType.fact,
   }) {
     return _db.cardDao.insertManualCard(
       ManualCardsCompanion.insert(
@@ -223,6 +243,8 @@ class CardRepository {
         answer: answer,
         context: Value(context),
         topicName: Value(topicName),
+        cognitiveType: Value(cognitiveType.name),
+        subtopic: Value(subtopic),
         createdAt: createdAt,
       ),
     );
@@ -333,6 +355,7 @@ class CardRepository {
     required String topicName,
     required String practiceName,
     required DateTime createdAt,
+    String subtopic = '',
   }) {
     return _db.cardDao.insertHighlight(
       HighlightsCompanion.insert(
@@ -341,6 +364,7 @@ class CardRepository {
         phrase: text,
         context: Value(context),
         topicName: Value(topicName),
+        subtopic: Value(subtopic),
         practiceName: Value(practiceName),
         createdAt: createdAt,
       ),
@@ -355,6 +379,12 @@ class CardRepository {
 
   Future<List<StudyHighlight>> highlightsForSession(int sessionId) async {
     final rows = await _db.cardDao.highlightsForSession(sessionId);
+    return rows.map(highlightFromRow).toList();
+  }
+
+  /// Highlights saved for a question in any session.
+  Future<List<StudyHighlight>> highlightsForQuestion(int questionId) async {
+    final rows = await _db.cardDao.highlightsForQuestion(questionId);
     return rows.map(highlightFromRow).toList();
   }
 
@@ -384,13 +414,11 @@ class CardRepository {
 
   Future<void> markExported({
     required List<int> conceptIds,
-    required List<int> errorCardIds,
     required List<int> manualCardIds,
     required DateTime exportedAt,
   }) {
     return _db.transaction(() async {
       await _db.cardDao.markConceptsExported(conceptIds, exportedAt);
-      await _db.cardDao.markErrorCardsExported(errorCardIds, exportedAt);
       await _db.cardDao.markManualCardsExported(manualCardIds, exportedAt);
     });
   }

@@ -65,7 +65,7 @@ class _SuggestedCardsSheetState extends ConsumerState<SuggestedCardsSheet> {
     try {
       final cards = await ref
           .read(lookupServiceProvider)
-          .suggestAtomicCards(
+          .suggestArchetypeCards(
             highlight: widget.highlight.text,
             questionContext: widget.highlight.context,
             topicName: widget.highlight.topicName,
@@ -106,6 +106,7 @@ class _SuggestedCardsSheetState extends ConsumerState<SuggestedCardsSheet> {
           answer: suggestion.back,
           context: widget.highlight.context,
           topicName: widget.highlight.topicName,
+          cognitiveType: suggestion.cognitiveType,
         );
         firstCardId ??= id;
         added++;

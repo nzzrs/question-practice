@@ -79,6 +79,30 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
     type: DriftSqlType.dateTime,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _minimumScoreMeta = const VerificationMeta(
+    'minimumScore',
+  );
+  @override
+  late final GeneratedColumn<int> minimumScore = GeneratedColumn<int>(
+    'minimum_score',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(70),
+  );
+  static const VerificationMeta _targetScoreMeta = const VerificationMeta(
+    'targetScore',
+  );
+  @override
+  late final GeneratedColumn<int> targetScore = GeneratedColumn<int>(
+    'target_score',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(80),
+  );
   static const VerificationMeta _archivedMeta = const VerificationMeta(
     'archived',
   );
@@ -102,6 +126,8 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
     priority,
     ankiDeck,
     createdAt,
+    minimumScore,
+    targetScore,
     archived,
   ];
   @override
@@ -156,6 +182,24 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
     } else if (isInserting) {
       context.missing(_createdAtMeta);
     }
+    if (data.containsKey('minimum_score')) {
+      context.handle(
+        _minimumScoreMeta,
+        minimumScore.isAcceptableOrUnknown(
+          data['minimum_score']!,
+          _minimumScoreMeta,
+        ),
+      );
+    }
+    if (data.containsKey('target_score')) {
+      context.handle(
+        _targetScoreMeta,
+        targetScore.isAcceptableOrUnknown(
+          data['target_score']!,
+          _targetScoreMeta,
+        ),
+      );
+    }
     if (data.containsKey('archived')) {
       context.handle(
         _archivedMeta,
@@ -195,6 +239,14 @@ class $TopicsTable extends Topics with TableInfo<$TopicsTable, TopicRow> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
       )!,
+      minimumScore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}minimum_score'],
+      )!,
+      targetScore: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}target_score'],
+      )!,
       archived: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}archived'],
@@ -215,6 +267,12 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
   final int? priority;
   final String? ankiDeck;
   final DateTime createdAt;
+
+  /// Percentage below which a score counts as failing this topic.
+  final int minimumScore;
+
+  /// Percentage at which a score counts as meeting the topic goal.
+  final int targetScore;
   final bool archived;
   const TopicRow({
     required this.id,
@@ -223,6 +281,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     this.priority,
     this.ankiDeck,
     required this.createdAt,
+    required this.minimumScore,
+    required this.targetScore,
     required this.archived,
   });
   @override
@@ -238,6 +298,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       map['anki_deck'] = Variable<String>(ankiDeck);
     }
     map['created_at'] = Variable<DateTime>(createdAt);
+    map['minimum_score'] = Variable<int>(minimumScore);
+    map['target_score'] = Variable<int>(targetScore);
     map['archived'] = Variable<bool>(archived);
     return map;
   }
@@ -254,6 +316,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           ? const Value.absent()
           : Value(ankiDeck),
       createdAt: Value(createdAt),
+      minimumScore: Value(minimumScore),
+      targetScore: Value(targetScore),
       archived: Value(archived),
     );
   }
@@ -270,6 +334,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       priority: serializer.fromJson<int?>(json['priority']),
       ankiDeck: serializer.fromJson<String?>(json['ankiDeck']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      minimumScore: serializer.fromJson<int>(json['minimumScore']),
+      targetScore: serializer.fromJson<int>(json['targetScore']),
       archived: serializer.fromJson<bool>(json['archived']),
     );
   }
@@ -283,6 +349,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       'priority': serializer.toJson<int?>(priority),
       'ankiDeck': serializer.toJson<String?>(ankiDeck),
       'createdAt': serializer.toJson<DateTime>(createdAt),
+      'minimumScore': serializer.toJson<int>(minimumScore),
+      'targetScore': serializer.toJson<int>(targetScore),
       'archived': serializer.toJson<bool>(archived),
     };
   }
@@ -294,6 +362,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     Value<int?> priority = const Value.absent(),
     Value<String?> ankiDeck = const Value.absent(),
     DateTime? createdAt,
+    int? minimumScore,
+    int? targetScore,
     bool? archived,
   }) => TopicRow(
     id: id ?? this.id,
@@ -302,6 +372,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     priority: priority.present ? priority.value : this.priority,
     ankiDeck: ankiDeck.present ? ankiDeck.value : this.ankiDeck,
     createdAt: createdAt ?? this.createdAt,
+    minimumScore: minimumScore ?? this.minimumScore,
+    targetScore: targetScore ?? this.targetScore,
     archived: archived ?? this.archived,
   );
   TopicRow copyWithCompanion(TopicsCompanion data) {
@@ -314,6 +386,12 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
       priority: data.priority.present ? data.priority.value : this.priority,
       ankiDeck: data.ankiDeck.present ? data.ankiDeck.value : this.ankiDeck,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      minimumScore: data.minimumScore.present
+          ? data.minimumScore.value
+          : this.minimumScore,
+      targetScore: data.targetScore.present
+          ? data.targetScore.value
+          : this.targetScore,
       archived: data.archived.present ? data.archived.value : this.archived,
     );
   }
@@ -327,6 +405,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           ..write('priority: $priority, ')
           ..write('ankiDeck: $ankiDeck, ')
           ..write('createdAt: $createdAt, ')
+          ..write('minimumScore: $minimumScore, ')
+          ..write('targetScore: $targetScore, ')
           ..write('archived: $archived')
           ..write(')'))
         .toString();
@@ -340,6 +420,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
     priority,
     ankiDeck,
     createdAt,
+    minimumScore,
+    targetScore,
     archived,
   );
   @override
@@ -352,6 +434,8 @@ class TopicRow extends DataClass implements Insertable<TopicRow> {
           other.priority == this.priority &&
           other.ankiDeck == this.ankiDeck &&
           other.createdAt == this.createdAt &&
+          other.minimumScore == this.minimumScore &&
+          other.targetScore == this.targetScore &&
           other.archived == this.archived);
 }
 
@@ -362,6 +446,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
   final Value<int?> priority;
   final Value<String?> ankiDeck;
   final Value<DateTime> createdAt;
+  final Value<int> minimumScore;
+  final Value<int> targetScore;
   final Value<bool> archived;
   const TopicsCompanion({
     this.id = const Value.absent(),
@@ -370,6 +456,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     this.priority = const Value.absent(),
     this.ankiDeck = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.minimumScore = const Value.absent(),
+    this.targetScore = const Value.absent(),
     this.archived = const Value.absent(),
   });
   TopicsCompanion.insert({
@@ -379,6 +467,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     this.priority = const Value.absent(),
     this.ankiDeck = const Value.absent(),
     required DateTime createdAt,
+    this.minimumScore = const Value.absent(),
+    this.targetScore = const Value.absent(),
     this.archived = const Value.absent(),
   }) : name = Value(name),
        createdAt = Value(createdAt);
@@ -389,6 +479,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     Expression<int>? priority,
     Expression<String>? ankiDeck,
     Expression<DateTime>? createdAt,
+    Expression<int>? minimumScore,
+    Expression<int>? targetScore,
     Expression<bool>? archived,
   }) {
     return RawValuesInsertable({
@@ -398,6 +490,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
       if (priority != null) 'priority': priority,
       if (ankiDeck != null) 'anki_deck': ankiDeck,
       if (createdAt != null) 'created_at': createdAt,
+      if (minimumScore != null) 'minimum_score': minimumScore,
+      if (targetScore != null) 'target_score': targetScore,
       if (archived != null) 'archived': archived,
     });
   }
@@ -409,6 +503,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     Value<int?>? priority,
     Value<String?>? ankiDeck,
     Value<DateTime>? createdAt,
+    Value<int>? minimumScore,
+    Value<int>? targetScore,
     Value<bool>? archived,
   }) {
     return TopicsCompanion(
@@ -418,6 +514,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
       priority: priority ?? this.priority,
       ankiDeck: ankiDeck ?? this.ankiDeck,
       createdAt: createdAt ?? this.createdAt,
+      minimumScore: minimumScore ?? this.minimumScore,
+      targetScore: targetScore ?? this.targetScore,
       archived: archived ?? this.archived,
     );
   }
@@ -443,6 +541,12 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (minimumScore.present) {
+      map['minimum_score'] = Variable<int>(minimumScore.value);
+    }
+    if (targetScore.present) {
+      map['target_score'] = Variable<int>(targetScore.value);
+    }
     if (archived.present) {
       map['archived'] = Variable<bool>(archived.value);
     }
@@ -458,6 +562,8 @@ class TopicsCompanion extends UpdateCompanion<TopicRow> {
           ..write('priority: $priority, ')
           ..write('ankiDeck: $ankiDeck, ')
           ..write('createdAt: $createdAt, ')
+          ..write('minimumScore: $minimumScore, ')
+          ..write('targetScore: $targetScore, ')
           ..write('archived: $archived')
           ..write(')'))
         .toString();
@@ -2497,6 +2603,18 @@ class $AttemptsTable extends Attempts
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _mistakeKindsJsonMeta = const VerificationMeta(
+    'mistakeKindsJson',
+  );
+  @override
+  late final GeneratedColumn<String> mistakeKindsJson = GeneratedColumn<String>(
+    'mistake_kinds_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _isCorrectMeta = const VerificationMeta(
     'isCorrect',
   );
@@ -2531,6 +2649,7 @@ class $AttemptsTable extends Attempts
     reasoning,
     distracted,
     unknown,
+    mistakeKindsJson,
     isCorrect,
     answeredAt,
   ];
@@ -2592,6 +2711,15 @@ class $AttemptsTable extends Attempts
         unknown.isAcceptableOrUnknown(data['unknown']!, _unknownMeta),
       );
     }
+    if (data.containsKey('mistake_kinds_json')) {
+      context.handle(
+        _mistakeKindsJsonMeta,
+        mistakeKindsJson.isAcceptableOrUnknown(
+          data['mistake_kinds_json']!,
+          _mistakeKindsJsonMeta,
+        ),
+      );
+    }
     if (data.containsKey('is_correct')) {
       context.handle(
         _isCorrectMeta,
@@ -2649,6 +2777,10 @@ class $AttemptsTable extends Attempts
         DriftSqlType.bool,
         data['${effectivePrefix}unknown'],
       )!,
+      mistakeKindsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mistake_kinds_json'],
+      )!,
       isCorrect: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_correct'],
@@ -2674,6 +2806,9 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
   final String reasoning;
   final bool distracted;
   final bool unknown;
+
+  /// Quick classifications chosen after a wrong answer.
+  final String mistakeKindsJson;
   final bool isCorrect;
   final DateTime answeredAt;
   const AttemptRow({
@@ -2684,6 +2819,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     required this.reasoning,
     required this.distracted,
     required this.unknown,
+    required this.mistakeKindsJson,
     required this.isCorrect,
     required this.answeredAt,
   });
@@ -2697,6 +2833,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     map['reasoning'] = Variable<String>(reasoning);
     map['distracted'] = Variable<bool>(distracted);
     map['unknown'] = Variable<bool>(unknown);
+    map['mistake_kinds_json'] = Variable<String>(mistakeKindsJson);
     map['is_correct'] = Variable<bool>(isCorrect);
     map['answered_at'] = Variable<DateTime>(answeredAt);
     return map;
@@ -2711,6 +2848,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       reasoning: Value(reasoning),
       distracted: Value(distracted),
       unknown: Value(unknown),
+      mistakeKindsJson: Value(mistakeKindsJson),
       isCorrect: Value(isCorrect),
       answeredAt: Value(answeredAt),
     );
@@ -2731,6 +2869,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       reasoning: serializer.fromJson<String>(json['reasoning']),
       distracted: serializer.fromJson<bool>(json['distracted']),
       unknown: serializer.fromJson<bool>(json['unknown']),
+      mistakeKindsJson: serializer.fromJson<String>(json['mistakeKindsJson']),
       isCorrect: serializer.fromJson<bool>(json['isCorrect']),
       answeredAt: serializer.fromJson<DateTime>(json['answeredAt']),
     );
@@ -2746,6 +2885,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
       'reasoning': serializer.toJson<String>(reasoning),
       'distracted': serializer.toJson<bool>(distracted),
       'unknown': serializer.toJson<bool>(unknown),
+      'mistakeKindsJson': serializer.toJson<String>(mistakeKindsJson),
       'isCorrect': serializer.toJson<bool>(isCorrect),
       'answeredAt': serializer.toJson<DateTime>(answeredAt),
     };
@@ -2759,6 +2899,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     String? reasoning,
     bool? distracted,
     bool? unknown,
+    String? mistakeKindsJson,
     bool? isCorrect,
     DateTime? answeredAt,
   }) => AttemptRow(
@@ -2769,6 +2910,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     reasoning: reasoning ?? this.reasoning,
     distracted: distracted ?? this.distracted,
     unknown: unknown ?? this.unknown,
+    mistakeKindsJson: mistakeKindsJson ?? this.mistakeKindsJson,
     isCorrect: isCorrect ?? this.isCorrect,
     answeredAt: answeredAt ?? this.answeredAt,
   );
@@ -2787,6 +2929,9 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
           ? data.distracted.value
           : this.distracted,
       unknown: data.unknown.present ? data.unknown.value : this.unknown,
+      mistakeKindsJson: data.mistakeKindsJson.present
+          ? data.mistakeKindsJson.value
+          : this.mistakeKindsJson,
       isCorrect: data.isCorrect.present ? data.isCorrect.value : this.isCorrect,
       answeredAt: data.answeredAt.present
           ? data.answeredAt.value
@@ -2804,6 +2949,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
           ..write('reasoning: $reasoning, ')
           ..write('distracted: $distracted, ')
           ..write('unknown: $unknown, ')
+          ..write('mistakeKindsJson: $mistakeKindsJson, ')
           ..write('isCorrect: $isCorrect, ')
           ..write('answeredAt: $answeredAt')
           ..write(')'))
@@ -2819,6 +2965,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
     reasoning,
     distracted,
     unknown,
+    mistakeKindsJson,
     isCorrect,
     answeredAt,
   );
@@ -2833,6 +2980,7 @@ class AttemptRow extends DataClass implements Insertable<AttemptRow> {
           other.reasoning == this.reasoning &&
           other.distracted == this.distracted &&
           other.unknown == this.unknown &&
+          other.mistakeKindsJson == this.mistakeKindsJson &&
           other.isCorrect == this.isCorrect &&
           other.answeredAt == this.answeredAt);
 }
@@ -2845,6 +2993,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
   final Value<String> reasoning;
   final Value<bool> distracted;
   final Value<bool> unknown;
+  final Value<String> mistakeKindsJson;
   final Value<bool> isCorrect;
   final Value<DateTime> answeredAt;
   const AttemptsCompanion({
@@ -2855,6 +3004,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     this.reasoning = const Value.absent(),
     this.distracted = const Value.absent(),
     this.unknown = const Value.absent(),
+    this.mistakeKindsJson = const Value.absent(),
     this.isCorrect = const Value.absent(),
     this.answeredAt = const Value.absent(),
   });
@@ -2866,6 +3016,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     this.reasoning = const Value.absent(),
     this.distracted = const Value.absent(),
     this.unknown = const Value.absent(),
+    this.mistakeKindsJson = const Value.absent(),
     required bool isCorrect,
     required DateTime answeredAt,
   }) : sessionId = Value(sessionId),
@@ -2880,6 +3031,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     Expression<String>? reasoning,
     Expression<bool>? distracted,
     Expression<bool>? unknown,
+    Expression<String>? mistakeKindsJson,
     Expression<bool>? isCorrect,
     Expression<DateTime>? answeredAt,
   }) {
@@ -2892,6 +3044,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
       if (reasoning != null) 'reasoning': reasoning,
       if (distracted != null) 'distracted': distracted,
       if (unknown != null) 'unknown': unknown,
+      if (mistakeKindsJson != null) 'mistake_kinds_json': mistakeKindsJson,
       if (isCorrect != null) 'is_correct': isCorrect,
       if (answeredAt != null) 'answered_at': answeredAt,
     });
@@ -2905,6 +3058,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     Value<String>? reasoning,
     Value<bool>? distracted,
     Value<bool>? unknown,
+    Value<String>? mistakeKindsJson,
     Value<bool>? isCorrect,
     Value<DateTime>? answeredAt,
   }) {
@@ -2916,6 +3070,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
       reasoning: reasoning ?? this.reasoning,
       distracted: distracted ?? this.distracted,
       unknown: unknown ?? this.unknown,
+      mistakeKindsJson: mistakeKindsJson ?? this.mistakeKindsJson,
       isCorrect: isCorrect ?? this.isCorrect,
       answeredAt: answeredAt ?? this.answeredAt,
     );
@@ -2947,6 +3102,9 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
     if (unknown.present) {
       map['unknown'] = Variable<bool>(unknown.value);
     }
+    if (mistakeKindsJson.present) {
+      map['mistake_kinds_json'] = Variable<String>(mistakeKindsJson.value);
+    }
     if (isCorrect.present) {
       map['is_correct'] = Variable<bool>(isCorrect.value);
     }
@@ -2966,6 +3124,7 @@ class AttemptsCompanion extends UpdateCompanion<AttemptRow> {
           ..write('reasoning: $reasoning, ')
           ..write('distracted: $distracted, ')
           ..write('unknown: $unknown, ')
+          ..write('mistakeKindsJson: $mistakeKindsJson, ')
           ..write('isCorrect: $isCorrect, ')
           ..write('answeredAt: $answeredAt')
           ..write(')'))
@@ -3075,6 +3234,18 @@ class $ConceptsTable extends Concepts
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _subtopicMeta = const VerificationMeta(
+    'subtopic',
+  );
+  @override
+  late final GeneratedColumn<String> subtopic = GeneratedColumn<String>(
+    'subtopic',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _sourceMeta = const VerificationMeta('source');
   @override
   late final GeneratedColumn<String> source = GeneratedColumn<String>(
@@ -3116,6 +3287,7 @@ class $ConceptsTable extends Concepts
     extra,
     context,
     topicName,
+    subtopic,
     source,
     createdAt,
     exportedAt,
@@ -3177,6 +3349,12 @@ class $ConceptsTable extends Concepts
       context.handle(
         _topicNameMeta,
         topicName.isAcceptableOrUnknown(data['topic_name']!, _topicNameMeta),
+      );
+    }
+    if (data.containsKey('subtopic')) {
+      context.handle(
+        _subtopicMeta,
+        subtopic.isAcceptableOrUnknown(data['subtopic']!, _subtopicMeta),
       );
     }
     if (data.containsKey('source')) {
@@ -3242,6 +3420,10 @@ class $ConceptsTable extends Concepts
         DriftSqlType.string,
         data['${effectivePrefix}topic_name'],
       )!,
+      subtopic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subtopic'],
+      )!,
       source: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}source'],
@@ -3272,6 +3454,9 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
   final String extra;
   final String context;
   final String topicName;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
   final String source;
   final DateTime createdAt;
   final DateTime? exportedAt;
@@ -3284,6 +3469,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     required this.extra,
     required this.context,
     required this.topicName,
+    required this.subtopic,
     required this.source,
     required this.createdAt,
     this.exportedAt,
@@ -3303,6 +3489,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     map['extra'] = Variable<String>(extra);
     map['context'] = Variable<String>(context);
     map['topic_name'] = Variable<String>(topicName);
+    map['subtopic'] = Variable<String>(subtopic);
     map['source'] = Variable<String>(source);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || exportedAt != null) {
@@ -3325,6 +3512,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
       extra: Value(extra),
       context: Value(context),
       topicName: Value(topicName),
+      subtopic: Value(subtopic),
       source: Value(source),
       createdAt: Value(createdAt),
       exportedAt: exportedAt == null && nullToAbsent
@@ -3347,6 +3535,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
       extra: serializer.fromJson<String>(json['extra']),
       context: serializer.fromJson<String>(json['context']),
       topicName: serializer.fromJson<String>(json['topicName']),
+      subtopic: serializer.fromJson<String>(json['subtopic']),
       source: serializer.fromJson<String>(json['source']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       exportedAt: serializer.fromJson<DateTime?>(json['exportedAt']),
@@ -3364,6 +3553,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
       'extra': serializer.toJson<String>(extra),
       'context': serializer.toJson<String>(context),
       'topicName': serializer.toJson<String>(topicName),
+      'subtopic': serializer.toJson<String>(subtopic),
       'source': serializer.toJson<String>(source),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'exportedAt': serializer.toJson<DateTime?>(exportedAt),
@@ -3379,6 +3569,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     String? extra,
     String? context,
     String? topicName,
+    String? subtopic,
     String? source,
     DateTime? createdAt,
     Value<DateTime?> exportedAt = const Value.absent(),
@@ -3391,6 +3582,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     extra: extra ?? this.extra,
     context: context ?? this.context,
     topicName: topicName ?? this.topicName,
+    subtopic: subtopic ?? this.subtopic,
     source: source ?? this.source,
     createdAt: createdAt ?? this.createdAt,
     exportedAt: exportedAt.present ? exportedAt.value : this.exportedAt,
@@ -3409,6 +3601,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
       extra: data.extra.present ? data.extra.value : this.extra,
       context: data.context.present ? data.context.value : this.context,
       topicName: data.topicName.present ? data.topicName.value : this.topicName,
+      subtopic: data.subtopic.present ? data.subtopic.value : this.subtopic,
       source: data.source.present ? data.source.value : this.source,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       exportedAt: data.exportedAt.present
@@ -3428,6 +3621,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
           ..write('extra: $extra, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
+          ..write('subtopic: $subtopic, ')
           ..write('source: $source, ')
           ..write('createdAt: $createdAt, ')
           ..write('exportedAt: $exportedAt')
@@ -3445,6 +3639,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
     extra,
     context,
     topicName,
+    subtopic,
     source,
     createdAt,
     exportedAt,
@@ -3461,6 +3656,7 @@ class ConceptRow extends DataClass implements Insertable<ConceptRow> {
           other.extra == this.extra &&
           other.context == this.context &&
           other.topicName == this.topicName &&
+          other.subtopic == this.subtopic &&
           other.source == this.source &&
           other.createdAt == this.createdAt &&
           other.exportedAt == this.exportedAt);
@@ -3475,6 +3671,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
   final Value<String> extra;
   final Value<String> context;
   final Value<String> topicName;
+  final Value<String> subtopic;
   final Value<String> source;
   final Value<DateTime> createdAt;
   final Value<DateTime?> exportedAt;
@@ -3487,6 +3684,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     this.extra = const Value.absent(),
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
+    this.subtopic = const Value.absent(),
     this.source = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.exportedAt = const Value.absent(),
@@ -3500,6 +3698,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     this.extra = const Value.absent(),
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
+    this.subtopic = const Value.absent(),
     required String source,
     required DateTime createdAt,
     this.exportedAt = const Value.absent(),
@@ -3515,6 +3714,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     Expression<String>? extra,
     Expression<String>? context,
     Expression<String>? topicName,
+    Expression<String>? subtopic,
     Expression<String>? source,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? exportedAt,
@@ -3528,6 +3728,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
       if (extra != null) 'extra': extra,
       if (context != null) 'context': context,
       if (topicName != null) 'topic_name': topicName,
+      if (subtopic != null) 'subtopic': subtopic,
       if (source != null) 'source': source,
       if (createdAt != null) 'created_at': createdAt,
       if (exportedAt != null) 'exported_at': exportedAt,
@@ -3543,6 +3744,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     Value<String>? extra,
     Value<String>? context,
     Value<String>? topicName,
+    Value<String>? subtopic,
     Value<String>? source,
     Value<DateTime>? createdAt,
     Value<DateTime?>? exportedAt,
@@ -3556,6 +3758,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
       extra: extra ?? this.extra,
       context: context ?? this.context,
       topicName: topicName ?? this.topicName,
+      subtopic: subtopic ?? this.subtopic,
       source: source ?? this.source,
       createdAt: createdAt ?? this.createdAt,
       exportedAt: exportedAt ?? this.exportedAt,
@@ -3589,6 +3792,9 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
     if (topicName.present) {
       map['topic_name'] = Variable<String>(topicName.value);
     }
+    if (subtopic.present) {
+      map['subtopic'] = Variable<String>(subtopic.value);
+    }
     if (source.present) {
       map['source'] = Variable<String>(source.value);
     }
@@ -3612,6 +3818,7 @@ class ConceptsCompanion extends UpdateCompanion<ConceptRow> {
           ..write('extra: $extra, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
+          ..write('subtopic: $subtopic, ')
           ..write('source: $source, ')
           ..write('createdAt: $createdAt, ')
           ..write('exportedAt: $exportedAt')
@@ -3783,6 +3990,42 @@ class $ErrorCardsTable extends ErrorCards
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _cognitiveTypeMeta = const VerificationMeta(
+    'cognitiveType',
+  );
+  @override
+  late final GeneratedColumn<String> cognitiveType = GeneratedColumn<String>(
+    'cognitive_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('contrast'),
+  );
+  static const VerificationMeta _subtopicMeta = const VerificationMeta(
+    'subtopic',
+  );
+  @override
+  late final GeneratedColumn<String> subtopic = GeneratedColumn<String>(
+    'subtopic',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _mistakeKindsJsonMeta = const VerificationMeta(
+    'mistakeKindsJson',
+  );
+  @override
+  late final GeneratedColumn<String> mistakeKindsJson = GeneratedColumn<String>(
+    'mistake_kinds_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _practiceNameMeta = const VerificationMeta(
     'practiceName',
   );
@@ -3883,6 +4126,9 @@ class $ErrorCardsTable extends ErrorCards
     bias,
     vaccine,
     topicName,
+    cognitiveType,
+    subtopic,
+    mistakeKindsJson,
     practiceName,
     status,
     createdAt,
@@ -3998,6 +4244,30 @@ class $ErrorCardsTable extends ErrorCards
       context.handle(
         _topicNameMeta,
         topicName.isAcceptableOrUnknown(data['topic_name']!, _topicNameMeta),
+      );
+    }
+    if (data.containsKey('cognitive_type')) {
+      context.handle(
+        _cognitiveTypeMeta,
+        cognitiveType.isAcceptableOrUnknown(
+          data['cognitive_type']!,
+          _cognitiveTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('subtopic')) {
+      context.handle(
+        _subtopicMeta,
+        subtopic.isAcceptableOrUnknown(data['subtopic']!, _subtopicMeta),
+      );
+    }
+    if (data.containsKey('mistake_kinds_json')) {
+      context.handle(
+        _mistakeKindsJsonMeta,
+        mistakeKindsJson.isAcceptableOrUnknown(
+          data['mistake_kinds_json']!,
+          _mistakeKindsJsonMeta,
+        ),
       );
     }
     if (data.containsKey('practice_name')) {
@@ -4126,6 +4396,18 @@ class $ErrorCardsTable extends ErrorCards
         DriftSqlType.string,
         data['${effectivePrefix}topic_name'],
       )!,
+      cognitiveType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cognitive_type'],
+      )!,
+      subtopic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subtopic'],
+      )!,
+      mistakeKindsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mistake_kinds_json'],
+      )!,
       practiceName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}practice_name'],
@@ -4181,6 +4463,15 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
   final String bias;
   final String vaccine;
   final String topicName;
+
+  /// Cognitive shape of the card generated from this error.
+  final String cognitiveType;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
+
+  /// Quick classifications chosen after the wrong answer.
+  final String mistakeKindsJson;
   final String practiceName;
   final String status;
   final DateTime createdAt;
@@ -4203,6 +4494,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     required this.bias,
     required this.vaccine,
     required this.topicName,
+    required this.cognitiveType,
+    required this.subtopic,
+    required this.mistakeKindsJson,
     required this.practiceName,
     required this.status,
     required this.createdAt,
@@ -4232,6 +4526,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     map['bias'] = Variable<String>(bias);
     map['vaccine'] = Variable<String>(vaccine);
     map['topic_name'] = Variable<String>(topicName);
+    map['cognitive_type'] = Variable<String>(cognitiveType);
+    map['subtopic'] = Variable<String>(subtopic);
+    map['mistake_kinds_json'] = Variable<String>(mistakeKindsJson);
     map['practice_name'] = Variable<String>(practiceName);
     map['status'] = Variable<String>(status);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -4266,6 +4563,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       bias: Value(bias),
       vaccine: Value(vaccine),
       topicName: Value(topicName),
+      cognitiveType: Value(cognitiveType),
+      subtopic: Value(subtopic),
+      mistakeKindsJson: Value(mistakeKindsJson),
       practiceName: Value(practiceName),
       status: Value(status),
       createdAt: Value(createdAt),
@@ -4306,6 +4606,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       bias: serializer.fromJson<String>(json['bias']),
       vaccine: serializer.fromJson<String>(json['vaccine']),
       topicName: serializer.fromJson<String>(json['topicName']),
+      cognitiveType: serializer.fromJson<String>(json['cognitiveType']),
+      subtopic: serializer.fromJson<String>(json['subtopic']),
+      mistakeKindsJson: serializer.fromJson<String>(json['mistakeKindsJson']),
       practiceName: serializer.fromJson<String>(json['practiceName']),
       status: serializer.fromJson<String>(json['status']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -4337,6 +4640,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       'bias': serializer.toJson<String>(bias),
       'vaccine': serializer.toJson<String>(vaccine),
       'topicName': serializer.toJson<String>(topicName),
+      'cognitiveType': serializer.toJson<String>(cognitiveType),
+      'subtopic': serializer.toJson<String>(subtopic),
+      'mistakeKindsJson': serializer.toJson<String>(mistakeKindsJson),
       'practiceName': serializer.toJson<String>(practiceName),
       'status': serializer.toJson<String>(status),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -4362,6 +4668,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     String? bias,
     String? vaccine,
     String? topicName,
+    String? cognitiveType,
+    String? subtopic,
+    String? mistakeKindsJson,
     String? practiceName,
     String? status,
     DateTime? createdAt,
@@ -4385,6 +4694,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     bias: bias ?? this.bias,
     vaccine: vaccine ?? this.vaccine,
     topicName: topicName ?? this.topicName,
+    cognitiveType: cognitiveType ?? this.cognitiveType,
+    subtopic: subtopic ?? this.subtopic,
+    mistakeKindsJson: mistakeKindsJson ?? this.mistakeKindsJson,
     practiceName: practiceName ?? this.practiceName,
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
@@ -4423,6 +4735,13 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       bias: data.bias.present ? data.bias.value : this.bias,
       vaccine: data.vaccine.present ? data.vaccine.value : this.vaccine,
       topicName: data.topicName.present ? data.topicName.value : this.topicName,
+      cognitiveType: data.cognitiveType.present
+          ? data.cognitiveType.value
+          : this.cognitiveType,
+      subtopic: data.subtopic.present ? data.subtopic.value : this.subtopic,
+      mistakeKindsJson: data.mistakeKindsJson.present
+          ? data.mistakeKindsJson.value
+          : this.mistakeKindsJson,
       practiceName: data.practiceName.present
           ? data.practiceName.value
           : this.practiceName,
@@ -4460,6 +4779,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
           ..write('bias: $bias, ')
           ..write('vaccine: $vaccine, ')
           ..write('topicName: $topicName, ')
+          ..write('cognitiveType: $cognitiveType, ')
+          ..write('subtopic: $subtopic, ')
+          ..write('mistakeKindsJson: $mistakeKindsJson, ')
           ..write('practiceName: $practiceName, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
@@ -4487,6 +4809,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     bias,
     vaccine,
     topicName,
+    cognitiveType,
+    subtopic,
+    mistakeKindsJson,
     practiceName,
     status,
     createdAt,
@@ -4514,6 +4839,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
           other.bias == this.bias &&
           other.vaccine == this.vaccine &&
           other.topicName == this.topicName &&
+          other.cognitiveType == this.cognitiveType &&
+          other.subtopic == this.subtopic &&
+          other.mistakeKindsJson == this.mistakeKindsJson &&
           other.practiceName == this.practiceName &&
           other.status == this.status &&
           other.createdAt == this.createdAt &&
@@ -4538,6 +4866,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
   final Value<String> bias;
   final Value<String> vaccine;
   final Value<String> topicName;
+  final Value<String> cognitiveType;
+  final Value<String> subtopic;
+  final Value<String> mistakeKindsJson;
   final Value<String> practiceName;
   final Value<String> status;
   final Value<DateTime> createdAt;
@@ -4560,6 +4891,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     this.bias = const Value.absent(),
     this.vaccine = const Value.absent(),
     this.topicName = const Value.absent(),
+    this.cognitiveType = const Value.absent(),
+    this.subtopic = const Value.absent(),
+    this.mistakeKindsJson = const Value.absent(),
     this.practiceName = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -4583,6 +4917,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     this.bias = const Value.absent(),
     this.vaccine = const Value.absent(),
     this.topicName = const Value.absent(),
+    this.cognitiveType = const Value.absent(),
+    this.subtopic = const Value.absent(),
+    this.mistakeKindsJson = const Value.absent(),
     this.practiceName = const Value.absent(),
     required String status,
     required DateTime createdAt,
@@ -4612,6 +4949,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     Expression<String>? bias,
     Expression<String>? vaccine,
     Expression<String>? topicName,
+    Expression<String>? cognitiveType,
+    Expression<String>? subtopic,
+    Expression<String>? mistakeKindsJson,
     Expression<String>? practiceName,
     Expression<String>? status,
     Expression<DateTime>? createdAt,
@@ -4637,6 +4977,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
       if (bias != null) 'bias': bias,
       if (vaccine != null) 'vaccine': vaccine,
       if (topicName != null) 'topic_name': topicName,
+      if (cognitiveType != null) 'cognitive_type': cognitiveType,
+      if (subtopic != null) 'subtopic': subtopic,
+      if (mistakeKindsJson != null) 'mistake_kinds_json': mistakeKindsJson,
       if (practiceName != null) 'practice_name': practiceName,
       if (status != null) 'status': status,
       if (createdAt != null) 'created_at': createdAt,
@@ -4663,6 +5006,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     Value<String>? bias,
     Value<String>? vaccine,
     Value<String>? topicName,
+    Value<String>? cognitiveType,
+    Value<String>? subtopic,
+    Value<String>? mistakeKindsJson,
     Value<String>? practiceName,
     Value<String>? status,
     Value<DateTime>? createdAt,
@@ -4687,6 +5033,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
       bias: bias ?? this.bias,
       vaccine: vaccine ?? this.vaccine,
       topicName: topicName ?? this.topicName,
+      cognitiveType: cognitiveType ?? this.cognitiveType,
+      subtopic: subtopic ?? this.subtopic,
+      mistakeKindsJson: mistakeKindsJson ?? this.mistakeKindsJson,
       practiceName: practiceName ?? this.practiceName,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
@@ -4742,6 +5091,15 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     if (topicName.present) {
       map['topic_name'] = Variable<String>(topicName.value);
     }
+    if (cognitiveType.present) {
+      map['cognitive_type'] = Variable<String>(cognitiveType.value);
+    }
+    if (subtopic.present) {
+      map['subtopic'] = Variable<String>(subtopic.value);
+    }
+    if (mistakeKindsJson.present) {
+      map['mistake_kinds_json'] = Variable<String>(mistakeKindsJson.value);
+    }
     if (practiceName.present) {
       map['practice_name'] = Variable<String>(practiceName.value);
     }
@@ -4787,6 +5145,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
           ..write('bias: $bias, ')
           ..write('vaccine: $vaccine, ')
           ..write('topicName: $topicName, ')
+          ..write('cognitiveType: $cognitiveType, ')
+          ..write('subtopic: $subtopic, ')
+          ..write('mistakeKindsJson: $mistakeKindsJson, ')
           ..write('practiceName: $practiceName, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
@@ -4891,6 +5252,30 @@ class $ManualCardsTable extends ManualCards
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _cognitiveTypeMeta = const VerificationMeta(
+    'cognitiveType',
+  );
+  @override
+  late final GeneratedColumn<String> cognitiveType = GeneratedColumn<String>(
+    'cognitive_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('fact'),
+  );
+  static const VerificationMeta _subtopicMeta = const VerificationMeta(
+    'subtopic',
+  );
+  @override
+  late final GeneratedColumn<String> subtopic = GeneratedColumn<String>(
+    'subtopic',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _createdAtMeta = const VerificationMeta(
     'createdAt',
   );
@@ -4922,6 +5307,8 @@ class $ManualCardsTable extends ManualCards
     answer,
     context,
     topicName,
+    cognitiveType,
+    subtopic,
     createdAt,
     exportedAt,
   ];
@@ -4980,6 +5367,21 @@ class $ManualCardsTable extends ManualCards
         topicName.isAcceptableOrUnknown(data['topic_name']!, _topicNameMeta),
       );
     }
+    if (data.containsKey('cognitive_type')) {
+      context.handle(
+        _cognitiveTypeMeta,
+        cognitiveType.isAcceptableOrUnknown(
+          data['cognitive_type']!,
+          _cognitiveTypeMeta,
+        ),
+      );
+    }
+    if (data.containsKey('subtopic')) {
+      context.handle(
+        _subtopicMeta,
+        subtopic.isAcceptableOrUnknown(data['subtopic']!, _subtopicMeta),
+      );
+    }
     if (data.containsKey('created_at')) {
       context.handle(
         _createdAtMeta,
@@ -5031,6 +5433,14 @@ class $ManualCardsTable extends ManualCards
         DriftSqlType.string,
         data['${effectivePrefix}topic_name'],
       )!,
+      cognitiveType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}cognitive_type'],
+      )!,
+      subtopic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subtopic'],
+      )!,
       createdAt: attachedDatabase.typeMapping.read(
         DriftSqlType.dateTime,
         data['${effectivePrefix}created_at'],
@@ -5058,6 +5468,12 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
   /// Optional source passage shown above the question on the card front.
   final String context;
   final String topicName;
+
+  /// Cognitive shape of the card: fact, heuristic, contrast or concept.
+  final String cognitiveType;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
   final DateTime createdAt;
   final DateTime? exportedAt;
   const ManualCardRow({
@@ -5068,6 +5484,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     required this.answer,
     required this.context,
     required this.topicName,
+    required this.cognitiveType,
+    required this.subtopic,
     required this.createdAt,
     this.exportedAt,
   });
@@ -5085,6 +5503,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     map['answer'] = Variable<String>(answer);
     map['context'] = Variable<String>(context);
     map['topic_name'] = Variable<String>(topicName);
+    map['cognitive_type'] = Variable<String>(cognitiveType);
+    map['subtopic'] = Variable<String>(subtopic);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || exportedAt != null) {
       map['exported_at'] = Variable<DateTime>(exportedAt);
@@ -5105,6 +5525,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       answer: Value(answer),
       context: Value(context),
       topicName: Value(topicName),
+      cognitiveType: Value(cognitiveType),
+      subtopic: Value(subtopic),
       createdAt: Value(createdAt),
       exportedAt: exportedAt == null && nullToAbsent
           ? const Value.absent()
@@ -5125,6 +5547,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       answer: serializer.fromJson<String>(json['answer']),
       context: serializer.fromJson<String>(json['context']),
       topicName: serializer.fromJson<String>(json['topicName']),
+      cognitiveType: serializer.fromJson<String>(json['cognitiveType']),
+      subtopic: serializer.fromJson<String>(json['subtopic']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       exportedAt: serializer.fromJson<DateTime?>(json['exportedAt']),
     );
@@ -5140,6 +5564,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       'answer': serializer.toJson<String>(answer),
       'context': serializer.toJson<String>(context),
       'topicName': serializer.toJson<String>(topicName),
+      'cognitiveType': serializer.toJson<String>(cognitiveType),
+      'subtopic': serializer.toJson<String>(subtopic),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'exportedAt': serializer.toJson<DateTime?>(exportedAt),
     };
@@ -5153,6 +5579,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     String? answer,
     String? context,
     String? topicName,
+    String? cognitiveType,
+    String? subtopic,
     DateTime? createdAt,
     Value<DateTime?> exportedAt = const Value.absent(),
   }) => ManualCardRow(
@@ -5163,6 +5591,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     answer: answer ?? this.answer,
     context: context ?? this.context,
     topicName: topicName ?? this.topicName,
+    cognitiveType: cognitiveType ?? this.cognitiveType,
+    subtopic: subtopic ?? this.subtopic,
     createdAt: createdAt ?? this.createdAt,
     exportedAt: exportedAt.present ? exportedAt.value : this.exportedAt,
   );
@@ -5177,6 +5607,10 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
       answer: data.answer.present ? data.answer.value : this.answer,
       context: data.context.present ? data.context.value : this.context,
       topicName: data.topicName.present ? data.topicName.value : this.topicName,
+      cognitiveType: data.cognitiveType.present
+          ? data.cognitiveType.value
+          : this.cognitiveType,
+      subtopic: data.subtopic.present ? data.subtopic.value : this.subtopic,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       exportedAt: data.exportedAt.present
           ? data.exportedAt.value
@@ -5194,6 +5628,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
           ..write('answer: $answer, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
+          ..write('cognitiveType: $cognitiveType, ')
+          ..write('subtopic: $subtopic, ')
           ..write('createdAt: $createdAt, ')
           ..write('exportedAt: $exportedAt')
           ..write(')'))
@@ -5209,6 +5645,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     answer,
     context,
     topicName,
+    cognitiveType,
+    subtopic,
     createdAt,
     exportedAt,
   );
@@ -5223,6 +5661,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
           other.answer == this.answer &&
           other.context == this.context &&
           other.topicName == this.topicName &&
+          other.cognitiveType == this.cognitiveType &&
+          other.subtopic == this.subtopic &&
           other.createdAt == this.createdAt &&
           other.exportedAt == this.exportedAt);
 }
@@ -5235,6 +5675,8 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
   final Value<String> answer;
   final Value<String> context;
   final Value<String> topicName;
+  final Value<String> cognitiveType;
+  final Value<String> subtopic;
   final Value<DateTime> createdAt;
   final Value<DateTime?> exportedAt;
   const ManualCardsCompanion({
@@ -5245,6 +5687,8 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     this.answer = const Value.absent(),
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
+    this.cognitiveType = const Value.absent(),
+    this.subtopic = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.exportedAt = const Value.absent(),
   });
@@ -5256,6 +5700,8 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     required String answer,
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
+    this.cognitiveType = const Value.absent(),
+    this.subtopic = const Value.absent(),
     required DateTime createdAt,
     this.exportedAt = const Value.absent(),
   }) : question = Value(question),
@@ -5269,6 +5715,8 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     Expression<String>? answer,
     Expression<String>? context,
     Expression<String>? topicName,
+    Expression<String>? cognitiveType,
+    Expression<String>? subtopic,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? exportedAt,
   }) {
@@ -5280,6 +5728,8 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
       if (answer != null) 'answer': answer,
       if (context != null) 'context': context,
       if (topicName != null) 'topic_name': topicName,
+      if (cognitiveType != null) 'cognitive_type': cognitiveType,
+      if (subtopic != null) 'subtopic': subtopic,
       if (createdAt != null) 'created_at': createdAt,
       if (exportedAt != null) 'exported_at': exportedAt,
     });
@@ -5293,6 +5743,8 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     Value<String>? answer,
     Value<String>? context,
     Value<String>? topicName,
+    Value<String>? cognitiveType,
+    Value<String>? subtopic,
     Value<DateTime>? createdAt,
     Value<DateTime?>? exportedAt,
   }) {
@@ -5304,6 +5756,8 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
       answer: answer ?? this.answer,
       context: context ?? this.context,
       topicName: topicName ?? this.topicName,
+      cognitiveType: cognitiveType ?? this.cognitiveType,
+      subtopic: subtopic ?? this.subtopic,
       createdAt: createdAt ?? this.createdAt,
       exportedAt: exportedAt ?? this.exportedAt,
     );
@@ -5333,6 +5787,12 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     if (topicName.present) {
       map['topic_name'] = Variable<String>(topicName.value);
     }
+    if (cognitiveType.present) {
+      map['cognitive_type'] = Variable<String>(cognitiveType.value);
+    }
+    if (subtopic.present) {
+      map['subtopic'] = Variable<String>(subtopic.value);
+    }
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
@@ -5352,6 +5812,8 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
           ..write('answer: $answer, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
+          ..write('cognitiveType: $cognitiveType, ')
+          ..write('subtopic: $subtopic, ')
           ..write('createdAt: $createdAt, ')
           ..write('exportedAt: $exportedAt')
           ..write(')'))
@@ -6323,6 +6785,18 @@ class $HighlightsTable extends Highlights
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _subtopicMeta = const VerificationMeta(
+    'subtopic',
+  );
+  @override
+  late final GeneratedColumn<String> subtopic = GeneratedColumn<String>(
+    'subtopic',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _practiceNameMeta = const VerificationMeta(
     'practiceName',
   );
@@ -6389,6 +6863,7 @@ class $HighlightsTable extends Highlights
     phrase,
     context,
     topicName,
+    subtopic,
     practiceName,
     createdAt,
     keptAt,
@@ -6440,6 +6915,12 @@ class $HighlightsTable extends Highlights
       context.handle(
         _topicNameMeta,
         topicName.isAcceptableOrUnknown(data['topic_name']!, _topicNameMeta),
+      );
+    }
+    if (data.containsKey('subtopic')) {
+      context.handle(
+        _subtopicMeta,
+        subtopic.isAcceptableOrUnknown(data['subtopic']!, _subtopicMeta),
       );
     }
     if (data.containsKey('practice_name')) {
@@ -6516,6 +6997,10 @@ class $HighlightsTable extends Highlights
         DriftSqlType.string,
         data['${effectivePrefix}topic_name'],
       )!,
+      subtopic: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subtopic'],
+      )!,
       practiceName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}practice_name'],
@@ -6552,6 +7037,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
   final String phrase;
   final String context;
   final String topicName;
+  final String subtopic;
   final String practiceName;
   final DateTime createdAt;
   final DateTime? keptAt;
@@ -6564,6 +7050,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     required this.phrase,
     required this.context,
     required this.topicName,
+    required this.subtopic,
     required this.practiceName,
     required this.createdAt,
     this.keptAt,
@@ -6583,6 +7070,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     map['phrase'] = Variable<String>(phrase);
     map['context'] = Variable<String>(context);
     map['topic_name'] = Variable<String>(topicName);
+    map['subtopic'] = Variable<String>(subtopic);
     map['practice_name'] = Variable<String>(practiceName);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || keptAt != null) {
@@ -6609,6 +7097,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
       phrase: Value(phrase),
       context: Value(context),
       topicName: Value(topicName),
+      subtopic: Value(subtopic),
       practiceName: Value(practiceName),
       createdAt: Value(createdAt),
       keptAt: keptAt == null && nullToAbsent
@@ -6635,6 +7124,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
       phrase: serializer.fromJson<String>(json['phrase']),
       context: serializer.fromJson<String>(json['context']),
       topicName: serializer.fromJson<String>(json['topicName']),
+      subtopic: serializer.fromJson<String>(json['subtopic']),
       practiceName: serializer.fromJson<String>(json['practiceName']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       keptAt: serializer.fromJson<DateTime?>(json['keptAt']),
@@ -6652,6 +7142,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
       'phrase': serializer.toJson<String>(phrase),
       'context': serializer.toJson<String>(context),
       'topicName': serializer.toJson<String>(topicName),
+      'subtopic': serializer.toJson<String>(subtopic),
       'practiceName': serializer.toJson<String>(practiceName),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'keptAt': serializer.toJson<DateTime?>(keptAt),
@@ -6667,6 +7158,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     String? phrase,
     String? context,
     String? topicName,
+    String? subtopic,
     String? practiceName,
     DateTime? createdAt,
     Value<DateTime?> keptAt = const Value.absent(),
@@ -6679,6 +7171,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     phrase: phrase ?? this.phrase,
     context: context ?? this.context,
     topicName: topicName ?? this.topicName,
+    subtopic: subtopic ?? this.subtopic,
     practiceName: practiceName ?? this.practiceName,
     createdAt: createdAt ?? this.createdAt,
     keptAt: keptAt.present ? keptAt.value : this.keptAt,
@@ -6697,6 +7190,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
       phrase: data.phrase.present ? data.phrase.value : this.phrase,
       context: data.context.present ? data.context.value : this.context,
       topicName: data.topicName.present ? data.topicName.value : this.topicName,
+      subtopic: data.subtopic.present ? data.subtopic.value : this.subtopic,
       practiceName: data.practiceName.present
           ? data.practiceName.value
           : this.practiceName,
@@ -6720,6 +7214,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
           ..write('phrase: $phrase, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
+          ..write('subtopic: $subtopic, ')
           ..write('practiceName: $practiceName, ')
           ..write('createdAt: $createdAt, ')
           ..write('keptAt: $keptAt, ')
@@ -6737,6 +7232,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     phrase,
     context,
     topicName,
+    subtopic,
     practiceName,
     createdAt,
     keptAt,
@@ -6753,6 +7249,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
           other.phrase == this.phrase &&
           other.context == this.context &&
           other.topicName == this.topicName &&
+          other.subtopic == this.subtopic &&
           other.practiceName == this.practiceName &&
           other.createdAt == this.createdAt &&
           other.keptAt == this.keptAt &&
@@ -6767,6 +7264,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
   final Value<String> phrase;
   final Value<String> context;
   final Value<String> topicName;
+  final Value<String> subtopic;
   final Value<String> practiceName;
   final Value<DateTime> createdAt;
   final Value<DateTime?> keptAt;
@@ -6779,6 +7277,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     this.phrase = const Value.absent(),
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
+    this.subtopic = const Value.absent(),
     this.practiceName = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.keptAt = const Value.absent(),
@@ -6792,6 +7291,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     required String phrase,
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
+    this.subtopic = const Value.absent(),
     this.practiceName = const Value.absent(),
     required DateTime createdAt,
     this.keptAt = const Value.absent(),
@@ -6806,6 +7306,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     Expression<String>? phrase,
     Expression<String>? context,
     Expression<String>? topicName,
+    Expression<String>? subtopic,
     Expression<String>? practiceName,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? keptAt,
@@ -6819,6 +7320,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
       if (phrase != null) 'phrase': phrase,
       if (context != null) 'context': context,
       if (topicName != null) 'topic_name': topicName,
+      if (subtopic != null) 'subtopic': subtopic,
       if (practiceName != null) 'practice_name': practiceName,
       if (createdAt != null) 'created_at': createdAt,
       if (keptAt != null) 'kept_at': keptAt,
@@ -6834,6 +7336,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     Value<String>? phrase,
     Value<String>? context,
     Value<String>? topicName,
+    Value<String>? subtopic,
     Value<String>? practiceName,
     Value<DateTime>? createdAt,
     Value<DateTime?>? keptAt,
@@ -6847,6 +7350,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
       phrase: phrase ?? this.phrase,
       context: context ?? this.context,
       topicName: topicName ?? this.topicName,
+      subtopic: subtopic ?? this.subtopic,
       practiceName: practiceName ?? this.practiceName,
       createdAt: createdAt ?? this.createdAt,
       keptAt: keptAt ?? this.keptAt,
@@ -6876,6 +7380,9 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     if (topicName.present) {
       map['topic_name'] = Variable<String>(topicName.value);
     }
+    if (subtopic.present) {
+      map['subtopic'] = Variable<String>(subtopic.value);
+    }
     if (practiceName.present) {
       map['practice_name'] = Variable<String>(practiceName.value);
     }
@@ -6903,6 +7410,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
           ..write('phrase: $phrase, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
+          ..write('subtopic: $subtopic, ')
           ..write('practiceName: $practiceName, ')
           ..write('createdAt: $createdAt, ')
           ..write('keptAt: $keptAt, ')
@@ -7381,6 +7889,8 @@ typedef $$TopicsTableCreateCompanionBuilder = TopicsCompanion Function({
   Value<int?> priority,
   Value<String?> ankiDeck,
   required DateTime createdAt,
+  Value<int> minimumScore,
+  Value<int> targetScore,
   Value<bool> archived,
 });
 typedef $$TopicsTableUpdateCompanionBuilder = TopicsCompanion Function({
@@ -7390,6 +7900,8 @@ typedef $$TopicsTableUpdateCompanionBuilder = TopicsCompanion Function({
   Value<int?> priority,
   Value<String?> ankiDeck,
   Value<DateTime> createdAt,
+  Value<int> minimumScore,
+  Value<int> targetScore,
   Value<bool> archived,
 });
 
@@ -7452,6 +7964,16 @@ class $$TopicsTableFilterComposer
 
   ColumnFilters<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get minimumScore => $composableBuilder(
+    column: $table.minimumScore,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get targetScore => $composableBuilder(
+    column: $table.targetScore,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7525,6 +8047,16 @@ class $$TopicsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get minimumScore => $composableBuilder(
+    column: $table.minimumScore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get targetScore => $composableBuilder(
+    column: $table.targetScore,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get archived => $composableBuilder(
     column: $table.archived,
     builder: (column) => ColumnOrderings(column),
@@ -7559,6 +8091,16 @@ class $$TopicsTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<int> get minimumScore => $composableBuilder(
+    column: $table.minimumScore,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get targetScore => $composableBuilder(
+    column: $table.targetScore,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get archived =>
       $composableBuilder(column: $table.archived, builder: (column) => column);
@@ -7623,6 +8165,8 @@ class $$TopicsTableTableManager
                 Value<int?> priority = const Value.absent(),
                 Value<String?> ankiDeck = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> minimumScore = const Value.absent(),
+                Value<int> targetScore = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
               }) => TopicsCompanion(
                 id: id,
@@ -7631,6 +8175,8 @@ class $$TopicsTableTableManager
                 priority: priority,
                 ankiDeck: ankiDeck,
                 createdAt: createdAt,
+                minimumScore: minimumScore,
+                targetScore: targetScore,
                 archived: archived,
               ),
           createCompanionCallback:
@@ -7641,6 +8187,8 @@ class $$TopicsTableTableManager
                 Value<int?> priority = const Value.absent(),
                 Value<String?> ankiDeck = const Value.absent(),
                 required DateTime createdAt,
+                Value<int> minimumScore = const Value.absent(),
+                Value<int> targetScore = const Value.absent(),
                 Value<bool> archived = const Value.absent(),
               }) => TopicsCompanion.insert(
                 id: id,
@@ -7649,6 +8197,8 @@ class $$TopicsTableTableManager
                 priority: priority,
                 ankiDeck: ankiDeck,
                 createdAt: createdAt,
+                minimumScore: minimumScore,
+                targetScore: targetScore,
                 archived: archived,
               ),
           withReferenceMapper: (p0) => p0
@@ -10738,6 +11288,7 @@ typedef $$AttemptsTableCreateCompanionBuilder = AttemptsCompanion Function({
   Value<String> reasoning,
   Value<bool> distracted,
   Value<bool> unknown,
+  Value<String> mistakeKindsJson,
   required bool isCorrect,
   required DateTime answeredAt,
 });
@@ -10749,6 +11300,7 @@ typedef $$AttemptsTableUpdateCompanionBuilder = AttemptsCompanion Function({
   Value<String> reasoning,
   Value<bool> distracted,
   Value<bool> unknown,
+  Value<String> mistakeKindsJson,
   Value<bool> isCorrect,
   Value<DateTime> answeredAt,
 });
@@ -10823,6 +11375,11 @@ class $$AttemptsTableFilterComposer
 
   ColumnFilters<bool> get unknown => $composableBuilder(
     column: $table.unknown,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mistakeKindsJson => $composableBuilder(
+    column: $table.mistakeKindsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10917,6 +11474,11 @@ class $$AttemptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get mistakeKindsJson => $composableBuilder(
+    column: $table.mistakeKindsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isCorrect => $composableBuilder(
     column: $table.isCorrect,
     builder: (column) => ColumnOrderings(column),
@@ -11001,6 +11563,11 @@ class $$AttemptsTableAnnotationComposer
 
   GeneratedColumn<bool> get unknown =>
       $composableBuilder(column: $table.unknown, builder: (column) => column);
+
+  GeneratedColumn<String> get mistakeKindsJson => $composableBuilder(
+    column: $table.mistakeKindsJson,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isCorrect =>
       $composableBuilder(column: $table.isCorrect, builder: (column) => column);
@@ -11092,6 +11659,7 @@ class $$AttemptsTableTableManager
                 Value<String> reasoning = const Value.absent(),
                 Value<bool> distracted = const Value.absent(),
                 Value<bool> unknown = const Value.absent(),
+                Value<String> mistakeKindsJson = const Value.absent(),
                 Value<bool> isCorrect = const Value.absent(),
                 Value<DateTime> answeredAt = const Value.absent(),
               }) => AttemptsCompanion(
@@ -11102,6 +11670,7 @@ class $$AttemptsTableTableManager
                 reasoning: reasoning,
                 distracted: distracted,
                 unknown: unknown,
+                mistakeKindsJson: mistakeKindsJson,
                 isCorrect: isCorrect,
                 answeredAt: answeredAt,
               ),
@@ -11114,6 +11683,7 @@ class $$AttemptsTableTableManager
                 Value<String> reasoning = const Value.absent(),
                 Value<bool> distracted = const Value.absent(),
                 Value<bool> unknown = const Value.absent(),
+                Value<String> mistakeKindsJson = const Value.absent(),
                 required bool isCorrect,
                 required DateTime answeredAt,
               }) => AttemptsCompanion.insert(
@@ -11124,6 +11694,7 @@ class $$AttemptsTableTableManager
                 reasoning: reasoning,
                 distracted: distracted,
                 unknown: unknown,
+                mistakeKindsJson: mistakeKindsJson,
                 isCorrect: isCorrect,
                 answeredAt: answeredAt,
               ),
@@ -11212,6 +11783,7 @@ typedef $$ConceptsTableCreateCompanionBuilder = ConceptsCompanion Function({
   Value<String> extra,
   Value<String> context,
   Value<String> topicName,
+  Value<String> subtopic,
   required String source,
   required DateTime createdAt,
   Value<DateTime?> exportedAt,
@@ -11225,6 +11797,7 @@ typedef $$ConceptsTableUpdateCompanionBuilder = ConceptsCompanion Function({
   Value<String> extra,
   Value<String> context,
   Value<String> topicName,
+  Value<String> subtopic,
   Value<String> source,
   Value<DateTime> createdAt,
   Value<DateTime?> exportedAt,
@@ -11305,6 +11878,11 @@ class $$ConceptsTableFilterComposer
 
   ColumnFilters<String> get topicName => $composableBuilder(
     column: $table.topicName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11409,6 +11987,11 @@ class $$ConceptsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get source => $composableBuilder(
     column: $table.source,
     builder: (column) => ColumnOrderings(column),
@@ -11499,6 +12082,9 @@ class $$ConceptsTableAnnotationComposer
 
   GeneratedColumn<String> get topicName =>
       $composableBuilder(column: $table.topicName, builder: (column) => column);
+
+  GeneratedColumn<String> get subtopic =>
+      $composableBuilder(column: $table.subtopic, builder: (column) => column);
 
   GeneratedColumn<String> get source =>
       $composableBuilder(column: $table.source, builder: (column) => column);
@@ -11594,6 +12180,7 @@ class $$ConceptsTableTableManager
                 Value<String> extra = const Value.absent(),
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
+                Value<String> subtopic = const Value.absent(),
                 Value<String> source = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> exportedAt = const Value.absent(),
@@ -11606,6 +12193,7 @@ class $$ConceptsTableTableManager
                 extra: extra,
                 context: context,
                 topicName: topicName,
+                subtopic: subtopic,
                 source: source,
                 createdAt: createdAt,
                 exportedAt: exportedAt,
@@ -11620,6 +12208,7 @@ class $$ConceptsTableTableManager
                 Value<String> extra = const Value.absent(),
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
+                Value<String> subtopic = const Value.absent(),
                 required String source,
                 required DateTime createdAt,
                 Value<DateTime?> exportedAt = const Value.absent(),
@@ -11632,6 +12221,7 @@ class $$ConceptsTableTableManager
                 extra: extra,
                 context: context,
                 topicName: topicName,
+                subtopic: subtopic,
                 source: source,
                 createdAt: createdAt,
                 exportedAt: exportedAt,
@@ -11726,6 +12316,9 @@ typedef $$ErrorCardsTableCreateCompanionBuilder = ErrorCardsCompanion Function({
   Value<String> bias,
   Value<String> vaccine,
   Value<String> topicName,
+  Value<String> cognitiveType,
+  Value<String> subtopic,
+  Value<String> mistakeKindsJson,
   Value<String> practiceName,
   required String status,
   required DateTime createdAt,
@@ -11749,6 +12342,9 @@ typedef $$ErrorCardsTableUpdateCompanionBuilder = ErrorCardsCompanion Function({
   Value<String> bias,
   Value<String> vaccine,
   Value<String> topicName,
+  Value<String> cognitiveType,
+  Value<String> subtopic,
+  Value<String> mistakeKindsJson,
   Value<String> practiceName,
   Value<String> status,
   Value<DateTime> createdAt,
@@ -11859,6 +12455,21 @@ class $$ErrorCardsTableFilterComposer
 
   ColumnFilters<String> get topicName => $composableBuilder(
     column: $table.topicName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cognitiveType => $composableBuilder(
+    column: $table.cognitiveType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get mistakeKindsJson => $composableBuilder(
+    column: $table.mistakeKindsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12013,6 +12624,21 @@ class $$ErrorCardsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get cognitiveType => $composableBuilder(
+    column: $table.cognitiveType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get mistakeKindsJson => $composableBuilder(
+    column: $table.mistakeKindsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get practiceName => $composableBuilder(
     column: $table.practiceName,
     builder: (column) => ColumnOrderings(column),
@@ -12152,6 +12778,19 @@ class $$ErrorCardsTableAnnotationComposer
   GeneratedColumn<String> get topicName =>
       $composableBuilder(column: $table.topicName, builder: (column) => column);
 
+  GeneratedColumn<String> get cognitiveType => $composableBuilder(
+    column: $table.cognitiveType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get subtopic =>
+      $composableBuilder(column: $table.subtopic, builder: (column) => column);
+
+  GeneratedColumn<String> get mistakeKindsJson => $composableBuilder(
+    column: $table.mistakeKindsJson,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get practiceName => $composableBuilder(
     column: $table.practiceName,
     builder: (column) => column,
@@ -12275,6 +12914,9 @@ class $$ErrorCardsTableTableManager
                 Value<String> bias = const Value.absent(),
                 Value<String> vaccine = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
+                Value<String> cognitiveType = const Value.absent(),
+                Value<String> subtopic = const Value.absent(),
+                Value<String> mistakeKindsJson = const Value.absent(),
                 Value<String> practiceName = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -12297,6 +12939,9 @@ class $$ErrorCardsTableTableManager
                 bias: bias,
                 vaccine: vaccine,
                 topicName: topicName,
+                cognitiveType: cognitiveType,
+                subtopic: subtopic,
+                mistakeKindsJson: mistakeKindsJson,
                 practiceName: practiceName,
                 status: status,
                 createdAt: createdAt,
@@ -12322,6 +12967,9 @@ class $$ErrorCardsTableTableManager
                 Value<String> bias = const Value.absent(),
                 Value<String> vaccine = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
+                Value<String> cognitiveType = const Value.absent(),
+                Value<String> subtopic = const Value.absent(),
+                Value<String> mistakeKindsJson = const Value.absent(),
                 Value<String> practiceName = const Value.absent(),
                 required String status,
                 required DateTime createdAt,
@@ -12344,6 +12992,9 @@ class $$ErrorCardsTableTableManager
                 bias: bias,
                 vaccine: vaccine,
                 topicName: topicName,
+                cognitiveType: cognitiveType,
+                subtopic: subtopic,
+                mistakeKindsJson: mistakeKindsJson,
                 practiceName: practiceName,
                 status: status,
                 createdAt: createdAt,
@@ -12438,6 +13089,8 @@ typedef $$ManualCardsTableCreateCompanionBuilder =
       required String answer,
       Value<String> context,
       Value<String> topicName,
+      Value<String> cognitiveType,
+      Value<String> subtopic,
       required DateTime createdAt,
       Value<DateTime?> exportedAt,
     });
@@ -12450,6 +13103,8 @@ typedef $$ManualCardsTableUpdateCompanionBuilder =
       Value<String> answer,
       Value<String> context,
       Value<String> topicName,
+      Value<String> cognitiveType,
+      Value<String> subtopic,
       Value<DateTime> createdAt,
       Value<DateTime?> exportedAt,
     });
@@ -12542,6 +13197,16 @@ class $$ManualCardsTableFilterComposer
 
   ColumnFilters<String> get topicName => $composableBuilder(
     column: $table.topicName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get cognitiveType => $composableBuilder(
+    column: $table.cognitiveType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12661,6 +13326,16 @@ class $$ManualCardsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get cognitiveType => $composableBuilder(
+    column: $table.cognitiveType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<DateTime> get createdAt => $composableBuilder(
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
@@ -12741,6 +13416,14 @@ class $$ManualCardsTableAnnotationComposer
 
   GeneratedColumn<String> get topicName =>
       $composableBuilder(column: $table.topicName, builder: (column) => column);
+
+  GeneratedColumn<String> get cognitiveType => $composableBuilder(
+    column: $table.cognitiveType,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get subtopic =>
+      $composableBuilder(column: $table.subtopic, builder: (column) => column);
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
@@ -12861,6 +13544,8 @@ class $$ManualCardsTableTableManager
                 Value<String> answer = const Value.absent(),
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
+                Value<String> cognitiveType = const Value.absent(),
+                Value<String> subtopic = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> exportedAt = const Value.absent(),
               }) => ManualCardsCompanion(
@@ -12871,6 +13556,8 @@ class $$ManualCardsTableTableManager
                 answer: answer,
                 context: context,
                 topicName: topicName,
+                cognitiveType: cognitiveType,
+                subtopic: subtopic,
                 createdAt: createdAt,
                 exportedAt: exportedAt,
               ),
@@ -12883,6 +13570,8 @@ class $$ManualCardsTableTableManager
                 required String answer,
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
+                Value<String> cognitiveType = const Value.absent(),
+                Value<String> subtopic = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> exportedAt = const Value.absent(),
               }) => ManualCardsCompanion.insert(
@@ -12893,6 +13582,8 @@ class $$ManualCardsTableTableManager
                 answer: answer,
                 context: context,
                 topicName: topicName,
+                cognitiveType: cognitiveType,
+                subtopic: subtopic,
                 createdAt: createdAt,
                 exportedAt: exportedAt,
               ),
@@ -13619,6 +14310,7 @@ typedef $$HighlightsTableCreateCompanionBuilder = HighlightsCompanion Function({
   required String phrase,
   Value<String> context,
   Value<String> topicName,
+  Value<String> subtopic,
   Value<String> practiceName,
   required DateTime createdAt,
   Value<DateTime?> keptAt,
@@ -13632,6 +14324,7 @@ typedef $$HighlightsTableUpdateCompanionBuilder = HighlightsCompanion Function({
   Value<String> phrase,
   Value<String> context,
   Value<String> topicName,
+  Value<String> subtopic,
   Value<String> practiceName,
   Value<DateTime> createdAt,
   Value<DateTime?> keptAt,
@@ -13722,6 +14415,11 @@ class $$HighlightsTableFilterComposer
 
   ColumnFilters<String> get topicName => $composableBuilder(
     column: $table.topicName,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13844,6 +14542,11 @@ class $$HighlightsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get subtopic => $composableBuilder(
+    column: $table.subtopic,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get practiceName => $composableBuilder(
     column: $table.practiceName,
     builder: (column) => ColumnOrderings(column),
@@ -13954,6 +14657,9 @@ class $$HighlightsTableAnnotationComposer
 
   GeneratedColumn<String> get topicName =>
       $composableBuilder(column: $table.topicName, builder: (column) => column);
+
+  GeneratedColumn<String> get subtopic =>
+      $composableBuilder(column: $table.subtopic, builder: (column) => column);
 
   GeneratedColumn<String> get practiceName => $composableBuilder(
     column: $table.practiceName,
@@ -14079,6 +14785,7 @@ class $$HighlightsTableTableManager
                 Value<String> phrase = const Value.absent(),
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
+                Value<String> subtopic = const Value.absent(),
                 Value<String> practiceName = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> keptAt = const Value.absent(),
@@ -14091,6 +14798,7 @@ class $$HighlightsTableTableManager
                 phrase: phrase,
                 context: context,
                 topicName: topicName,
+                subtopic: subtopic,
                 practiceName: practiceName,
                 createdAt: createdAt,
                 keptAt: keptAt,
@@ -14105,6 +14813,7 @@ class $$HighlightsTableTableManager
                 required String phrase,
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
+                Value<String> subtopic = const Value.absent(),
                 Value<String> practiceName = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> keptAt = const Value.absent(),
@@ -14117,6 +14826,7 @@ class $$HighlightsTableTableManager
                 phrase: phrase,
                 context: context,
                 topicName: topicName,
+                subtopic: subtopic,
                 practiceName: practiceName,
                 createdAt: createdAt,
                 keptAt: keptAt,

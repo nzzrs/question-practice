@@ -74,15 +74,10 @@ void main() {
       createdAt: harness.clock.now().toUtc(),
     );
     final concepts = await harness.cards.watchConcepts().first;
-    final errors = await harness.cards.watchErrorCards().first;
     final manuals = await harness.cards.watchManualCards().first;
     expect(conceptId, isPositive);
     expect(manualId, isPositive);
-    return ExportSelection(
-      concepts: concepts,
-      errorCards: errors,
-      manualCards: manuals,
-    );
+    return ExportSelection(concepts: concepts, manualCards: manuals);
   }
 
   test('exports all selected notes and marks them exported', () async {
@@ -93,12 +88,11 @@ void main() {
     );
 
     expect(outcome.success, isTrue);
-    expect(outcome.added, 3);
+    expect(outcome.added, 2);
     expect(outcome.failed, 0);
-    expect(gateway.importedNotes, hasLength(3));
+    expect(gateway.importedNotes, hasLength(2));
     expect(gateway.importedNotes.map((note) => note.model), [
       AnkiModel.concept,
-      AnkiModel.error,
       AnkiModel.basic,
     ]);
     expect(gateway.importedNotes.map((note) => note.deckName).toSet(), {
@@ -106,8 +100,9 @@ void main() {
     });
     expect(gateway.syncCount, 1);
     expect(await harness.cards.watchConcepts().first, isEmpty);
-    expect(await harness.cards.watchErrorCards().first, isEmpty);
     expect(await harness.cards.watchManualCards().first, isEmpty);
+    // Errors are reviewed into atomic cards, never exported directly.
+    expect(await harness.cards.watchErrorCards().first, isNotEmpty);
   });
 
   test('does not export when permission is missing', () async {
@@ -117,7 +112,6 @@ void main() {
       permissionGranted: false,
       deckExists: false,
       conceptModelAvailable: true,
-      errorModelAvailable: false,
       basicModelAvailable: false,
     );
     final items = await selection();
@@ -138,7 +132,6 @@ void main() {
       permissionGranted: true,
       deckExists: true,
       conceptModelAvailable: false,
-      errorModelAvailable: true,
       basicModelAvailable: true,
     );
     final items = await selection();

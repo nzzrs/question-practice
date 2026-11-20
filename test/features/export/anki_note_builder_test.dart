@@ -13,25 +13,26 @@ void main() {
     );
   });
 
+  test('concept cloze prefixes the topic and subtopic', () {
+    expect(
+      builder.conceptCloze(
+        'TCP',
+        'A reliable transport protocol.',
+        topicName: 'Networking',
+        subtopic: 'Layer 4',
+      ),
+      '[Networking / Layer 4] '
+      'Definition of {{c1::TCP}}: {{c2::A reliable transport protocol.}}',
+    );
+    expect(
+      builder.conceptCloze('TCP', 'Definition', topicName: 'Networking'),
+      '[Networking] Definition of {{c1::TCP}}: {{c2::Definition}}',
+    );
+  });
+
   test('cloze content cannot break the cloze syntax', () {
     final text = builder.conceptCloze('A::B', 'x}} y');
     expect(text, 'Definition of {{c1::A: :B}}: {{c2::x} } y}}');
-  });
-
-  test('error cards keep the six-field order', () {
-    final card = _errorCard();
-    final notes = builder.notes(ExportSelection(errorCards: [card]));
-    expect(notes, hasLength(1));
-    expect(notes.single.model, AnkiModel.error);
-    expect(notes.single.deckName, 'Question Practice');
-    expect(notes.single.fields, [
-      'Question &lt;one&gt;?',
-      'Wrong &amp; answer',
-      'Correct answer',
-      'Bias line',
-      'Vaccine line',
-      'Overall explanation<br><br>Wrong &amp; explanation',
-    ]);
   });
 
   test('newlines become HTML breaks and tabs become spaces', () {
@@ -42,7 +43,8 @@ void main() {
     final notes = builder.notes(ExportSelection(concepts: [_concept()]));
     expect(notes.single.model, AnkiModel.concept);
     expect(notes.single.fields, [
-      'Definition of {{c1::TCP}}: {{c2::A reliable transport protocol.}}',
+      '[Networking basics] '
+          'Definition of {{c1::TCP}}: {{c2::A reliable transport protocol.}}',
       'Transmission Control Protocol',
     ]);
   });
@@ -56,18 +58,7 @@ void main() {
     final notes = builder.notes(
       ExportSelection(
         concepts: [_concept()],
-        errorCards: [_errorCard()],
-        manualCards: [
-          ManualCard(
-            id: 2,
-            sessionId: 1,
-            question: 'Front',
-            answer: 'Back',
-            topicName: 'Cloud',
-            createdAt: DateTime.utc(2026),
-            exportedAt: null,
-          ),
-        ],
+        manualCards: [_manualCard(topicName: 'Cloud')],
       ),
       defaultDeck: 'Default deck',
       deckByTopic: const {
@@ -77,49 +68,47 @@ void main() {
     );
     expect(notes.map((note) => note.deckName), [
       'Networking deck',
-      'Networking deck',
       'Cloud deck',
     ]);
   });
 
   test('basic cards contain only the question and the answer', () {
-    final basic = ManualCard(
-      id: 3,
-      sessionId: 1,
-      questionId: 7,
-      question: 'What is a subnet?',
-      answer: 'A range of IP addresses.',
-      context: 'IPv4 addresses are split into networks.',
-      topicName: 'Networking basics',
-      createdAt: DateTime.utc(2026),
-      exportedAt: null,
-    );
+    final basic = _manualCard();
     final files = builder.files(ExportSelection(manualCards: [basic]));
     expect(files.basic, 'What is a subnet?\tA range of IP addresses.');
     expect(files.basic, isNot(contains('IPv4 addresses are split')));
 
     final note = builder.notes(ExportSelection(manualCards: [basic])).single;
+    expect(note.model, AnkiModel.basic);
     expect(note.fields.first, 'What is a subnet?');
     expect(note.fields.last, 'A range of IP addresses.');
   });
 
+  test('tags are hierarchical and derive from topic and subtopic', () {
+    final note = builder
+        .notes(
+          ExportSelection(
+            manualCards: [
+              _manualCard(topicName: 'Networking basics', subtopic: 'Layer 4'),
+            ],
+          ),
+        )
+        .single;
+    expect(note.tags, [
+      'question-practice',
+      'topic::networking-basics',
+      'subtopic::layer-4',
+    ]);
+  });
+
   test('files contain the selected cards only', () {
     final concept = _concept();
-    final basic = ManualCard(
-      id: 2,
-      sessionId: 1,
-      question: 'Front',
-      answer: 'Back',
-      topicName: 'Networking basics',
-      createdAt: DateTime.utc(2026),
-      exportedAt: null,
-    );
+    final basic = _manualCard();
     final files = builder.files(
       ExportSelection(concepts: [concept], manualCards: [basic]),
     );
     expect(files.concepts, contains('Definition of {{c1::TCP}}'));
-    expect(files.basic, 'Front\tBack');
-    expect(files.errors, isEmpty);
+    expect(files.basic, contains('What is a subnet?'));
   });
 }
 
@@ -139,31 +128,20 @@ Concept _concept() {
   );
 }
 
-ErrorCard _errorCard() {
-  return ErrorCard(
-    id: 1,
-    questionId: 1,
+ManualCard _manualCard({
+  String topicName = 'Networking basics',
+  String subtopic = '',
+}) {
+  return ManualCard(
+    id: 3,
     sessionId: 1,
-    question: 'Question <one>?',
-    alternatives: ['Wrong & answer', 'Correct answer'],
-    correctIndexes: const [1],
-    wrongIndexes: const [0],
-    reasoning: 'Reason',
-    explanation: 'Overall explanation',
-    alternativeExplanations: const [
-      'Wrong & explanation',
-      'Correct explanation',
-    ],
-    bias: 'Bias line',
-    vaccine: 'Vaccine line',
-    topicName: 'Networking basics',
-    practiceName: 'Practice',
-    status: ErrorCardStatus.active,
+    questionId: 7,
+    question: 'What is a subnet?',
+    answer: 'A range of IP addresses.',
+    context: 'IPv4 addresses are split into networks.',
+    topicName: topicName,
+    subtopic: subtopic,
     createdAt: DateTime.utc(2026),
-    lastWrongAt: DateTime.utc(2026),
-    dueAt: DateTime.utc(2026, 1, 3),
-    detailsCompletedAt: DateTime.utc(2026),
-    resolvedAt: null,
     exportedAt: null,
   );
 }

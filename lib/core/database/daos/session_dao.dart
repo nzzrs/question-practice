@@ -181,6 +181,12 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     );
   }
 
+  Future<void> updateAttemptMistakeKinds(int id, String mistakeKindsJson) {
+    return (update(attempts)..where((a) => a.id.equals(id))).write(
+      AttemptsCompanion(mistakeKindsJson: Value(mistakeKindsJson)),
+    );
+  }
+
   Future<void> completeSession({
     required int id,
     required int total,

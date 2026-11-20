@@ -110,6 +110,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
             context: item.question.prompt,
             topicName: item.topicName,
             practiceName: item.practiceName,
+            subtopic: item.question.subtopic,
             createdAt: ref.read(clockProvider).now().toUtc(),
           );
       if (!mounted) return;

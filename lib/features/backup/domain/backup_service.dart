@@ -806,6 +806,8 @@ class BackupService {
       // Older exports used the SQL column spelling, so accept both.
       ankiDeck: row.optionalStringAny(const ['ankiDeck', 'anki_deck', 'deck']),
       createdAt: row.requireDate('createdAt'),
+      minimumScore: row.intOr('minimumScore', 70),
+      targetScore: row.intOr('targetScore', 80),
       archived: row.boolOr('archived', false),
     );
   }
@@ -871,6 +873,7 @@ class BackupService {
       reasoning: row.stringOr('reasoning', ''),
       distracted: row.boolOr('distracted', false),
       unknown: row.boolOr('unknown', false),
+      mistakeKindsJson: row.stringOr('mistakeKindsJson', '[]'),
       isCorrect: row.requireBool('isCorrect'),
       answeredAt: row.requireDate('answeredAt'),
     );
@@ -886,6 +889,7 @@ class BackupService {
       extra: row.stringOr('extra', ''),
       context: row.stringOr('context', ''),
       topicName: row.stringOr('topicName', ''),
+      subtopic: row.stringOr('subtopic', ''),
       source: row.requireEnum('source', ConceptSource.values),
       createdAt: row.requireDate('createdAt'),
       exportedAt: row.optionalDate('exportedAt'),
@@ -911,6 +915,9 @@ class BackupService {
       vaccine: row.stringOr('vaccine', ''),
       topicName: row.stringOr('topicName', ''),
       practiceName: row.stringOr('practiceName', ''),
+      cognitiveType: row.stringOr('cognitiveType', 'contrast'),
+      subtopic: row.stringOr('subtopic', ''),
+      mistakeKindsJson: row.stringOr('mistakeKindsJson', '[]'),
       status: row.requireEnum('status', ErrorCardStatus.values),
       createdAt: row.requireDate('createdAt'),
       lastWrongAt: row.requireDate('lastWrongAt'),
@@ -930,6 +937,8 @@ class BackupService {
       answer: row.requireString('answer'),
       context: row.stringOr('context', ''),
       topicName: row.stringOr('topicName', ''),
+      cognitiveType: row.stringOr('cognitiveType', 'fact'),
+      subtopic: row.stringOr('subtopic', ''),
       createdAt: row.requireDate('createdAt'),
       exportedAt: row.optionalDate('exportedAt'),
     );
@@ -966,6 +975,7 @@ class BackupService {
       phrase: row.requireString('phrase'),
       context: row.stringOr('context', ''),
       topicName: row.stringOr('topicName', ''),
+      subtopic: row.stringOr('subtopic', ''),
       practiceName: row.stringOr('practiceName', ''),
       createdAt: row.requireDate('createdAt'),
       keptAt: row.optionalDate('keptAt'),

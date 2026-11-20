@@ -86,6 +86,7 @@ class LookupService {
     required String practiceName,
     required int? sessionId,
     required int? questionId,
+    String subtopic = '',
   }) async {
     final cleanedTerm = term.trim();
     if (cleanedTerm.isEmpty) {
@@ -100,6 +101,7 @@ class LookupService {
         practiceName: practiceName,
         sessionId: sessionId,
         questionId: questionId,
+        subtopic: subtopic,
       );
     }
 
@@ -123,6 +125,7 @@ class LookupService {
       extra: definition.extra,
       question: question,
       topicName: topicName,
+      subtopic: subtopic,
       sessionId: sessionId,
       questionId: questionId,
       source: ConceptSource.ai,
@@ -144,6 +147,7 @@ class LookupService {
     required String practiceName,
     required int? sessionId,
     required int? questionId,
+    String subtopic = '',
   }) async {
     final cleanedTerm = term.trim();
     final settings = await _settings.load();
@@ -154,6 +158,7 @@ class LookupService {
       extra: '',
       question: question,
       topicName: topicName,
+      subtopic: subtopic,
       sessionId: sessionId,
       questionId: questionId,
       source: ConceptSource.web,
@@ -294,15 +299,17 @@ class LookupService {
     return trimmed;
   }
 
-  /// Suggests a short list of atomic basic cards from a saved highlight.
+  /// Suggests structured atomic cards from a saved highlight.
   ///
-  /// Each card tests one fact, so a highlight that contains several facts
-  /// becomes several small cards instead of one long paragraph. The result is
-  /// empty when the AI finds nothing worth turning into a card.
-  Future<List<SuggestedCard>> suggestAtomicCards({
+  /// The AI must classify each proposal as a procedure/operator, a rule or
+  /// heuristic, or an atomic fact, so the learner sees the cognitive shape of
+  /// every card before adding it. Generic summaries and long paragraphs are
+  /// rejected by the prompt.
+  Future<List<SuggestedCard>> suggestArchetypeCards({
     required String highlight,
     required String questionContext,
     required String topicName,
+    String subtopic = '',
   }) async {
     final passage = highlight.trim();
     if (passage.isEmpty) {
@@ -316,21 +323,103 @@ class LookupService {
       );
     }
     const systemPrompt =
-        'You turn one saved highlight from a study app into atomic basic '
-        'cards. Use the highlight, the question around it and the topic. '
-        'Return exactly one JSON object: '
-        '{"cards":[{"front":"...","back":"..."}]}. Rules: each card tests '
-        'exactly ONE fact; at most 6 cards; the front is a short, specific '
-        'prompt or term, never a paragraph; the back is a concise answer; '
-        'front and back are at most 20 words each; no markdown; only facts '
-        'supported by the highlight or its context; skip trivial or duplicate '
-        'cards.';
+        'You turn one saved highlight from a study app into atomic cards with '
+        'a fixed archetype. Use the highlight, the question around it, the '
+        'topic and the subtopic. Return exactly one JSON object: '
+        '{"cards":[{"type":"procedure|heuristic|fact","front":"...",'
+        '"back":"..."}]}. Rules: classify every card honestly as procedure '
+        '(an operator, formula or ordered steps), heuristic (a rule of thumb '
+        'or condition-action rule), or fact (one atomic verified fact); each '
+        'card tests exactly ONE idea; at most 6 cards; the front is a short, '
+        'specific prompt, never a paragraph, and must not restate the whole '
+        'highlight; the back is a concise atomic answer; front and back are at '
+        'most 20 words each; do not produce generic definitions, summaries or '
+        'essay-like paragraphs; no markdown; only ideas supported by the '
+        'highlight or its context; skip trivial or duplicate cards.';
     final context = questionContext.trim();
     final userPrompt = [
       if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
+      if (subtopic.trim().isNotEmpty) 'Subtopic: ${subtopic.trim()}',
       if (context.isNotEmpty) 'Question context: $context',
       'Highlighted passage: $passage',
     ].join('\n');
+    final cards = await _requestJsonCards(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      errorMessage: 'The AI returned invalid card suggestions. Try again.',
+    );
+    return cards.take(6).toList(growable: false);
+  }
+
+  /// Breaks one error into a direct contrast and a condition-action rule.
+  ///
+  /// Returns at most two cards: a contrast between the chosen wrong option
+  /// and the correct one, and a heuristic whose front follows the mandatory
+  /// "given requirement with restriction, what rule applies?" template.
+  Future<List<SuggestedCard>> breakdownErrorCard({
+    required String question,
+    required String wrongAnswer,
+    required String correctAnswer,
+    required String reasoning,
+    required String explanation,
+    required String topicName,
+    String subtopic = '',
+    List<MistakeKind> mistakeKinds = const [],
+  }) async {
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'Breaking down cards needs an AI provider. Add an API key in Settings.',
+      );
+    }
+    const systemPrompt =
+        'You split one study error into at most two atomic cards. Return '
+        'exactly one JSON object: {"cards":[{"type":"contrast",'
+        '"front":"...","back":"..."},{"type":"heuristic",'
+        '"front":"...","back":"..."}]}. Rules: '
+        '(1) A contrast card asks the learner to distinguish the chosen wrong '
+        'option from the correct one; the front names both briefly and the '
+        'back states the correct choice plus the decisive difference; '
+        '(2) a heuristic card is a condition-action rule with the mandatory '
+        'front "Given requirement X with restriction Y, what rule applies?" '
+        'and an atomic back that answers it; '
+        '(3) include a card only when it is genuinely useful; '
+        '(4) no question may be answerable with yes/no; '
+        '(5) no front may exceed 30 words and no clue may give the answer '
+        'away; no markdown; no option letters.';
+    final mistakes = mistakeKinds.map((kind) => kind.label).join(', ');
+    final userPrompt = [
+      if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
+      if (subtopic.trim().isNotEmpty) 'Subtopic: ${subtopic.trim()}',
+      'Question: $question',
+      'Chosen wrong answer: $wrongAnswer',
+      'Correct answer: $correctAnswer',
+      'Mistake classifications: ${mistakes.isEmpty ? '(none)' : mistakes}',
+      'Learner reasoning: ${reasoning.trim().isEmpty ? '(not written)' : reasoning.trim()}',
+      'Explanation: $explanation',
+    ].join('\n');
+    final cards = await _requestJsonCards(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      errorMessage: 'The AI returned an invalid card breakdown. Try again.',
+      allowedTypes: const {CognitiveType.contrast, CognitiveType.heuristic},
+    );
+    return cards.take(2).toList(growable: false);
+  }
+
+  Future<List<SuggestedCard>> _requestJsonCards({
+    required AppSettings settings,
+    required String apiKey,
+    required String systemPrompt,
+    required String userPrompt,
+    required String errorMessage,
+    Set<CognitiveType>? allowedTypes,
+  }) async {
     final content = await _requestAi(
       settings: settings,
       apiKey: apiKey,
@@ -352,16 +441,22 @@ class LookupService {
         final front = rawFront is String ? rawFront.trim() : '';
         final back = rawBack is String ? rawBack.trim() : '';
         if (front.isEmpty || back.isEmpty) continue;
-        final key = '${front.toLowerCase()}\u0000${back.toLowerCase()}';
+        final rawType = item['type'];
+        final type = switch (rawType is String ? rawType.trim() : null) {
+          'contrast' => CognitiveType.contrast,
+          'heuristic' || 'procedure' || 'rule' => CognitiveType.heuristic,
+          'fact' => CognitiveType.fact,
+          _ => CognitiveType.fact,
+        };
+        if (allowedTypes != null && !allowedTypes.contains(type)) continue;
+        final key = '${type.name}\u0000${front.toLowerCase()}';
         if (!seen.add(key)) continue;
-        cards.add(SuggestedCard(front: front, back: back));
+        cards.add(SuggestedCard(front: front, back: back, cognitiveType: type));
         if (cards.length == 6) break;
       }
       return cards;
     } on Object {
-      throw const LookupException(
-        'The AI returned invalid card suggestions. Try again.',
-      );
+      throw LookupException(errorMessage);
     }
   }
 
@@ -444,6 +539,7 @@ class LookupService {
     required int? sessionId,
     required int? questionId,
     required ConceptSource source,
+    String subtopic = '',
   }) {
     return _cards.createConcept(
       sessionId: sessionId,
@@ -453,6 +549,7 @@ class LookupService {
       extra: extra,
       context: question,
       topicName: topicName,
+      subtopic: subtopic,
       source: source,
       createdAt: _clock.now().toUtc(),
     );

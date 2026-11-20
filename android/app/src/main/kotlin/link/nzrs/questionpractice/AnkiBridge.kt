@@ -20,178 +20,6 @@ class AnkiBridge(
         private const val CHANNEL = "link.nzrs.questionpractice/anki"
         private const val PERMISSION_REQUEST = 4107
         private const val ANKI_PACKAGE = "com.ichi2.anki"
-        private const val ERROR_MODEL = "Question Practice: Error v2"
-        private const val BASIC_MODEL = "Basic"
-        private val ERROR_FIELDS = arrayOf(
-            "Problem",
-            "Wrong Solution",
-            "Correct Solution",
-            "Mental Trap",
-            "Vaccine",
-            "Explanation",
-        )
-        private const val ERROR_QUESTION_FORMAT = """
-            <div class="field-container">
-              <div class="field-label">Problem:</div>
-              <div class="field-content">{{Problem}}</div>
-            </div>
-
-            <div class="field-container wrong">
-              <div class="field-label">Wrong answer chosen:</div>
-              <div class="field-content">{{Wrong Solution}}</div>
-            </div>
-
-            {{#Correct Solution}}
-            <div class="field-container discarded">
-              <div class="field-label">Right answer discarded:</div>
-              <div class="field-content">{{Correct Solution}}</div>
-            </div>
-            {{/Correct Solution}}
-
-            <div class="prompt-action">
-              What was the <strong>flawed assumption</strong>?
-            </div>
-        """
-        private const val ERROR_ANSWER_FORMAT = """
-            {{FrontSide}}
-
-            <hr id="answer">
-
-            {{#Mental Trap}}
-            <div class="field-container trap">
-              <div class="field-label">Flawed Assumption (Bias):</div>
-              <div class="field-content">{{Mental Trap}}</div>
-            </div>
-            {{/Mental Trap}}
-
-            <div class="reference-box">
-              {{#Vaccine}}
-              <div class="field-container vaccine">
-                <div class="field-label">Vaccine (Rule / Protocol):</div>
-                <div class="field-content">{{Vaccine}}</div>
-              </div>
-              {{/Vaccine}}
-
-              {{#Explanation}}
-              <div class="field-container explanation">
-                <div class="field-label">Distractor analysis / Explanation:</div>
-                <div class="field-content">{{Explanation}}</div>
-              </div>
-              {{/Explanation}}
-            </div>
-        """
-        private const val ERROR_CSS = """
-            html {
-              height: 100%;
-            }
-
-            * {
-              box-sizing: border-box;
-            }
-
-            p {
-              margin: 0;
-            }
-
-            .card {
-              font-family: "Cascadia Code", "Consolas", "Segoe UI", monospace, sans-serif;
-              text-align: center;
-              color: #E0E0E0;
-              background-color: #0D1117;
-              display: flex;
-              flex-direction: column;
-              justify-content: center;
-              align-items: center;
-              min-height: 100%;
-              margin: 0;
-              padding: 30px 15px;
-            }
-
-            .field-container {
-              margin: 12px auto 0 auto;
-              text-align: left;
-              width: 100%;
-              max-width: 650px;
-              border-radius: 6px;
-              padding: 14px 18px;
-              border: 1px solid #30363d;
-              background-color: #161b22;
-            }
-
-            .field-label {
-              font-size: 11px;
-              font-weight: 700;
-              letter-spacing: 1px;
-              margin-bottom: 6px;
-              text-transform: uppercase;
-            }
-
-            .field-content {
-              font-size: 16px;
-              line-height: 1.5;
-            }
-
-            .wrong {
-              background-color: #211515;
-              border-left: 4px solid #f85149;
-            }
-            .wrong .field-label { color: #f85149; }
-
-            .discarded, .correct {
-              background-color: #132316;
-              border-left: 4px solid #3fb950;
-            }
-            .discarded .field-label, .correct .field-label {
-              color: #3fb950;
-            }
-
-            .trap {
-              background-color: #261c14;
-              border-left: 4px solid #db6d28;
-            }
-            .trap .field-label { color: #db6d28; }
-
-            .vaccine {
-              background-color: #1c1427;
-              border-left: 4px solid #ab47bc;
-            }
-            .vaccine .field-label { color: #ab47bc; }
-
-            .explanation {
-              background-color: #161b22;
-              border-left: 4px solid #58a6ff;
-            }
-            .explanation .field-label { color: #58a6ff; }
-            .explanation .field-content { font-size: 14px; }
-
-            .reference-box {
-              width: 100%;
-              max-width: 650px;
-              margin-top: 10px;
-              opacity: 0.85;
-            }
-
-            .prompt-action {
-              color: #8b949e;
-              font-size: 14px;
-              margin: 25px auto 5px auto;
-              text-align: left;
-              width: 100%;
-              max-width: 650px;
-              padding: 0 4px;
-            }
-
-            .prompt-action strong { color: #c9d1d9; }
-
-            #answer {
-              display: block;
-              border: 0;
-              border-top: 1px solid #30363d;
-              width: 100%;
-              max-width: 650px;
-              margin: 25px auto 15px auto;
-            }
-        """
     }
 
     private val channel = MethodChannel(messenger, CHANNEL)
@@ -292,12 +120,6 @@ class AnkiBridge(
                 "failed" to rawNotes.size,
                 "message" to "AnkiDroid has no Cloze note type.",
             )
-        val errorModel = ensureErrorModel(api)
-            ?: return mapOf(
-                "added" to 0,
-                "failed" to rawNotes.size,
-                "message" to "Could not create the error note type.",
-            )
         val basicModel = ensureBasicModel(api)
             ?: return mapOf(
                 "added" to 0,
@@ -328,10 +150,6 @@ class AnkiBridge(
                     "concept" -> {
                         modelId = cloze.id
                         fieldCount = cloze.fieldNames.size
-                    }
-                    "error" -> {
-                        modelId = errorModel
-                        fieldCount = ERROR_FIELDS.size
                     }
                     else -> {
                         modelId = basicModel
@@ -388,21 +206,6 @@ class AnkiBridge(
         val existing = api.deckList?.entries?.firstOrNull { it.value == deckName }
         if (existing != null) return existing.key
         return api.addNewDeck(deckName)
-    }
-
-    private fun ensureErrorModel(api: AddContentApi): Long? {
-        val existing = api.modelList?.entries?.firstOrNull { it.value == ERROR_MODEL }
-        if (existing != null) return existing.key
-        return api.addNewCustomModel(
-            ERROR_MODEL,
-            ERROR_FIELDS,
-            arrayOf("Card 1"),
-            arrayOf(ERROR_QUESTION_FORMAT.trimIndent()),
-            arrayOf(ERROR_ANSWER_FORMAT.trimIndent()),
-            ERROR_CSS.trimIndent(),
-            null,
-            0,
-        )
     }
 
     private fun ensureBasicModel(api: AddContentApi): Long? {
@@ -465,14 +268,12 @@ class AnkiBridge(
         val permission = hasPermission()
         var deckExists = false
         var conceptModel = false
-        var errorModel = false
         var basicModel = false
         if (installed && apiAvailable && permission) {
             try {
                 val api = AddContentApi(activity)
                 deckExists = api.deckList?.values?.any { it == "Question Practice" } == true
                 conceptModel = findClozeModel() != null
-                errorModel = api.modelList?.values?.any { it == ERROR_MODEL } == true
                 basicModel = api.modelList?.values?.any { it == BASIC_MODEL } == true
             } catch (error: Exception) {
                 // The status map reports what could be read; failures stay false.
@@ -484,7 +285,6 @@ class AnkiBridge(
             "permissionGranted" to permission,
             "deckExists" to deckExists,
             "conceptModelAvailable" to conceptModel,
-            "errorModelAvailable" to errorModel,
             "basicModelAvailable" to basicModel,
         )
     }

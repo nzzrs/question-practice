@@ -209,6 +209,8 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
             description: _description.text.trim(),
             priority: parsedPriority,
             ankiDeck: _deck.text.trim().isEmpty ? null : _deck.text.trim(),
+            minimumScore: widget.topic.minimumScore,
+            targetScore: widget.topic.targetScore,
           );
       if (mounted) Navigator.of(context).pop(true);
     } on Object catch (error) {

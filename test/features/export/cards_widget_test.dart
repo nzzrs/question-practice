@@ -195,11 +195,19 @@ void main() {
     expect(find.text('Review the skipped question'), findsOneWidget);
     expect(find.text('Item 1 of 1'), findsOneWidget);
 
-    await tester.tap(find.text('Make a card'));
+    await tester.tap(find.text('Create cards'));
     await pumpFrames(tester);
-    expect(find.text('Turn this skipped question into a card'), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-front')), findsOneWidget);
 
-    await tester.tap(find.text('Create'));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-add')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Save 1 card'));
     await pumpFrames(tester, frames: 24);
 
     final manuals = await tester.runAsync(
@@ -319,26 +327,40 @@ void main() {
     await tester.tap(row);
     await pumpFrames(tester);
 
-    final suggest = find.byKey(const ValueKey('highlight-suggest-cards'));
-    expect(suggest, findsOneWidget);
-    await tester.ensureVisible(suggest);
+    final create = find.byKey(const ValueKey('highlight-make-card'));
+    expect(create, findsOneWidget);
+    await tester.ensureVisible(create);
+    await tester.tap(create);
+    await pumpFrames(tester);
+
+    final suggest = find.byKey(const ValueKey('creator-ai-suggest'));
+    await tester.scrollUntilVisible(
+      suggest,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
     await tester.tap(suggest);
     await pumpFrames(tester, frames: 24);
 
-    expect(find.text('Suggested cards with AI'), findsOneWidget);
-    expect(find.text('Procedures & rules'), findsOneWidget);
-    expect(find.text('Atomic facts'), findsOneWidget);
+    expect(find.text('Suggest with AI'), findsWidgets);
     expect(find.text('Heuristic'), findsOneWidget);
     expect(find.text('Fact'), findsNWidgets(2));
-    expect(find.text('Ready'), findsNWidgets(2));
+    expect(find.text('Ready'), findsNWidgets(3));
     expect(
       find.textContaining('Can be answered with yes or no'),
       findsOneWidget,
     );
-    expect(find.text('Add 3 cards'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Add 3 cards'));
-    await tester.tap(find.text('Add 3 cards'));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-add')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
     final manuals = await tester.runAsync(
@@ -367,10 +389,6 @@ void main() {
       () => harness.cards.watchHighlights().first,
     );
     expect(highlights!.single.hasCard, isTrue);
-    expect(
-      find.textContaining('3 cards added from the note'),
-      findsOneWidget,
-    );
   });
 
   testWidgets('Cards review opens the shared highlight view', (tester) async {
@@ -395,7 +413,7 @@ void main() {
     expect(find.text('Review the note'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
     expect(find.text('From the question'), findsOneWidget);
-    expect(find.text('Suggest with AI'), findsOneWidget);
+    expect(find.text('Suggest with AI'), findsNothing);
     expect(find.text('Create cards'), findsOneWidget);
     expect(find.text('Keep for later'), findsOneWidget);
     expect(find.text('Keep & done'), findsOneWidget);
@@ -435,17 +453,19 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('highlight-make-card')));
     await pumpFrames(tester);
 
-    expect(find.text('Turn the note into a concept card'), findsOneWidget);
-    expect(find.byKey(const ValueKey('new-card-definition')), findsOneWidget);
-    expect(find.byKey(const ValueKey('new-card-question')), findsNothing);
-    expect(find.text('Basic card'), findsNothing);
+    expect(find.byKey(const ValueKey('creator-definition')), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-front')), findsNothing);
+    expect(find.text('Basic'), findsOneWidget);
+    expect(find.text('Concept'), findsOneWidget);
 
     await tester.enterText(
-      find.byKey(const ValueKey('new-card-definition')),
+      find.byKey(const ValueKey('creator-definition')),
       'A private network.',
     );
     await pumpFrames(tester);
-    await tester.tap(find.text('Create'));
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
     final concepts = await tester.runAsync(

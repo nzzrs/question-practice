@@ -7,9 +7,8 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import 'highlight_card_actions.dart';
+import '../export/card_creator_page.dart';
 import 'highlight_review_view.dart';
-import 'suggested_cards_sheet.dart';
 
 /// Reviews saved highlights one at a time.
 ///
@@ -95,38 +94,29 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     }
   }
 
-  Future<void> _makeCard(
+  Future<void> _createCards(
     StudyHighlight highlight,
     int index,
     int length,
   ) async {
     if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final created = await convertHighlightToCard(context, ref, highlight);
-      if (!mounted || created == 0) return;
-      _cards += created;
-      _advanceFrom(index, length);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _suggestCards(
-    StudyHighlight highlight,
-    int index,
-    int length,
-  ) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final added = await suggestCardsFromHighlight(context, highlight);
-      if (!mounted || added == 0) return;
-      _cards += added;
-      _advanceFrom(index, length);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final created = await showCardCreator(
+      context,
+      request: CardCreatorRequest(
+        title: 'Create cards',
+        sessionId: highlight.sessionId,
+        questionId: highlight.questionId,
+        questionContext: highlight.context,
+        topicName: highlight.topicName,
+        subtopic: highlight.subtopic,
+        initialKind: CardCreatorKind.concept,
+        initialTerm: highlight.text,
+        note: highlight,
+      ),
+    );
+    if (!mounted || created == 0) return;
+    _cards += created;
+    _advanceFrom(index, length);
   }
 
   Future<void> _deleteHighlight(StudyHighlight highlight, int length) async {
@@ -196,8 +186,7 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
           Text(
             changed
                 ? [
-                    if (_kept > 0)
-                      '$_kept note${_kept == 1 ? '' : 's'} kept',
+                    if (_kept > 0) '$_kept note${_kept == 1 ? '' : 's'} kept',
                     if (_cards > 0)
                       '$_cards card${_cards == 1 ? '' : 's'} created',
                   ].join(' and ')
@@ -289,9 +278,8 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
         HighlightReviewView(
           key: ValueKey('highlight-review-${highlight.id}'),
           highlight: highlight,
-          onMakeCard: () => _makeCard(highlight, index, highlights.length),
-          onSuggestCards: () =>
-              _suggestCards(highlight, index, highlights.length),
+          onCreateCards: () =>
+              _createCards(highlight, index, highlights.length),
           onKeep: highlight.isKept
               ? null
               : () => _keep(highlight, index, highlights.length),

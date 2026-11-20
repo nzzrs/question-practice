@@ -65,12 +65,25 @@ void main() {
       find.text('It spreads traffic across several servers.'),
       findsOneWidget,
     );
-    expect(find.text('Turn into a card'), findsOneWidget);
+    expect(find.text('Create cards'), findsOneWidget);
     expect(find.text('Ask another'), findsOneWidget);
 
-    await tester.tap(find.text('Turn into a card'));
+    await tester.tap(find.byKey(const ValueKey('ask-create-cards')));
     await pumpFrames(tester);
-    await tester.tap(find.text('Create'));
+    expect(find.byKey(const ValueKey('creator-front')), findsOneWidget);
+    expect(
+      find.text('It spreads traffic across several servers.'),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-add')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Save 1 card'));
     await pumpFrames(tester, frames: 24);
 
     final manuals = await tester.runAsync(

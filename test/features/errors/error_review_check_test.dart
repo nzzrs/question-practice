@@ -96,7 +96,52 @@ void main() {
     expect(find.text('Flawed assumption (bias)'), findsNothing);
     expect(find.text('Vaccine (rule / protocol)'), findsNothing);
     expect(find.byKey(const ValueKey('error-card-reading-time')), findsNothing);
-    expect(find.text('Break into atomic cards (AI)'), findsOneWidget);
+    expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
+    expect(find.text('Create cards'), findsOneWidget);
+  });
+
+  testWidgets('manual error cards work without an AI provider', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final card = await _createError(harness);
+
+    await _pumpView(tester, harness, card);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('error-create-cards')),
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
+    await pumpFrames(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Which layer owns IP addresses?',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'The network layer owns addressing.',
+    );
+    await pumpFrames(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-add')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await pumpFrames(tester, frames: 24);
+
+    final cards = await tester.runAsync(
+      () => harness.cards.watchManualCards().first,
+    );
+    expect(cards, hasLength(1));
+    expect(cards!.single.cognitiveType, CognitiveType.fact);
+    final saved = await tester.runAsync(
+      () => harness.cards.errorCardById(card.id),
+    );
+    expect(saved!.needsDetails, isFalse);
   });
 
   testWidgets('breakdown shows cognitive types and litmus badges', (
@@ -126,40 +171,40 @@ void main() {
 
     await _pumpView(tester, harness, card);
     await tester.ensureVisible(
-      find.byKey(const ValueKey('error-breakdown-ai')),
+      find.byKey(const ValueKey('error-create-cards')),
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-breakdown-ai')));
+    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
+    await pumpFrames(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-suggest')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
     await pumpFrames(tester, frames: 24);
 
     expect(tester.takeException(), isNull);
     expect(
       tester
-          .widget<Pill>(find.byKey(const ValueKey('error-type-badge-0')))
+          .widget<Pill>(find.byKey(const ValueKey('creator-ai-type-0')))
           .label,
       'Contrast',
     );
-    expect(
-      tester
-          .widget<Pill>(find.byKey(const ValueKey('error-litmus-badge-0')))
-          .label,
-      'Ready',
+    final ready = tester.widget<Pill>(
+      find.descendant(
+        of: find.byKey(const ValueKey('creator-ai-litmus-0')),
+        matching: find.byType(Pill),
+      ),
     );
+    expect(ready.label, 'Ready');
+    expect(ready.tone, PillTone.success);
     expect(
       tester
-          .widget<Pill>(find.byKey(const ValueKey('error-litmus-badge-0')))
-          .tone,
-      PillTone.success,
-    );
-    expect(
-      tester
-          .widget<Pill>(find.byKey(const ValueKey('error-type-badge-1')))
+          .widget<Pill>(find.byKey(const ValueKey('creator-ai-type-1')))
           .label,
       'Heuristic',
-    );
-    expect(
-      find.byKey(const ValueKey('error-heuristic-template')),
-      findsOneWidget,
     );
     expect(
       find.textContaining(
@@ -167,7 +212,15 @@ void main() {
       ),
       findsWidgets,
     );
-    expect(find.text('Add 2 cards'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-add')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
+    await pumpFrames(tester);
+    expect(find.text('Save 2 cards'), findsOneWidget);
     expect(sentBody, isNotNull);
     expect(sentBody, contains('Chosen wrong answer: Wrong 1'));
     expect(sentBody, contains('Correct answer: Correct 1'));
@@ -195,20 +248,31 @@ void main() {
 
     await _pumpView(tester, harness, card);
     await tester.ensureVisible(
-      find.byKey(const ValueKey('error-breakdown-ai')),
+      find.byKey(const ValueKey('error-create-cards')),
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-breakdown-ai')));
+    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
+    await pumpFrames(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-suggest')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
     await pumpFrames(tester, frames: 24);
 
-    expect(find.byKey(const ValueKey('error-suggestion-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-ai-0')), findsOneWidget);
     final badge = tester.widget<Pill>(
-      find.byKey(const ValueKey('error-litmus-badge-0')),
+      find.descendant(
+        of: find.byKey(const ValueKey('creator-ai-litmus-0')),
+        matching: find.byType(Pill),
+      ),
     );
     expect(badge.label, 'Check quality');
     expect(badge.tone, PillTone.error);
     final detail = tester.widget<Text>(
-      find.byKey(const ValueKey('error-litmus-detail-0')),
+      find.byKey(const ValueKey('creator-ai-litmus-detail-0')),
     );
     expect(detail.data, contains('Can be answered with yes or no'));
     expect(
@@ -248,14 +312,30 @@ void main() {
       onCardsAdded: (count) => reported = count,
     );
     await tester.ensureVisible(
-      find.byKey(const ValueKey('error-breakdown-ai')),
+      find.byKey(const ValueKey('error-create-cards')),
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-breakdown-ai')));
-    await pumpFrames(tester, frames: 24);
-    await tester.ensureVisible(find.byKey(const ValueKey('error-add-cards')));
+    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-add-cards')));
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-suggest')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
+    await pumpFrames(tester, frames: 24);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-add')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
     expect(reported, 2);
@@ -280,7 +360,7 @@ void main() {
     expect(saved.vaccine, card.vaccine);
   });
 
-  testWidgets('a missing AI key shows a Settings hint and Try again', (
+  testWidgets('a missing AI key shows a Settings hint without blocking cards', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -289,18 +369,20 @@ void main() {
 
     await _pumpView(tester, harness, card);
     await tester.ensureVisible(
-      find.byKey(const ValueKey('error-breakdown-ai')),
+      find.byKey(const ValueKey('error-create-cards')),
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-breakdown-ai')));
-    await pumpFrames(tester, frames: 24);
+    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
+    await pumpFrames(tester);
 
-    expect(find.textContaining('Add an API key in Settings'), findsOneWidget);
-    expect(
-      find.text('Open Settings to add an AI provider and key.'),
-      findsOneWidget,
+    expect(find.byKey(const ValueKey('creator-ai-suggest')), findsNothing);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-unavailable')),
+      300,
+      scrollable: find.byType(Scrollable).first,
     );
-    expect(find.byKey(const ValueKey('error-breakdown-retry')), findsOneWidget);
+    await pumpFrames(tester);
+    expect(find.textContaining('Add an API key in Settings'), findsOneWidget);
   });
 
   testWidgets('Try again retries after an AI error', (tester) async {
@@ -324,21 +406,31 @@ void main() {
 
     await _pumpView(tester, harness, card);
     await tester.ensureVisible(
-      find.byKey(const ValueKey('error-breakdown-ai')),
+      find.byKey(const ValueKey('error-create-cards')),
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-breakdown-ai')));
+    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
+    await pumpFrames(tester);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-suggest')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
     await pumpFrames(tester, frames: 24);
 
-    expect(find.byKey(const ValueKey('error-breakdown-error')), findsOneWidget);
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('error-breakdown-retry')),
+    expect(find.byKey(const ValueKey('creator-ai-error')), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('creator-ai-retry')),
+      300,
+      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-breakdown-retry')));
+    await tester.tap(find.byKey(const ValueKey('creator-ai-retry')));
     await pumpFrames(tester, frames: 24);
 
     expect(calls, 2);
-    expect(find.byKey(const ValueKey('error-suggestion-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-ai-0')), findsOneWidget);
   });
 }

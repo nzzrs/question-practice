@@ -182,8 +182,8 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
-    expect(find.text('Break this error into atomic cards'), findsOneWidget);
-    expect(find.byKey(const ValueKey('error-breakdown-ai')), findsOneWidget);
+    expect(find.text('Create cards from this error'), findsOneWidget);
+    expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
     expect(find.text('Check with AI'), findsNothing);
   });
 

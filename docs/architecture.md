@@ -99,8 +99,9 @@ of the random queue.
    enforced by the partial unique index `error_cards_active_question`.
 3. The end-of-session review and Cards offer a contextual **Create cards**
    button inside the review, not a floating button. It opens one card creator
-   shared by errors, notes and skipped questions. Manual entry adds cards one at
-   a time and needs no AI. **Suggest with AI** is optional: for an error it
+   shared by errors, notes and skipped questions as a draggable half-height
+   bottom sheet, so the review stays visible above it. Manual entry adds cards
+   one at a time and needs no AI. **Suggest with AI** is optional: for an error it
    proposes at most one contrast card and one condition-action heuristic card,
    each with a Litmus quality badge for binary fronts, fronts over 30 words,
    syntactic clues and a heuristic front that does not use the rule template.
@@ -133,11 +134,11 @@ that session.
 - Notes from the session that are neither kept nor converted become note
   steps.
 
-The skipped branch asks what was missing. **A concept** creates a cloze concept
-with term and definition; **Another question** creates a basic card. The
-contextual **Create cards** action opens the shared card creator, whose manual
-entry adds one card at a time and needs no AI; **Suggest with AI** is optional.
-Both mark the persistent skipped record handled with `concept` or `basic`.
+The skipped branch asks what was missing. The contextual **Create cards** action
+opens the shared card creator in the same draggable sheet; the creator can make
+a cloze concept or a basic card. Manual entry adds one card at a time and needs
+no AI; **Suggest with AI** is optional. Saving marks the persistent skipped
+record handled.
 Skipped questions stay in the combined **Error and skipped** section of Cards
 until handled, where pencils open the same review surface.
 

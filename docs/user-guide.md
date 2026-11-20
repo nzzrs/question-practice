@@ -76,7 +76,7 @@ Questions is an offline Android app for practising questions and exporting study
 Review opens fullscreen.
 
 - **Wrong questions** show your wrong answer, the correct answer and the explanations.
-- **Create cards** sits inside the error review and opens the card creator. Manual entry adds cards one at a time and works offline without AI. **Suggest with AI** is optional: it proposes at most two cards, a contrast between your choice and the correct option and/or a condition-action heuristic written as "Given requirement X with restriction Y, what rule applies?".
+- **Create cards** sits inside the error review and opens the card creator as a draggable half-height sheet, so the error stays visible above it; drag it up for more room. Manual entry adds cards one at a time and works offline without AI. **Suggest with AI** is optional: it proposes at most two cards, a contrast between your choice and the correct option and/or a condition-action heuristic written as "Given requirement X with restriction Y, what rule applies?".
 - Suggestions carry a Litmus quality badge that warns about binary questions, fronts over 30 words, syntactic clues or a heuristic front that does not use the rule template. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
 - **Skipped questions** ask **What was missing here?**.
   - **A concept** creates a concept card from a term and definition.

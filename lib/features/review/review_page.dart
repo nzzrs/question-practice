@@ -141,6 +141,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           topicName: step.topicName,
           source: ConceptSource.manual,
           skippedQuestionId: step.skippedQuestionId,
+          subtopic: step.question.subtopic,
         );
       } else {
         await service.createBasicCard(
@@ -151,6 +152,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           context: step.question.prompt,
           topicName: step.topicName,
           skippedQuestionId: step.skippedQuestionId,
+          subtopic: step.question.subtopic,
         );
       }
       if (!mounted) return;

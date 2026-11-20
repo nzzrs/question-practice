@@ -190,6 +190,7 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
         practiceName: card.practiceName,
         sessionId: card.sessionId,
         questionId: card.questionId,
+        subtopic: card.subtopic,
         anchor: anchor,
       );
     }

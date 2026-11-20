@@ -31,7 +31,8 @@ testable.
 | Feature | Behaviour | Code | Tables |
 |---|---|---|---|
 | Home library | Active topics with practice count, question count, accuracy, progress, active/due errors, completed sessions and last practised date. Empty states distinguish no topics from all topics archived. | `lib/features/home/home_page.dart`, `StatsDao.watchTopicSummaries` | `topics`, `practices`, `questions`, `sessions`, `attempts`, `error_cards` |
-| Topic editing | Name, description, optional priority 1–5 and optional AnkiDroid deck. Deck names can be typed or browsed from live AnkiDroid data. | `lib/features/topics/topic_actions.dart`, `anki_deck_picker.dart` | `topics` |
+| Topic editing | Name, description, optional priority 1–5, optional AnkiDroid deck, minimum approval score and target score (percentages, default 70 and 80). Deck names can be typed or browsed from live AnkiDroid data. | `lib/features/topics/topic_actions.dart`, `topic_editor_sheet.dart`, `anki_deck_picker.dart` | `topics` |
+| Topic JSON download and update | Shares one file with the topic and every practice it contains. Updating validates the file, matches the topic by name, updates metadata, diffs each practice by practice name and question `sourceId`/prompt, creates new practices/questions and deletes missing questions. Practices absent from the file are left untouched. Separate from the per-practice JSON options. | `lib/features/topics/domain/topic_edit_service.dart`, `ImportService`, `PracticeRepository` | `topics`, `practices`, `questions`; existing history |
 | Archive and restore | Archiving sets `topics.archived`; the active Home query excludes archived rows, while the archived sheet includes them. Data, deck, sessions and statistics remain. | `topic_actions.dart`, `archived_topics_sheet.dart`, `PracticeRepository.watchArchivedTopicSummaries` | `topics` |
 | Delete topic | Confirmation, then cascading deletion of its practices, questions, sessions and attempts. Error cards and skipped records go with their question; concepts/basic cards/highlights are removed with their session and otherwise keep only their snapshot with a `NULL` question link. | `PracticeRepository.deleteTopic` | `topics` and dependants |
 | Practice list | Each topic lists its practices with question count, last score and an in-progress badge. | `lib/features/topics/topic_page.dart`, `StatsDao.watchPracticeSummaries` | `practices`, `questions`, `sessions` |
@@ -61,7 +62,7 @@ testable.
 | Paused sessions | Home watches every `inProgress` session, not only the newest. Each card offers **Resume** and **Discard**. Save for later keeps the session; discard deletes it and the error cards it created. | `SessionDao.watchInProgressSessions`, Home | `sessions`, `attempts`, `error_cards` |
 | Question navigation | The question index lives in the session page. Arrow controls move without answering; submitted attempts reload their selection, reasoning and feedback. | `session_page.dart`, `SessionStart.attempts` | `session_questions`, `attempts` |
 | Alternatives | Each session shuffles alternative order and keeps it per question. Original letters stay hidden until feedback or the eye toggle; the toggle reveals letters without reordering. | `SessionQuestionItem.alternativeOrder` | none (session state) |
-| Reasoning | Optional text saved on the attempt, debounced and kept in step with an error card or skipped record created by the same answer. | `SessionService.updateReasoning` | `attempts`, `error_cards`, `skipped_questions` |
+| Mistake chips | After a wrong answer, one-tap chips classify the error as forgotten fact, confusion between two options, misinterpretation or distraction. The choice is saved on the attempt and mirrored to its active error card for the card generator. | `SessionService.setMistakeKinds`, `session_page.dart` | `attempts`, `error_cards` |
 | Skip and unknown | **Skip** records an empty selection. **I didn't know this** marks a submitted wrong answer as unknown. Both count as skipped and create/mark a skipped-question record, not an error card. | `Attempt.isSkipped`, `SessionService.setUnknown`, `_trackSkipped` | `attempts`, `skipped_questions` |
 | Distraction | After a wrong answer, checking **I was distracted or read too fast** updates the attempt, removes an error card created by this session and refreshes completed counts. Unchecking restores or updates the card. A card from an earlier session is not deleted. | `SessionService.setDistracted` | `attempts`, `error_cards` |
 | Finish early | **Finish practice** offers **Leave unanswered** or **Mark skipped**. Left-out questions are excluded from score and statistics; marked ones get an empty attempt and skipped record. A question answered in an earlier attempt is never treated as unanswered again. | `SessionService.finishEarly`, `SessionStart.pendingUnanswered`, `SessionDao.questionsLeftUnanswered` | `sessions`, `attempts`, `session_questions` |
@@ -96,9 +97,12 @@ of the random queue.
    explanations, topic and practice names.
 2. `dueAt` is the last wrong time plus 48 hours. One active card per question is
    enforced by the partial unique index `error_cards_active_question`.
-3. The end-of-session review fills `bias`, `vaccine` and `detailsCompletedAt`.
-   Cards screen **Complete**, **Review all** and **Review selected** use the same
-   `ErrorCardReviewView`, with **Check with AI** suggestions.
+3. The end-of-session review and Cards run **Break into atomic cards (AI)**,
+   which proposes at most one contrast card and one condition-action heuristic
+   card, each with a Litmus quality badge. Selected proposals become Basic
+   `manual_cards` with a cognitive type and subtopic; the error then gets
+   `detailsCompletedAt`. Errors are not exported directly. Bias/vaccine text
+   boxes and the old AI check were removed.
 4. After the delay, the card appears in Past errors. A correct re-test sets
    `status = resolved` and `resolvedAt`, keeping the row for history. A wrong
    re-test updates `lastWrongAt` and pushes `dueAt` another 48 hours.
@@ -141,12 +145,6 @@ list at six. Checked suggestions become basic cards through
 `ReviewService.createBasicCard`; the highlight is then marked converted once,
 with the first created card id.
 
-The shared error-card view also shows an estimated reading time for the front.
-`core/domain/reading_time.dart` counts whitespace-separated words at 200 words
-per minute, rounds up to five seconds with a five-second minimum and formats
-`~15 s read`. Only the question and the two answers contribute; reasoning,
-bias, vaccine and explanations are excluded.
-
 Review pages run inside `ImmersiveReview`, which hides the system bars while the
 review is visible, restores them while another page covers it, and re-enters on
 resume or when the learner returns. The end-of-session review and the Cards
@@ -157,19 +155,20 @@ view.
 
 | Feature | Behaviour | Code | Tables |
 |---|---|---|---|
-| Define (AI) | Sends the selected term, question and topic to the configured provider, saves the definition and shows it in a read-only bubble. Acronyms get their full form in `extra`. | `LookupService.define`, `lookup_sheet.dart` | `concepts`, `settings` |
+| Define (AI) | Sends the selected term, question, topic and subtopic to the configured provider, saves the definition and shows it in a read-only bubble. Acronyms get their full form in `extra`. Concept cards carry the topic/subtopic on the front. | `LookupService.define`, `lookup_sheet.dart` | `concepts`, `settings` |
 | Define (web) | Opens DuckDuckGo or Wikipedia in a Custom Tab and keeps an editable definition sheet with Save. A missing concept is saved immediately. | `LookupService.openWeb`, `WebLauncher` | `concepts`, `settings` |
 | Ask | Sends the selected passage, its question and the learner message to AI. The answer can become a concept card or a basic card; the basic front places the question context above the learner question. | `ask_sheet.dart`, `LookupService.ask`, `ReviewService.createConcept/createBasicCard` | `concepts` or `manual_cards` when saved |
-| Concept cards | Cloze text `Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
-| Basic cards | Question/answer cards from skipped questions, Ask or a highlight, with optional context above the front. | `CardRepository.createManualCard`, `new_card_dialog.dart` | `manual_cards` |
+| Concept cards | Cloze text `[Topic / Subtopic] Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
+| Basic cards | Question/answer cards from skipped questions, Ask or a highlight, with optional context above the front and a cognitive type (fact, heuristic, contrast). | `CardRepository.createManualCard`, `new_card_dialog.dart` | `manual_cards` |
 | Skipped queue | Every skipped/unknown answer is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
-| Highlights | Selecting text offers Highlight. The phrase is stored with context, topic, practice, session and question; it paints in place. At review it can become a concept, become a basic card, be kept or be deleted. **Suggest cards with AI** proposes up to six atomic basic cards from the highlight and its context; each checked suggestion is created with `ReviewService.createBasicCard` and the highlight is marked converted once. Kept highlights remain in Cards: **Review highlights** walks them one at a time through the shared view, where the card actions live and disappear once a card exists. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `CardRepository.createHighlight/keepHighlight/markHighlightConverted/deleteHighlights`, `LookupService.suggestAtomicCards`, `highlight_review_page.dart`, `highlight_review_view.dart`, `suggested_cards_sheet.dart` | `highlights`, `manual_cards` |
+| Highlights | Selecting question, answer or explanation text offers Highlight. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it paints whenever that question is shown again. Tapping a painted highlight offers Define, Ask and Delete highlight; deletion is immediate with no confirmation. At review a highlight can become a concept card or be kept. **Suggest cards with AI** classifies up to six proposals as procedures/rules or atomic facts; each checked suggestion becomes a Basic card with its cognitive type and subtopic, and the highlight is marked converted once. Kept highlights remain in Cards: **Review highlights** walks them one at a time through the shared view. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createHighlight/highlightsForQuestion/keepHighlight/markHighlightConverted/deleteHighlights`, `LookupService.suggestArchetypeCards`, `highlight_review_page.dart`, `highlight_review_view.dart`, `suggested_cards_sheet.dart` | `highlights`, `manual_cards` |
 | Highlight download | **Download all** writes a plain-text file through the system share sheet. | `CardsPage._downloadHighlights`, `ExportService.shareHighlights` | `highlights` |
 
 ### Statistics and statistics export
 
 - Topic statistics are derived from completed sessions at query time; no
   aggregate table is stored.
+- Topic scores are compared with the topic's minimum approval and target scores: below the minimum is red, from the minimum up to the target is the normal theme color, and at or above the target is green. The same bands color the practice score pills, readiness ring, latest/average/best cards, subtopic and session pills, and chart dots.
 - The hero shows the latest score, best session, completed-session count and a
   question-weighted average: `sum(correct) / sum(total)` over completed
   sessions, not the mean of session percentages.
@@ -178,6 +177,7 @@ view.
   squares fit of session score against cumulative questions answered, with each
   session weighted by its own question count. The slope is the score change per
   answered question.
+- A small projection under the trend uses the weekly learning rate to state when the weighted average would reach the target. It reports that the target is already reached, that the current pace does not reach it, or the number of weeks/months at the current pace.
 - **Learning rate** shows two figures from that fit: percentage points per 100
   answered questions (`slope × 10,000`) and percentage points per week
   (`slope × questionsPerDay × 7 × 100`). Questions per day are answered
@@ -229,17 +229,14 @@ Code: `lib/features/topics/topic_stats_page.dart`,
 
 ### Cards, Anki export and deck routing
 
-- Cards has filter chips **All**, **Concepts**, **Errors & skipped**, **Basic**
-  and **Highlights**, plus Show/Hide exported.
+- Cards filters by cognitive type: **All**, **Facts**, **Heuristics**, **Contrasts** and **Concepts**, with separate entries for **Errors & skipped** and **Highlights**, plus Show/Hide exported. Facts, heuristics and contrasts are manual cards; concepts come from the concepts table.
 - Selection uses long-press, not checkboxes. Long-press any row to enter
   selection mode and select it; while selection mode is active a tap toggles
   that row, and a normal tap otherwise previews it (or opens the highlight
   review for a highlight). The subtitle counts the selection, the app-bar close
   clears it, and no banner or extra row is inserted, so rows keep their
   positions as the selection grows. Selection is independent per section.
-- Selection defaults to unexported, complete cards. Incomplete error cards can
-  be selected only to review them; export and share stay disabled until every
-  selected error card has bias and vaccine. Concepts need a definition.
+- Selection defaults to unexported, complete cards. Error rows are selectable only for review/delete and never count toward export or share; review them into atomic cards first. Concepts need a definition. Manual cards of every cognitive type export as Basic.
   Skipped questions and highlights can be selected too: they count toward the
   subtitle and **Delete selected**, but never toward export or share.
 - **Review all** sits above the combined error/skipped section;
@@ -252,8 +249,7 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   uses the same view.
 - **Export to AnkiDroid** creates missing decks and note types, bulk-adds notes,
   marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
-- **Share as files** writes Anki-compatible cloze `.txt` and error/basic `.tsv`
-  files. File export does not encode a deck and never includes highlights.
+- **Share as files** writes Anki-compatible cloze `.txt` and basic `.tsv` files. File export does not encode a deck, tags or highlights. Exported notes carry hierarchical `topic::` and `subtopic::` tags in the direct AnkiDroid path.
 - **Delete selected** removes the selected concepts, error cards, basic cards,
   skipped questions and highlights. Deleting an active error card also removes
   it from the error queue; deleting a skipped row removes only the queue record,
@@ -276,9 +272,11 @@ See [AnkiDroid export](anki.md).
 ### Backup, restore and erase
 
 `BackupService` writes one checksummed JSON document with every local table:
-topics (including archived topics and decks), practices, questions (including
-subtopics), sessions, session questions, attempts, concepts, error cards, basic
-cards, skipped questions, highlights and settings.
+topics (including archived topics, decks and score bands), practices, questions
+(including subtopics), sessions, session questions, attempts (including mistake
+chips), concepts (including subtopic), error cards (including cognitive type,
+subtopic and mistake chips), basic cards (including cognitive type and
+subtopic), skipped questions, highlights and settings.
 
 - Format **v2** keeps the v1 canonical checksum over the `tables` object and
   adds `metadata` with format version, app version/build, database schema

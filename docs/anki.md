@@ -27,8 +27,7 @@ The picker reads the live deck list through AnkiDroid's API (`AddContentApi.deck
 Routing uses the topic name captured on each card:
 
 - concept cards use the topic name captured when the term was looked up;
-- error cards use the topic name captured when the wrong answer was recorded;
-- skipped-question basic cards use the topic name captured in the review.
+- basic cards made from an error, skipped question or highlight use the topic name captured on the card.
 
 If a topic is renamed, cards created before the rename keep the old captured topic name and fall back to the default deck. Cards created after the rename use the new topic name and its deck. File exports do not encode a deck; choose the deck when importing the file into Anki.
 
@@ -37,16 +36,13 @@ If a topic is renamed, cards created before the rename keep the old captured top
 | Model | Fields | Used for |
 |---|---|---|
 | AnkiDroid's Cloze type | existing `Text` and `Back Extra` fields | Concept cards |
-| `Question Practice: Error v2` | Problem, Wrong Solution, Correct Solution, Mental Trap, Vaccine, Explanation | Error cards |
-| `Basic` | Front, Back | Skipped-question and other basic question/answer cards |
+| `Basic` | Front, Back | Facts, heuristics, contrasts and other question/answer cards |
 
 Basic cards use the note type named exactly **`Basic`**, with the two fields `Front` and `Back`. If that note type is missing, the app creates it through AnkiDroid's `addNewBasicModel` before adding notes; it does not use `Basic (and reversed card)` or another variant.
 
-Questions checks for `Question Practice: Error v2` before inserting notes. If the model is missing, it creates it with the six fields, front/back templates and CSS defined in `AnkiBridge.kt`. The versioned name lets an existing AnkiDroid model keep its old cards while new exports use the revised template.
+Errors are not exported directly. The shared error review turns a wrong answer into atomic basic cards for contrasts, heuristics and facts, and skipped questions can become basic cards from their review. Both use the same `Basic` note type with the question on the front and the answer on the back.
 
-The error front shows the problem, the wrong answer chosen and the right answer discarded, then the flawed-assumption prompt. The back shows the mental trap first, then the vaccine and explanation in a secondary reference box.
-
-When a question has several correct answers, **Wrong Solution** lists every alternative the user selected and **Correct Solution** lists every correct alternative, separated by `<br>`. **Explanation** contains the overall question explanation followed by the alternative explanation for each failed selected distractor.
+Every note is tagged `topic::<slug>` and `subtopic::<slug>` when a subtopic exists. The slug is lower-case and hyphenated.
 
 Concept note text is exactly:
 
@@ -64,11 +60,11 @@ Back Extra: Google Cloud Platform
 The definition never spells the acronym out. The same expansion appears under
 the definition bubble in the app.
 
-The error and basic note types are created automatically the first time they are needed. AnkiDroid's API cannot create a cloze note type, so the app uses the existing one.
+The `Basic` note type is created automatically the first time it is needed. AnkiDroid's API cannot create a cloze note type, so the app uses the existing one.
 
 ## What is sent
 
-Only selected, completed cards are sent. Error cards must have both bias and vaccine; concepts must have a definition. The Cards screen previews every card and lets you deselect or delete items first.
+Only selected concepts and basic cards are sent. Errors are reviewed into atomic cards first, and skipped questions stay in Cards until converted; neither is exported directly. Concepts must have a definition. The Cards screen previews every card and lets you deselect or delete items first.
 
 After a successful import the app broadcasts `com.ichi2.anki.DO_SYNC` so AnkiDroid can sync in the background.
 
@@ -84,7 +80,6 @@ After a successful import the app broadcasts `com.ichi2.anki.DO_SYNC` so AnkiDro
 **Share files** creates UTF-8, Anki-compatible files:
 
 - `question-practice-concepts-YYYYMMDD-HHmm.txt` — one cloze note per line;
-- `question-practice-errors-YYYYMMDD-HHmm.tsv` — six tab-separated fields in the model order;
 - `question-practice-basic-YYYYMMDD-HHmm.tsv` — two tab-separated fields.
 
 Import them into Anki desktop or AnkiDroid with the matching note types. Tabs become spaces and newlines become `<br>`; user content is HTML-escaped.
@@ -93,16 +88,16 @@ Import them into Anki desktop or AnkiDroid with the matching note types. Tabs be
 
 On a connected Android device with AnkiDroid installed:
 
-1. Import the sample practice and create one concept, one error card and one basic card.
+1. Import the sample practice and create one concept card, one error reviewed into atomic cards and one skipped-question card.
 2. In Cards, confirm the preview and selection.
 3. Export to AnkiDroid and accept the permission prompt.
 4. Open AnkiDroid, open the Question Practice deck and confirm:
    - concept notes render as cloze cards;
-   - error notes use `Question Practice: Error v2` with all six fields;
-   - basic notes use the `Basic` note type with `Front` and `Back`.
+   - facts, heuristics and contrasts use the `Basic` note type with `Front` and `Back`;
+   - notes carry `topic::` and `subtopic::` tags when those fields exist.
 5. Set the Cloud topic to a separate deck with **Edit topic → AnkiDroid deck** (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck. Open **Edit practice** and confirm it has no deck row; deck selection is topic-level only.
-6. Import a multi-answer question and export its error card. Confirm both selected and correct alternatives appear in the respective fields.
-7. Delete `Question Practice: Error v2` in AnkiDroid, export again, and confirm the app creates it before adding notes.
+6. Import a multi-answer question, review the wrong answer into atomic cards and confirm the contrast card names the selected wrong option and the correct one.
+7. Delete the `Basic` note type in AnkiDroid, export again, and confirm the app creates it before adding notes.
 8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
 9. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.
 10. Disable the AnkiDroid API and confirm the app reports the problem without losing cards.

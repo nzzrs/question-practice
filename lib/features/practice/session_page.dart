@@ -537,6 +537,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
       practiceName: item.practiceName,
       sessionId: _start.session.id,
       questionId: item.question.id,
+      subtopic: item.question.subtopic,
       anchor: anchor,
     );
   }
@@ -556,6 +557,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
       practiceName: item.practiceName,
       sessionId: _start.session.id,
       questionId: item.question.id,
+      subtopic: item.question.subtopic,
     );
   }
 

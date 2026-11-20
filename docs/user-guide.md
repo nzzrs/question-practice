@@ -92,7 +92,7 @@ Review opens fullscreen.
 
 ## Cards
 
-- Filters: **All**, **Concepts**, **Errors & skipped**, **Basic**, **Highlights**, and **Show exported** or **Hide exported**.
+- Filters: **All**, **Facts**, **Heuristics**, **Contrasts**, **Concepts**, **Errors & skipped**, **Highlights**, and **Show exported** or **Hide exported**.
 - Cards has no checkboxes. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. The subtitle counts the selection and rows keep their positions.
 - **Review all** sits above the error and skipped section; **Review selected** appears while cards are selected.
 - **Complete** finishes a missing concept definition or an error card's details.
@@ -100,13 +100,13 @@ Review opens fullscreen.
 - **Export to AnkiDroid** sends the selected cards to AnkiDroid.
 - **Share as files** creates Anki-compatible text files.
 - **Delete selected** removes the chosen cards, skipped questions and highlights. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a highlight removes only the saved phrase; cards already made from it stay.
-- Incomplete error cards and concepts without a definition block export until they are completed. Skipped questions and highlights cannot be exported, but they can still be selected and deleted.
+- Incomplete error cards and concepts without a definition block export until they are completed. Error and skipped questions are reviewed into atomic cards first; skipped questions and highlights cannot be exported, but they can still be selected and deleted.
 
 ## Highlights
 
 - Select text during practice and choose **Highlight**. The phrase is painted in place.
 - Highlights stay in **Cards** and can be reviewed one at a time from **Review highlights** or by tapping one.
-- **Turn into a card** creates a concept or basic card. **Suggest cards with AI** reads the highlight, its question context and the topic, then proposes up to six atomic basic cards. Check the ones to add.
+- **Make concept card** creates a concept card. **Suggest cards with AI** reads the highlight, its question context and the topic, then proposes up to six atomic facts and procedures. Check the ones to add.
 - A highlight with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete highlight** removes only the saved phrase.
 - **Download all** saves highlights as plain text.
 - Highlights are never sent to AnkiDroid.
@@ -114,7 +114,7 @@ Review opens fullscreen.
 ## AnkiDroid export
 
 - **Export to AnkiDroid** needs AnkiDroid installed, its API enabled and storage permission granted.
-- Concepts use the **Cloze** note type. Error cards use their own note type with six fields. Basic cards use the **Basic** note type, created automatically if missing.
+- Concepts use the **Cloze** note type. Facts, heuristics and contrasts use the **Basic** note type with **Front** and **Back**, created automatically if missing. Notes carry `topic::` and `subtopic::` tags when those fields exist.
 - Each topic can use its own deck. A topic without a deck uses the default deck from **Settings**.
 - Set a topic's deck with **Edit topic → AnkiDroid deck**. **Browse decks** lists live deck names; a typed name is created on export.
 - **Share as files** writes Anki-compatible text files. File export cannot encode a deck and never includes highlights.

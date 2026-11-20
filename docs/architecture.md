@@ -131,15 +131,15 @@ the persistent skipped record handled with `concept` or `basic`. Skipped
 questions stay in the combined **Error and skipped** section of Cards until
 handled, where pencils open the same review surface.
 
-Highlight steps offer the manual card dialog and an AI suggestion sheet through
+Highlight steps offer a concept card dialog and an AI suggestion sheet through
 the shared `HighlightReviewView`, the same view Cards uses for **Review
-highlights**. The provider receives the highlight, its question context and the
-topic, and must
-return one JSON object with at most six atomic front/back cards. The parser
-tolerates fenced JSON, trims values, drops empty or duplicate pairs and caps the
-list at six. Checked suggestions become basic cards through
-`ReviewService.createBasicCard`; the highlight is then marked converted once,
-with the first created card id.
+highlights**. The provider receives the highlight, its question context, topic
+and subtopic, and must return one JSON object with at most six atomic front/back
+cards classified as facts, heuristics or procedures. The parser tolerates fenced
+JSON, trims values, drops empty or duplicate pairs and caps the list at six.
+Checked suggestions become manual cards of their suggested cognitive type
+through `ReviewService.createBasicCard`; the highlight is then marked converted
+once, with the first created card id.
 
 The shared error-card view also shows an estimated reading time for the front.
 `core/domain/reading_time.dart` counts whitespace-separated words at 200 words
@@ -161,9 +161,9 @@ view.
 | Define (web) | Opens DuckDuckGo or Wikipedia in a Custom Tab and keeps an editable definition sheet with Save. A missing concept is saved immediately. | `LookupService.openWeb`, `WebLauncher` | `concepts`, `settings` |
 | Ask | Sends the selected passage, its question and the learner message to AI. The answer can become a concept card or a basic card; the basic front places the question context above the learner question. | `ask_sheet.dart`, `LookupService.ask`, `ReviewService.createConcept/createBasicCard` | `concepts` or `manual_cards` when saved |
 | Concept cards | Cloze text `Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
-| Basic cards | Question/answer cards from skipped questions, Ask or a highlight, with optional context above the front. | `CardRepository.createManualCard`, `new_card_dialog.dart` | `manual_cards` |
+| Basic cards | Question/answer cards for facts, heuristics and contrasts, from errors, skipped questions, Ask or AI highlight suggestions, with optional context above the front. | `CardRepository.createManualCard`, `new_card_dialog.dart` | `manual_cards` |
 | Skipped queue | Every skipped/unknown answer is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
-| Highlights | Selecting text offers Highlight. The phrase is stored with context, topic, practice, session and question; it paints in place. At review it can become a concept, become a basic card, be kept or be deleted. **Suggest cards with AI** proposes up to six atomic basic cards from the highlight and its context; each checked suggestion is created with `ReviewService.createBasicCard` and the highlight is marked converted once. Kept highlights remain in Cards: **Review highlights** walks them one at a time through the shared view, where the card actions live and disappear once a card exists. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `CardRepository.createHighlight/keepHighlight/markHighlightConverted/deleteHighlights`, `LookupService.suggestAtomicCards`, `highlight_review_page.dart`, `highlight_review_view.dart`, `suggested_cards_sheet.dart` | `highlights`, `manual_cards` |
+| Highlights | Selecting text offers Highlight. The phrase is stored with context, topic, subtopic, practice, session and question; it paints in place. At review it can become a concept, be kept or be deleted. **Suggest cards with AI** proposes up to six atomic facts and procedures from the highlight and its context; each checked suggestion is created with `ReviewService.createBasicCard` using its cognitive type and the highlight subtopic, and the highlight is marked converted once. Kept highlights remain in Cards: **Review highlights** walks them one at a time through the shared view, where the card actions live and disappear once a card exists. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `CardRepository.createHighlight/keepHighlight/markHighlightConverted/deleteHighlights`, `LookupService.suggestArchetypeCards`, `highlight_review_page.dart`, `highlight_review_view.dart`, `suggested_cards_sheet.dart` | `highlights`, `manual_cards` |
 | Highlight download | **Download all** writes a plain-text file through the system share sheet. | `CardsPage._downloadHighlights`, `ExportService.shareHighlights` | `highlights` |
 
 ### Statistics and statistics export
@@ -229,19 +229,20 @@ Code: `lib/features/topics/topic_stats_page.dart`,
 
 ### Cards, Anki export and deck routing
 
-- Cards has filter chips **All**, **Concepts**, **Errors & skipped**, **Basic**
-  and **Highlights**, plus Show/Hide exported.
+- Cards has cognitive filter chips **All**, **Facts**, **Heuristics**,
+  **Contrasts** and **Concepts**, source chips **Errors & skipped** and
+  **Highlights**, plus Show/Hide exported.
 - Selection uses long-press, not checkboxes. Long-press any row to enter
   selection mode and select it; while selection mode is active a tap toggles
   that row, and a normal tap otherwise previews it (or opens the highlight
   review for a highlight). The subtitle counts the selection, the app-bar close
   clears it, and no banner or extra row is inserted, so rows keep their
   positions as the selection grows. Selection is independent per section.
-- Selection defaults to unexported, complete cards. Incomplete error cards can
-  be selected only to review them; export and share stay disabled until every
-  selected error card has bias and vaccine. Concepts need a definition.
-  Skipped questions and highlights can be selected too: they count toward the
-  subtitle and **Delete selected**, but never toward export or share.
+- Selection defaults to unexported concepts and manual cards. Incomplete error
+  cards can be selected only to review them; they never count toward export or
+  share. Concepts need a definition. Skipped questions and highlights can be
+  selected too: they count toward the subtitle and **Delete selected**, but
+  never toward export or share.
 - **Review all** sits above the combined error/skipped section;
   **Review selected** appears for selected cards or skipped questions.
 - **Review highlights** sits under the Highlights heading and walks every
@@ -252,9 +253,9 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   uses the same view.
 - **Export to AnkiDroid** creates missing decks and note types, bulk-adds notes,
   marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
-- **Share as files** writes Anki-compatible cloze `.txt` and error/basic `.tsv`
+- **Share as files** writes Anki-compatible cloze `.txt` and basic `.tsv`
   files. File export does not encode a deck and never includes highlights.
-- **Delete selected** removes the selected concepts, error cards, basic cards,
+- **Delete selected** removes the selected concepts, manual cards, error cards,
   skipped questions and highlights. Deleting an active error card also removes
   it from the error queue; deleting a skipped row removes only the queue record,
   not its question. Deleting highlights removes only the saved phrases; cards

@@ -47,8 +47,8 @@ Use a connected Samsung Android device and AnkiDroid 2.25.3.
 11. Complete one error card with **Complete**, then try **Review all** at the top of the error section and **Review selected**.
 12. Preview, deselect and delete a card.
 13. Set a topic's deck with **Edit topic → AnkiDroid deck** from the live list (or type a new deck), export, and verify cards land in that deck while a blank topic uses the default. Confirm **Edit practice** has no deck row and that decks are topic-level only. Use **Browse decks** in Settings for the default deck.
-14. Export to AnkiDroid; verify the deck, Cloze model, six-field `Question Practice: Error v2` model and the `Basic` note type with `Front` and `Back`.
-15. Delete `Question Practice: Error v2` in AnkiDroid and export again; confirm it is recreated.
+14. Export to AnkiDroid; verify the deck, Cloze model, the `Basic` note type with `Front` and `Back`, and `topic::`/`subtopic::` tags.
+15. Delete the `Basic` note type in AnkiDroid and export again; confirm it is recreated.
 16. Use Define with web mode; confirm the Custom Tab opens and the editable definition sheet still appears.
 17. Configure OpenAI or Groq, load models, save the key, and test one definition. Confirm it appears in a read-only bubble and is saved without a Save button. Define an acronym such as SRE and confirm the bubble shows the full form under “Stands for”.
 18. In an error card review, write bias and vaccine and use “Check with AI”; confirm feedback appears without leaving the review.

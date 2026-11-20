@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/theme.dart';
+import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/ui/immersive_review.dart';
 import 'package:question_practice/features/errors/past_errors_page.dart';
 import 'package:question_practice/features/export/cards_page.dart';
@@ -215,10 +216,45 @@ void main() {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
     await _seedErrorCard(harness, seeded, complete: true);
+    await harness.cards.createManualCard(
+      sessionId: null,
+      questionId: question.id,
+      question: 'A heuristic card with a fairly long front for a narrow row',
+      answer: 'A short answer.',
+      context: question.prompt,
+      topicName: 'Topic',
+      cognitiveType: CognitiveType.heuristic,
+      subtopic: 'Networking',
+      createdAt: harness.clock.now().toUtc(),
+    );
+    await harness.cards.createConcept(
+      sessionId: null,
+      questionId: question.id,
+      term: 'VPC',
+      definition: 'A private network.',
+      context: question.prompt,
+      topicName: 'Topic',
+      subtopic: 'Networking',
+      source: ConceptSource.manual,
+      createdAt: harness.clock.now().toUtc(),
+    );
     await _pumpNarrow(tester, home: const CardsPage(), harness: harness);
+    expect(tester.takeException(), isNull);
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
-    expect(find.text('Review all'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('cards-filter-heuristics')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const ValueKey('cards-filter-facts')));
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('cards-filter-all')));
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('cards page with long tags fits 320', (tester) async {

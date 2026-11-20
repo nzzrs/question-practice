@@ -48,6 +48,7 @@ void main() {
           practiceName: 'Core',
           sessionId: null,
           questionId: null,
+          subtopic: 'Networking',
         ),
       ),
       harness: harness,
@@ -66,5 +67,18 @@ void main() {
     );
     expect(find.text('Turn into a card'), findsOneWidget);
     expect(find.text('Ask another'), findsOneWidget);
+
+    await tester.tap(find.text('Turn into a card'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Create'));
+    await pumpFrames(tester, frames: 24);
+
+    final manuals = await tester.runAsync(
+      () => harness.cards.watchManualCards().first,
+    );
+    expect(manuals, hasLength(1));
+    expect(manuals!.single.subtopic, 'Networking');
+    expect(manuals.single.cognitiveType, CognitiveType.fact);
+    expect(manuals.single.answer, 'It spreads traffic across several servers.');
   });
 }

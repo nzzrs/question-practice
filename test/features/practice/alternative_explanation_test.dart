@@ -109,17 +109,11 @@ void main() {
       dueAfter: const Duration(hours: 48),
     );
     final card = (await harness.cards.errorCardById(id))!;
-    final bias = TextEditingController();
-    final vaccine = TextEditingController();
-    addTearDown(bias.dispose);
-    addTearDown(vaccine.dispose);
 
     await pumpTestApp(
       tester,
       home: Scaffold(
-        body: SingleChildScrollView(
-          child: ErrorCardReviewView(card: card, bias: bias, vaccine: vaccine),
-        ),
+        body: SingleChildScrollView(child: ErrorCardReviewView(card: card)),
       ),
       harness: harness,
     );

@@ -181,14 +181,9 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
-    expect(
-      find.text('What was the flawed assumption in your reasoning?'),
-      findsOneWidget,
-    );
-    expect(
-      find.text('What do you need to know to prevent that error?'),
-      findsOneWidget,
-    );
+    expect(find.text('Break this error into atomic cards'), findsOneWidget);
+    expect(find.byKey(const ValueKey('error-breakdown-ai')), findsOneWidget);
+    expect(find.text('Check with AI'), findsNothing);
   });
 
   testWidgets('session page fits 320', (tester) async {

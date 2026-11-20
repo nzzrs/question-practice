@@ -6,7 +6,7 @@ import 'package:question_practice/features/practice/session_page.dart';
 import '../../helpers/test_harness.dart';
 
 void main() {
-  testWidgets('reasoning can be written after answering a question', (
+  testWidgets('practice pages no longer show a reasoning field', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -26,53 +26,16 @@ void main() {
       harness: harness,
     );
 
+    expect(find.text('Add reasoning (optional)'), findsNothing);
+    expect(find.byType(EditableText), findsNothing);
+
     await tester.tap(find.text('Correct 1'));
     await tester.pump();
     await tester.tap(find.text('Check'));
     await pumpFrames(tester);
 
-    await tester.scrollUntilVisible(
-      find.text('Your reasoning (optional)'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await pumpFrames(tester);
-    expect(find.text('Your reasoning (optional)'), findsOneWidget);
-
-    await tester.tap(find.text('Your reasoning (optional)'));
-    await pumpFrames(tester);
-
-    await tester.enterText(
-      find.byType(EditableText).last,
-      'Because the first option matched the definition.',
-    );
-    await pumpFrames(tester, frames: 20);
-
-    final attempt = await harness.sessions.attemptForQuestion(
-      start.session.id,
-      start.items.first.question.id,
-    );
-    expect(
-      attempt?.reasoning,
-      'Because the first option matched the definition.',
-    );
-
-    await tester.tap(find.text('Next question'));
-    await pumpFrames(tester);
-    await tester.drag(find.byType(ListView), const Offset(0, 1200));
-    await pumpFrames(tester);
-    await tester.tap(find.byIcon(Icons.chevron_left));
-    await pumpFrames(tester);
-
-    await tester.scrollUntilVisible(
-      find.text('Because the first option matched the definition.'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(
-      find.text('Because the first option matched the definition.'),
-      findsOneWidget,
-    );
+    expect(find.text('Your reasoning (optional)'), findsNothing);
+    expect(find.byType(EditableText), findsNothing);
   });
 
   test('updating reasoning also refreshes the linked error card', () async {

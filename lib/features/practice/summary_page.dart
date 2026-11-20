@@ -185,7 +185,7 @@ class _SummaryPageState extends ConsumerState<SummaryPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'The review asks for the flawed assumption and the fix, or what was missing on a skipped question. It stays in this session.',
+                  'Review each error and skipped question with Create cards. Add cards by hand, or use Suggest with AI when a provider is set. The review stays in this session.',
                   style: theme.typography.baseline.bodySmall.copyWith(
                     color: theme.colorScheme.onSecondaryContainer.withValues(
                       alpha: 0.85,
@@ -216,7 +216,7 @@ class _SummaryPageState extends ConsumerState<SummaryPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Review completed. Cards missing details can be finished from Cards.',
+                  'Review completed. You can create missing cards later from Cards.',
                   style: theme.typography.baseline.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),

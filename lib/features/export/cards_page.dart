@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
-import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_cards_review_page.dart';
 import '../lookup/lookup_actions.dart';
@@ -823,19 +822,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _previewMeta([
         Pill(card.topicName),
         Pill('deck: ${_deckForTopic(card.topicName)}', tone: PillTone.primary),
-        Tooltip(
-          message: 'Estimated time to read the front',
-          child: Pill(
-            readingTimeLabel(
-              '${card.question} ${card.wrongAnswer} ${card.correctAnswer}',
-            ),
-            icon: Icons.schedule,
-          ),
-        ),
         Pill(
-          card.needsDetails ? 'Needs notes' : 'Ready',
+          card.needsDetails ? 'Needs review' : 'Reviewed',
           tone: card.needsDetails ? PillTone.error : PillTone.success,
         ),
+        for (final kind in card.mistakeKinds) Pill(kind.label),
       ]),
       const SizedBox(height: 14),
       TonalBox(
@@ -875,16 +866,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         const SizedBox(height: 10),
         _PreviewNote(label: 'Your reasoning', text: card.reasoning),
       ],
-      const SizedBox(height: 10),
-      _PreviewNote(
-        label: 'Flawed assumption',
-        text: card.bias.isEmpty ? '— needs notes —' : card.bias,
-      ),
-      const SizedBox(height: 8),
-      _PreviewNote(
-        label: 'Vaccine',
-        text: card.vaccine.isEmpty ? '— needs notes —' : card.vaccine,
-      ),
       if (card.explanation.trim().isNotEmpty) ...[
         const SizedBox(height: 8),
         _PreviewNote(label: 'Why this answer', text: card.explanation),
@@ -1298,8 +1279,8 @@ class _ErrorRow extends StatelessWidget {
           ? null
           : M3EIconButton(
               variant: M3EIconButtonVariant.standard,
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Complete',
+              icon: const Icon(Icons.add_card),
+              tooltip: 'Create cards',
               onPressed: onComplete,
             ),
       child: Column(
@@ -1314,7 +1295,7 @@ class _ErrorRow extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             card.needsDetails
-                ? 'Needs bias and vaccine before export.'
+                ? 'Needs review. Create cards to export.'
                 : 'You: ${card.wrongAnswer} · Correct: ${card.correctAnswer}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,

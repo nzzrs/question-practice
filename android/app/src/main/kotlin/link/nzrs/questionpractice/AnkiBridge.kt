@@ -20,6 +20,7 @@ class AnkiBridge(
         private const val CHANNEL = "link.nzrs.questionpractice/anki"
         private const val PERMISSION_REQUEST = 4107
         private const val ANKI_PACKAGE = "com.ichi2.anki"
+        private const val BASIC_MODEL = "Basic"
     }
 
     private val channel = MethodChannel(messenger, CHANNEL)
@@ -114,12 +115,17 @@ class AnkiBridge(
     ): Map<String, Any> {
         val api = AddContentApi(activity)
 
-        val cloze = findClozeModel()
-            ?: return mapOf(
-                "added" to 0,
-                "failed" to rawNotes.size,
-                "message" to "AnkiDroid has no Cloze note type.",
-            )
+        val needsCloze = rawNotes.any { (it["model"] as? String) == "concept" }
+        val cloze = if (needsCloze) {
+            findClozeModel()
+                ?: return mapOf(
+                    "added" to 0,
+                    "failed" to rawNotes.size,
+                    "message" to "AnkiDroid has no Cloze note type.",
+                )
+        } else {
+            null
+        }
         val basicModel = ensureBasicModel(api)
             ?: return mapOf(
                 "added" to 0,
@@ -148,8 +154,14 @@ class AnkiBridge(
                 val fieldCount: Int
                 when (modelName) {
                     "concept" -> {
-                        modelId = cloze.id
-                        fieldCount = cloze.fieldNames.size
+                        val model = cloze
+                            ?: return mapOf(
+                                "added" to 0,
+                                "failed" to rawNotes.size,
+                                "message" to "AnkiDroid has no Cloze note type.",
+                            )
+                        modelId = model.id
+                        fieldCount = model.fieldNames.size
                     }
                     else -> {
                         modelId = basicModel

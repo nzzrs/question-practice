@@ -81,6 +81,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
       questionContext: card.question,
       topicName: card.topicName,
       subtopic: card.subtopic,
+      existingFronts: ref.watch(existingCardTextsProvider),
       error: CardCreatorErrorSource(
         card: card,
         question: card.question,
@@ -171,6 +172,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
           topicName: question.topicName,
           initialFront: question.question,
           initialBack: question.correctAnswer,
+          existingFronts: ref.read(existingCardTextsProvider),
           skippedQuestionId: question.id,
         ),
       );

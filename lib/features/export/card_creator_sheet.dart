@@ -573,7 +573,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       switch (seed) {
         case BulletCardSeed(:final bullet):
           final error = request.error;
-          final suggestion = await lookup.suggestCardFromWrongNote(
+          final draft = await lookup.suggestCardFromWrongNote(
             note: bullet,
             question: error?.question ?? request.questionContext,
             wrongAnswer: error?.wrongAnswer ?? '',
@@ -584,11 +584,16 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             otherNotes: error?.wrongNotes ?? const [],
           );
           if (!mounted || requestId != _seedRequest) return;
+          final suggestion = draft != null && !_repeatsKnownCard(draft.front)
+              ? draft
+              : null;
           setState(() {
             _seedLoading = false;
             if (suggestion == null) {
-              _seedError =
-                  'The AI found nothing to draft. Write the card yourself.';
+              _seedError = draft == null
+                  ? 'The AI found nothing to draft. Write the card yourself.'
+                  : 'The AI repeated a card you already have. Write a '
+                        'different card yourself.';
             } else if (_seedTouched ||
                 _front.text.trim() != _seedInitialFront.trim() ||
                 _back.text.trim().isNotEmpty) {
@@ -608,13 +613,19 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             subtopic: request.subtopic,
           );
           if (!mounted || requestId != _seedRequest) return;
+          final filtered = filterDuplicateIdeas(
+            ideas,
+            existingTexts: _knownCardTexts,
+          );
           setState(() {
             _seedLoading = false;
             _retiredIdeas.addAll(_ideas ?? const []);
-            _ideas = [for (final idea in ideas) _SuggestedIdea(idea)];
-            if (ideas.isEmpty) {
-              _seedError =
-                  'The AI found nothing to draft. Write the card yourself.';
+            _ideas = [for (final idea in filtered) _SuggestedIdea(idea)];
+            if (filtered.isEmpty) {
+              _seedError = ideas.isEmpty
+                  ? 'The AI found nothing to draft. Write the card yourself.'
+                  : 'The AI only repeated cards you already have. Write a '
+                        'different card yourself.';
             }
           });
       }
@@ -901,6 +912,10 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         _ConceptDraft(:final term) => term,
       },
   ];
+
+  bool _repeatsKnownCard(String front) {
+    return _knownCardTexts.any((known) => isDuplicateCardText(front, known));
+  }
 
   Future<void> _loadAiSuggestions() async {
     if (_aiLoading || _saving) return;
@@ -1365,8 +1380,8 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             if (_seedHint) ...[
               const SizedBox(height: 10),
               Text(
-                'AI is optional. Add an API key in Settings to draft the back '
-                'automatically.',
+                'Add an API key in Settings to draft the back automatically, '
+                'or write it yourself.',
                 key: const ValueKey('creator-seed-hint'),
                 style: theme.typography.baseline.bodySmall.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,

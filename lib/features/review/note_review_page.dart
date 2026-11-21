@@ -104,6 +104,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
         subtopic: note.subtopic,
         initialTemplate: CardTemplate.definition,
         initialTerm: note.text,
+        existingFronts: ref.read(existingCardTextsProvider),
         note: note,
       ),
     );

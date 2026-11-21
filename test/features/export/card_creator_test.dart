@@ -412,6 +412,40 @@ void main() {
     expect(fieldText(tester, 'creator-back'), '[One-line cause and effect].');
   });
 
+  testWidgets('switching to Definition and back keeps custom text', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+    );
+
+    await tapTemplate(tester, CardTemplate.contrast);
+    await enter(tester, 'creator-front', 'My own front?');
+    await enter(tester, 'creator-back', 'My own back.');
+
+    await tapTemplate(tester, CardTemplate.definition);
+    await enter(
+      tester,
+      'creator-definition-cloze',
+      '{{c1::Subnet}} is {{c2::a smaller network}}',
+    );
+
+    await tapTemplate(tester, CardTemplate.contrast);
+    expect(fieldText(tester, 'creator-front'), 'My own front?');
+    expect(fieldText(tester, 'creator-back'), 'My own back.');
+
+    await tapTemplate(tester, CardTemplate.definition);
+    expect(
+      fieldText(tester, 'creator-definition-cloze'),
+      '{{c1::Subnet}} is {{c2::a smaller network}}',
+    );
+  });
+
   testWidgets('error contrast scaffold inserts the wrong and correct answers', (
     tester,
   ) async {
@@ -765,12 +799,26 @@ void main() {
     expect(find.byKey(const ValueKey('creator-ai-section')), findsNothing);
     expect(find.text('AI suggestions'), findsNothing);
     expect(find.byKey(const ValueKey('creator-ai-suggest')), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is M3ETooltip && widget.message == 'Suggest cards with AI',
+      ),
+      findsOneWidget,
+    );
 
     await tapKey(tester, 'creator-ai-suggest');
     await pumpFrames(tester, frames: 24);
 
     expect(find.byKey(const ValueKey('creator-ai-section')), findsOneWidget);
     expect(find.text('AI suggestions'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is M3ETooltip && widget.message == 'Hide AI suggestions',
+      ),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsOneWidget);
     expect(find.text('Contrast'), findsWidgets);
   });
@@ -830,6 +878,53 @@ void main() {
       'Why does a private subnet need NAT?',
     );
     expect(find.byKey(const ValueKey('creator-ai-front-0-1')), findsNothing);
+  });
+
+  testWidgets('AI note seeds drop ideas that repeat existing cards', (
+    tester,
+  ) async {
+    final client = MockClient(
+      (_) async => ideasResponse([
+        ideaJson(
+          'contrast',
+          'Which layer owns IP addresses?',
+          'The network layer.',
+        ),
+      ]),
+    );
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await enableAi(harness);
+    final fixture = await seedNote(harness);
+    final creator = CardCreatorController();
+    addTearDown(creator.dispose);
+
+    await pumpTestApp(
+      tester,
+      harness: harness,
+      home: Scaffold(
+        body: CardCreatorPane(
+          request: CardCreatorRequest(
+            title: 'Create cards',
+            topicName: 'Topic',
+            note: fixture.note,
+            existingFronts: const ['Which layer owns IP addresses?'],
+          ),
+          controller: creator,
+        ),
+      ),
+    );
+    await pumpFrames(tester);
+
+    creator.seedFromNote(fixture.note);
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.byKey(const ValueKey('creator-seed-error')), findsOneWidget);
+    expect(
+      find.textContaining('only repeated cards you already have'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsNothing);
   });
 
   testWidgets('a missing AI key only shows guidance after the sparkle tap', (
@@ -1633,6 +1728,36 @@ void main() {
     await reveal(tester, find.byKey(const ValueKey('creator-save')));
     expect(tester.takeException(), isNull);
     expect(find.text('Save'), findsOneWidget);
+  });
+
+  testWidgets('compact picker opens and selects at 320dp text scale 2.0', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+    );
+    final picker = find.byKey(const ValueKey('creator-template-picker'));
+    await reveal(tester, picker);
+    await tester.tap(picker);
+    await pumpFrames(tester, frames: 24);
+    expect(find.text('Cause and effect'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Cause and effect').last);
+    await pumpFrames(tester, frames: 24);
+    expect(fieldText(tester, 'creator-front'), contains('[effect]'));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('retry and quality controls expose tooltips and semantics', (

@@ -118,7 +118,58 @@ void main() {
     expect(termOnly.definition, isEmpty);
     expect(termOnly.isComplete, isFalse);
 
+    final termOnlyPeriod = parseDefinitionCloze('Definition of {{c1::VPC}}.');
+    expect(termOnlyPeriod.term, 'VPC');
+    expect(termOnlyPeriod.definition, isEmpty);
+    expect(termOnlyPeriod.isComplete, isFalse);
+
     expect(parseDefinitionCloze('No cloze here').isComplete, isFalse);
+  });
+
+  test('definition parses clozes before the term and multiple clozes', () {
+    final beforeTerm = parseDefinitionCloze(
+      '{{c2::A private network}} is {{c1::VPC}}',
+    );
+    expect(beforeTerm.term, 'VPC');
+    expect(beforeTerm.definition, 'A private network');
+    expect(beforeTerm.isComplete, isTrue);
+
+    final beforeTermWithStop = parseDefinitionCloze(
+      '{{c2::A private network}} is {{c1::VPC}}.',
+    );
+    expect(beforeTermWithStop.term, 'VPC');
+    expect(beforeTermWithStop.definition, 'A private network');
+
+    final noC1 = parseDefinitionCloze(
+      '{{c2::VPC}} is {{c3::a private network}}',
+    );
+    expect(noC1.term, 'VPC');
+    expect(noC1.definition, 'a private network');
+
+    final multiple = parseDefinitionCloze(
+      '{{c1::VPC}} is {{c2::a private}} {{c3::network}}.',
+    );
+    expect(multiple.term, 'VPC');
+    expect(multiple.definition, 'a private network.');
+
+    final plainBefore = parseDefinitionCloze(
+      'A private network is {{c1::VPC}}',
+    );
+    expect(plainBefore.term, 'VPC');
+    expect(plainBefore.definition, 'A private network');
+  });
+
+  test('definition keeps a definition passed without a term', () {
+    expect(
+      seedDefinitionCloze(definition: 'A private network.'),
+      'Definition of {{c1::term}}: {{c2::A private network.}}',
+    );
+    final parsed = parseDefinitionCloze(
+      seedDefinitionCloze(definition: 'A private network.'),
+    );
+    expect(parsed.term, isEmpty);
+    expect(parsed.definition, 'A private network.');
+    expect(parsed.isComplete, isFalse);
   });
 
   test('definition previews the exported Anki front field', () {
@@ -147,6 +198,14 @@ void main() {
     expect(templateFromName('definition'), CardTemplate.definition);
     expect(templateFromName('Cause and effect'), CardTemplate.mechanism);
     expect(templateFromName('exam tip'), CardTemplate.heuristic);
+    expect(templateFromName('Exam heuristic'), CardTemplate.heuristic);
+    expect(templateFromName('Phase transition'), CardTemplate.procedure);
+    expect(
+      templateFromName('Mechanism / cause-effect'),
+      CardTemplate.mechanism,
+    );
+    expect(templateFromName('Definition / term'), CardTemplate.definition);
+    expect(templateFromName('Contrast / difference'), CardTemplate.contrast);
     expect(templateFromName(null), CardTemplate.mechanism);
     expect(templateFromName('unknown'), CardTemplate.mechanism);
   });

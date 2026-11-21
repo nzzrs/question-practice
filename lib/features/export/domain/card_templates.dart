@@ -90,7 +90,11 @@ String seedDefinitionCloze({
     return 'Definition of {{c1::$safeTerm}}: {{c2::$safeDefinition}}';
   }
 
-  final text = safeTerm.isNotEmpty ? safeTerm : source.trim();
+  final text = safeTerm.isNotEmpty
+      ? safeTerm
+      : safeDefinition.isNotEmpty
+      ? safeDefinition
+      : source.trim();
   if (text.isNotEmpty) {
     final split = _splitDefinitionSentence(text);
     if (split != null) {
@@ -120,8 +124,10 @@ ParsedDefinitionCloze parseDefinitionCloze(String raw) {
     orElse: () => matches.first,
   );
   final term = _cleanValue(termMatch.group(2) ?? '');
-  final tail = raw.substring(termMatch.end);
-  var definition = _cleanDefinition(stripCloze(tail));
+  // Read the definition from everything around the term, so text before the
+  // term is kept as well. The term cloze is removed before cleaning.
+  final withoutTerm = raw.replaceRange(termMatch.start, termMatch.end, ' ');
+  var definition = _cleanDefinition(stripCloze(withoutTerm));
 
   if (definition.isEmpty) {
     final others = [
@@ -242,11 +248,18 @@ CardTemplate templateFromName(String? value) {
     if (template.name == name) return template;
   }
   return switch (name) {
-    'rule' || 'exam tip' => CardTemplate.heuristic,
-    'steps' || 'procedure' => CardTemplate.procedure,
-    'cause and effect' || 'mechanism' || 'fact' => CardTemplate.mechanism,
-    'definition' => CardTemplate.definition,
-    'contrast' => CardTemplate.contrast,
+    'rule' || 'exam tip' || 'exam heuristic' => CardTemplate.heuristic,
+    'steps' ||
+    'procedure' ||
+    'phase transition' ||
+    'phase transition / procedure' => CardTemplate.procedure,
+    'cause and effect' ||
+    'cause-effect' ||
+    'mechanism' ||
+    'mechanism / cause-effect' ||
+    'fact' => CardTemplate.mechanism,
+    'definition' || 'definition / term' => CardTemplate.definition,
+    'contrast' || 'contrast / difference' => CardTemplate.contrast,
     _ => CardTemplate.mechanism,
   };
 }
@@ -269,16 +282,34 @@ String _cleanValue(String value) {
   return trimmed;
 }
 
+final _definitionPrefix = RegExp(
+  r'^definition(?:\s+of)?\s*[:;,\-–—=|]*\s*',
+  caseSensitive: false,
+);
+final _leadingPunctuation = RegExp(r'^[:;,\-–—=|]+\s*');
+final _leadingConnector = RegExp(
+  r'^(is|are|means|refers to|describes|defines)\s+',
+  caseSensitive: false,
+);
+final _trailingConnector = RegExp(
+  r'\s+(is|are|means|refers to|describes|defines)\s*[.!?]*$',
+  caseSensitive: false,
+);
+final _connectorOnly = RegExp(
+  r'^(is|are|means|refers to|describes|defines)$',
+  caseSensitive: false,
+);
+final _punctuationOnly = RegExp(r'^[\s\p{P}\p{S}]+$', unicode: true);
+
 String _cleanDefinition(String value) {
   var text = value.trim();
-  text = text.replaceFirst(RegExp(r'^[:;,\-–—=|]+\s*'), '');
-  text = text.replaceFirst(
-    RegExp(
-      r'^(is|are|means|refers to|describes|defines)\s+',
-      caseSensitive: false,
-    ),
-    '',
-  );
+  text = text.replaceFirst(_definitionPrefix, '');
+  text = text.replaceFirst(_leadingPunctuation, '');
+  text = text.replaceFirst(_leadingConnector, '');
+  text = text.replaceFirst(_trailingConnector, '');
+  text = text.trim();
+  if (text.isEmpty || _connectorOnly.hasMatch(text)) return '';
+  if (_punctuationOnly.hasMatch(text)) return '';
   return _cleanValue(text);
 }
 

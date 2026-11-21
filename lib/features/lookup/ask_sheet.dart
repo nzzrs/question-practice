@@ -114,6 +114,7 @@ class _AskSheetState extends ConsumerState<AskSheet> {
         subtopic: widget.subtopic,
         initialFront: message.isEmpty ? widget.selection : message,
         initialBack: answer,
+        existingFronts: ref.read(existingCardTextsProvider),
       ),
     );
     if (!mounted || created == 0) return;

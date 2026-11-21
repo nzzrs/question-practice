@@ -75,7 +75,7 @@ class BackupInfo {
 
   String get description {
     final archived = archivedTopics > 0
-        ? ' (${formatCount(archivedTopics, 'archived')})'
+        ? ' (${formatCount(archivedTopics, 'archived topic')})'
         : '';
     final buffer = StringBuffer(
       '${formatCount(topics, 'topic')}$archived, '

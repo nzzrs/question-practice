@@ -12,6 +12,7 @@ import '../../core/ui/widgets.dart';
 import '../import/domain/import_models.dart';
 import 'anki_deck_picker.dart';
 import 'domain/topic_edit_service.dart';
+import 'domain/topic_update_copy.dart';
 import 'topic_update_preview_page.dart';
 
 /// The editable field a topic editor tile expands.
@@ -351,14 +352,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       if (applied != true || !mounted) return;
       await _load();
       if (!mounted) return;
-      await showSnack(
-        context,
-        'Topic updated: ${preview.newPracticeCount} new and '
-        '${preview.modifiedPracticeCount} changed practices, '
-        '${preview.newQuestionCount} new, '
-        '${preview.modifiedQuestionCount} modified and '
-        '${preview.deletedQuestionCount} deleted questions.',
-      );
+      await showSnack(context, topicUpdateSummary(preview));
     } on ImportException catch (error) {
       if (mounted) await _showIssues(error.issues);
     } on TopicFileException catch (error) {

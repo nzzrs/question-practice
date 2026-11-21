@@ -301,4 +301,39 @@ void main() {
     expect(top('Practice 1'), lessThan(top('Practice 2')));
     expect(top('Practice 2'), lessThan(top('Practice 12')));
   });
+
+  testWidgets('split copy singularizes one question per slice', (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 2,
+    );
+
+    await pumpTestApp(
+      tester,
+      home: TopicPage(topicId: seeded.topicId),
+      harness: harness,
+    );
+
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -240));
+    await pumpFrames(tester);
+    await tester.longPress(find.text('TCP/IP'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Split into two'));
+    await pumpFrames(tester);
+
+    expect(find.text('Split practice?'), findsOneWidget);
+    expect(
+      find.textContaining('1 randomly chosen question each'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('1 randomly chosen questions'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

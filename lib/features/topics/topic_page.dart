@@ -391,7 +391,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
       title: 'Split practice?',
       message:
           'This replaces "${summary.practice.name}" with two practices of '
-          '${count ~/ 2} randomly chosen questions each, named '
+          '${formatCount(count ~/ 2, 'randomly chosen question')} each, named '
           '"${summary.practice.name} Slice A" and '
           '"${summary.practice.name} Slice B".\n\n'
           'Sessions, answers and error cards for the original practice are '

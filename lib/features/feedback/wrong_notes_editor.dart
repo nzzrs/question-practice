@@ -177,7 +177,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
         Text('What went wrong?', style: theme.typography.emphasized.titleSmall),
         const SizedBox(height: 4),
         Text(
-          'One idea per line. These notes feed the card creator.',
+          'One idea per line. These notes feed Create cards.',
           style: theme.typography.baseline.labelSmall.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

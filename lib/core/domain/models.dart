@@ -41,22 +41,18 @@ enum CognitiveType {
 /// not stored: after saving, [cognitiveType] carries the pedagogical shape and
 /// the Definition template becomes a [Concept].
 enum CardTemplate {
-  definition('Definition', 'Definition / term', CognitiveType.concept),
-  contrast('Contrast', 'Contrast / difference', CognitiveType.contrast),
-  mechanism('Mechanism', 'Mechanism / cause-effect', CognitiveType.fact),
-  heuristic('Exam heuristic', 'Exam heuristic', CognitiveType.heuristic),
-  procedure(
-    'Procedure',
-    'Phase transition / procedure',
-    CognitiveType.heuristic,
-  );
+  definition('Definition', 'Definition', CognitiveType.concept),
+  contrast('Contrast', 'Contrast', CognitiveType.contrast),
+  mechanism('Cause and effect', 'Cause and effect', CognitiveType.fact),
+  heuristic('Exam tip', 'Exam tip', CognitiveType.heuristic),
+  procedure('Steps', 'Steps', CognitiveType.heuristic);
 
   const CardTemplate(this.label, this.chipLabel, this.cognitiveType);
 
   /// Short name for quality rows and group headers.
   final String label;
 
-  /// Full pedagogical name shown on the template chips.
+  /// Name shown in the template picker and AI suggestion rows.
   final String chipLabel;
 
   /// The stored shape after the card is saved.

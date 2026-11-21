@@ -170,10 +170,13 @@ void main() {
     expect(find.text('From this note'), findsOneWidget);
     expect(find.byKey(const ValueKey('creator-seed-hint')), findsOneWidget);
 
-    final term = tester.widget<M3ETextField>(
-      find.byKey(const ValueKey('creator-term')),
+    final cloze = tester.widget<M3ETextField>(
+      find.byKey(const ValueKey('creator-definition-cloze')),
     );
-    expect(term.controller!.text, 'a managed service removes host maintenance');
+    expect(
+      cloze.controller!.text,
+      contains('a managed service removes host maintenance'),
+    );
   });
 
   testWidgets('the old error content editor is unreachable', (tester) async {

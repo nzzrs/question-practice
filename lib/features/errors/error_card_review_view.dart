@@ -112,7 +112,7 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
           );
       await _loadNotes();
       if (!mounted) return;
-      await showSnack(context, 'Note saved. It is ready in the card creator.');
+      await showSnack(context, 'Note saved. It is ready in Create cards.');
     } on Object catch (error) {
       if (mounted) {
         await showSnack(context, 'Could not save the note: $error');

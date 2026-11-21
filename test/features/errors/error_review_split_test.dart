@@ -160,7 +160,7 @@ void main() {
     expect(find.byType(CardCreatorPane), findsOneWidget);
     expect(find.byType(CardCreatorSheet), findsNothing);
     expect(find.byKey(AdaptiveSplitView.dividerKey), findsOneWidget);
-    expect(find.text('Card creator'), findsOneWidget);
+    expect(find.text('Create cards'), findsOneWidget);
     expect(find.text('Turn bullet into card'), findsWidgets);
 
     final window = tester.getSize(find.byType(AdaptiveSplitView));
@@ -683,11 +683,20 @@ void main() {
     await pumpFrames(tester);
     expect(
       tester
-          .widget<M3ETextField>(find.byKey(const ValueKey('creator-term')))
+          .widget<M3ETextField>(
+            find.byKey(const ValueKey('creator-definition-cloze')),
+          )
           .controller!
           .text,
-      'a managed service removes host maintenance',
+      contains('a managed service removes host maintenance'),
     );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-definition-cloze')),
+      'Definition of {{c1::managed service}}: '
+      '{{c2::A service run by the provider.}}',
+    );
+    await pumpFrames(tester);
 
     await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);

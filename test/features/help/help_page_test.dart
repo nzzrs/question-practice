@@ -85,6 +85,21 @@ void main() {
     expect(texts.any((text) => text.contains('Error v2')), isFalse);
     expect(texts.any((text) => text.contains('shuffle button')), isFalse);
     expect(
+      texts.any(
+        (text) => text.contains(
+          'Definition, Contrast, Cause and effect, Exam tip and Steps',
+        ),
+      ),
+      isTrue,
+    );
+    expect(texts.any((text) => text.contains('Exam heuristic')), isFalse);
+    expect(texts.any((text) => text.contains('Phase transition')), isFalse);
+    expect(
+      texts.any((text) => text.contains('Mechanism / cause-effect')),
+      isFalse,
+    );
+    expect(texts.any((text) => text.contains('card creator')), isFalse);
+    expect(
       texts.any((text) => text.contains('A quiet loop for practice')),
       isFalse,
     );

@@ -80,9 +80,9 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await tester.ensureVisible(find.text('Save 1 card'));
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester);
-    await tester.tap(find.text('Save 1 card'));
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
     final manuals = await tester.runAsync(

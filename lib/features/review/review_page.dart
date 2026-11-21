@@ -161,6 +161,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       questionContext: card.question,
       topicName: card.topicName,
       subtopic: card.subtopic,
+      existingFronts: ref.watch(existingCardTextsProvider),
       error: CardCreatorErrorSource(
         card: card,
         question: card.question,
@@ -186,6 +187,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         subtopic: step.question.subtopic,
         initialFront: step.question.prompt,
         initialBack: step.question.correctAnswer,
+        existingFronts: ref.read(existingCardTextsProvider),
         skippedQuestionId: step.skippedQuestionId,
       ),
     );
@@ -236,6 +238,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         subtopic: note.subtopic,
         initialTemplate: CardTemplate.definition,
         initialTerm: note.text,
+        existingFronts: ref.read(existingCardTextsProvider),
         note: note,
       ),
     );

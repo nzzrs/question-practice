@@ -163,6 +163,20 @@ final skippedQuestionsProvider = StreamProvider<List<SkippedQuestion>>(
   (ref) => ref.watch(cardRepositoryProvider).watchUnhandledSkippedQuestions(),
 );
 
+/// Fronts and terms of saved cards, used to keep AI suggestions from
+/// repeating a card the learner already has.
+final existingCardTextsProvider = Provider<List<String>>((ref) {
+  final manuals =
+      ref.watch(allManualCardsProvider).value ?? const <ManualCard>[];
+  final concepts = ref.watch(allConceptsProvider).value ?? const <Concept>[];
+  return [
+    for (final card in manuals)
+      if (card.question.trim().isNotEmpty) card.question,
+    for (final concept in concepts)
+      if (concept.term.trim().isNotEmpty) concept.term,
+  ];
+});
+
 final notesProvider = StreamProvider<List<Note>>(
   (ref) => ref.watch(cardRepositoryProvider).watchNotes(),
 );

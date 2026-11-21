@@ -64,7 +64,12 @@ void main() {
   }
 
   Future<void> tapTemplate(WidgetTester tester, CardTemplate template) async {
-    await tapKey(tester, 'creator-template-${template.name}');
+    final picker = find.byKey(const ValueKey('creator-template-picker'));
+    await reveal(tester, picker);
+    await tester.tap(picker);
+    await pumpFrames(tester, frames: 24);
+    await tester.tap(find.text(template.chipLabel).last);
+    await pumpFrames(tester, frames: 24);
   }
 
   Future<void> enter(WidgetTester tester, String key, String text) async {
@@ -230,7 +235,13 @@ void main() {
       onSaved: (count) => created = count,
     );
 
-    expect(find.text('Save 0 cards'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+    expect(
+      tester
+          .widget<AppPrimaryButton>(find.byKey(const ValueKey('creator-save')))
+          .onPressed,
+      isNull,
+    );
     expect(find.text('Waiting for text'), findsOneWidget);
     expect(find.byKey(const ValueKey('creator-ai-section')), findsNothing);
     expect(find.byKey(const ValueKey('creator-tags')), findsOneWidget);
@@ -247,12 +258,18 @@ void main() {
     await enter(tester, 'creator-front', 'Which layer owns IP addresses?');
     await enter(tester, 'creator-back', 'The network layer.');
     await addBuilderCard(tester);
-    expect(find.text('Save 1 card'), findsOneWidget);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
 
     await enter(tester, 'creator-front', 'Which layer owns MAC addresses?');
     await enter(tester, 'creator-back', 'The data link layer.');
     await addBuilderCard(tester);
-    expect(find.text('Save 2 cards'), findsOneWidget);
+    expect(find.text('Cards to save · 2'), findsOneWidget);
+    expect(
+      tester
+          .widget<AppPrimaryButton>(find.byKey(const ValueKey('creator-save')))
+          .onPressed,
+      isNotNull,
+    );
 
     await saveAll(tester);
 
@@ -273,7 +290,7 @@ void main() {
     );
   });
 
-  testWidgets('template chips fill the exact scaffolds', (tester) async {
+  testWidgets('template picker fills the exact scaffolds', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
 
@@ -282,6 +299,12 @@ void main() {
       harness,
       const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
     );
+
+    expect(
+      find.byKey(const ValueKey('creator-template-picker')),
+      findsOneWidget,
+    );
+    expect(find.byType(M3EChip), findsNothing);
 
     await tapTemplate(tester, CardTemplate.contrast);
     expect(
@@ -299,7 +322,7 @@ void main() {
       fieldText(tester, 'creator-front'),
       'Why does [technology or concept] cause or require [effect]?',
     );
-    expect(fieldText(tester, 'creator-back'), '[One-line causal mechanism].');
+    expect(fieldText(tester, 'creator-back'), '[One-line cause and effect].');
 
     await tapTemplate(tester, CardTemplate.heuristic);
     expect(
@@ -318,14 +341,22 @@ void main() {
 
     await tapTemplate(tester, CardTemplate.definition);
     expect(find.byKey(const ValueKey('creator-front')), findsNothing);
-    expect(find.byKey(const ValueKey('creator-term')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('creator-definition-cloze')),
+      findsOneWidget,
+    );
+    expect(
+      fieldText(tester, 'creator-definition-cloze'),
+      'Definition of {{c1::term}}: {{c2::…}}',
+    );
     expect(
       find.byKey(const ValueKey('creator-definition-preview')),
       findsOneWidget,
     );
+    expect(find.byKey(const ValueKey('creator-template-fill')), findsNothing);
   });
 
-  testWidgets('switching templates keeps typed text until Fill template', (
+  testWidgets('a template change fills only empty or generated fields', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -344,22 +375,75 @@ void main() {
     await tapTemplate(tester, CardTemplate.mechanism);
     expect(fieldText(tester, 'creator-front'), 'My own front?');
     expect(fieldText(tester, 'creator-back'), 'My own back.');
-    expect(find.byKey(const ValueKey('creator-template-fill')), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-template-fill')), findsNothing);
 
-    await tapKey(tester, 'creator-template-fill');
-    expect(find.text('Replace the text with this template?'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await pumpFrames(tester);
+    await enter(tester, 'creator-back', '');
+    await tapTemplate(tester, CardTemplate.heuristic);
     expect(fieldText(tester, 'creator-front'), 'My own front?');
+    expect(fieldText(tester, 'creator-back'), 'Discard [Z] because [rule].');
 
-    await tapKey(tester, 'creator-template-fill');
-    await tester.tap(find.text('Replace'));
-    await pumpFrames(tester);
+    await enter(tester, 'creator-front', '');
+    await tapTemplate(tester, CardTemplate.procedure);
+    expect(
+      fieldText(tester, 'creator-front'),
+      'In [process X], what must be true before [next step Y]?',
+    );
+    expect(fieldText(tester, 'creator-back'), '[Condition or command].');
+  });
+
+  testWidgets('a template change replaces its own generated text', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+    );
+
+    await tapTemplate(tester, CardTemplate.contrast);
+    await tapTemplate(tester, CardTemplate.mechanism);
     expect(
       fieldText(tester, 'creator-front'),
       'Why does [technology or concept] cause or require [effect]?',
     );
-    expect(fieldText(tester, 'creator-back'), '[One-line causal mechanism].');
+    expect(fieldText(tester, 'creator-back'), '[One-line cause and effect].');
+  });
+
+  testWidgets('switching to Definition and back keeps custom text', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+    );
+
+    await tapTemplate(tester, CardTemplate.contrast);
+    await enter(tester, 'creator-front', 'My own front?');
+    await enter(tester, 'creator-back', 'My own back.');
+
+    await tapTemplate(tester, CardTemplate.definition);
+    await enter(
+      tester,
+      'creator-definition-cloze',
+      '{{c1::Subnet}} is {{c2::a smaller network}}',
+    );
+
+    await tapTemplate(tester, CardTemplate.contrast);
+    expect(fieldText(tester, 'creator-front'), 'My own front?');
+    expect(fieldText(tester, 'creator-back'), 'My own back.');
+
+    await tapTemplate(tester, CardTemplate.definition);
+    expect(
+      fieldText(tester, 'creator-definition-cloze'),
+      '{{c1::Subnet}} is {{c2::a smaller network}}',
+    );
   });
 
   testWidgets('error contrast scaffold inserts the wrong and correct answers', (
@@ -440,17 +524,11 @@ void main() {
 
     expect(fieldText(tester, 'creator-front'), 'A custom question?');
     expect(fieldText(tester, 'creator-back'), 'A custom answer.');
-    expect(find.text('Custom card'), findsOneWidget);
-    for (final template in CardTemplate.values) {
-      expect(
-        tester
-            .widget<M3EChip>(
-              find.byKey(ValueKey('creator-template-${template.name}')),
-            )
-            .selected,
-        isFalse,
-      );
-    }
+    expect(find.text('Custom card'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('creator-template-picker')),
+      findsOneWidget,
+    );
 
     await addBuilderCard(tester);
     await saveAll(tester);
@@ -516,7 +594,7 @@ void main() {
     );
   });
 
-  testWidgets('definition uses an existing saved definition without HTTP', (
+  testWidgets('definition seeds a raw cloze and saves a concept without HTTP', (
     tester,
   ) async {
     var requests = 0;
@@ -526,17 +604,6 @@ void main() {
     });
     final harness = TestHarness(httpClient: client);
     addTearDown(harness.close);
-    final seededId = await harness.cards.createConcept(
-      sessionId: null,
-      questionId: null,
-      term: 'VPC',
-      definition: 'A private network.',
-      extra: 'Virtual Private Cloud',
-      context: 'Context',
-      topicName: 'Topic',
-      source: ConceptSource.manual,
-      createdAt: harness.clock.now().toUtc(),
-    );
     int? created;
 
     await openCreator(
@@ -547,108 +614,77 @@ void main() {
         topicName: 'Topic',
         initialTemplate: CardTemplate.definition,
         initialTerm: 'VPC',
+        initialDefinition: 'A private network.',
       ),
       onSaved: (count) => created = count,
     );
     await pumpFrames(tester, frames: 8);
 
-    expect(find.text('From your cards'), findsOneWidget);
-    expect(find.text('A private network.'), findsOneWidget);
+    expect(
+      fieldText(tester, 'creator-definition-cloze'),
+      'Definition of {{c1::VPC}}: {{c2::A private network.}}',
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('creator-definition-preview')),
+        matching: find.text(
+          'Definition of {{c1::VPC}}: {{c2::A private network.}}',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('From your cards'), findsNothing);
     expect(requests, 0);
 
     await addBuilderCard(tester);
     expect(find.text('Definition pending'), findsNothing);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
     await saveAll(tester);
 
-    expect(created, 1);
-    final concepts = await tester.runAsync(
-      () => harness.cards.watchConcepts().first,
-    );
-    expect(concepts, hasLength(2));
-    final newest = concepts!.firstWhere((concept) => concept.id != seededId);
-    expect(newest.definition, 'A private network.');
-    expect(newest.extra, 'Virtual Private Cloud');
-    expect(newest.source, ConceptSource.manual);
-  });
-
-  testWidgets('definition resolves AI when no saved definition exists', (
-    tester,
-  ) async {
-    var requests = 0;
-    final client = MockClient((request) async {
-      requests++;
-      return choicesResponse({
-        'definition': 'A private network.',
-        'expansion': 'Virtual Private Cloud',
-      });
-    });
-    final harness = TestHarness(httpClient: client);
-    addTearDown(harness.close);
-    await enableAi(harness);
-    int? created;
-
-    await openCreator(
-      tester,
-      harness,
-      const CardCreatorRequest(
-        title: 'Create cards',
-        topicName: 'Topic',
-        initialTemplate: CardTemplate.definition,
-        initialTerm: 'VPC',
-      ),
-      onSaved: (count) => created = count,
-    );
-    await pumpFrames(tester, frames: 12);
-
-    expect(find.text('From AI'), findsOneWidget);
-    expect(find.text('A private network.'), findsOneWidget);
-    expect(requests, 1);
-
-    await addBuilderCard(tester);
-    await saveAll(tester);
     expect(created, 1);
     final concepts = await tester.runAsync(
       () => harness.cards.watchConcepts().first,
     );
     expect(concepts, hasLength(1));
-    expect(concepts!.single.source, ConceptSource.ai);
+    expect(concepts!.single.term, 'VPC');
     expect(concepts.single.definition, 'A private network.');
+    expect(concepts.single.extra, isEmpty);
+    expect(concepts.single.source, ConceptSource.manual);
   });
 
-  testWidgets('definition saves a pending concept with no provider', (
+  testWidgets('definition edits, previews and saves the parsed raw cloze', (
     tester,
   ) async {
-    var requests = 0;
-    final client = MockClient((request) async {
-      requests++;
-      return http.Response('{}', 500);
-    });
-    final harness = TestHarness(httpClient: client);
+    final harness = TestHarness();
     addTearDown(harness.close);
     int? created;
 
     await openCreator(
       tester,
       harness,
-      const CardCreatorRequest(
-        title: 'Create cards',
-        topicName: 'Topic',
-        initialTemplate: CardTemplate.definition,
-        initialTerm: 'VPC',
-      ),
+      const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
       onSaved: (count) => created = count,
     );
-    await pumpFrames(tester, frames: 12);
+
+    await tapTemplate(tester, CardTemplate.definition);
+    await enter(
+      tester,
+      'creator-definition-cloze',
+      '{{c1::VPC}} is {{c2::a private network}}',
+    );
 
     expect(
-      find.byKey(const ValueKey('creator-definition-unavailable')),
+      find.descendant(
+        of: find.byKey(const ValueKey('creator-definition-preview')),
+        matching: find.text(
+          'Definition of {{c1::VPC}}: {{c2::a private network}}',
+        ),
+      ),
       findsOneWidget,
     );
-    expect(requests, 0);
+    expect(find.text('Ready'), findsOneWidget);
 
     await addBuilderCard(tester);
-    expect(find.text('Definition pending'), findsWidgets);
-    expect(find.textContaining('No definition yet'), findsOneWidget);
     await saveAll(tester);
 
     expect(created, 1);
@@ -656,37 +692,15 @@ void main() {
       () => harness.cards.watchConcepts().first,
     );
     expect(concepts, hasLength(1));
-    expect(concepts!.single.definition, isEmpty);
-    expect(concepts.single.isExportable, isFalse);
+    expect(concepts!.single.term, 'VPC');
+    expect(concepts.single.definition, 'a private network');
   });
 
-  testWidgets('term change clears and re-resolves the meaning', (tester) async {
-    var requests = 0;
-    final client = MockClient((request) async {
-      requests++;
-      final body = jsonDecode(request.body) as Map<String, dynamic>;
-      final messages = body['messages'] as List<dynamic>;
-      final prompt =
-          (messages.last as Map<String, dynamic>)['content'] as String;
-      final term = prompt.split('Term: ').last.trim();
-      return choicesResponse({
-        'definition': 'Meaning for $term.',
-        'expansion': '',
-      });
-    });
-    final harness = TestHarness(httpClient: client);
+  testWidgets('definition is never added or saved without a definition', (
+    tester,
+  ) async {
+    final harness = TestHarness();
     addTearDown(harness.close);
-    await enableAi(harness);
-    await harness.cards.createConcept(
-      sessionId: null,
-      questionId: null,
-      term: 'VPC',
-      definition: 'A private network.',
-      context: 'Context',
-      topicName: 'Topic',
-      source: ConceptSource.manual,
-      createdAt: harness.clock.now().toUtc(),
-    );
 
     await openCreator(
       tester,
@@ -699,15 +713,260 @@ void main() {
       ),
     );
     await pumpFrames(tester, frames: 8);
-    expect(find.text('From your cards'), findsOneWidget);
 
-    await enter(tester, 'creator-term', 'Subnet');
-    expect(find.text('A private network.'), findsNothing);
-    await pumpFrames(tester, frames: 18);
+    expect(
+      fieldText(tester, 'creator-definition-cloze'),
+      'Definition of {{c1::VPC}}: {{c2::…}}',
+    );
+    expect(find.text('Check quality'), findsOneWidget);
+    expect(find.textContaining('No definition yet'), findsOneWidget);
+    expect(
+      tester
+          .widget<M3EButton>(find.byKey(const ValueKey('creator-add')))
+          .onPressed,
+      isNull,
+    );
+    expect(find.text('Save'), findsOneWidget);
+    expect(
+      tester
+          .widget<AppPrimaryButton>(find.byKey(const ValueKey('creator-save')))
+          .onPressed,
+      isNull,
+    );
+  });
 
-    expect(find.text('From AI'), findsOneWidget);
-    expect(find.text('Meaning for Subnet.'), findsOneWidget);
-    expect(requests, 1);
+  testWidgets('definition preview follows raw cloze edits', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(
+        title: 'Create cards',
+        topicName: 'Topic',
+        initialTemplate: CardTemplate.definition,
+      ),
+    );
+    await pumpFrames(tester, frames: 8);
+
+    expect(find.text('Waiting for text'), findsOneWidget);
+
+    await enter(
+      tester,
+      'creator-definition-cloze',
+      'Definition of {{c1::Subnet}}: {{c2::A smaller network.}}',
+    );
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('creator-definition-preview')),
+        matching: find.text(
+          'Definition of {{c1::Subnet}}: {{c2::A smaller network.}}',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Ready'), findsOneWidget);
+
+    await enter(tester, 'creator-definition-cloze', '{{c1::Subnet}}');
+    expect(find.textContaining('No definition yet'), findsOneWidget);
+  });
+
+  testWidgets('AI suggestions stay hidden until the sparkle action is used', (
+    tester,
+  ) async {
+    final client = MockClient(
+      (_) async =>
+          ideasResponse([ideaJson('contrast', 'Why A?', 'Because one.')]),
+    );
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await enableAi(harness);
+    final fixture = await seedNote(harness);
+
+    await openCreator(
+      tester,
+      harness,
+      CardCreatorRequest(
+        title: 'Create cards',
+        topicName: 'Topic',
+        subtopic: 'Sub',
+        questionContext: fixture.question.prompt,
+        note: fixture.note,
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('creator-ai-section')), findsNothing);
+    expect(find.text('AI suggestions'), findsNothing);
+    expect(find.byKey(const ValueKey('creator-ai-suggest')), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is M3ETooltip && widget.message == 'Suggest cards with AI',
+      ),
+      findsOneWidget,
+    );
+
+    await tapKey(tester, 'creator-ai-suggest');
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.byKey(const ValueKey('creator-ai-section')), findsOneWidget);
+    expect(find.text('AI suggestions'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is M3ETooltip && widget.message == 'Hide AI suggestions',
+      ),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsOneWidget);
+    expect(find.text('Contrast'), findsWidgets);
+  });
+
+  testWidgets('AI suggestions skip drafts and existing card fronts', (
+    tester,
+  ) async {
+    final client = MockClient(
+      (_) async => ideasResponse([
+        ideaJson(
+          'contrast',
+          'Which layer owns IP addresses?',
+          'The network layer.',
+        ),
+        ideaJson(
+          'mechanism',
+          'Which layer owns MAC addresses',
+          'The data link layer.',
+        ),
+        ideaJson(
+          'definition',
+          'Why does a private subnet need NAT?',
+          'To reach the internet.',
+        ),
+      ]),
+    );
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await enableAi(harness);
+    final fixture = await seedNote(harness);
+
+    await openCreator(
+      tester,
+      harness,
+      CardCreatorRequest(
+        title: 'Create cards',
+        topicName: 'Topic',
+        subtopic: 'Sub',
+        questionContext: fixture.question.prompt,
+        note: fixture.note,
+        existingFronts: const ['Which layer owns IP addresses?'],
+      ),
+    );
+
+    await enter(tester, 'creator-front', 'Which layer owns MAC addresses?');
+    await enter(tester, 'creator-back', 'The data link layer.');
+    await addBuilderCard(tester);
+
+    await tapKey(tester, 'creator-ai-suggest');
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.text('1 idea · 1 variant'), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-ai-idea-1')), findsNothing);
+    expect(find.text('Which layer owns IP addresses?'), findsNothing);
+    expect(
+      fieldText(tester, 'creator-ai-front-0-0'),
+      'Why does a private subnet need NAT?',
+    );
+    expect(find.byKey(const ValueKey('creator-ai-front-0-1')), findsNothing);
+  });
+
+  testWidgets('AI note seeds drop ideas that repeat existing cards', (
+    tester,
+  ) async {
+    final client = MockClient(
+      (_) async => ideasResponse([
+        ideaJson(
+          'contrast',
+          'Which layer owns IP addresses?',
+          'The network layer.',
+        ),
+      ]),
+    );
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await enableAi(harness);
+    final fixture = await seedNote(harness);
+    await harness.cards.createManualCard(
+      sessionId: null,
+      question: 'Which layer owns IP addresses?',
+      answer: 'The network layer.',
+      topicName: 'Topic',
+      createdAt: harness.clock.now().toUtc(),
+    );
+    final creator = CardCreatorController();
+    addTearDown(creator.dispose);
+
+    await pumpTestApp(
+      tester,
+      harness: harness,
+      home: Scaffold(
+        body: CardCreatorPane(
+          request: CardCreatorRequest(
+            title: 'Create cards',
+            topicName: 'Topic',
+            note: fixture.note,
+          ),
+          controller: creator,
+        ),
+      ),
+    );
+    await pumpFrames(tester);
+
+    creator.seedFromNote(fixture.note);
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.byKey(const ValueKey('creator-seed-error')), findsOneWidget);
+    expect(
+      find.textContaining('only repeated cards you already have'),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsNothing);
+  });
+
+  testWidgets('a missing AI key only shows guidance after the sparkle tap', (
+    tester,
+  ) async {
+    var requests = 0;
+    final client = MockClient((request) async {
+      requests++;
+      return http.Response('{}', 500);
+    });
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    final fixture = await seedNote(harness);
+
+    await openCreator(
+      tester,
+      harness,
+      CardCreatorRequest(
+        title: 'Create cards',
+        topicName: 'Topic',
+        subtopic: 'Sub',
+        questionContext: fixture.question.prompt,
+        note: fixture.note,
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('creator-ai-unavailable')), findsNothing);
+    await tapKey(tester, 'creator-ai-suggest');
+    await pumpFrames(tester, frames: 8);
+
+    expect(
+      find.byKey(const ValueKey('creator-ai-unavailable')),
+      findsOneWidget,
+    );
+    expect(find.text('Add an AI provider in Settings.'), findsOneWidget);
+    expect(requests, 0);
   });
 
   testWidgets(
@@ -784,6 +1043,8 @@ void main() {
   testWidgets('AI suggestions cap at three ideas and three variants', (
     tester,
   ) async {
+    const ideaWords = ['alpha', 'beta', 'gamma', 'delta', 'epsilon'];
+    const variantWords = ['one', 'two', 'three', 'four', 'five'];
     final client = MockClient(
       (_) async => ideasResponse([
         for (var idea = 0; idea < 5; idea++)
@@ -792,8 +1053,9 @@ void main() {
             'variants': [
               for (var variant = 0; variant < 5; variant++)
                 {
-                  'front': 'Idea $idea variant $variant',
-                  'back': 'Answer $idea $variant',
+                  'front':
+                      '${ideaWords[idea]} question ${variantWords[variant]}',
+                  'back': 'Answer ${ideaWords[idea]} ${variantWords[variant]}',
                 },
             ],
           },
@@ -865,13 +1127,13 @@ void main() {
     expect(fieldText(tester, 'creator-ai-front-0-0'), 'First proposal?');
 
     await tapKey(tester, 'creator-ai-add');
-    expect(find.text('Save 1 card'), findsOneWidget);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
 
     await tapKey(tester, 'creator-ai-retry');
     await pumpFrames(tester, frames: 24);
 
     expect(requests, 2);
-    expect(find.text('Save 1 card'), findsOneWidget);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
     expect(fieldText(tester, 'creator-ai-front-0-0'), 'Second proposal?');
     expect(find.text('Clear suggestions'), findsNothing);
     expect(
@@ -904,13 +1166,13 @@ void main() {
     await enter(tester, 'creator-front', 'Which layer owns IP?');
     await enter(tester, 'creator-back', 'The network layer.');
     await addBuilderCard(tester);
-    expect(find.text('Save 1 card'), findsOneWidget);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
 
     await tapKey(tester, 'creator-ai-suggest');
     await pumpFrames(tester, frames: 24);
 
     expect(find.byKey(const ValueKey('creator-ai-error')), findsOneWidget);
-    expect(find.text('Save 1 card'), findsOneWidget);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
     expect(
       tester
           .widget<M3ETextField>(find.byKey(const ValueKey('creator-front')))
@@ -964,7 +1226,7 @@ void main() {
     );
 
     await tapKey(tester, 'creator-ai-add');
-    expect(find.text('Save 1 card'), findsOneWidget);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('creator-ai-variant-0-0')),
       findsOneWidget,
@@ -1157,6 +1419,77 @@ void main() {
     expect(saved, 1);
   });
 
+  testWidgets('a host can save drafts without a second save button', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final creator = CardCreatorController();
+    addTearDown(creator.dispose);
+    final handle = CardCreatorSaveHandle();
+    int? saved;
+
+    await pumpTestApp(
+      tester,
+      harness: harness,
+      home: Scaffold(
+        body: CardCreatorPane(
+          request: const CardCreatorRequest(
+            title: 'Create cards',
+            topicName: 'Topic',
+          ),
+          controller: creator,
+          saveHandle: handle,
+          showSaveButton: false,
+          onSaved: (count) => saved = count,
+        ),
+      ),
+    );
+    await pumpFrames(tester);
+
+    expect(find.byKey(const ValueKey('creator-save')), findsNothing);
+    expect(handle.isAttached, isTrue);
+
+    await enter(tester, 'creator-front', 'What is a VPC?');
+    await enter(tester, 'creator-back', 'A private network.');
+    await addBuilderCard(tester);
+
+    final created = await tester.runAsync(() => handle.save());
+    await pumpFrames(tester);
+
+    expect(created, 1);
+    expect(saved, 1);
+    final cards = await tester.runAsync(
+      () => harness.cards.watchManualCards().first,
+    );
+    expect(cards, hasLength(1));
+  });
+
+  testWidgets('the compact template picker has an accessible name', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(
+        title: 'Create cards',
+        topicName: 'Topic',
+        initialFront: 'A custom question?',
+        initialBack: 'A custom answer.',
+      ),
+    );
+
+    final picker = find.bySemanticsLabel(RegExp('Card template'));
+    expect(picker, findsOneWidget);
+    final node = tester.getSemantics(picker);
+    expect(node.flagsCollection.isButton, isTrue);
+    semantics.dispose();
+  });
+
   testWidgets('completeErrorOnSave false leaves the error details open', (
     tester,
   ) async {
@@ -1258,7 +1591,7 @@ void main() {
         find.textContaining('1 card saved, but the rest could not be saved'),
         findsOneWidget,
       );
-      expect(find.text('Save 1 card'), findsOneWidget);
+      expect(find.text('Cards to save · 1'), findsOneWidget);
       expect(find.byKey(const ValueKey('creator-draft-0')), findsOneWidget);
       final cards = await tester.runAsync(
         () => harness.cards.watchManualCards().first,
@@ -1340,7 +1673,7 @@ void main() {
     await reveal(tester, find.byKey(const ValueKey('creator-save')));
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Save 1 card'), findsOneWidget);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
   });
 
   testWidgets('creator fits 360dp at text scale 2.0', (tester) async {
@@ -1362,9 +1695,74 @@ void main() {
         subtopic: 'Sub',
       ),
     );
-    await tapTemplate(tester, CardTemplate.heuristic);
+    await reveal(tester, find.byKey(const ValueKey('creator-template-picker')));
+    expect(tester.takeException(), isNull);
     await reveal(tester, find.byKey(const ValueKey('creator-save')));
 
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('creator fits 320dp at text scale 2.0 with the AI action', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final error = await seedError(harness);
+
+    await openCreator(
+      tester,
+      harness,
+      CardCreatorRequest(
+        title: 'Create cards',
+        topicName: 'A very long topic name that wraps',
+        subtopic: 'A long subtopic name',
+        error: error,
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('creator-ai-suggest')), findsOneWidget);
+    await reveal(tester, find.byKey(const ValueKey('creator-template-picker')));
+    expect(tester.takeException(), isNull);
+    await reveal(tester, find.byKey(const ValueKey('creator-front')));
+    expect(tester.takeException(), isNull);
+    await reveal(tester, find.byKey(const ValueKey('creator-save')));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Save'), findsOneWidget);
+  });
+
+  testWidgets('compact picker opens and selects at 320dp text scale 2.0', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+    );
+    final picker = find.byKey(const ValueKey('creator-template-picker'));
+    await reveal(tester, picker);
+    await tester.tap(picker);
+    await pumpFrames(tester, frames: 24);
+    expect(find.text('Cause and effect'), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Cause and effect').last);
+    await pumpFrames(tester, frames: 24);
+    expect(fieldText(tester, 'creator-front'), contains('[effect]'));
     expect(tester.takeException(), isNull);
   });
 

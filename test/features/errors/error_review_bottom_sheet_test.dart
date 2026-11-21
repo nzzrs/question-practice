@@ -6,11 +6,12 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:question_practice/app/providers.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/ui/adaptive_split_view.dart';
-import 'package:question_practice/core/ui/app_scaffold.dart';
 import 'package:question_practice/features/errors/error_cards_review_page.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
+import 'package:question_practice/features/review/domain/review_service.dart';
 import 'package:question_practice/features/feedback/question_feedback_view.dart';
 
 import '../../helpers/test_harness.dart';
@@ -84,28 +85,6 @@ String _field(WidgetTester tester, String key) {
       .text;
 }
 
-Finder get _feedbackScroll {
-  return find
-      .descendant(
-        of: find.byType(QuestionFeedbackView),
-        matching: find.byType(Scrollable),
-      )
-      .first;
-}
-
-Finder get _creatorScroll {
-  return find
-      .descendant(
-        of: find.byType(CardCreatorPane),
-        matching: find.byType(Scrollable),
-      )
-      .first;
-}
-
-double _scrollOffset(WidgetTester tester, Finder scrollable) {
-  return tester.state<ScrollableState>(scrollable).position.pixels;
-}
-
 http.Response _cardResponse(String front, String back) {
   return http.Response(
     jsonEncode({
@@ -125,6 +104,20 @@ http.Response _cardResponse(String front, String back) {
   );
 }
 
+Future<void> _openCreator(WidgetTester tester) async {
+  await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+  await pumpFrames(tester);
+  await expandCardCreatorSheet(tester);
+}
+
+Future<void> _closeCreator(WidgetTester tester) async {
+  final close = find.byKey(const ValueKey('creator-close'));
+  await tester.ensureVisible(close);
+  await pumpFrames(tester);
+  await tester.tap(close);
+  await pumpFrames(tester, frames: 24);
+}
+
 Future<void> _enterDraft(WidgetTester tester) async {
   await tester.enterText(
     find.byKey(const ValueKey('creator-front')),
@@ -142,7 +135,7 @@ Future<void> _enterDraft(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets('error review renders a split studio instead of a modal sheet', (
+  testWidgets('error review is one full-width reading surface with one dock', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -155,77 +148,25 @@ void main() {
       harness: harness,
     );
 
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
-    expect(find.byType(QuestionFeedbackView), findsOneWidget);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
-    expect(find.byType(CardCreatorSheet), findsNothing);
-    expect(find.byKey(AdaptiveSplitView.dividerKey), findsOneWidget);
-    expect(find.text('Create cards'), findsOneWidget);
-    expect(find.text('Turn bullet into card'), findsWidgets);
-
-    final window = tester.getSize(find.byType(AdaptiveSplitView));
-    final feedback = tester.getSize(find.byType(QuestionFeedbackView));
-    final horizontal = window.width >= 720;
-    final expected = horizontal
-        ? (window.width - AdaptiveSplitView.dividerExtent) * 0.56
-        : (window.height - AdaptiveSplitView.dividerExtent) * 0.52;
-    expect(horizontal ? feedback.width : feedback.height, closeTo(expected, 2));
-  });
-
-  testWidgets('the divider drag changes the ratio and survives a step change', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(400, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await _seedCard(harness);
-
-    await pumpTestApp(
-      tester,
-      home: ErrorCardsReviewPage(
-        cards: [seeded.card],
-        skippedQuestions: [_skippedQuestion(harness, seeded.question)],
-      ),
-      harness: harness,
-    );
-
-    final initial = tester.getSize(find.byType(QuestionFeedbackView)).height;
-    await tester.drag(
-      find.byKey(AdaptiveSplitView.dividerKey),
-      const Offset(0, -70),
-    );
-    await pumpFrames(tester);
-    final dragged = tester.getSize(find.byType(QuestionFeedbackView)).height;
-    expect(dragged, lessThan(initial));
-
-    await tester.tap(find.text('Skip'));
-    await pumpFrames(tester);
     expect(find.byType(AdaptiveSplitView), findsNothing);
-    expect(find.text('Review the skipped question'), findsOneWidget);
-
-    await tester.tap(find.text('Previous'));
-    await pumpFrames(tester);
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
-    final restored = tester.getSize(find.byType(QuestionFeedbackView)).height;
-    expect(restored, closeTo(dragged, 2));
+    expect(find.byType(CardCreatorPane), findsNothing);
+    expect(find.byType(CardCreatorSheet), findsNothing);
+    expect(find.byType(QuestionFeedbackView), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-back')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-next')), findsOneWidget);
+    expect(find.text('Finish'), findsOneWidget);
+    expect(find.text('Create cards'), findsNothing);
+    expect(find.text('Skip'), findsNothing);
   });
 
-  testWidgets('both panes scroll independently', (tester) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
+  testWidgets('the create action opens the creator as a bottom sheet', (
+    tester,
+  ) async {
     final harness = TestHarness();
     addTearDown(harness.close);
-    final seeded = await _seedCard(
-      harness,
-      reasoning: [
-        'I confused the network and transport layers.',
-        'I read reliable as secure.',
-        'I forgot that addressing belongs to the network layer.',
-      ].join('\n'),
-    );
+    final seeded = await _seedCard(harness);
 
     await pumpTestApp(
       tester,
@@ -233,21 +174,12 @@ void main() {
       harness: harness,
     );
 
-    final feedback = _feedbackScroll;
-    final creator = _creatorScroll;
-    expect(_scrollOffset(tester, feedback), 0);
-    expect(_scrollOffset(tester, creator), 0);
-
-    await tester.drag(feedback, const Offset(0, -140));
-    await pumpFrames(tester);
-    expect(_scrollOffset(tester, feedback), greaterThan(0));
-    expect(_scrollOffset(tester, creator), 0);
-
-    final feedbackOffset = _scrollOffset(tester, feedback);
-    await tester.drag(creator, const Offset(0, -140));
-    await pumpFrames(tester);
-    expect(_scrollOffset(tester, creator), greaterThan(0));
-    expect(_scrollOffset(tester, feedback), closeTo(feedbackOffset, 0.1));
+    await _openCreator(tester);
+    expect(find.byType(CardCreatorSheet), findsOneWidget);
+    expect(find.byType(CardCreatorPane), findsNothing);
+    expect(find.byKey(const ValueKey('creator-save')), findsNothing);
+    expect(find.byKey(const ValueKey('creator-context')), findsNothing);
+    expect(find.text('From this error'), findsNothing);
   });
 
   testWidgets('a bullet seeds the creator with a manual fallback', (
@@ -268,6 +200,7 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(bullet);
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
 
     expect(
       _field(tester, 'creator-front'),
@@ -276,11 +209,11 @@ void main() {
     expect(_field(tester, 'creator-back'), isEmpty);
     expect(find.byKey(const ValueKey('creator-seed-hint')), findsOneWidget);
     expect(find.byKey(const ValueKey('creator-seed-error')), findsNothing);
-    expect(find.text('From this bullet'), findsOneWidget);
-    expect(find.byType(CardCreatorSheet), findsNothing);
+    expect(find.text('From this bullet'), findsNothing);
+    expect(find.byKey(const ValueKey('creator-context')), findsNothing);
   });
 
-  testWidgets('a bullet AI draft fills the fields after a loading state', (
+  testWidgets('a bullet AI draft fills the fields and picks its template', (
     tester,
   ) async {
     final response = Completer<http.Response>();
@@ -301,12 +234,10 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(bullet);
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
     expect(find.byKey(const ValueKey('creator-seed-loading')), findsOneWidget);
-    expect(tester.widget<M3EButton>(bullet).onPressed, isNull);
-    expect(
-      find.descendant(of: bullet, matching: find.text('Drafting…')),
-      findsOneWidget,
-    );
+    expect(tester.widget<M3EIconButton>(bullet).onPressed, isNull);
+    expect(find.text('Turn this bullet into a card'), findsNothing);
 
     response.complete(
       _cardResponse(
@@ -324,45 +255,8 @@ void main() {
       _field(tester, 'creator-back'),
       'The network layer addresses hosts; transport moves segments.',
     );
+    expect(find.text('Contrast'), findsWidgets);
   });
-
-  testWidgets(
-    'an AI failure keeps the manual draft and shows an inline error',
-    (tester) async {
-      final harness = TestHarness(
-        httpClient: MockClient((_) async => http.Response('down', 500)),
-      );
-      addTearDown(harness.close);
-      await harness.settings.save(_aiSettings);
-      await harness.keyStore.writeApiKey('secret-key');
-      final seeded = await _seedCard(harness);
-
-      await pumpTestApp(
-        tester,
-        home: ErrorCardsReviewPage(cards: [seeded.card]),
-        harness: harness,
-      );
-
-      final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
-      await tester.ensureVisible(bullet);
-      await pumpFrames(tester);
-      await tester.tap(bullet);
-      await pumpFrames(tester, frames: 24);
-
-      expect(find.byKey(const ValueKey('creator-seed-error')), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const ValueKey('creator-seed-error')),
-          matching: find.byType(Text),
-        ),
-        findsWidgets,
-      );
-      expect(
-        _field(tester, 'creator-front'),
-        'I confused the network and transport layers.',
-      );
-    },
-  );
 
   testWidgets('a second bullet asks before replacing an edited draft', (
     tester,
@@ -382,11 +276,13 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(first);
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
     await tester.enterText(
       find.byKey(const ValueKey('creator-back')),
       'My own answer.',
     );
     await pumpFrames(tester);
+    await _closeCreator(tester);
 
     final second = find.byKey(const ValueKey('wrong-note-card-1'));
     await tester.ensureVisible(second);
@@ -397,11 +293,12 @@ void main() {
 
     await tester.tap(find.text('Keep editing'));
     await pumpFrames(tester);
-    expect(find.text('Replace the draft you started?'), findsNothing);
+    await _openCreator(tester);
     expect(
       _field(tester, 'creator-front'),
       'I confused the network and transport layers.',
     );
+    await _closeCreator(tester);
 
     await tester.tap(second);
     await pumpFrames(tester);
@@ -410,7 +307,7 @@ void main() {
     expect(_field(tester, 'creator-front'), 'I read reliable as secure.');
   });
 
-  testWidgets('a bullet chip disables when added and re-enables on removal', (
+  testWidgets('a bullet icon disables when added and re-enables on removal', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -428,6 +325,7 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(bullet);
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
 
     await tester.enterText(
       find.byKey(const ValueKey('creator-back')),
@@ -438,27 +336,22 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
+    await _closeCreator(tester);
 
-    expect(
-      find.descendant(of: bullet, matching: find.text('Added to cards')),
-      findsOneWidget,
-    );
-    expect(tester.widget<M3EButton>(bullet).onPressed, isNull);
+    expect(tester.widget<M3EIconButton>(bullet).onPressed, isNull);
 
+    await _openCreator(tester);
     final remove = find.byIcon(Icons.delete_outline);
     await tester.ensureVisible(remove);
     await pumpFrames(tester);
     await tester.tap(remove);
     await pumpFrames(tester);
+    await _closeCreator(tester);
 
-    expect(
-      find.descendant(of: bullet, matching: find.text('Turn bullet into card')),
-      findsOneWidget,
-    );
-    expect(tester.widget<M3EButton>(bullet).onPressed, isNotNull);
+    expect(tester.widget<M3EIconButton>(bullet).onPressed, isNotNull);
   });
 
-  testWidgets('added bullet state does not leak into the next error step', (
+  testWidgets('drafts stay with their item across close and step changes', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -472,32 +365,190 @@ void main() {
       harness: harness,
     );
 
-    final firstBullet = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(firstBullet);
-    await pumpFrames(tester);
-    await tester.tap(firstBullet);
-    await pumpFrames(tester);
+    await _openCreator(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Typed front?',
+    );
     await tester.enterText(
       find.byKey(const ValueKey('creator-back')),
-      'The network layer owns addressing.',
+      'Typed back.',
+    );
+    await pumpFrames(tester);
+    await _closeCreator(tester);
+
+    await _openCreator(tester);
+    expect(_field(tester, 'creator-front'), 'Typed front?');
+    expect(_field(tester, 'creator-back'), 'Typed back.');
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
+    await _closeCreator(tester);
+
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
+    await pumpFrames(tester);
+    expect(find.text('Item 2 of 2'), findsOneWidget);
+
+    await _openCreator(tester);
+    expect(find.byKey(const ValueKey('creator-draft-0')), findsNothing);
+    expect(_field(tester, 'creator-front'), isEmpty);
+    await _closeCreator(tester);
+
+    await tester.tap(find.byKey(const ValueKey('review-dock-back')));
+    await pumpFrames(tester);
+    await _openCreator(tester);
+    expect(find.byKey(const ValueKey('creator-draft-0')), findsOneWidget);
+    expect(_field(tester, 'creator-front'), isEmpty);
+  });
+
+  testWidgets('saving from the dock uses the cached drafts and advances', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final first = await _seedCard(harness);
+    final second = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [first.card, second.card]),
+      harness: harness,
+    );
+
+    await _openCreator(tester);
+    await _enterDraft(tester);
+    await _closeCreator(tester);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.text('Item 2 of 2'), findsOneWidget);
+    final cards = await tester.runAsync(
+      () => harness.cards.watchManualCards().first,
+    );
+    expect(cards, hasLength(1));
+  });
+
+  testWidgets('a typed card that was not added guards the dock Save', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final first = await _seedCard(harness);
+    final second = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [first.card, second.card]),
+      harness: harness,
+    );
+
+    await _openCreator(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Not added yet?',
+    );
+    await pumpFrames(tester);
+    await _closeCreator(tester);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
+    await pumpFrames(tester);
+
+    expect(
+      find.text('Add this card to the list before saving.'),
+      findsOneWidget,
+    );
+    await expandCardCreatorSheet(tester);
+    expect(find.byType(CardCreatorSheet), findsOneWidget);
+    expect(_field(tester, 'creator-front'), 'Not added yet?');
+  });
+
+  testWidgets('a note seeded card saves through the review dock', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: seeded.card.sessionId,
+      questionId: seeded.question.id,
+      text: 'a managed service removes host maintenance',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final create = find.byKey(ValueKey('feedback-note-card-$noteId'));
+    await tester.ensureVisible(create);
+    await pumpFrames(tester);
+    await tester.tap(create);
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
+    expect(find.text('From this note'), findsNothing);
+    expect(
+      tester
+          .widget<M3ETextField>(
+            find.byKey(const ValueKey('creator-definition-cloze')),
+          )
+          .controller!
+          .text,
+      contains('a managed service removes host maintenance'),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-definition-cloze')),
+      'Definition of {{c1::managed service}}: '
+      '{{c2::A service run by the provider.}}',
     );
     await pumpFrames(tester);
     await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await _closeCreator(tester);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
-    expect(find.text('Item 2 of 2'), findsOneWidget);
 
-    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(bullet);
-    await pumpFrames(tester);
-    expect(
-      find.descendant(of: bullet, matching: find.text('Turn bullet into card')),
-      findsOneWidget,
+    final notes = await tester.runAsync(
+      () => harness.cards.notesForQuestion(seeded.question.id),
     );
-    expect(tester.widget<M3EButton>(bullet).onPressed, isNotNull);
+    expect(notes!.single.hasCard, isTrue);
+    final concepts = await tester.runAsync(
+      () => harness.cards.watchConcepts().first,
+    );
+    expect(concepts, hasLength(1));
+  });
+
+  testWidgets('a skipped step uses the same shell and creator sheet', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(
+        cards: const [],
+        skippedQuestions: [_skippedQuestion(harness, seeded.question)],
+      ),
+      harness: harness,
+    );
+
+    expect(find.byType(AdaptiveSplitView), findsNothing);
+    expect(find.text('Review the skipped question'), findsOneWidget);
+    expect(find.text('What was missing?'), findsNothing);
+    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.text('Finish'), findsOneWidget);
+    await _openCreator(tester);
+    expect(find.byType(CardCreatorSheet), findsOneWidget);
   });
 
   testWidgets('a late AI reply cannot refill a composer after Add to list', (
@@ -521,22 +572,10 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(bullet);
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
     expect(find.byKey(const ValueKey('creator-seed-loading')), findsOneWidget);
 
-    await tester.enterText(
-      find.byKey(const ValueKey('creator-front')),
-      'Manual front',
-    );
-    await tester.enterText(
-      find.byKey(const ValueKey('creator-back')),
-      'Manual back',
-    );
-    await pumpFrames(tester);
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-add')));
-    await pumpFrames(tester);
-
+    await _enterDraft(tester);
     response.complete(_cardResponse('Late AI front', 'Late AI back'));
     await pumpFrames(tester, frames: 24);
 
@@ -566,11 +605,13 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(first);
     await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
     await tester.enterText(
       find.byKey(const ValueKey('creator-back')),
       'My own answer.',
     );
     await pumpFrames(tester);
+    await _closeCreator(tester);
 
     response.complete(
       _cardResponse(
@@ -579,7 +620,6 @@ void main() {
       ),
     );
     await pumpFrames(tester, frames: 24);
-    expect(find.byKey(const ValueKey('creator-seed-loading')), findsNothing);
 
     final second = find.byKey(const ValueKey('wrong-note-card-1'));
     await tester.ensureVisible(second);
@@ -587,203 +627,66 @@ void main() {
     await tester.tap(second);
     await pumpFrames(tester);
     expect(find.text('Replace the draft you started?'), findsOneWidget);
-    expect(_field(tester, 'creator-back'), 'My own answer.');
+    await tester.tap(find.text('Replace'));
+    await pumpFrames(tester, frames: 24);
+    expect(_field(tester, 'creator-back'), 'It addresses hosts.');
   });
 
-  testWidgets('unsaved drafts guard Continue and Skip', (tester) async {
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final first = await _seedCard(harness);
-    final second = await _seedCard(harness);
-
-    await pumpTestApp(
-      tester,
-      home: ErrorCardsReviewPage(cards: [first.card, second.card]),
-      harness: harness,
-    );
-
-    await _enterDraft(tester);
-    await tester.tap(find.text('Continue'));
-    await pumpFrames(tester);
-    expect(find.text('Discard unsaved cards?'), findsOneWidget);
-
-    await tester.tap(find.text('Keep editing'));
-    await pumpFrames(tester);
-    expect(find.text('Item 1 of 2'), findsOneWidget);
-    expect(find.byKey(const ValueKey('creator-draft-0')), findsOneWidget);
-
-    await tester.tap(find.text('Skip'));
-    await pumpFrames(tester);
-    expect(find.text('Discard unsaved cards?'), findsOneWidget);
-    await tester.tap(find.text('Discard cards'));
-    await pumpFrames(tester);
-    expect(find.text('Item 2 of 2'), findsOneWidget);
-  });
-
-  testWidgets('unsaved drafts guard Previous and closing the review', (
+  testWidgets('a failed dock save keeps the remaining draft and stays', (
     tester,
   ) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final first = await _seedCard(harness);
     final second = await _seedCard(harness);
+    final service = _ControlledReviewService(harness)..failOnCall = 2;
 
     await pumpTestApp(
       tester,
       home: ErrorCardsReviewPage(cards: [first.card, second.card]),
       harness: harness,
+      overrides: [reviewServiceProvider.overrideWithValue(service)],
     );
 
-    await tester.tap(find.text('Continue'));
-    await pumpFrames(tester);
-    expect(find.text('Item 2 of 2'), findsOneWidget);
-
-    await _enterDraft(tester);
-    await tester.tap(find.text('Previous'));
-    await pumpFrames(tester);
-    expect(find.text('Discard unsaved cards?'), findsOneWidget);
-    await tester.tap(find.text('Keep editing'));
-    await pumpFrames(tester);
-    expect(find.text('Item 2 of 2'), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('app-focus-exit')));
-    await pumpFrames(tester);
-    expect(find.text('Discard unsaved cards?'), findsOneWidget);
-    await tester.tap(find.text('Keep editing'));
-    await pumpFrames(tester);
-    expect(find.byType(ErrorCardsReviewPage), findsOneWidget);
-  });
-
-  testWidgets('a note seeded card saves and marks the note converted', (
-    tester,
-  ) async {
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await _seedCard(harness);
-    final noteId = await harness.cards.createNote(
-      sessionId: seeded.card.sessionId,
-      questionId: seeded.question.id,
-      text: 'a managed service removes host maintenance',
-      context: seeded.question.prompt,
-      topicName: 'Topic',
-      practiceName: 'Practice',
-      createdAt: harness.clock.now().toUtc(),
-    );
-
-    await pumpTestApp(
-      tester,
-      home: ErrorCardsReviewPage(cards: [seeded.card]),
-      harness: harness,
-    );
-
-    final create = find.byKey(ValueKey('feedback-note-card-$noteId'));
-    await tester.ensureVisible(create);
-    await pumpFrames(tester);
-    await tester.tap(create);
-    await pumpFrames(tester);
-    expect(
-      tester
-          .widget<M3ETextField>(
-            find.byKey(const ValueKey('creator-definition-cloze')),
-          )
-          .controller!
-          .text,
-      contains('a managed service removes host maintenance'),
-    );
-
+    await _openCreator(tester);
     await tester.enterText(
-      find.byKey(const ValueKey('creator-definition-cloze')),
-      'Definition of {{c1::managed service}}: '
-      '{{c2::A service run by the provider.}}',
+      find.byKey(const ValueKey('creator-front')),
+      'First saved?',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'First answer.',
     );
     await pumpFrames(tester);
-
     await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Second stays?',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'Second answer.',
+    );
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await _closeCreator(tester);
+
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
-    final notes = await tester.runAsync(
-      () => harness.cards.notesForQuestion(seeded.question.id),
-    );
-    expect(notes!.single.hasCard, isTrue);
-    final concepts = await tester.runAsync(
-      () => harness.cards.watchConcepts().first,
-    );
-    expect(concepts, hasLength(1));
-  });
-
-  testWidgets('a skipped step still uses the card creator sheet', (
-    tester,
-  ) async {
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await _seedCard(harness);
-
-    await pumpTestApp(
-      tester,
-      home: ErrorCardsReviewPage(
-        cards: const [],
-        skippedQuestions: [_skippedQuestion(harness, seeded.question)],
-      ),
-      harness: harness,
-    );
-
-    expect(find.byType(AdaptiveSplitView), findsNothing);
-    expect(find.text('Review the skipped question'), findsOneWidget);
-    await tester.tap(find.text('Create cards'));
-    await pumpFrames(tester);
-    expect(find.byType(CardCreatorSheet), findsOneWidget);
-  });
-
-  testWidgets('an open keyboard keeps both panes scrollable without overflow', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(360, 640);
-    tester.view.devicePixelRatio = 1;
-    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-    addTearDown(tester.view.reset);
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await _seedCard(harness);
-
-    await pumpTestApp(
-      tester,
-      home: ErrorCardsReviewPage(cards: [seeded.card]),
-      harness: harness,
-    );
-
-    expect(tester.takeException(), isNull);
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
-    expect(_feedbackScroll, findsOneWidget);
-    expect(_creatorScroll, findsOneWidget);
-    expect(find.byType(AppActionDock), findsNothing);
-    expect(find.text('Continue'), findsNothing);
-  });
-
-  testWidgets('the keyboard leaves the creator room to type', (tester) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
-    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-    addTearDown(tester.view.reset);
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await _seedCard(harness);
-
-    await pumpTestApp(
-      tester,
-      home: ErrorCardsReviewPage(cards: [seeded.card]),
-      harness: harness,
-    );
-
-    expect(tester.takeException(), isNull);
+    expect(find.text('Item 1 of 2'), findsOneWidget);
     expect(
-      tester.getSize(find.byType(CardCreatorPane)).height,
-      greaterThanOrEqualTo(240),
+      find.textContaining('1 card saved, but the rest could not be saved'),
+      findsOneWidget,
     );
+    await _openCreator(tester);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
   });
 
   for (final config in const [
@@ -793,7 +696,9 @@ void main() {
     (label: '720 dp tablet', size: Size(720, 1024), scale: 1.0),
     (label: '720 dp at 2.0', size: Size(720, 1024), scale: 2.0),
   ]) {
-    testWidgets('the split studio fits ${config.label}', (tester) async {
+    testWidgets('the review shell and creator fit ${config.label}', (
+      tester,
+    ) async {
       tester.view.physicalSize = config.size;
       tester.view.devicePixelRatio = 1;
       tester.platformDispatcher.textScaleFactorTestValue = config.scale;
@@ -805,17 +710,8 @@ void main() {
         harness,
         reasoning:
             'A long wrong-answer bullet that has to wrap cleanly without '
-            'pushing the split panes out of the window.\nSecond bullet.',
+            'pushing the reading surface out of the window.\nSecond bullet.',
         distracted: true,
-      );
-      await harness.cards.createNote(
-        sessionId: seeded.card.sessionId,
-        questionId: seeded.question.id,
-        text: 'A note that has to wrap at the narrow width and large scale.',
-        context: seeded.question.prompt,
-        topicName: 'Topic',
-        practiceName: 'Practice',
-        createdAt: harness.clock.now().toUtc(),
       );
 
       await pumpTestApp(
@@ -825,17 +721,52 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(AdaptiveSplitView), findsOneWidget);
-      expect(find.byType(CardCreatorPane), findsOneWidget);
-      final divider = tester.getSize(find.byKey(AdaptiveSplitView.dividerKey));
-      final horizontal =
-          config.size.width >= 720 ||
-          (config.size.width >= 600 && config.size.width > config.size.height);
-      if (horizontal) {
-        expect(divider.width, AdaptiveSplitView.dividerExtent);
-      } else {
-        expect(divider.height, AdaptiveSplitView.dividerExtent);
-      }
+      expect(find.byType(AdaptiveSplitView), findsNothing);
+      expect(find.byType(CardCreatorPane), findsNothing);
+      expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
+      await _openCreator(tester);
+      expect(tester.takeException(), isNull);
+      expect(find.byType(CardCreatorSheet), findsOneWidget);
     });
+  }
+}
+
+class _ControlledReviewService extends ReviewService {
+  _ControlledReviewService(TestHarness harness)
+    : super(
+        practices: harness.practices,
+        sessions: harness.sessions,
+        cards: harness.cards,
+        clock: harness.clock,
+      );
+
+  int calls = 0;
+  int failOnCall = 0;
+
+  @override
+  Future<int> createBasicCard({
+    required int? sessionId,
+    required String question,
+    required String answer,
+    required String topicName,
+    int? questionId,
+    String context = '',
+    int? skippedQuestionId,
+    String subtopic = '',
+    CognitiveType cognitiveType = CognitiveType.fact,
+  }) async {
+    calls++;
+    if (calls == failOnCall) throw StateError('database offline');
+    return super.createBasicCard(
+      sessionId: sessionId,
+      question: question,
+      answer: answer,
+      topicName: topicName,
+      questionId: questionId,
+      context: context,
+      skippedQuestionId: skippedQuestionId,
+      subtopic: subtopic,
+      cognitiveType: cognitiveType,
+    );
   }
 }

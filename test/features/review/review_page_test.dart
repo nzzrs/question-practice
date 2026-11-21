@@ -180,12 +180,14 @@ void main() {
       harness: harness,
     );
 
-    expect(find.text('Keep this note?'), findsOneWidget);
+    expect(find.text('Review the note'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
-    expect(find.text('From the question'), findsOneWidget);
-    expect(find.text('Create cards'), findsOneWidget);
+    expect(find.text('From the question'), findsNothing);
+    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.byKey(const ValueKey('note-see-context')), findsOneWidget);
     expect(find.text('Suggest cards with AI'), findsNothing);
-    expect(find.text('Keep & save'), findsOneWidget);
+    expect(find.text('Finish'), findsOneWidget);
+    expect(find.text('Keep & save'), findsNothing);
   });
 
   testWidgets('error review continues without bias or vaccine notes', (
@@ -216,14 +218,15 @@ void main() {
     );
 
     expect(find.text('Analyse the error'), findsOneWidget);
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
-    expect(find.text('Continue'), findsOneWidget);
+    expect(find.byType(AdaptiveSplitView), findsNothing);
+    expect(find.byType(CardCreatorSheet), findsNothing);
+    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.text('Finish'), findsOneWidget);
     expect(find.text('Check with AI'), findsNothing);
     expect(find.text('Flawed assumption (bias)'), findsNothing);
     expect(find.text('Vaccine (rule / protocol)'), findsNothing);
 
-    await tester.tap(find.text('Continue'));
+    await tester.tap(find.text('Finish'));
     await pumpFrames(tester);
 
     expect(find.text('Review complete'), findsWidgets);
@@ -256,6 +259,9 @@ void main() {
       harness: harness,
     );
 
+    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
     await tester.enterText(
       find.byKey(const ValueKey('creator-front')),
       'Which layer owns IP addresses?',
@@ -269,7 +275,9 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await tester.tap(find.byKey(const ValueKey('creator-close')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
     expect(find.textContaining('1 card completed or created'), findsOneWidget);

@@ -46,14 +46,16 @@ void main() {
 
     expect(find.text('Item 1 of 2'), findsOneWidget);
     expect(find.text('second note'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+    expect(find.text('Save and finish'), findsNothing);
 
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
     await pumpFrames(tester);
 
     expect(find.text('Item 2 of 2'), findsOneWidget);
     expect(find.text('first note'), findsOneWidget);
 
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
     await pumpFrames(tester);
 
     expect(find.text('Note review complete'), findsOneWidget);
@@ -74,11 +76,11 @@ void main() {
       harness: harness,
     );
 
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
     await pumpFrames(tester);
     expect(find.text('Item 2 of 2'), findsOneWidget);
 
-    await tester.tap(find.text('Keep & done'));
+    await tester.tap(find.text('Save and finish'));
     await pumpFrames(tester, frames: 24);
 
     expect(find.text('Note review complete'), findsOneWidget);
@@ -118,7 +120,7 @@ void main() {
     );
 
     expect(find.text('second note'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('note-delete')));
+    await tester.tap(find.byKey(const ValueKey('review-dock-delete')));
     await pumpFrames(tester);
     expect(find.text('Delete note?'), findsOneWidget);
     await tester.tap(find.text('Delete'));

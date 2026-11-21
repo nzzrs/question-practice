@@ -165,9 +165,10 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(ValueKey('feedback-note-card-$noteId')));
     await pumpFrames(tester);
-    expect(find.byType(CardCreatorSheet), findsNothing);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
-    expect(find.text('From this note'), findsOneWidget);
+    expect(find.byType(CardCreatorSheet), findsOneWidget);
+    expect(find.byType(CardCreatorPane), findsNothing);
+    expect(find.text('From this note'), findsNothing);
+    expect(find.byKey(const ValueKey('creator-context')), findsNothing);
     expect(find.byKey(const ValueKey('creator-seed-hint')), findsOneWidget);
 
     final cloze = tester.widget<M3ETextField>(
@@ -192,8 +193,9 @@ void main() {
 
     expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);
     expect(find.text('Edit card content'), findsNothing);
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
+    expect(find.byType(AdaptiveSplitView), findsNothing);
+    expect(find.byType(CardCreatorPane), findsNothing);
+    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
   });
 
   testWidgets('the review fits 360 dp at 2.0 text scale', (tester) async {
@@ -221,9 +223,10 @@ void main() {
       harness: harness,
     );
     expect(tester.takeException(), isNull);
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
+    expect(find.byType(AdaptiveSplitView), findsNothing);
+    expect(find.byType(CardCreatorPane), findsNothing);
     expect(find.byKey(const ValueKey('wrong-notes-list')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

@@ -83,34 +83,41 @@ Future<void> _pumpView(
   await pumpTestApp(
     tester,
     home: Scaffold(
-      body: AdaptiveSplitView(
-        leading: SingleChildScrollView(
-          child: ErrorCardReviewView(
-            card: card,
-            creator: creator,
-            onSeedRequested: () {},
-          ),
-        ),
-        trailing: CardCreatorPane(
-          request: CardCreatorRequest(
-            title: 'Create cards',
-            sessionId: card.sessionId,
-            questionId: card.questionId,
-            questionContext: card.question,
-            topicName: card.topicName,
-            subtopic: card.subtopic,
-            error: CardCreatorErrorSource(
-              card: card,
-              question: card.question,
-              wrongAnswer: card.wrongAnswer,
-              correctAnswer: card.correctAnswer,
-              reasoning: card.reasoning,
-              explanation: card.explanation,
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              child: ErrorCardReviewView(
+                card: card,
+                creator: creator,
+                onSeedRequested: () {},
+              ),
             ),
           ),
-          controller: creator,
-          onSaved: onCardsAdded,
-        ),
+          SizedBox(
+            height: 360,
+            child: CardCreatorPane(
+              request: CardCreatorRequest(
+                title: 'Create cards',
+                sessionId: card.sessionId,
+                questionId: card.questionId,
+                questionContext: card.question,
+                topicName: card.topicName,
+                subtopic: card.subtopic,
+                error: CardCreatorErrorSource(
+                  card: card,
+                  question: card.question,
+                  wrongAnswer: card.wrongAnswer,
+                  correctAnswer: card.correctAnswer,
+                  reasoning: card.reasoning,
+                  explanation: card.explanation,
+                ),
+              ),
+              controller: creator,
+              onSaved: onCardsAdded,
+            ),
+          ),
+        ],
       ),
     ),
     harness: harness,
@@ -142,7 +149,7 @@ void main() {
     expect(find.text('Flawed assumption (bias)'), findsNothing);
     expect(find.text('Vaccine (rule / protocol)'), findsNothing);
     expect(find.byKey(const ValueKey('error-card-reading-time')), findsNothing);
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
+    expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorPane), findsOneWidget);
     expect(find.text('Create cards'), findsOneWidget);
   });

@@ -9,6 +9,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/providers.dart';
 import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/core/domain/reading_time.dart';
 import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/export/card_creator_controller.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
@@ -131,7 +132,10 @@ void main() {
     return NoteFixture(note: note, question: question);
   }
 
-  Future<CardCreatorErrorSource> seedError(TestHarness harness) async {
+  Future<CardCreatorErrorSource> seedError(
+    TestHarness harness, {
+    List<MistakeKind> mistakeKinds = const [],
+  }) async {
     final seeded = await harness.seedPractice(count: 1);
     final question = (await harness.practices.questionsForPractice(
       seeded.practiceId,
@@ -149,6 +153,7 @@ void main() {
       topicName: 'Topic',
       practiceName: 'Practice',
       subtopic: 'Sub',
+      mistakeKinds: mistakeKinds,
       lastWrongAt: harness.clock.now().toUtc(),
       dueAfter: const Duration(hours: 48),
     );
@@ -386,6 +391,34 @@ void main() {
     expect(back, contains('[behavior A]'));
   });
 
+  testWidgets('legacy mistake kinds stay out of the creator recap', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final error = await seedError(
+      harness,
+      mistakeKinds: const [MistakeKind.forgottenFact, MistakeKind.confusion],
+    );
+
+    await openCreator(
+      tester,
+      harness,
+      CardCreatorRequest(
+        title: 'Create cards',
+        topicName: 'Topic',
+        subtopic: 'Sub',
+        error: error,
+      ),
+    );
+
+    expect(find.byKey(const ValueKey('creator-context')), findsOneWidget);
+    expect(find.text('Wrong answer chosen'), findsOneWidget);
+    expect(find.text('Forgotten fact'), findsNothing);
+    expect(find.text('Confusion between 2 options'), findsNothing);
+    expect(find.text('Misinterpretation'), findsNothing);
+  });
+
   testWidgets('custom prefilled skipped or ask text is preserved', (
     tester,
   ) async {
@@ -457,6 +490,19 @@ void main() {
       find.byKey(const ValueKey('creator-litmus-detail-current')),
     );
     expect(detail.data, contains('Can be answered with yes or no'));
+
+    final readingTime = find.byKey(
+      const ValueKey('creator-litmus-reading-time'),
+    );
+    expect(readingTime, findsOneWidget);
+    expect(
+      find.descendant(
+        of: readingTime,
+        matching: find.text(readingTimeLabel('Is a VPC public?')),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byTooltip('Estimated time to read the front'), findsOneWidget);
 
     await enter(
       tester,

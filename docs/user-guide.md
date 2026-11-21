@@ -123,7 +123,7 @@ Review opens fullscreen.
 
 - **Export to AnkiDroid** needs AnkiDroid installed, its API enabled and storage permission granted.
 - Concepts use the **Cloze** note type. Facts, heuristics and contrasts use the standard **Basic** note type, created automatically if missing. There is no custom error note type.
-- Exported Anki notes carry hierarchical `topic::<topic>` and `subtopic::<subtopic>` tags. Concept fronts also show `[Topic / Subtopic]`.
+- Exported Anki notes carry `question-practice`, `topic::<topic>` and `subtopic::<subtopic>` tags. Topic and subtopic are never written inside card text.
 - Each topic can use its own deck. A topic without a deck uses the default deck from **Settings**.
 - Set a topic's deck with **Edit topic → AnkiDroid deck**. **Browse decks** lists live deck names; a typed name is created on export.
 - **Share as files** writes Anki-compatible text files. File export cannot encode a deck and never includes notes.

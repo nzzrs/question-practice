@@ -42,12 +42,13 @@ Basic cards use the note type named exactly **`Basic`**, with the two fields `Fr
 Concept note text is:
 
 ```
-[Topic / Subtopic] Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}
+Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}
 ```
 
-The topic and subtopic context is added automatically when the term is defined
-inside a question. If only one of them exists, only that one is shown; with
-neither, the card starts directly with `Definition of`.
+The topic and subtopic are never written into the note text, even when the term
+is defined inside a question. They travel as tags (`question-practice`,
+`topic::<topic>`, `subtopic::<subtopic>`) and, in file exports, in the third
+`Tags` column.
 
 When the selected term is an acronym, the AI returns a dictionary-style meaning
 for the cloze and puts only the full form in the note's `Back Extra` field:

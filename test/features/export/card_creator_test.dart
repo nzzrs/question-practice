@@ -1,14 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:question_practice/app/providers.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
+import 'package:question_practice/features/review/domain/review_service.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -18,10 +21,12 @@ void main() {
     TestHarness harness,
     CardCreatorRequest request, {
     ValueChanged<int>? onSaved,
+    List<Override> overrides = const [],
   }) async {
     await pumpTestApp(
       tester,
       harness: harness,
+      overrides: overrides,
       home: Builder(
         builder: (context) => Scaffold(
           body: Center(
@@ -479,6 +484,7 @@ void main() {
       questionId: null,
       term: 'VPC',
       definition: 'A private network.',
+      extra: 'Virtual Private Cloud',
       context: 'Context',
       topicName: 'Topic',
       source: ConceptSource.manual,
@@ -514,6 +520,7 @@ void main() {
     expect(concepts, hasLength(2));
     final newest = concepts!.firstWhere((concept) => concept.id != seededId);
     expect(newest.definition, 'A private network.');
+    expect(newest.extra, 'Virtual Private Cloud');
     expect(newest.source, ConceptSource.manual);
   });
 
@@ -1173,6 +1180,91 @@ void main() {
     expect(skipped, isEmpty);
   });
 
+  testWidgets(
+    'partial save failure keeps the remaining draft and shows snack',
+    (tester) async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final service = _ControlledReviewService(harness)..failOnCall = 2;
+
+      await openCreator(
+        tester,
+        harness,
+        const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+        overrides: [reviewServiceProvider.overrideWithValue(service)],
+      );
+
+      await enter(tester, 'creator-front', 'First saved?');
+      await enter(tester, 'creator-back', 'First answer.');
+      await addBuilderCard(tester);
+      await enter(tester, 'creator-front', 'Second stays?');
+      await enter(tester, 'creator-back', 'Second answer.');
+      await addBuilderCard(tester);
+
+      await saveAll(tester);
+      await pumpFrames(tester, frames: 4);
+
+      expect(
+        find.textContaining('1 card saved, but the rest could not be saved'),
+        findsOneWidget,
+      );
+      expect(find.text('Save 1 card'), findsOneWidget);
+      expect(find.byKey(const ValueKey('creator-draft-0')), findsOneWidget);
+      final cards = await tester.runAsync(
+        () => harness.cards.watchManualCards().first,
+      );
+      expect(cards, hasLength(1));
+      expect(cards!.single.question, 'First saved?');
+    },
+  );
+
+  testWidgets('saving disables close, fields and save until it finishes', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final gate = Completer<void>();
+    final service = _ControlledReviewService(harness)..gate = gate;
+    int? saved;
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+      onSaved: (count) => saved = count,
+      overrides: [reviewServiceProvider.overrideWithValue(service)],
+    );
+
+    await enter(tester, 'creator-front', 'A slow save?');
+    await enter(tester, 'creator-back', 'A slow answer.');
+    await addBuilderCard(tester);
+    await tapKey(tester, 'creator-save');
+
+    expect(find.text('Saving…'), findsOneWidget);
+    expect(
+      tester
+          .widget<AppPrimaryButton>(find.byKey(const ValueKey('creator-save')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<M3EIconButton>(find.byKey(const ValueKey('creator-close')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<M3ETextField>(find.byKey(const ValueKey('creator-front')))
+          .enabled,
+      isFalse,
+    );
+
+    gate.complete();
+    await pumpFrames(tester, frames: 24);
+    expect(saved, 1);
+  });
+
   testWidgets('creator fits a 320x640 screen and keep save reachable', (
     tester,
   ) async {
@@ -1287,4 +1379,50 @@ class NoteFixture {
 
   final Note note;
   final Question question;
+}
+
+/// Wraps the real review service so a test can fail or hold one card save.
+class _ControlledReviewService extends ReviewService {
+  _ControlledReviewService(TestHarness harness)
+    : super(
+        practices: harness.practices,
+        sessions: harness.sessions,
+        cards: harness.cards,
+        clock: harness.clock,
+      );
+
+  int calls = 0;
+  int failOnCall = 0;
+  Completer<void>? gate;
+
+  @override
+  Future<int> createBasicCard({
+    required int? sessionId,
+    required String question,
+    required String answer,
+    required String topicName,
+    int? questionId,
+    String context = '',
+    int? skippedQuestionId,
+    String subtopic = '',
+    CognitiveType cognitiveType = CognitiveType.fact,
+  }) async {
+    calls++;
+    if (calls == failOnCall) {
+      throw StateError('database offline');
+    }
+    final held = gate;
+    if (held != null) await held.future;
+    return super.createBasicCard(
+      sessionId: sessionId,
+      question: question,
+      answer: answer,
+      topicName: topicName,
+      questionId: questionId,
+      context: context,
+      skippedQuestionId: skippedQuestionId,
+      subtopic: subtopic,
+      cognitiveType: cognitiveType,
+    );
+  }
 }

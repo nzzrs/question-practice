@@ -15,7 +15,7 @@ Built with Flutter and Material 3 Expressive. No account, no analytics, no count
 - Get a score and the number of terms looked up at the end of a session.
 - Review wrong and skipped questions immediately and create:
   - atomic cards from a mistake: **Create cards** opens the card creator. Manual entry adds cards one at a time and works without AI. Five templates write the front and back, and optional AI suggestions propose ideas with up to three variants each. Every builder card, draft and variant shows an advisory quality badge for yes/no questions, long fronts or cards, answer clues, template mismatches and missing fields. Topic and subtopic travel as Anki tags only. Errors are never exported directly;
-  - concept cards such as `[Topic / Subtopic] Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}`, with an acronym's full form in the Anki extra field;
+  - concept cards such as `Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}`, with an acronym's full form in the Anki extra field and the topic/subtopic carried only as tags;
   - basic question/answer cards for skipped questions.
 - Review cards show the skipped or unknown question in a structured panel with the correct answer in green and a collapsible list of the other alternatives and their explanations.
 - Skipped questions stay in the combined **Error and skipped** section of Cards after the session ends, so they can become cards later. They leave the section when converted into a card.

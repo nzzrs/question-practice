@@ -134,10 +134,7 @@ void main() {
       find.text('I assumed both alternatives did the same job.'),
       findsOneWidget,
     );
-    expect(
-      find.text('Not quite. This is the error card from that attempt.'),
-      findsOneWidget,
-    );
+    expect(find.text('Not quite.'), findsOneWidget);
     expect(find.text('Network layer'), findsOneWidget);
     expect(find.text('Why this answer'), findsOneWidget);
     expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);

@@ -30,7 +30,7 @@ class FeedbackStatusBanner extends StatelessWidget {
             (FeedbackMode.review, _, _, _, _) => (
               theme.colorScheme.errorContainer,
               Icons.error_outline,
-              'Not quite. This is the error card from that attempt.',
+              'Not quite.',
             ),
             (_, true, true, _, _) => (
               AppSuccess.container(context),

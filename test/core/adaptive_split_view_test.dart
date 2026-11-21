@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -48,6 +49,31 @@ Future<void> _setSize(WidgetTester tester, Size size) async {
 
 Size _sizeOf(WidgetTester tester, Key key) {
   return tester.getSize(find.byKey(key));
+}
+
+class _CounterPane extends StatefulWidget {
+  const _CounterPane({super.key});
+
+  @override
+  State<_CounterPane> createState() => _CounterPaneState();
+}
+
+class _CounterPaneState extends State<_CounterPane> {
+  int _count = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text('count $_count'),
+        TextButton(
+          onPressed: () => setState(() => _count++),
+          child: const Text('increment'),
+        ),
+      ],
+    );
+  }
 }
 
 void main() {
@@ -254,6 +280,119 @@ void main() {
     semantics.dispose();
   });
 
+  testWidgets('mirrors horizontal drags and arrow keys in RTL', (tester) async {
+    await _setSize(tester, const Size(800, 600));
+    await tester.pumpWidget(
+      _app(Directionality(textDirection: TextDirection.rtl, child: _split())),
+    );
+
+    expect(
+      tester.getTopLeft(find.byKey(_leadingKey)).dx,
+      greaterThan(tester.getTopLeft(find.byKey(_trailingKey)).dx),
+    );
+
+    final initial = _sizeOf(tester, _leadingKey).width;
+    await tester.drag(
+      find.byKey(AdaptiveSplitView.dividerKey),
+      const Offset(30, 0),
+    );
+    await tester.pumpAndSettle();
+
+    final afterDrag = _sizeOf(tester, _leadingKey).width;
+    expect(afterDrag, lessThan(initial));
+
+    await tester.tap(find.byKey(AdaptiveSplitView.dividerKey));
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+
+    expect(
+      afterDrag - _sizeOf(tester, _leadingKey).width,
+      closeTo(752 * 0.05, 0.6),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+
+    expect(_sizeOf(tester, _leadingKey).width, closeTo(afterDrag, 0.6));
+  });
+
+  testWidgets('preserves pane state when the split axis changes', (
+    tester,
+  ) async {
+    await _setSize(tester, const Size(400, 800));
+
+    Widget split() {
+      return _app(
+        const AdaptiveSplitView(
+          leading: _CounterPane(key: _leadingKey),
+          trailing: SizedBox.expand(key: _trailingKey),
+        ),
+      );
+    }
+
+    await tester.pumpWidget(split());
+    await tester.tap(find.text('increment'));
+    await tester.pump();
+    await tester.tap(find.text('increment'));
+    await tester.pump();
+    expect(find.text('count 2'), findsOneWidget);
+
+    await _setSize(tester, const Size(800, 600));
+    await tester.pumpWidget(split());
+
+    expect(find.text('count 2'), findsOneWidget);
+  });
+
+  testWidgets('focus ring surrounds the dragging handle and cancel resets it', (
+    tester,
+  ) async {
+    await _setSize(tester, const Size(800, 600));
+    await tester.pumpWidget(_app(_split()));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pumpAndSettle();
+
+    final handle = find.byKey(AdaptiveSplitView.dividerHandleKey);
+    final ring = find.byKey(AdaptiveSplitView.dividerFocusRingKey);
+    expect(handle, findsOneWidget);
+    expect(ring, findsOneWidget);
+
+    void expectRingContainsHandle() {
+      final ringRect = tester.getRect(ring);
+      final handleRect = tester.getRect(handle);
+      expect(ringRect.left, lessThan(handleRect.left));
+      expect(ringRect.top, lessThan(handleRect.top));
+      expect(ringRect.right, greaterThan(handleRect.right));
+      expect(ringRect.bottom, greaterThan(handleRect.bottom));
+    }
+
+    expectRingContainsHandle();
+
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(AdaptiveSplitView.dividerKey)),
+      kind: PointerDeviceKind.mouse,
+    );
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(20, 0));
+    await tester.pumpAndSettle();
+
+    expect(
+      _sizeOf(tester, AdaptiveSplitView.dividerHandleKey),
+      const Size(6, 48),
+    );
+    expectRingContainsHandle();
+
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+
+    expect(
+      _sizeOf(tester, AdaptiveSplitView.dividerHandleKey),
+      const Size(4, 32),
+    );
+  });
+
   testWidgets('keeps a 48dp divider and fits at 320dp and 2x text', (
     tester,
   ) async {
@@ -294,6 +433,21 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(_sizeOf(tester, AdaptiveSplitView.dividerKey), const Size(48, 500));
+
+    await _setSize(tester, const Size(600, 320));
+    await tester.pumpWidget(
+      _app(_scaled(_split(), const TextScaler.linear(2))),
+    );
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(_sizeOf(tester, AdaptiveSplitView.dividerKey), const Size(48, 320));
+    expect(
+      _sizeOf(tester, _leadingKey).width +
+          _sizeOf(tester, _trailingKey).width +
+          AdaptiveSplitView.dividerExtent,
+      closeTo(600, 0.01),
+    );
   });
 
   testWidgets('the panes scroll independently', (tester) async {

@@ -14,6 +14,12 @@ import 'package:material_ui/material_ui.dart';
 /// Each child owns its scrolling. The split view never wraps the panes in a
 /// scroll view; it only gives each pane a bounded extent along the split axis.
 ///
+/// The leading pane sits at the start of the reading direction, so in a
+/// right-to-left context it is on the right and horizontal drags and arrow
+/// keys move in the mirrored direction. The same [Flex] parent is reused when
+/// the axis flips, so pane state, such as a scroll offset, survives a
+/// breakpoint change.
+///
 /// The ratio is kept per [PageStorage] bucket under [storageKey], with a
 /// separate value for each orientation. Nothing is written to settings or the
 /// database, so reopening the route restores the default ratio.
@@ -72,6 +78,16 @@ class AdaptiveSplitView extends StatefulWidget {
 
   /// The draggable divider, exposed for tests and host focus handling.
   static const Key dividerKey = ValueKey<String>('adaptive-split-view-divider');
+
+  /// The visible divider handle, exposed for tests.
+  static const Key dividerHandleKey = ValueKey<String>(
+    'adaptive-split-view-divider-handle',
+  );
+
+  /// The keyboard focus ring, exposed for tests.
+  static const Key dividerFocusRingKey = ValueKey<String>(
+    'adaptive-split-view-focus-ring',
+  );
 
   /// Extent of the divider along the split axis, including the hit target.
   static const double dividerExtent = 48;
@@ -148,6 +164,9 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
     );
   }
 
+  TextDirection get _textDirection =>
+      Directionality.maybeOf(context) ?? TextDirection.ltr;
+
   bool _isHorizontal(BoxConstraints constraints, Size window) {
     final override = widget.horizontal;
     if (override != null) return override;
@@ -204,7 +223,11 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
     bool horizontal,
   ) {
     if (bounds.space <= 0) return;
-    final delta = horizontal ? details.delta.dx : details.delta.dy;
+    final alongReadingDirection =
+        horizontal && _textDirection == TextDirection.rtl ? -1.0 : 1.0;
+    final delta = horizontal
+        ? details.delta.dx * alongReadingDirection
+        : details.delta.dy;
     if (delta == 0) return;
 
     final current = _resolveRatio(bounds, horizontal);
@@ -303,13 +326,9 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
           ratio: ratio,
         );
 
-        if (horizontal) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [leading, divider, trailing],
-          );
-        }
-        return Column(
+        // A single Flex keeps the pane elements alive when the axis flips.
+        return Flex(
+          direction: horizontal ? Axis.horizontal : Axis.vertical,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [leading, divider, trailing],
         );
@@ -338,6 +357,7 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
         ? Container(width: 1, height: double.infinity, color: lineColor)
         : Container(width: double.infinity, height: 1, color: lineColor);
     final handle = AnimatedContainer(
+      key: AdaptiveSplitView.dividerHandleKey,
       duration: duration,
       width: horizontal ? (_dragging ? 6 : 4) : (_dragging ? 48 : 32),
       height: horizontal ? (_dragging ? 48 : 32) : (_dragging ? 6 : 4),
@@ -358,13 +378,16 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
       bounds,
     );
 
+    // The long side covers the dragging handle (48dp) with a 2dp gap on each
+    // end; the short side stays inside the 48dp divider strip.
     final focusRing = _focusHighlight
         ? Container(
-            width: horizontal ? 12 : 40,
-            height: horizontal ? 40 : 12,
+            key: AdaptiveSplitView.dividerFocusRingKey,
+            width: horizontal ? 16 : 52,
+            height: horizontal ? 52 : 16,
             decoration: BoxDecoration(
               border: Border.all(color: scheme.primary, width: 2),
-              borderRadius: BorderRadius.circular(6),
+              borderRadius: BorderRadius.circular(8),
             ),
           )
         : const SizedBox.shrink();
@@ -382,11 +405,19 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
       ),
     );
 
+    final step = horizontal && _textDirection == TextDirection.rtl
+        ? -0.05
+        : 0.05;
     final resizeIntent = horizontal
-        ? const {
-            SingleActivator(LogicalKeyboardKey.arrowLeft): _ResizeIntent(-0.05),
-            SingleActivator(LogicalKeyboardKey.arrowRight): _ResizeIntent(0.05),
-            SingleActivator(LogicalKeyboardKey.home): _ResetSplitIntent(),
+        ? {
+            const SingleActivator(LogicalKeyboardKey.arrowLeft): _ResizeIntent(
+              -step,
+            ),
+            const SingleActivator(LogicalKeyboardKey.arrowRight): _ResizeIntent(
+              step,
+            ),
+            const SingleActivator(LogicalKeyboardKey.home):
+                const _ResetSplitIntent(),
           }
         : const {
             SingleActivator(LogicalKeyboardKey.arrowUp): _ResizeIntent(-0.05),

@@ -896,6 +896,13 @@ void main() {
     addTearDown(harness.close);
     await enableAi(harness);
     final fixture = await seedNote(harness);
+    await harness.cards.createManualCard(
+      sessionId: null,
+      question: 'Which layer owns IP addresses?',
+      answer: 'The network layer.',
+      topicName: 'Topic',
+      createdAt: harness.clock.now().toUtc(),
+    );
     final creator = CardCreatorController();
     addTearDown(creator.dispose);
 
@@ -908,7 +915,6 @@ void main() {
             title: 'Create cards',
             topicName: 'Topic',
             note: fixture.note,
-            existingFronts: const ['Which layer owns IP addresses?'],
           ),
           controller: creator,
         ),

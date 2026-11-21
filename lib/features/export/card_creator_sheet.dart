@@ -92,11 +92,10 @@ class CardCreatorRequest {
   final String initialTerm;
   final String initialDefinition;
 
-  /// Fronts or terms already written for this review context.
+  /// Fronts or terms known for this review context.
   ///
-  /// AI suggestions that repeat any of them are dropped. Callers that know the
-  /// review's existing cards pass their fronts and terms here; the creator
-  /// always adds its own drafts before asking the AI.
+  /// AI suggestions that repeat any of them are dropped. The creator also
+  /// reads saved cards and adds its own drafts before asking the AI.
   final List<String> existingFronts;
 
   /// Note context: enables AI suggestions and marks the note converted on save.
@@ -392,6 +391,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   String _appliedDefinitionCloze = '';
 
   final _drafts = <_CardDraft>[];
+  List<String> _savedCardTexts = const [];
   List<_SuggestedIdea>? _ideas;
   final _retiredIdeas = <_SuggestedIdea>[];
   final _retiredVariants = <_AiVariant>[];
@@ -422,6 +422,11 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     super.initState();
     widget.controller?.addListener(_onControllerChanged);
     widget.saveHandle?._attach(_saveHandler);
+    ref.listenManual(
+      existingCardTextsProvider,
+      (_, next) => _savedCardTexts = next,
+      fireImmediately: true,
+    );
     final request = widget.request;
     _front = TextEditingController(text: request.initialFront);
     _back = TextEditingController(text: request.initialBack);
@@ -902,6 +907,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   /// Card fronts and terms the AI must not repeat.
   List<String> get _knownCardTexts => [
     ...widget.request.existingFronts,
+    ..._savedCardTexts,
     if (widget.request.initialFront.trim().isNotEmpty)
       widget.request.initialFront,
     if (widget.request.initialTerm.trim().isNotEmpty)

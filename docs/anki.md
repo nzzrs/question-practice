@@ -31,7 +31,7 @@ Routing uses the topic name captured on each card: concept cards use the topic c
 | Model | Fields | Used for |
 |---|---|---|
 | AnkiDroid's Cloze type | existing `Text` and `Back Extra` fields | Concept cards and definitions |
-| `Basic` | `Front`, `Back` | Facts, heuristics, contrasts, skipped-question cards and Ask answers |
+| `Basic` | `Front`, `Back` | Contrast, Cause and effect, Exam tip and Steps cards, skipped-question cards and Ask answers |
 
 The app no longer creates or writes a custom error note type. An error is a review record that is turned into atomic Basic cards with **Create cards** before export. The old `Question Practice: Error v2` model is no longer required, created or written.
 
@@ -64,10 +64,11 @@ the definition bubble in the app.
 
 The end-of-session review and the Cards screen show the same feedback as practice: the question, every alternative with its correct/wrong state and explanation, the status, and your read-only wrong-answer bullets. Notes saved for the question can be copied or turned into cards with the icon-only sparkle. A distracted re-test keeps the card due and adds a warning. The review no longer edits the question or options. There are no free-text bias or vaccine fields and no "Check with AI" button.
 
-An error step is one full-width reading surface with a shared bottom dock. The card icon opens the creator as a bottom sheet, so the feedback stays readable above it; there is no split view. **Turn bullet into card** is replaced by an icon-only sparkle that seeds the creator from a bullet; with AI it drafts the front and back and picks the template, and without a key it prefills the bullet as the front with a Settings hint. Manual entry adds cards one at a time and works offline without AI. Five templates write the front and back: Definition / term, Contrast / difference, Mechanism / cause-effect, Exam heuristic and Phase transition / procedure. A Definition card becomes a Cloze concept; the other four become Basic cards.
+An error step is one full-width reading surface with a shared bottom dock. The card icon opens **Create cards** as a bottom sheet, so the feedback stays readable above it; there is no split view. An icon-only sparkle beside a bullet seeds the sheet from it; with AI it drafts the front and back and picks the template, and without a key it prefills the bullet as the front with a Settings hint. Manual entry adds cards one at a time and works offline without AI. Five templates write the front and back: **Definition**, **Contrast**, **Cause and effect**, **Exam tip** and **Steps**. A Definition card becomes a Cloze concept; the other four become Basic cards. Definition uses one raw cloze field with the term in `{{c1::…}}` and the definition in `{{c2::…}}`; both are required.
 
-AI suggestions are optional and sit below manual entry. Each idea offers up to
-three wording variants, and an error breakdown proposes at most two ideas:
+The sparkle icon beside the template opens optional AI suggestions. Each idea
+offers up to three wording variants, and an error breakdown proposes at most
+two ideas:
 
 - a **contrast** idea that asks you to distinguish the chosen wrong option from the correct one;
 - a **heuristic** idea whose front follows the mandatory template
@@ -99,7 +100,7 @@ bracketed `[Topic / Subtopic]` prefix.
 ## What is sent
 
 Only selected, complete cards are sent. Concepts need a definition. Manual
-cards (facts, heuristics and contrasts) are always exportable Basic cards.
+cards built from any Basic template are always exportable Basic cards.
 Error records and skipped questions are not exported directly: turn an error
 into atomic cards with **Create cards** first and convert a skipped question
 into a concept or basic card. The Cards screen previews every card and lets you
@@ -136,10 +137,10 @@ On a connected Android device with AnkiDroid installed:
 3. Export to AnkiDroid and accept the permission prompt.
 4. In AnkiDroid, open the Question Practice deck and confirm:
    - concept notes render as cloze cards with no topic prefix in the text;
-   - contrast and heuristic notes use the `Basic` note type;
+   - Contrast, Cause and effect, Exam tip and Steps cards use the `Basic` note type;
    - `question-practice`, `topic::` and `subtopic::` tags are present.
 5. Set the Cloud topic to a separate deck with **Edit topic → AnkiDroid deck** (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck. Open **Edit practice** and confirm it has no deck row; deck selection is topic-level only.
-6. Import a multi-answer question, answer it wrong, open the review and confirm **Create cards** adds two cards manually without AI, while **AI suggestions** proposes contrast and heuristic ideas with variants, advisory quality badges and reading times. Retry with the refresh icon and confirm drafts stay.
+6. Import a multi-answer question, answer it wrong, open the review and confirm **Create cards** adds two cards manually without AI, while the sparkle icon opens AI suggestions with contrast and exam-tip ideas, variants, advisory quality badges and reading times. Retry with the refresh icon and confirm drafts stay.
 7. Confirm no `Question Practice: Error v2` model is created in AnkiDroid.
 8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
 9. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.

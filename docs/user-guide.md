@@ -10,7 +10,7 @@ Questions is an offline Android app for practising questions and exporting study
 - Long-press a topic to **Edit topic**, **Archive topic** or **Delete topic**. Delete asks for confirmation and removes everything inside the topic.
 - **Session in progress** cards sit at the top. Each has **Resume** and **Discard**. Several sessions can stay paused at once.
 - **Review past errors** opens the 48-hour error queue.
-- **Cards** opens concepts, error and skipped cards, basic cards and notes.
+- **Cards** opens concepts, basic cards, error and skipped questions, and notes.
 - The **Shuffle** floating button opens **Start shuffled practice**.
 - **Import** adds practices from a file. The help icon opens **How to use it**; the settings icon opens **Settings**.
 
@@ -46,7 +46,7 @@ Questions is an offline Android app for practising questions and exporting study
 ## Practice
 
 - Select one alternative, or every correct alternative when the question has several.
-- After a wrong answer, **What went wrong?** keeps one idea per bullet. Enter makes a new bullet, pasting an outline splits it into bullets, and edits save automatically. These bullets appear later in the error review and feed the card creator.
+- After a wrong answer, **What went wrong?** keeps one idea per bullet. Enter makes a new bullet, pasting an outline splits it into bullets, and edits save automatically. These bullets appear later in the error review and feed **Create cards**.
 - Alternative letters stay hidden until feedback. The eye icon shows them early without changing the order.
 - **Check** stays on the same screen. Correct and wrong choices are marked, the correct and selected alternatives open with their explanation, and the overall explanation appears below.
 - The arrows and question list move between questions without answering. Submitted answers keep their feedback. Answered questions get a **Done** tag.
@@ -60,8 +60,7 @@ Questions is an offline Android app for practising questions and exporting study
 
 - A wrong answer creates an error record with the question, your answer, the correct answer and the explanation.
 - **What went wrong?** collects one atomic note per bullet. Add bullets, edit them in place, or delete one; empty bullets disappear when you leave the field. The list keeps up to 30 bullets and 500 characters each.
-- **I was distracted or read too fast** removes a new error card. Uncheck it to restore the card. On a re-test of an older error the card stays due and the review warns that you were distracted or misread.
-- **I didn't know this** counts as skipped and creates no error card.
+- **I was distracted or read too fast** is the only answer-level check. It removes a new error card, and unchecking it restores the card. On a re-test of an older error the card stays due and the review warns that you were distracted or misread.
 - Skipped questions create no error card. The review asks what was missing.
 - Feedback stays on screen while you move between questions.
 
@@ -77,20 +76,18 @@ Review opens fullscreen.
 
 - **Wrong questions** use the same feedback as practice: the topic and subtopic labels, the question, every alternative with its correct/wrong state and explanation, the status banner, **Why this answer**, and your read-only **What went wrong?** bullets.
 - If the card was kept because a re-test was distracted, a warning says **You were distracted or misread. This card stays due.**
-- Notes saved for the question appear below the bullets. **Copy** copies a note; the sparkle action seeds the creator with it. The note menu also offers Define, Ask and Delete; Delete asks for confirmation.
-- The review does not edit the question or options. Every step is one full-width reading surface with a shared bottom dock. The card icon opens the creator as a bottom sheet, so the feedback stays readable above it. The creator keeps a separate session for each item: typed text, the selected template, drafts and AI results stay when the sheet closes and when you move between steps.
-- The sparkle action beside any read-only bullet seeds the creator with that bullet. With an AI provider the creator shows **Drafting a card…** and fills the front and back, choosing the template; without one it prefills the front and leaves the back for you to write. If you edit the fields before the draft arrives, the creator offers **Use AI draft** instead of overwriting your text. A second bullet or note asks before replacing a draft you started.
-- Manual entry adds cards one at a time and works offline without AI. Five templates write the front and back: Definition / term, Contrast / difference, Mechanism / cause-effect, Exam heuristic and Phase transition / procedure.
-- The dock keeps the same controls in the same order: back arrow, Create cards, Delete when the step has something to delete, Save and the forward arrow. The back arrow is disabled on the first step. Save creates the listed drafts and moves on; the last step shows **Finish**, and note review shows **Save and finish**. The forward arrow moves without saving, but the drafts stay with their item. Leaving the last step asks before discarding any drafts or typed text.
+- Notes saved for the question appear below the bullets. **Copy** copies a note; the sparkle action seeds **Create cards** with it. The note menu also offers Define, Ask and Delete; Delete asks for confirmation.
+- The review does not edit the question or options. Every step is one full-width reading surface with a shared bottom dock. The card icon opens **Create cards** as a bottom sheet, so the feedback stays readable above it. The sheet keeps separate state for each item: typed text, the selected template, drafts and AI results stay when it closes and when you move between steps.
+- The sparkle action beside any read-only bullet seeds the sheet with that bullet. With an AI provider it shows **Drafting a card…** and fills the front and back, choosing the template; without one it prefills the front and leaves the back for you to write. If you edit the fields before the draft arrives, it offers **Use AI draft** instead of overwriting your text. A second bullet or note asks before replacing a draft you started.
+- Manual entry adds cards one at a time and works offline without AI. Five templates write the front and back: **Definition**, **Contrast**, **Cause and effect**, **Exam tip** and **Steps**. Selecting a template fills the empty fields and keeps your own text. **Definition** uses one raw cloze field: put the term in `{{c1::…}}` and the definition in `{{c2::…}}`; both are required.
+- The dock keeps the same controls in the same order: back arrow, Create cards, Delete when the step has something to delete, Save and the forward arrow. The back arrow is disabled on the first step. Save creates the listed cards and moves on; the last step shows **Finish**, and note review shows **Save and finish**. The forward arrow moves without saving, but the drafts stay with their item. Leaving the last step asks before discarding any drafts or typed text.
 - Delete is an icon with a confirmation. No Delete note or Delete card text sits in the dock.
-- AI suggestions are optional: each idea offers up to three wording variants, and the error breakdown proposes a contrast between your choice and the correct option and/or an exam heuristic. The refresh icon asks for another try and keeps your drafts.
+- The sparkle icon beside the template opens optional AI suggestions; tap it again to hide them. Each idea offers up to three wording variants, and an error breakdown may propose a contrast between your choice and the correct option and an exam tip. The refresh icon asks for another try and keeps your drafts.
 - Every builder card, draft and AI variant carries an advisory quality badge and the estimated reading time. The badge warns about yes/no questions, fronts over 30 words, cards over 15 seconds to read, answer clues, template mismatches, empty fronts or backs, a missing definition, and a definition that repeats its term. It never blocks saving. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
-- **Skipped questions** ask what was missing.
-  - **A concept** creates a concept card from a term and definition.
-  - **Another question** creates a basic card from a question and answer.
-- **Create cards** also sits in the skipped review dock and opens the same creator with the question and correct answer prefilled as a custom card. Manual entry adds one card at a time; AI is not required.
-- **Concepts without a definition** get a definition field.
-- **Notes** from the session can be kept with **Save** or turned into cards with **Create cards**. The creator's manual entry adds cards one by one and needs no AI provider. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
+- **Skipped questions** ask what was missing and show the correct answer.
+- **Create cards** sits in the skipped review dock and opens the same sheet with the question and correct answer prefilled as a basic card. Choose another template when needed. Manual entry adds one card at a time; AI is not required.
+- **Concepts without a definition** get a definition step. The definition can also be added later from the concept preview in **Cards**.
+- **Notes** from the session can be kept with **Save** or turned into cards with **Create cards**. Manual entry adds cards one by one and needs no AI provider. The sparkle icon beside the template offers optional AI suggestions with up to three wording variants per idea; check the ones to add.
 - The forward arrow leaves a step for later and the last one reports completion. Missing card details can be finished from **Cards**.
 
 ## Past errors
@@ -98,14 +95,14 @@ Review opens fullscreen.
 - Wrong answers wait 48 hours before they are offered again.
 - **Review N errors** starts a re-test session.
 - A correct answer resolves the card and keeps it in history and statistics.
-- A wrong answer keeps the card active and schedules the next attempt 48 hours later.
+- A wrong answer keeps the card active, schedules the next attempt 48 hours later and makes the card reviewable again, even if it was reviewed before.
 - Marking a re-test answer as distracted does not resolve the card.
 - Resolved cards stay in the history list.
 
 ## Cards
 
 - Filters: **All**, **Cards**, **Errors** and **Notes** in one compact row. Cards groups concepts and basic cards; Errors also includes skipped questions. A visibility action includes exported cards.
-- Cards has no checkboxes. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. Select all in the app bar selects what the current filter shows. The subtitle counts the selection and rows keep their positions.
+- Cards has no checkboxes and no per-row edit or create icons. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. Select all in the app bar selects what the current filter shows; section headers also have a select-all icon. The subtitle counts the selection and rows keep their positions.
 - The selection is global and survives leaving Cards and restarting the app. It starts empty, and ids of deleted or exported rows are dropped.
 - The main action exports ready cards. When the selection includes pending errors or skipped questions it becomes **Review pending** and opens that review instead. **Review all pending** in the app bar opens every pending error and skipped question, even ones not selected.
 - Tap a card to preview it. Error and skipped previews include **Review** beside **Close**. A concept without a definition can be completed from its preview.
@@ -114,7 +111,7 @@ Review opens fullscreen.
 - **Share as files** creates Anki-compatible text files.
 - **Delete selected** removes the chosen cards, skipped questions and notes. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a note removes only the saved phrase; cards already made from it stay.
 - Errors are never exported directly: review them into atomic cards first. Concepts without a definition block export until completed. Skipped questions and notes cannot be exported, but they can still be selected and deleted.
-- Concept cards in the creator need only a term. The meaning is looked up from your saved concepts first, then from AI when a provider is configured. There is no definition field to type in the creator. Without a provider the concept is saved as **Definition pending** and is not exported until a definition is added.
+- **Definition** cards use one raw cloze field in **Create cards**: put the term in `{{c1::…}}` and the definition in `{{c2::…}}`. Both are required before the card can be added. A saved concept without a definition blocks export until you complete it from its preview in **Cards**.
 - Topic and subtopic are never written inside card text. They travel as `question-practice`, `topic::<slug>` and `subtopic::<slug>` Anki tags. File exports put them in a third `Tags` column with `#tags column:3`.
 
 ## Notes
@@ -122,15 +119,15 @@ Review opens fullscreen.
 - Select any question, answer or explanation text during practice and choose **Save as note**. The phrase is shown in place and belongs to the question, so it appears whenever that question is practised again.
 - In practice, tapping a note offers **Define**, **Ask** or **Delete note**; deletion is immediate and asks no confirmation.
 - Notes stay in **Cards**. Tap one to open **Note preview** with its selectable text and question context; **Close** returns to Cards and **Review** opens the note review. In the review, **See context** opens the original question and your attempt read-only, without repeating the note.
-- **Create cards** sits in the note review dock and opens the card creator as a bottom sheet. Manual entry adds cards one at a time and works without AI. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
-- The dock delete icon removes only the saved phrase and asks first. A note with a card keeps its text until you delete it. **Save and finish** keeps the note and closes the review.
+- **Create cards** sits in the note review dock and opens as a bottom sheet. Manual entry adds cards one at a time and works without AI. The sparkle icon beside the template offers optional AI suggestions with up to three wording variants per idea; check the ones to add.
+- The dock delete icon removes only the saved phrase and asks first. A note with a card keeps its text until you delete it. **Save and finish** keeps the note and finishes the review.
 - The download and select-all icons in the Notes header save every note as plain text or select the note rows.
 - Notes are never sent to AnkiDroid.
 
 ## AnkiDroid export
 
 - **Export to AnkiDroid** needs AnkiDroid installed, its API enabled and storage permission granted.
-- Concepts use the **Cloze** note type. Facts, heuristics and contrasts use the standard **Basic** note type, created automatically if missing. There is no custom error note type.
+- Concepts use the **Cloze** note type. **Contrast**, **Cause and effect**, **Exam tip** and **Steps** cards use the standard **Basic** note type, created automatically if missing. There is no custom error note type.
 - Exported Anki notes carry `question-practice`, `topic::<topic>` and `subtopic::<subtopic>` tags. Topic and subtopic are never written inside card text.
 - Each topic can use its own deck. A topic without a deck uses the default deck from **Settings**.
 - Set a topic's deck with **Edit topic → AnkiDroid deck**. **Browse decks** lists live deck names; a typed name is created on export.
@@ -162,7 +159,7 @@ Review opens fullscreen.
 - **Delete** removes the category but keeps every question; its questions move to **Uncategorized**. Deleting **Uncategorized** does nothing.
 - **Merge** asks for the name to keep, either one of the selected categories or a new name, and applies it to all of them. Other topics are not changed.
 - The **share** icon exports the visible statistics as a JSON file. It includes the summary, progress points, per-subtopic figures and trend data, with the weighted regression slope and intercept plus learning rates per 100 questions and per week.
-- A topic's header **Readiness** is the correct share of the last 100 answered questions in that topic, across completed sessions. Every attempt counts, including wrong, skipped and **I didn't know this** answers; questions left unanswered have no attempt and stay out. Shorter histories use every answer they have, and only the tail of the oldest session needed joins the window.
+- A topic's header **Readiness** is the correct share of the last 100 answered questions in that topic, across completed sessions. Every attempt counts, including wrong and skipped answers; questions left unanswered have no attempt and stay out. Shorter histories use every answer they have, and only the tail of the oldest session needed joins the window.
 - The **Sessions** list keeps one row per completed session. Long-press a row to start selecting sessions, then tap others to toggle them. The trash icon asks for confirmation and deletes the selected completed sessions together with their answers, cards, notes and skipped records. Selection tints the row and uses the app bar, so the page does not move; category and session selection are separate modes.
 
 ## Lookup

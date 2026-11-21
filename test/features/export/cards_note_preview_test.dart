@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/export/cards_page.dart';
@@ -58,6 +59,30 @@ void main() {
     );
     expect(highlighted.data, 'managed service');
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('note preview exposes labelled dialog actions', (tester) async {
+    final handle = tester.ensureSemantics();
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final noteId = await seedNote(harness, question, text: 'managed service');
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    final row = find.byKey(ValueKey('note-row-$noteId'));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await pumpFrames(tester);
+
+    final dialog = tester.getSemantics(find.byType(M3EDialog));
+    expect(dialog.label, 'Note preview');
+    expect(find.bySemanticsLabel('Close'), findsOneWidget);
+    expect(find.bySemanticsLabel('Review'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('managed service')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    handle.dispose();
   });
 
   testWidgets('close dismisses the preview without opening review', (

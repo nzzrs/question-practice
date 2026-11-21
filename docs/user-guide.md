@@ -39,7 +39,7 @@ Questions is an offline Android app for practising questions and exporting study
 - A practice marked done keeps a **Done** tag.
 - **Edit practice** offers **Rename**, **Edit description**, **Download practice JSON** and **Update practice JSON**.
 - **Split into two** needs an even number of questions. It replaces the practice with Slice A and Slice B, and removes the original practice's sessions and cards.
-- **Edit topic** is in the topic long-press menu. Its options are grouped into **Details** (name and description), **Study targets** (priority, minimum approval score and target score), **AnkiDroid** (deck) and **Topic file** (**Download topic JSON** and **Update topic JSON**).
+- **Edit topic** is in the topic long-press menu. It is one compact form of **Name**, **Description**, **Priority**, **Minimum score**, **Target score**, **AnkiDroid deck**, **Download topic JSON** and **Update topic JSON**, with no section headings between them. Tap a row to edit its value in place.
 - The topic long-press menu groups **Edit topic**, **Archive topic**/**Unarchive topic** and **Delete topic**, like the practice menu.
 - Decks are set per topic. There is no per-practice deck.
 
@@ -149,7 +149,7 @@ Review opens fullscreen.
 
 - A subtopic is an optional group inside a practice. Questions without one appear under **Uncategorized**.
 - Spelling and capitalisation define a group, so `Networking` and `networking` are separate.
-- Set a topic's **minimum approval score** (70% by default) and **target score** (80% by default) in **Edit topic**. Scores below the minimum are red, scores from the minimum to the target use the normal color, and scores at or above the target are green. This applies to practice score pills, the readiness ring, the latest/average/best statistics and chart dots.
+- Set a topic's **minimum score** (70% by default) and **target score** (80% by default) in **Edit topic**. Scores below the minimum are red, scores from the minimum to the target use the normal color, and scores at or above the target are green. This applies to practice score pills, the readiness ring, the latest/average/best statistics and chart dots.
 - **Statistics** is opened from the **insights** icon on a topic. It shows the latest, best and average score and the number of completed sessions. The average is weighted by the number of questions in each session, so a long session counts more than a short one.
 - **Progress over time** plots one point per completed session. The dashed **Trend (questions)** line is a weighted fit of score against the total questions answered so far; sessions with more questions have more influence.
 - **Learning rate** reports the fit as percentage points per 100 answered questions and as percentage points per week. It appears as soon as two sessions give a usable fit, without waiting for a week of history.

@@ -1,8 +1,8 @@
 import 'package:intl/intl.dart';
 
-/// How a score compares with a topic's minimum approval and target scores.
+/// How a score compares with a topic's minimum and target scores.
 enum ScoreBand {
-  /// Below the minimum approval score: the learner should revisit it.
+  /// Below the minimum score: the learner should revisit it.
   belowMinimum,
 
   /// At or above the minimum but below the target: acceptable progress.

@@ -66,6 +66,13 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     return (select(questions)..where((q) => q.id.equals(id))).getSingleOrNull();
   }
 
+  /// Question rows for [ids] in one query. The result order is unspecified.
+  Future<List<QuestionRow>> questionsByIds(Iterable<int> ids) {
+    final values = ids.toSet().toList(growable: false);
+    if (values.isEmpty) return Future.value(const []);
+    return (select(questions)..where((q) => q.id.isIn(values))).get();
+  }
+
   Future<TopicRow?> topicById(int id) {
     return (select(topics)..where((t) => t.id.equals(id))).getSingleOrNull();
   }

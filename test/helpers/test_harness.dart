@@ -1,4 +1,5 @@
 import 'package:clock/clock.dart';
+import 'package:drift/drift.dart' show QueryExecutor;
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,8 +43,9 @@ class TestHarness {
     AnkiGateway? anki,
     PracticeSoundPlayer? soundPlayer,
     http.Client? httpClient,
+    QueryExecutor? executor,
   }) : clock = TestClock(now ?? DateTime.utc(2026, 1, 1, 12)),
-       database = AppDatabase(NativeDatabase.memory()),
+       database = AppDatabase(executor ?? NativeDatabase.memory()),
        keyStore = keyStore ?? InMemorySecureKeyStore(),
        webLauncher = webLauncher ?? RecordingWebLauncher(),
        anki = anki ?? FakeAnkiGateway(),

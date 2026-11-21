@@ -70,21 +70,23 @@ class SessionRepository {
     return row == null ? null : attemptFromRow(row);
   }
 
+  /// Question rows for [ids] in one query. The result order is unspecified.
+  Future<List<Question>> questionsByIds(Iterable<int> ids) async {
+    final rows = await _db.topicDao.questionsByIds(ids);
+    return rows.map(questionFromRow).toList();
+  }
+
   /// History for every question, derived from its attempts across sessions.
   Future<QuestionProgress> questionProgress() async {
-    final rows = await _db.sessionDao.allAttempts();
+    final flags = await _db.sessionDao.questionProgressFlags();
     final leftUnanswered = await _db.sessionDao.questionsLeftUnanswered();
     final done = <int>{};
     final solved = <int>{};
     final skipped = <int>{...leftUnanswered};
-    for (final row in rows) {
-      final attempt = attemptFromRow(row);
-      if (attempt.isSkipped) {
-        skipped.add(attempt.questionId);
-      } else {
-        done.add(attempt.questionId);
-      }
-      if (attempt.isCorrect) solved.add(attempt.questionId);
+    for (final flag in flags) {
+      if (flag.done) done.add(flag.questionId);
+      if (flag.solved) solved.add(flag.questionId);
+      if (flag.skipped) skipped.add(flag.questionId);
     }
     return QuestionProgress(
       doneQuestionIds: done,

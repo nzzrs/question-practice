@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
@@ -221,6 +222,87 @@ void main() {
       },
     );
   }
+
+  test('a real v2 backup with highlights and phrase restores notes', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final service = _service(harness);
+
+    final fixture = await File('test/fixtures/backup_v2_legacy.json')
+        .readAsString();
+    final info = await service.restoreText(fixture);
+
+    expect(info.formatVersion, 2);
+    expect(info.schemaVersion, 11);
+    expect(info.appVersion, '0.9.8');
+    expect(info.notes, 1);
+    expect(info.manualCards, 1);
+
+    final notes = await harness.database.select(harness.database.notes).get();
+    expect(notes.single.noteText, 'object storage');
+    expect(notes.single.context, 'What is object storage?');
+    expect(notes.single.topicName, 'Cloud');
+    expect(notes.single.subtopic, 'Storage');
+    expect(notes.single.practiceName, 'Core');
+    expect(notes.single.sessionId, 1);
+    expect(notes.single.questionId, 1);
+    expect(notes.single.manualCardId, 1);
+    expect(notes.single.keptAt?.toUtc(), DateTime.utc(2025, 6, 1, 9, 15));
+    expect(
+      notes.single.cardCreatedAt?.toUtc(),
+      DateTime.utc(2025, 6, 1, 9, 30),
+    );
+  });
+
+  test('a legacy highlights table is still checked for references', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final service = _service(harness);
+    final payload = jsonDecode(
+      await File('test/fixtures/backup_v2_legacy.json').readAsString(),
+    ) as Map<String, dynamic>;
+    final tables = payload['tables'] as Map<String, dynamic>;
+    final note = (tables['highlights'] as List<dynamic>).single;
+    (note as Map<String, dynamic>)['questionId'] = 99;
+    _resign(payload);
+
+    await expectLater(
+      service.restoreText(jsonEncode(payload)),
+      throwsA(
+        isA<BackupException>().having(
+          (error) => error.message,
+          'message',
+          allOf(contains('notes row 1'), contains('missing question 99')),
+        ),
+      ),
+    );
+    expect(
+      await harness.database.select(harness.database.notes).get(),
+      isEmpty,
+    );
+  });
+
+  test('legacy highlight row counts are verified', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final service = _service(harness);
+    final payload = jsonDecode(
+      await File('test/fixtures/backup_v2_legacy.json').readAsString(),
+    ) as Map<String, dynamic>;
+    final metadata = payload['metadata'] as Map<String, dynamic>;
+    (metadata['tableCounts'] as Map<String, dynamic>)['highlights'] = 2;
+
+    await expectLater(
+      service.restoreText(jsonEncode(payload)),
+      throwsA(
+        isA<BackupException>().having(
+          (error) => error.message,
+          'message',
+          allOf(contains('"highlights"'), contains('has 2 rows')),
+        ),
+      ),
+    );
+  });
 
   test('unknown future tables are ignored', () async {
     final harness = TestHarness();

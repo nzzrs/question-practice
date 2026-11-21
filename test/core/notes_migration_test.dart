@@ -94,6 +94,51 @@ void main() {
     expect(names, isNot(contains('highlights_session')));
     expect(names, isNot(contains('highlights_question')));
     expect(database.schemaVersion, 12);
+
+    // Renaming keeps the foreign keys attached to the new table.
+    final foreignKeys = await database
+        .customSelect('PRAGMA foreign_key_list(notes)')
+        .get();
+    final targets = {
+      for (final row in foreignKeys)
+        row.read<String>('table'): row.read<String>('on_delete'),
+    };
+    expect(targets, {
+      'sessions': 'CASCADE',
+      'questions': 'SET NULL',
+      'manual_cards': 'SET NULL',
+    });
+
+    // AUTOINCREMENT keeps counting after the rename instead of reusing ids.
+    final nextId = await database
+        .into(database.notes)
+        .insert(
+          NotesCompanion.insert(
+            noteText: 'after upgrade',
+            createdAt: DateTime.fromMillisecondsSinceEpoch(1700000004000),
+          ),
+        );
+    expect(nextId, 3);
+
+    // ON DELETE SET NULL for the question, then for the manual card.
+    await database.customStatement('DELETE FROM questions WHERE id = 7');
+    final afterQuestion = await database
+        .customSelect('SELECT id, question_id FROM notes ORDER BY id')
+        .get();
+    expect(afterQuestion.first.read<int?>('question_id'), isNull);
+
+    await database.customStatement('DELETE FROM manual_cards WHERE id = 3');
+    final afterCard = await database
+        .customSelect('SELECT id, manual_card_id FROM notes ORDER BY id')
+        .get();
+    expect(afterCard[1].read<int?>('manual_card_id'), isNull);
+
+    // ON DELETE CASCADE for the session.
+    await database.customStatement('DELETE FROM sessions WHERE id = 1');
+    final remaining = await database
+        .customSelect('SELECT id FROM notes ORDER BY id')
+        .get();
+    expect([for (final row in remaining) row.read<int>('id')], [2, 3]);
   });
 
   test(

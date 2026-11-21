@@ -572,11 +572,9 @@ class BackupService {
     final recorded = _readCounts(metadata['tableCounts']);
     if (recorded == null) return;
     for (final entry in recorded.entries) {
-      final known =
-          requiredTables.contains(entry.key) ||
-          optionalTables.contains(entry.key);
-      if (!known) continue;
-      final raw = tables[entry.key];
+      final key = _countKey(entry.key, tables);
+      if (key == null) continue;
+      final raw = tables[key];
       final actual = raw is List ? raw.length : 0;
       if (actual != entry.value) {
         throw BackupException(
@@ -585,6 +583,21 @@ class BackupService {
         );
       }
     }
+  }
+
+  /// Maps a recorded count key to the table it numbers.
+  ///
+  /// v1 and v2 files count notes under `highlights`, so that key is checked
+  /// against the legacy table when no `notes` table is present.
+  String? _countKey(String recorded, Map<String, dynamic> tables) {
+    if (recorded == 'highlights') {
+      return tables.containsKey('notes') ? null : 'highlights';
+    }
+    if (requiredTables.contains(recorded) ||
+        optionalTables.contains(recorded)) {
+      return recorded;
+    }
+    return null;
   }
 
   Map<String, int>? _readCounts(Object? value) {

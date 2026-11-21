@@ -33,17 +33,20 @@ class ExportService {
     required PracticeRepository practices,
     required Clock clock,
     AnkiNoteBuilder builder = const AnkiNoteBuilder(),
+    Future<Directory> Function()? temporaryDirectory,
   }) : _gateway = gateway,
        _cards = cards,
        _practices = practices,
        _clock = clock,
-       _builder = builder;
+       _builder = builder,
+       _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
 
   final AnkiGateway _gateway;
   final CardRepository _cards;
   final PracticeRepository _practices;
   final Clock _clock;
   final AnkiNoteBuilder _builder;
+  final Future<Directory> Function() _temporaryDirectory;
 
   AnkiNoteBuilder get builder => _builder;
 
@@ -130,7 +133,7 @@ class ExportService {
   }
 
   Future<List<File>> writeFiles(ExportSelection selection) async {
-    final directory = await getTemporaryDirectory();
+    final directory = await _temporaryDirectory();
     final stamp = DateFormat('yyyyMMdd-HHmm').format(_clock.now());
     final files = _builder.files(selection);
     final result = <File>[];
@@ -189,7 +192,7 @@ class ExportService {
   /// Writes all notes to a text file and opens the share sheet.
   Future<void> shareNotes(List<Note> notes) async {
     if (notes.isEmpty) return;
-    final directory = await getTemporaryDirectory();
+    final directory = await _temporaryDirectory();
     final stamp = DateFormat('yyyyMMdd-HHmm').format(_clock.now());
     final file = File(
       p.join(directory.path, 'question-practice-notes-$stamp.txt'),

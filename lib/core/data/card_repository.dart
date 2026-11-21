@@ -72,6 +72,12 @@ class CardRepository {
     return row == null ? null : errorCardFromRow(row);
   }
 
+  /// Newest saved concept with [term], ignoring case and empty definitions.
+  Future<Concept?> latestConceptForTerm(String term) async {
+    final row = await _db.cardDao.latestConceptForTerm(term);
+    return row == null ? null : conceptFromRow(row);
+  }
+
   Future<int> countErrorCardsNeedingDetailsForSession(int sessionId) {
     return _db.cardDao.countErrorCardsNeedingDetailsForSession(sessionId);
   }

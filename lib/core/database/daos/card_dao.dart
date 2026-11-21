@@ -60,6 +60,24 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     return into(concepts).insert(concept);
   }
 
+  /// Newest concept with this term (case-insensitive) that has a definition.
+  Future<ConceptRow?> latestConceptForTerm(String term) {
+    final cleaned = term.trim();
+    if (cleaned.isEmpty) return Future.value(null);
+    return (select(concepts)
+          ..where(
+            (c) =>
+                c.term.lower().equals(cleaned.toLowerCase()) &
+                c.definition.equals('').not(),
+          )
+          ..orderBy([
+            (c) => OrderingTerm.desc(c.createdAt),
+            (c) => OrderingTerm.desc(c.id),
+          ])
+          ..limit(1))
+        .getSingleOrNull();
+  }
+
   Future<void> updateConceptDefinition(int id, String definition) {
     return (update(concepts)..where((c) => c.id.equals(id))).write(
       ConceptsCompanion(definition: Value(definition)),

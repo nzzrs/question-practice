@@ -155,12 +155,12 @@ void main() {
         SuggestedCard(
           front: 'Which layer owns IP addresses?',
           back: 'The network layer.',
-          cognitiveType: CognitiveType.contrast,
+          template: CardTemplate.contrast,
         ),
         SuggestedCard(
           front: 'Given requirement X with restriction Y, what rule applies?',
           back: 'Match the layer to its addressing job.',
-          cognitiveType: CognitiveType.heuristic,
+          template: CardTemplate.heuristic,
         ),
       ],
     );

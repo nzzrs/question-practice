@@ -565,8 +565,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         content: const Text(
           'Concepts become Anki Cloze cards. Facts, heuristics and contrasts '
           'become Anki Basic cards with a front and a back. '
-          'Cards are tagged topic::<topic> and subtopic::<subtopic> when a '
-          'subtopic exists. '
+          'Cards carry question-practice, topic::<topic> and '
+          'subtopic::<subtopic> tags. '
+          'Tags travel in the third column. Map it to Tags when importing. '
+          'Topic and subtopic are never written inside card text. '
           'Errors are not exported directly: Create cards turns them into '
           'atomic cards, by hand or with optional AI suggestions. Skipped '
           'questions stay in Cards until you create cards from them. '

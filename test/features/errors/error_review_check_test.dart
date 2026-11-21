@@ -17,19 +17,28 @@ const _aiSettings = AppSettings(
   aiBaseUrl: 'https://example.test/v1',
 );
 
-http.Response _aiResponse(List<Map<String, String>> cards) {
+http.Response _aiResponse(List<Map<String, dynamic>> ideas) {
   return http.Response(
     jsonEncode({
       'choices': [
         {
           'message': {
-            'content': jsonEncode({'cards': cards}),
+            'content': jsonEncode({'ideas': ideas}),
           },
         },
       ],
     }),
     200,
   );
+}
+
+Map<String, dynamic> _idea(String template, String front, String back) {
+  return {
+    'template': template,
+    'variants': [
+      {'front': front, 'back': back},
+    ],
+  };
 }
 
 Future<ErrorCard> _createError(
@@ -164,7 +173,7 @@ void main() {
       () => harness.cards.watchManualCards().first,
     );
     expect(cards, hasLength(1));
-    expect(cards!.single.cognitiveType, CognitiveType.fact);
+    expect(cards!.single.cognitiveType, CognitiveType.contrast);
     final saved = await tester.runAsync(
       () => harness.cards.errorCardById(card.id),
     );
@@ -178,16 +187,17 @@ void main() {
     final client = MockClient((request) async {
       sentBody = request.body;
       return _aiResponse([
-        {
-          'type': 'contrast',
-          'front': 'Which layer owns IP addresses?',
-          'back': 'The network layer owns addressing.',
-        },
-        {
-          'type': 'heuristic',
-          'front': 'Given requirement X with restriction Y, what rule applies?',
-          'back': 'Match the layer to its addressing job.',
-        },
+        _idea(
+          'contrast',
+          'Which layer owns IP addresses?',
+          'The network layer owns addressing.',
+        ),
+        _idea(
+          'heuristic',
+          'If a scenario asks for addressing but restricts with layer, which '
+              'option is always discarded?',
+          'Discard the physical layer because it has no addressing.',
+        ),
       ]);
     });
     final harness = TestHarness(httpClient: client);
@@ -220,7 +230,7 @@ void main() {
     );
     final ready = tester.widget<Pill>(
       find.descendant(
-        of: find.byKey(const ValueKey('creator-ai-litmus-0')),
+        of: find.byKey(const ValueKey('creator-ai-litmus-0-0')),
         matching: find.byType(Pill),
       ),
     );
@@ -230,11 +240,11 @@ void main() {
       tester
           .widget<Pill>(find.byKey(const ValueKey('creator-ai-type-1')))
           .label,
-      'Heuristic',
+      'Exam heuristic',
     );
     expect(
       find.textContaining(
-        'Given requirement X with restriction Y, what rule applies?',
+        'If a scenario asks for addressing but restricts with layer',
       ),
       findsWidgets,
     );
@@ -255,11 +265,11 @@ void main() {
   ) async {
     final client = MockClient(
       (_) async => _aiResponse([
-        {
-          'type': 'heuristic',
-          'front': 'Is a managed service the right choice here?',
-          'back': 'A managed service removes host maintenance.',
-        },
+        _idea(
+          'heuristic',
+          'Is a managed service the right choice here?',
+          'A managed service removes host maintenance.',
+        ),
       ]),
     );
     final harness = TestHarness(httpClient: client);
@@ -283,22 +293,24 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
     await pumpFrames(tester, frames: 24);
 
-    expect(find.byKey(const ValueKey('creator-ai-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsOneWidget);
     final badge = tester.widget<Pill>(
       find.descendant(
-        of: find.byKey(const ValueKey('creator-ai-litmus-0')),
+        of: find.byKey(const ValueKey('creator-ai-litmus-0-0')),
         matching: find.byType(Pill),
       ),
     );
     expect(badge.label, 'Check quality');
     expect(badge.tone, PillTone.error);
     final detail = tester.widget<Text>(
-      find.byKey(const ValueKey('creator-ai-litmus-detail-0')),
+      find.byKey(const ValueKey('creator-ai-litmus-detail-0-0')),
     );
     expect(detail.data, contains('Can be answered with yes or no'));
     expect(
       detail.data,
-      contains('Heuristic front does not use the rule template'),
+      contains(
+        'Exam heuristic front does not use the required prompt structure',
+      ),
     );
   });
 
@@ -307,16 +319,17 @@ void main() {
   ) async {
     final client = MockClient(
       (_) async => _aiResponse([
-        {
-          'type': 'contrast',
-          'front': 'Which layer owns IP addresses?',
-          'back': 'The network layer owns addressing.',
-        },
-        {
-          'type': 'heuristic',
-          'front': 'Given requirement X with restriction Y, what rule applies?',
-          'back': 'Match the layer to its addressing job.',
-        },
+        _idea(
+          'contrast',
+          'Which layer owns IP addresses?',
+          'The network layer owns addressing.',
+        ),
+        _idea(
+          'heuristic',
+          'If a scenario asks for addressing but restricts with layer, which '
+              'option is always discarded?',
+          'Discard the physical layer because it has no addressing.',
+        ),
       ]),
     );
     final harness = TestHarness(httpClient: client);
@@ -400,17 +413,17 @@ void main() {
     expect(find.textContaining('Add an API key in Settings'), findsOneWidget);
   });
 
-  testWidgets('Try again retries after an AI error', (tester) async {
+  testWidgets('Suggest again retries after an AI error', (tester) async {
     var calls = 0;
     final client = MockClient((_) async {
       calls++;
       if (calls == 1) return http.Response('down', 500);
       return _aiResponse([
-        {
-          'type': 'contrast',
-          'front': 'Which layer owns IP addresses?',
-          'back': 'The network layer owns addressing.',
-        },
+        _idea(
+          'contrast',
+          'Which layer owns IP addresses?',
+          'The network layer owns addressing.',
+        ),
       ]);
     });
     final harness = TestHarness(httpClient: client);
@@ -441,6 +454,6 @@ void main() {
     await pumpFrames(tester, frames: 24);
 
     expect(calls, 2);
-    expect(find.byKey(const ValueKey('creator-ai-0')), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsOneWidget);
   });
 }

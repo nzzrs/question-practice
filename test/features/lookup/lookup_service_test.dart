@@ -562,7 +562,7 @@ void main() {
     );
   });
 
-  test('AI card suggestions send the note context and parse cards', () async {
+  test('AI card suggestions send the note context and parse ideas', () async {
     await useAi();
     String? userPrompt;
     String? systemPrompt;
@@ -578,12 +578,26 @@ void main() {
             {
               'message': {
                 'content': jsonEncode({
-                  'cards': [
+                  'ideas': [
                     {
-                      'front': '  What is a VPC?  ',
-                      'back': ' A private network ',
+                      'template': 'mechanism',
+                      'variants': [
+                        {
+                          'front': '  What is a VPC?  ',
+                          'back': ' A private network ',
+                        },
+                        {
+                          'front': 'How is a VPC described?',
+                          'back': 'A private network.',
+                        },
+                      ],
                     },
-                    {'front': 'Who owns it?', 'back': 'The account owner'},
+                    {
+                      'template': 'contrast',
+                      'variants': [
+                        {'front': 'Who owns it?', 'back': 'The account owner'},
+                      ],
+                    },
                   ],
                 }),
               },
@@ -594,15 +608,18 @@ void main() {
       );
     });
 
-    final cards = await serviceWith(client).suggestArchetypeCards(
+    final ideas = await serviceWith(client).suggestArchetypeCards(
       note: 'A VPC is a private network owned by the account.',
       questionContext: 'Which network isolates resources?',
       topicName: 'Cloud',
     );
 
-    expect(cards, hasLength(2));
-    expect(cards.first.front, 'What is a VPC?');
-    expect(cards.first.back, 'A private network');
+    expect(ideas, hasLength(2));
+    expect(ideas.first.template, CardTemplate.mechanism);
+    expect(ideas.first.variants, hasLength(2));
+    expect(ideas.first.variants.first.front, 'What is a VPC?');
+    expect(ideas.first.variants.first.back, 'A private network');
+    expect(ideas.first.variants.last.variantIndex, 1);
     expect(
       userPrompt,
       contains(
@@ -615,7 +632,8 @@ void main() {
     );
     expect(userPrompt, contains('Topic: Cloud'));
     expect(systemPrompt, contains('atomic'));
-    expect(systemPrompt, contains('at most 20 words'));
+    expect(systemPrompt, contains('Front <= 30 words'));
+    expect(systemPrompt, contains('Never put the topic or subtopic inside'));
   });
 
   test('AI card suggestions tolerate fenced JSON', () async {
@@ -626,7 +644,9 @@ void main() {
           'choices': [
             {
               'message': {
-                'content': '```json\n{"cards":[{"front":"Term","back":"Meaning"}]}\n```',
+                'content':
+                    '```json\n{"ideas":[{"template":"mechanism",'
+                    '"variants":[{"front":"Term","back":"Meaning"}]}]}\n```',
               },
             },
           ],
@@ -635,39 +655,121 @@ void main() {
       ),
     );
 
-    final cards = await serviceWith(client).suggestArchetypeCards(
+    final ideas = await serviceWith(client).suggestArchetypeCards(
       note: 'Term means meaning.',
       questionContext: '',
       topicName: '',
     );
 
-    expect(cards, hasLength(1));
-    expect(cards.single.front, 'Term');
-    expect(cards.single.back, 'Meaning');
+    expect(ideas, hasLength(1));
+    expect(ideas.single.variants.single.front, 'Term');
+    expect(ideas.single.variants.single.back, 'Meaning');
+  });
+
+  test('AI card suggestions cap at three ideas and three variants', () async {
+    await useAi();
+    final ideasJson = [
+      for (var idea = 0; idea < 5; idea++)
+        {
+          'template': 'mechanism',
+          'variants': [
+            for (var variant = 0; variant < 5; variant++)
+              {
+                'front': 'Idea $idea variant $variant',
+                'back': 'Answer $idea $variant',
+              },
+          ],
+        },
+    ];
+    final client = MockClient(
+      (request) async => http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'content': jsonEncode({'ideas': ideasJson}),
+              },
+            },
+          ],
+        }),
+        200,
+      ),
+    );
+
+    final ideas = await serviceWith(client).suggestArchetypeCards(
+      note: 'Note',
+      questionContext: 'Question',
+      topicName: 'Topic',
+    );
+
+    expect(ideas, hasLength(3));
+    expect(ideas.every((idea) => idea.variants.length == 3), isTrue);
+    expect(ideas.last.variants.last.front, 'Idea 2 variant 2');
   });
 
   test(
-    'AI card suggestions drop empty and duplicate cards and cap at six',
+    'AI card suggestions deduplicate variants and skip empty variants',
     () async {
       await useAi();
-      final cards = [
-        {'front': 'A', 'back': 'One'},
-        {'front': '  ', 'back': 'Empty front'},
-        {'front': 'B', 'back': '  '},
-        {'front': 'a', 'back': 'one'},
-        {'front': 'C', 'back': 'Three'},
-        {'front': 'D', 'back': 'Four'},
-        {'front': 'E', 'back': 'Five'},
-        {'front': 'F', 'back': 'Six'},
-        {'front': 'G', 'back': 'Seven'},
-      ];
+      final payload = {
+        'ideas': [
+          {
+            'template': 'contrast',
+            'variants': [
+              {'front': 'A', 'back': 'One'},
+              {'front': 'a', 'back': 'One again'},
+              {'front': ' ', 'back': 'Empty front'},
+              {'front': 'B', 'back': '  '},
+              {'front': 'C', 'back': 'Three'},
+            ],
+          },
+        ],
+      };
+      final client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {'content': jsonEncode(payload)},
+              },
+            ],
+          }),
+          200,
+        ),
+      );
+
+      final ideas = await serviceWith(client).suggestArchetypeCards(
+        note: 'Note',
+        questionContext: 'Question',
+        topicName: 'Topic',
+      );
+
+      expect(ideas, hasLength(1));
+      expect(ideas.single.variants.map((variant) => variant.front), ['A', 'C']);
+      expect(ideas.single.variants.map((variant) => variant.variantIndex), [
+        0,
+        1,
+      ]);
+    },
+  );
+
+  test(
+    'AI card suggestions accept legacy flat cards as one-variant ideas',
+    () async {
+      await useAi();
       final client = MockClient(
         (request) async => http.Response(
           jsonEncode({
             'choices': [
               {
                 'message': {
-                  'content': jsonEncode({'cards': cards}),
+                  'content': jsonEncode({
+                    'cards': [
+                      {'type': 'fact', 'front': 'A', 'back': 'One'},
+                      {'type': 'heuristic', 'front': 'B', 'back': 'Two'},
+                      {'type': 'unknown', 'front': 'C', 'back': 'Three'},
+                    ],
+                  }),
                 },
               },
             ],
@@ -676,21 +778,291 @@ void main() {
         ),
       );
 
-      final suggestions = await serviceWith(client).suggestArchetypeCards(
+      final ideas = await serviceWith(client).suggestArchetypeCards(
         note: 'Note',
         questionContext: 'Question',
         topicName: 'Topic',
       );
 
-      expect(suggestions, hasLength(6));
-      expect(suggestions.map((card) => card.front), [
-        'A',
-        'C',
-        'D',
-        'E',
-        'F',
-        'G',
+      expect(ideas, hasLength(2));
+      expect(ideas.first.template, CardTemplate.mechanism);
+      expect(ideas.first.variants.single.front, 'A');
+      expect(ideas.last.template, CardTemplate.heuristic);
+    },
+  );
+
+  test(
+    'breakdown error card keeps only contrast and heuristic ideas',
+    () async {
+      await useAi();
+      final client = MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({
+                    'ideas': [
+                      {
+                        'template': 'definition',
+                        'variants': [
+                          {'front': 'VPC', 'back': 'A private network.'},
+                        ],
+                      },
+                      {
+                        'template': 'mechanism',
+                        'variants': [
+                          {'front': 'Why?', 'back': 'Because.'},
+                        ],
+                      },
+                      {
+                        'template': 'contrast',
+                        'variants': [
+                          {'front': 'A or B?', 'back': 'A, because of size.'},
+                        ],
+                      },
+                      {
+                        'template': 'heuristic',
+                        'variants': [
+                          {
+                            'front':
+                                'If a scenario asks X but restricts with Y, '
+                                'which option is always discarded?',
+                            'back': 'Discard Z because rule.',
+                          },
+                        ],
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+          200,
+        ),
+      );
+
+      final ideas = await serviceWith(client).breakdownErrorCard(
+        question: 'Question',
+        wrongAnswer: 'Wrong',
+        correctAnswer: 'Correct',
+        reasoning: 'Reason',
+        explanation: 'Explanation',
+        topicName: 'Topic',
+      );
+
+      expect(ideas, hasLength(2));
+      expect(ideas.map((idea) => idea.template), [
+        CardTemplate.contrast,
+        CardTemplate.heuristic,
       ]);
+    },
+  );
+
+  test('breakdown error card caps at two ideas and three variants', () async {
+    await useAi();
+    final payload = {
+      'ideas': [
+        for (var idea = 0; idea < 4; idea++)
+          {
+            'template': idea.isEven ? 'contrast' : 'heuristic',
+            'variants': [
+              for (var variant = 0; variant < 4; variant++)
+                {
+                  'front': 'Idea $idea variant $variant',
+                  'back': 'Answer $idea $variant',
+                },
+            ],
+          },
+      ],
+    };
+    final client = MockClient(
+      (request) async => http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'content': jsonEncode(payload)},
+            },
+          ],
+        }),
+        200,
+      ),
+    );
+
+    final ideas = await serviceWith(client).breakdownErrorCard(
+      question: 'Question',
+      wrongAnswer: 'Wrong',
+      correctAnswer: 'Correct',
+      reasoning: 'Reason',
+      explanation: 'Explanation',
+      topicName: 'Topic',
+    );
+
+    expect(ideas, hasLength(2));
+    expect(ideas.every((idea) => idea.variants.length == 3), isTrue);
+  });
+
+  test('invalid AI JSON throws the existing error message', () async {
+    await useAi();
+    final client = MockClient(
+      (request) async => http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {'content': 'not json'},
+            },
+          ],
+        }),
+        200,
+      ),
+    );
+
+    await expectLater(
+      serviceWith(client).suggestArchetypeCards(
+        note: 'Note',
+        questionContext: 'Question',
+        topicName: 'Topic',
+      ),
+      throwsA(
+        isA<LookupException>().having(
+          (error) => error.message,
+          'message',
+          'The AI returned invalid card suggestions. Try again.',
+        ),
+      ),
+    );
+  });
+
+  test(
+    'resolveDefinition returns a definition without saving a concept',
+    () async {
+      await useAi();
+      String? termPrompt;
+      final client = MockClient((request) async {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        final messages = body['messages'] as List<dynamic>;
+        termPrompt =
+            (messages.last as Map<String, dynamic>)['content'] as String;
+        return http.Response(
+          jsonEncode({
+            'choices': [
+              {
+                'message': {
+                  'content': jsonEncode({
+                    'definition': 'A private network.',
+                    'expansion': 'Virtual Private Cloud',
+                  }),
+                },
+              },
+            ],
+          }),
+          200,
+        );
+      });
+
+      final suggestion = await serviceWith(client).resolveDefinition(
+        term: 'VPC',
+        question: 'Which network?',
+        topicName: 'Cloud',
+      );
+
+      expect(suggestion.definition, 'A private network.');
+      expect(suggestion.extra, 'Virtual Private Cloud');
+      expect(termPrompt, contains('Term: VPC'));
+      expect(await harness.cards.watchConcepts().first, isEmpty);
+    },
+  );
+
+  test(
+    'resolveDefinition reports no provider without a key or in web mode',
+    () async {
+      await harness.settings.save(
+        const AppSettings(lookupMode: LookupMode.ai, aiModel: 'test-model'),
+      );
+      final noKey = serviceWith(
+        MockClient((_) async => http.Response('{}', 200)),
+      );
+      await expectLater(
+        noKey.resolveDefinition(
+          term: 'VPC',
+          question: 'Question',
+          topicName: 'Topic',
+        ),
+        throwsA(
+          isA<LookupException>().having(
+            (error) => error.failure,
+            'failure',
+            LookupFailure.noProvider,
+          ),
+        ),
+      );
+
+      await harness.settings.save(
+        const AppSettings(lookupMode: LookupMode.web),
+      );
+      await harness.keyStore.writeApiKey('secret-key');
+      await expectLater(
+        serviceWith(MockClient((_) async => http.Response('{}', 200)))
+            .resolveDefinition(
+              term: 'VPC',
+              question: 'Question',
+              topicName: 'Topic',
+            ),
+        throwsA(
+          isA<LookupException>().having(
+            (error) => error.failure,
+            'failure',
+            LookupFailure.noProvider,
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'latestConceptForTerm prefers the newest non-empty definition',
+    () async {
+      final older = await harness.cards.createConcept(
+        sessionId: null,
+        questionId: null,
+        term: 'VPC',
+        definition: 'Older meaning.',
+        context: 'Context',
+        topicName: 'Cloud',
+        source: ConceptSource.manual,
+        createdAt: harness.clock.now().toUtc().subtract(
+          const Duration(days: 1),
+        ),
+      );
+      harness.clock.advance(const Duration(days: 1));
+      final newer = await harness.cards.createConcept(
+        sessionId: null,
+        questionId: null,
+        term: 'vpc',
+        definition: 'Newer meaning.',
+        context: 'Context',
+        topicName: 'Cloud',
+        source: ConceptSource.manual,
+        createdAt: harness.clock.now().toUtc(),
+      );
+      harness.clock.advance(const Duration(days: 1));
+      await harness.cards.createConcept(
+        sessionId: null,
+        questionId: null,
+        term: 'VPC',
+        definition: '',
+        context: 'Context',
+        topicName: 'Cloud',
+        source: ConceptSource.manual,
+        createdAt: harness.clock.now().toUtc(),
+      );
+
+      final found = await harness.cards.latestConceptForTerm('  vpc  ');
+
+      expect(found, isNotNull);
+      expect(found!.id, isNot(older));
+      expect(found.id, newer);
+      expect(found.definition, 'Newer meaning.');
     },
   );
 

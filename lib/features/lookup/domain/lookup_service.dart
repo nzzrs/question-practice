@@ -10,15 +10,35 @@ import '../../../core/domain/acronyms.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/platform/secure_key_store.dart';
 import '../../../core/platform/web_launcher.dart';
+import '../../export/domain/card_templates.dart';
+
+/// Why a lookup failed, so the creator can show a neutral fallback instead of
+/// an error when no provider is configured.
+enum LookupFailure { noProvider, providerError }
 
 class LookupException implements Exception {
-  const LookupException(this.message, {this.canUseWeb = false});
+  const LookupException(
+    this.message, {
+    this.canUseWeb = false,
+    this.failure = LookupFailure.providerError,
+  });
 
   final String message;
   final bool canUseWeb;
+  final LookupFailure failure;
 
   @override
   String toString() => message;
+}
+
+/// A resolved dictionary-style meaning, without saving a concept.
+class DefinitionSuggestion {
+  const DefinitionSuggestion({required this.definition, required this.extra});
+
+  final String definition;
+
+  /// The full form of an acronym, shown in the Anki extra field.
+  final String extra;
 }
 
 class LookupResult {
@@ -105,19 +125,11 @@ class LookupService {
       );
     }
 
-    final apiKey = await _keyStore.readApiKey();
-    if (apiKey == null || apiKey.trim().isEmpty) {
-      throw const LookupException(
-        'No API key saved. Add one in Settings or use web search.',
-        canUseWeb: true,
-      );
-    }
-    final definition = await _askAi(
-      settings: settings,
-      apiKey: apiKey,
+    final definition = await resolveDefinition(
       term: cleanedTerm,
       question: question,
       topicName: topicName,
+      subtopic: subtopic,
     );
     final id = await _saveConcept(
       term: cleanedTerm,
@@ -137,6 +149,47 @@ class LookupService {
       extra: definition.extra,
       source: ConceptSource.ai,
       openedWeb: false,
+    );
+  }
+
+  /// Resolves a meaning from AI without saving a concept.
+  ///
+  /// The creator calls this while the learner types a term. Web lookup mode is
+  /// treated as no provider: resolving a meaning never opens a browser.
+  Future<DefinitionSuggestion> resolveDefinition({
+    required String term,
+    required String question,
+    required String topicName,
+    String subtopic = '',
+  }) async {
+    final cleanedTerm = term.trim();
+    if (cleanedTerm.isEmpty) {
+      throw const LookupException('Select a word or phrase first.');
+    }
+    final settings = await _settings.load();
+    if (settings.lookupMode == LookupMode.web) {
+      throw const LookupException(
+        'Turning on AI lookup in Settings fills the meaning automatically.',
+        failure: LookupFailure.noProvider,
+      );
+    }
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'No API key saved. Add one in Settings.',
+        failure: LookupFailure.noProvider,
+      );
+    }
+    final definition = await _askAi(
+      settings: settings,
+      apiKey: apiKey,
+      term: cleanedTerm,
+      question: question,
+      topicName: topicName,
+    );
+    return DefinitionSuggestion(
+      definition: definition.definition,
+      extra: definition.extra,
     );
   }
 
@@ -299,13 +352,11 @@ class LookupService {
     return trimmed;
   }
 
-  /// Suggests structured atomic cards from a saved note.
+  /// Suggests structured atomic card ideas from a saved note.
   ///
-  /// The AI must classify each proposal as a procedure/operator, a rule or
-  /// heuristic, or an atomic fact, so the learner sees the cognitive shape of
-  /// every card before adding it. Generic summaries and long paragraphs are
-  /// rejected by the prompt.
-  Future<List<SuggestedCard>> suggestArchetypeCards({
+  /// Each idea returns one to three wording variants of the same fact, so the
+  /// learner can keep the variants that help without re-running the request.
+  Future<List<SuggestedCardIdea>> suggestArchetypeCards({
     required String note,
     required String questionContext,
     required String topicName,
@@ -320,22 +371,36 @@ class LookupService {
     if (apiKey == null || apiKey.trim().isEmpty) {
       throw const LookupException(
         'Suggesting cards needs an AI provider. Add an API key in Settings.',
+        failure: LookupFailure.noProvider,
       );
     }
     const systemPrompt =
-        'You turn one saved note from a study app into atomic cards with '
-        'a fixed archetype. Use the note, the question around it, the '
-        'topic and the subtopic. Return exactly one JSON object: '
-        '{"cards":[{"type":"procedure|heuristic|fact","front":"...",'
-        '"back":"..."}]}. Rules: classify every card honestly as procedure '
-        '(an operator, formula or ordered steps), heuristic (a rule of thumb '
-        'or condition-action rule), or fact (one atomic verified fact); each '
-        'card tests exactly ONE idea; at most 6 cards; the front is a short, '
-        'specific prompt, never a paragraph, and must not restate the whole '
-        'note; the back is a concise atomic answer; front and back are at '
-        'most 20 words each; do not produce generic definitions, summaries or '
-        'essay-like paragraphs; no markdown; only ideas supported by the '
-        'note or its context; skip trivial or duplicate cards.';
+        'You turn one saved note from a study app into atomic card ideas with '
+        'a fixed template. Use the note, the question around it, the topic and '
+        'the subtopic. Return exactly one JSON object: '
+        '{"ideas":[{"template":"definition|contrast|mechanism|heuristic|'
+        'procedure","variants":[{"front":"...","back":"..."}]}]}. Rules: '
+        '- At most 3 ideas. Each idea has 1-3 variants. Variants of one idea '
+        'test the same fact in different wording. '
+        '- definition: front is the term only; back is an atomic meaning that '
+        'never repeats the term. '
+        '- contrast: the front names both options and the criterion; the back '
+        'says what A does while B does. '
+        '- mechanism: the front asks why X causes or requires Y; the back is '
+        'one causal line. '
+        '- heuristic: the front must be exactly "If a scenario asks X but '
+        'restricts with Y, which option is always discarded?"; the back '
+        'starts with "Discard Z because ...". '
+        '- procedure: the front asks what must be true before the next step; '
+        'the back is the condition or command. '
+        '- Each variant tests exactly one idea. Front <= 30 words; back <= 20 '
+        'words. '
+        '- No yes/no questions, no answer clues, no option letters, no '
+        'markdown. '
+        '- Never put the topic or subtopic inside the front or back. Tags are '
+        'applied by the app. '
+        '- Only use ideas supported by the note or its context. Skip trivial '
+        'or duplicate ideas.';
     final context = questionContext.trim();
     final userPrompt = [
       if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
@@ -343,22 +408,23 @@ class LookupService {
       if (context.isNotEmpty) 'Question context: $context',
       'Selected passage: $passage',
     ].join('\n');
-    final cards = await _requestJsonCards(
+    return _requestJsonCardIdeas(
       settings: settings,
       apiKey: apiKey,
       systemPrompt: systemPrompt,
       userPrompt: userPrompt,
       errorMessage: 'The AI returned invalid card suggestions. Try again.',
+      maxIdeas: 3,
+      maxVariants: 3,
     );
-    return cards.take(6).toList(growable: false);
   }
 
-  /// Breaks one error into a direct contrast and a condition-action rule.
+  /// Breaks one error into contrast and heuristic ideas.
   ///
-  /// Returns at most two cards: a contrast between the chosen wrong option
-  /// and the correct one, and a heuristic whose front follows the mandatory
-  /// "given requirement with restriction, what rule applies?" template.
-  Future<List<SuggestedCard>> breakdownErrorCard({
+  /// At most two ideas are returned: a contrast between the chosen wrong
+  /// option and the correct one, and a heuristic whose front follows the
+  /// mandatory exam-heuristic template.
+  Future<List<SuggestedCardIdea>> breakdownErrorCard({
     required String question,
     required String wrongAnswer,
     required String correctAnswer,
@@ -373,23 +439,30 @@ class LookupService {
     if (apiKey == null || apiKey.trim().isEmpty) {
       throw const LookupException(
         'Breaking down cards needs an AI provider. Add an API key in Settings.',
+        failure: LookupFailure.noProvider,
       );
     }
     const systemPrompt =
-        'You split one study error into at most two atomic cards. Return '
-        'exactly one JSON object: {"cards":[{"type":"contrast",'
-        '"front":"...","back":"..."},{"type":"heuristic",'
-        '"front":"...","back":"..."}]}. Rules: '
-        '(1) A contrast card asks the learner to distinguish the chosen wrong '
-        'option from the correct one; the front names both briefly and the '
-        'back states the correct choice plus the decisive difference; '
-        '(2) a heuristic card is a condition-action rule with the mandatory '
-        'front "Given requirement X with restriction Y, what rule applies?" '
-        'and an atomic back that answers it; '
-        '(3) include a card only when it is genuinely useful; '
-        '(4) no question may be answerable with yes/no; '
-        '(5) no front may exceed 30 words and no clue may give the answer '
-        'away; no markdown; no option letters.';
+        'You split one study error into atomic card ideas. Return exactly one '
+        'JSON object: {"ideas":[{"template":"contrast|heuristic",'
+        '"variants":[{"front":"...","back":"..."}]}]}. Rules: '
+        '- At most 2 ideas: one contrast and one heuristic. Each has 1-3 '
+        'variants. '
+        '- The contrast uses the chosen wrong answer and the correct answer; '
+        'the front names both options and the criterion, and the back states '
+        'the decisive difference. '
+        '- The heuristic front must use the exact exam-heuristic template: '
+        '"If a scenario asks X but restricts with Y, which option is always '
+        'discarded?" The back starts with "Discard Z because ...". '
+        '- No definition, mechanism, or procedure ideas. '
+        '- Each variant tests exactly one idea. Front <= 30 words; back <= 20 '
+        'words. '
+        '- No yes/no questions, no answer clues, no option letters, no '
+        'markdown. '
+        '- Never put the topic or subtopic inside the front or back. Tags are '
+        'applied by the app. '
+        '- Only use ideas supported by the error context. Skip trivial or '
+        'duplicate ideas.';
     final mistakes = mistakeKinds.map((kind) => kind.label).join(', ');
     final userPrompt = [
       if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
@@ -401,24 +474,27 @@ class LookupService {
       'Learner reasoning: ${reasoning.trim().isEmpty ? '(not written)' : reasoning.trim()}',
       'Explanation: $explanation',
     ].join('\n');
-    final cards = await _requestJsonCards(
+    return _requestJsonCardIdeas(
       settings: settings,
       apiKey: apiKey,
       systemPrompt: systemPrompt,
       userPrompt: userPrompt,
       errorMessage: 'The AI returned an invalid card breakdown. Try again.',
-      allowedTypes: const {CognitiveType.contrast, CognitiveType.heuristic},
+      maxIdeas: 2,
+      maxVariants: 3,
+      allowedTemplates: const {CardTemplate.contrast, CardTemplate.heuristic},
     );
-    return cards.take(2).toList(growable: false);
   }
 
-  Future<List<SuggestedCard>> _requestJsonCards({
+  Future<List<SuggestedCardIdea>> _requestJsonCardIdeas({
     required AppSettings settings,
     required String apiKey,
     required String systemPrompt,
     required String userPrompt,
     required String errorMessage,
-    Set<CognitiveType>? allowedTypes,
+    required int maxIdeas,
+    required int maxVariants,
+    Set<CardTemplate>? allowedTemplates,
   }) async {
     final content = await _requestAi(
       settings: settings,
@@ -428,13 +504,33 @@ class LookupService {
     );
     try {
       final payload = _decodeObject(content);
+      final ideas = <SuggestedCardIdea>[];
+      final seenIdeas = <String>{};
+      final rawIdeas = payload['ideas'];
+      if (rawIdeas is List) {
+        for (final rawIdea in rawIdeas) {
+          if (ideas.length >= maxIdeas) break;
+          final idea = _parseIdea(
+            rawIdea,
+            maxVariants: maxVariants,
+            allowedTemplates: allowedTemplates,
+          );
+          if (idea == null) continue;
+          final key =
+              '${idea.template.name}\u0000'
+              '${idea.variants.first.front.toLowerCase()}';
+          if (!seenIdeas.add(key)) continue;
+          ideas.add(idea);
+        }
+        return List.unmodifiable(ideas);
+      }
+
       final rawCards = payload['cards'];
       if (rawCards is! List) {
-        throw const FormatException('Missing cards list');
+        throw const FormatException('Missing ideas list');
       }
-      final cards = <SuggestedCard>[];
-      final seen = <String>{};
       for (final item in rawCards) {
+        if (ideas.length >= maxIdeas) break;
         if (item is! Map<String, dynamic>) continue;
         final rawFront = item['front'];
         final rawBack = item['back'];
@@ -442,22 +538,68 @@ class LookupService {
         final back = rawBack is String ? rawBack.trim() : '';
         if (front.isEmpty || back.isEmpty) continue;
         final rawType = item['type'];
-        final type = switch (rawType is String ? rawType.trim() : null) {
-          'contrast' => CognitiveType.contrast,
-          'heuristic' || 'procedure' || 'rule' => CognitiveType.heuristic,
-          'fact' => CognitiveType.fact,
-          _ => CognitiveType.fact,
-        };
-        if (allowedTypes != null && !allowedTypes.contains(type)) continue;
-        final key = '${type.name}\u0000${front.toLowerCase()}';
-        if (!seen.add(key)) continue;
-        cards.add(SuggestedCard(front: front, back: back, cognitiveType: type));
-        if (cards.length == 6) break;
+        final template = templateFromLegacyType(
+          rawType is String ? rawType : null,
+        );
+        if (template == null) continue;
+        if (allowedTemplates != null && !allowedTemplates.contains(template)) {
+          continue;
+        }
+        final key = '${template.name}\u0000${front.toLowerCase()}';
+        if (!seenIdeas.add(key)) continue;
+        ideas.add(
+          SuggestedCardIdea(
+            template: template,
+            variants: [
+              SuggestedCard(front: front, back: back, template: template),
+            ],
+          ),
+        );
       }
-      return cards;
+      return List.unmodifiable(ideas);
     } on Object {
       throw LookupException(errorMessage);
     }
+  }
+
+  SuggestedCardIdea? _parseIdea(
+    Object? rawIdea, {
+    required int maxVariants,
+    Set<CardTemplate>? allowedTemplates,
+  }) {
+    if (rawIdea is! Map<String, dynamic>) return null;
+    final rawTemplate = rawIdea['template'];
+    final template = templateFromName(
+      rawTemplate is String ? rawTemplate : null,
+    );
+    if (template == null) return null;
+    if (allowedTemplates != null && !allowedTemplates.contains(template)) {
+      return null;
+    }
+    final rawVariants = rawIdea['variants'];
+    if (rawVariants is! List) return null;
+    final variants = <SuggestedCard>[];
+    final seenFronts = <String>{};
+    for (final item in rawVariants) {
+      if (variants.length >= maxVariants) break;
+      if (item is! Map<String, dynamic>) continue;
+      final rawFront = item['front'];
+      final rawBack = item['back'];
+      final front = rawFront is String ? rawFront.trim() : '';
+      final back = rawBack is String ? rawBack.trim() : '';
+      if (front.isEmpty || back.isEmpty) continue;
+      if (!seenFronts.add(front.toLowerCase())) continue;
+      variants.add(
+        SuggestedCard(
+          front: front,
+          back: back,
+          template: template,
+          variantIndex: variants.length,
+        ),
+      );
+    }
+    if (variants.isEmpty) return null;
+    return SuggestedCardIdea(template: template, variants: variants);
   }
 
   Future<List<String>> listModels({
@@ -688,6 +830,7 @@ class LookupService {
       throw const LookupException(
         'No AI model configured. Add a model in Settings.',
         canUseWeb: true,
+        failure: LookupFailure.noProvider,
       );
     }
     final base = settings.aiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
@@ -695,6 +838,7 @@ class LookupService {
       throw const LookupException(
         'No AI endpoint configured. Add one in Settings.',
         canUseWeb: true,
+        failure: LookupFailure.noProvider,
       );
     }
     final isGemini = settings.aiProvider == AiProvider.gemini;

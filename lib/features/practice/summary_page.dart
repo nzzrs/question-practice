@@ -185,7 +185,7 @@ class _SummaryPageState extends ConsumerState<SummaryPage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Review each error and skipped question with Create cards. Add cards by hand, or use Suggest with AI when a provider is set. The review stays in this session.',
+                  'Review each error and skipped question with Create cards. Add cards by hand one at a time; AI suggestions are optional. The review stays in this session.',
                   style: theme.typography.baseline.bodySmall.copyWith(
                     color: theme.colorScheme.onSecondaryContainer.withValues(
                       alpha: 0.85,

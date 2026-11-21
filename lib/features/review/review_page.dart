@@ -164,7 +164,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         questionContext: note.context,
         topicName: note.topicName,
         subtopic: note.subtopic,
-        initialKind: CardCreatorKind.concept,
+        initialTemplate: CardTemplate.definition,
         initialTerm: note.text,
         note: note,
       ),

@@ -358,6 +358,17 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
       bounds,
     );
 
+    final focusRing = _focusHighlight
+        ? Container(
+            width: horizontal ? 12 : 40,
+            height: horizontal ? 40 : 12,
+            decoration: BoxDecoration(
+              border: Border.all(color: scheme.primary, width: 2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+          )
+        : const SizedBox.shrink();
+
     final Widget dividerBody = SizedBox(
       width: horizontal ? AdaptiveSplitView.dividerExtent : null,
       height: horizontal ? null : AdaptiveSplitView.dividerExtent,
@@ -366,6 +377,7 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
         children: [
           Center(child: line),
           Center(child: handle),
+          Center(child: focusRing),
         ],
       ),
     );
@@ -442,15 +454,7 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
         cursor: horizontal
             ? SystemMouseCursors.resizeLeftRight
             : SystemMouseCursors.resizeUpDown,
-        child: DecoratedBox(
-          position: DecorationPosition.foreground,
-          decoration: BoxDecoration(
-            border: _focusHighlight
-                ? Border.all(color: scheme.primary, width: 2)
-                : null,
-          ),
-          child: semanticDivider,
-        ),
+        child: semanticDivider,
       ),
     );
   }

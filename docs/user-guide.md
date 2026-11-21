@@ -39,7 +39,7 @@ Questions is an offline Android app for practising questions and exporting study
 - A practice marked done keeps a **Done** tag.
 - **Edit practice** offers **Rename**, **Edit description**, **Download practice JSON** and **Update practice JSON**.
 - **Split into two** needs an even number of questions. It replaces the practice with Slice A and Slice B, and removes the original practice's sessions and cards.
-- **Edit topic** is in the topic long-press menu. It changes the name, description, priority, AnkiDroid deck, minimum approval score and target score, and offers **Download topic JSON** and **Update topic JSON**.
+- **Edit topic** is in the topic long-press menu. Its options are grouped into **Details** (name and description), **Study targets** (priority, minimum approval score and target score), **AnkiDroid** (deck) and **Topic file** (**Download topic JSON** and **Update topic JSON**).
 - The topic long-press menu groups **Edit topic**, **Archive topic**/**Unarchive topic** and **Delete topic**, like the practice menu.
 - Decks are set per topic. There is no per-practice deck.
 

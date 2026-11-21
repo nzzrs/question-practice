@@ -353,10 +353,10 @@ have changed.
 
 ### Downloading and updating a topic
 
-Long-press a topic and choose **Edit topic → Download topic JSON**. The file
-contains one topic with every practice in it, using the same format above plus
-the topic's `minimumScore` and `targetScore`. **Update topic JSON**, next to the
-download action, validates the whole file first, then:
+Long-press a topic and choose **Edit topic → Topic file → Download topic
+JSON**. The file contains one topic with every practice in it, using the same
+format above plus the topic's `minimumScore` and `targetScore`. **Update topic
+JSON**, next to the download action, validates the whole file first, then:
 
 - a practice whose name matches a stored practice is updated question by
   question with the same `sourceId` then prompt matching used by a practice

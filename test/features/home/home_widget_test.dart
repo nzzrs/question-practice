@@ -86,7 +86,7 @@ void main() {
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
     expect(find.text('Cloud'), findsOneWidget);
-    expect(find.text('1 practices · 3 questions'), findsOneWidget);
+    expect(find.text('1 practice · 3 questions'), findsOneWidget);
 
     await tester.tap(find.text('Cloud'));
     await pumpFrames(tester);
@@ -145,7 +145,7 @@ void main() {
     await service.finishEarly(start: start, markSkipped: false);
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
-    expect(find.text('1 practices · 1 questions'), findsOneWidget);
+    expect(find.text('1 practice · 1 question'), findsOneWidget);
   });
 
   testWidgets('session gives in-place feedback, explanation and score', (

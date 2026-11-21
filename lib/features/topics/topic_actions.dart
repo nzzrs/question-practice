@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/plural.dart';
 import '../../core/ui/widgets.dart';
 import 'topic_editor_sheet.dart';
 
@@ -119,7 +120,7 @@ class TopicOptionsSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${summary.practiceCount} practices · '
+                    '${formatCount(summary.practiceCount, 'practice')} · '
                     '${topic.archived ? 'Archived' : 'Active'}',
                     style: theme.typography.baseline.bodySmall.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,

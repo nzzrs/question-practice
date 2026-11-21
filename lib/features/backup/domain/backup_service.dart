@@ -11,6 +11,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/domain/models.dart';
+import '../../../core/domain/plural.dart';
 
 /// Raised when a backup file cannot be read or applied.
 class BackupException implements Exception {
@@ -73,16 +74,22 @@ class BackupInfo {
   int get cards => concepts + errorCards + manualCards;
 
   String get description {
-    final archived = archivedTopics > 0 ? ' ($archivedTopics archived)' : '';
+    final archived = archivedTopics > 0
+        ? ' (${formatCount(archivedTopics, 'archived topic')})'
+        : '';
     final buffer = StringBuffer(
-      '$topics topics$archived, $practices practices, $questions questions, '
-      '$sessions sessions, $attempts answers and $cards cards',
+      '${formatCount(topics, 'topic')}$archived, '
+      '${formatCount(practices, 'practice')}, '
+      '${formatCount(questions, 'question')}, '
+      '${formatCount(sessions, 'session')}, '
+      '${formatCount(attempts, 'answer')} and '
+      '${formatCount(cards, 'card')}',
     );
     if (skippedQuestions > 0) {
-      buffer.write(', $skippedQuestions skipped questions');
+      buffer.write(', ${formatCount(skippedQuestions, 'skipped question')}');
     }
     if (notes > 0) {
-      buffer.write(', $notes notes');
+      buffer.write(', ${formatCount(notes, 'note')}');
     }
     return buffer.toString();
   }

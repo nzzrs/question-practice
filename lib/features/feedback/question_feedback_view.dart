@@ -125,28 +125,31 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> {
           onNoteTap: widget.actions.onNoteTap,
           notes: notes,
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Icon(
-              Icons.text_fields,
-              size: 14,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                snapshot.allowsMultiple
-                    ? 'Select every correct alternative. Select text to define '
-                          'a term.'
-                    : 'Select text to define a term.',
-                style: theme.typography.baseline.labelSmall.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+        if (snapshot.mode == FeedbackMode.practice && !snapshot.revealed) ...[
+          const SizedBox(height: 8),
+          Row(
+            key: const ValueKey('feedback-instructions'),
+            children: [
+              Icon(
+                Icons.text_fields,
+                size: 14,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  snapshot.allowsMultiple
+                      ? 'Select every correct alternative. Select text to '
+                            'define a term.'
+                      : 'Select text to define a term.',
+                  style: theme.typography.baseline.labelSmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
         const SizedBox(height: 18),
         for (final index in widget.snapshot.order)
           Padding(

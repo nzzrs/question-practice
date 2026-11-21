@@ -103,15 +103,16 @@ Review opens fullscreen.
 
 ## Cards
 
-- Cognitive filters: **All**, **Facts**, **Heuristics**, **Contrasts** and **Concepts**. Separate entries show **Errors & skipped** and **Notes**. **Show exported** or **Hide exported** controls finished cards.
-- Cards has no checkboxes. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. The subtitle counts the selection and rows keep their positions.
-- **Review all** sits above the error and skipped section; **Review selected** appears while cards are selected.
-- **Complete** finishes a missing concept definition; an error is completed by adding cards with **Create cards** or skipping it.
-- Tap a card to preview it. Tapping a note opens the note review at that note. In the error review, **Create cards** creates the cards to export; the question and alternatives stay read-only. An error preview is titled **Error preview**.
+- Filters: **All**, **Cards**, **Errors** and **Notes** in one compact row. Cards groups concepts and basic cards; Errors also includes skipped questions. A visibility action includes exported cards.
+- Cards has no checkboxes. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. Select all in the app bar selects what the current filter shows. The subtitle counts the selection and rows keep their positions.
+- The selection is global and survives leaving Cards and restarting the app. It starts empty, and ids of deleted or exported rows are dropped.
+- The main action exports ready cards. When the selection includes pending errors or skipped questions it becomes **Review pending** and opens that review instead. **Review all pending** in the app bar opens every pending error and skipped question, even ones not selected.
+- Tap a card to preview it. Error and skipped previews include **Review** beside **Close**. A concept without a definition can be completed from its preview.
+- Tap a note to review it. In the error review, **Create cards** creates the cards to export; the question and alternatives stay read-only.
 - **Export to AnkiDroid** sends the selected cards to AnkiDroid.
 - **Share as files** creates Anki-compatible text files.
 - **Delete selected** removes the chosen cards, skipped questions and notes. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a note removes only the saved phrase; cards already made from it stay.
-- Errors are never exported directly: review them into atomic cards with **Create cards** first. Concepts without a definition block export until completed. Skipped questions and notes cannot be exported, but they can still be selected and deleted.
+- Errors are never exported directly: review them into atomic cards first. Concepts without a definition block export until completed. Skipped questions and notes cannot be exported, but they can still be selected and deleted.
 - Concept cards in the creator need only a term. The meaning is looked up from your saved concepts first, then from AI when a provider is configured. There is no definition field to type in the creator. Without a provider the concept is saved as **Definition pending** and is not exported until a definition is added.
 - Topic and subtopic are never written inside card text. They travel as `question-practice`, `topic::<slug>` and `subtopic::<slug>` Anki tags. File exports put them in a third `Tags` column with `#tags column:3`.
 
@@ -119,10 +120,10 @@ Review opens fullscreen.
 
 - Select any question, answer or explanation text during practice and choose **Save as note**. The phrase is shown in place and belongs to the question, so it appears whenever that question is practised again.
 - Tap a note to **Define**, **Ask** or **Delete note**. Deleting is immediate and asks no confirmation.
-- Notes stay in **Cards** and can be reviewed one at a time from **Review notes** or by tapping one.
+- Notes stay in **Cards** and can be reviewed one at a time by tapping one.
 - **Create cards** sits inside the note review and opens the card creator. Manual entry adds cards one at a time and works without AI. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
 - A note with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete note** removes only the saved phrase.
-- **Download all** saves notes as plain text.
+- The download action in the Notes header saves notes as plain text.
 - Notes are never sent to AnkiDroid.
 
 ## AnkiDroid export

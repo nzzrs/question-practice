@@ -132,7 +132,7 @@ File exports carry no deck, so choose one when importing.
 On a connected Android device with AnkiDroid installed:
 
 1. Import the sample practice and create one concept, one atomic card and one skipped-question basic card.
-2. In Cards, filter by Facts, Heuristics, Contrasts and Concepts and confirm the rows match their type.
+2. In Cards, use **Cards** to see concepts and basic cards, and **Errors** to see error and skipped rows.
 3. Export to AnkiDroid and accept the permission prompt.
 4. In AnkiDroid, open the Question Practice deck and confirm:
    - concept notes render as cloze cards with no topic prefix in the text;

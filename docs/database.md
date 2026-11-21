@@ -206,7 +206,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 
 **Drift class:** `ErrorCards` · **Row class:** `ErrorCardRow`
 
-**Feature use:** Wrong-answer error queue, 48-hour retry, bias/vaccine review, shared card review and Anki export.
+**Feature use:** Wrong-answer error queue, 48-hour retry, shared read-only feedback, bullet-to-card review and Anki export.
 
 **Domain model:** `ErrorCard` · **Repository:** `CardRepository` · **DAO:** `CardDao`, `StatsDao`
 
@@ -251,7 +251,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 
 **Drift class:** `ManualCards` · **Row class:** `ManualCardRow`
 
-**Feature use:** Basic question/answer cards from skipped questions, Ask or a note.
+**Feature use:** Basic question/answer cards from skipped questions, Ask, notes or review bullets.
 
 **Domain model:** `ManualCard` · **Repository:** `CardRepository` · **DAO:** `CardDao`, `StatsDao`
 

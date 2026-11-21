@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../review/domain/card_litmus.dart';
@@ -1230,6 +1231,9 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         _LitmusRow(
           report: _currentReport,
           waiting: _waitingForText,
+          readingTime: readingTimeLabel(
+            _template == CardTemplate.definition ? _term.text : _front.text,
+          ),
           badgeKey: const ValueKey('creator-litmus-current'),
           detailKey: const ValueKey('creator-litmus-detail-current'),
         ),
@@ -1995,17 +1999,6 @@ class _CreatorContextRecap extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         _RecapField(label: 'Correct answer', value: error.correctAnswer.trim()),
-        if (error.card.mistakeKinds.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final kind in error.card.mistakeKinds)
-                Pill(kind.label, tone: PillTone.secondary),
-            ],
-          ),
-        ],
       ];
     } else if (note != null) {
       fields = [
@@ -2217,6 +2210,11 @@ class _DraftRow extends StatelessWidget {
                     Pill(draft.template.label, tone: PillTone.secondary),
                     if (pending) const Pill('Definition pending'),
                     _QualityBadge(report: report, waiting: waiting),
+                    Pill(
+                      readingTimeLabel(title),
+                      tone: PillTone.neutral,
+                      icon: Icons.schedule_outlined,
+                    ),
                   ],
                 ),
                 if (!waiting && !report.isClean) ...[
@@ -2353,10 +2351,24 @@ class _AiVariantTile extends StatelessWidget {
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.only(top: 12),
-                child: _QualityBadge(
-                  key: ValueKey('creator-ai-litmus-$ideaIndex-$variantIndex'),
-                  report: report,
-                  waiting: variant.waiting,
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    _QualityBadge(
+                      key: ValueKey(
+                        'creator-ai-litmus-$ideaIndex-$variantIndex',
+                      ),
+                      report: report,
+                      waiting: variant.waiting,
+                    ),
+                    Pill(
+                      readingTimeLabel(variant.front.text),
+                      tone: PillTone.neutral,
+                      icon: Icons.schedule_outlined,
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -2401,12 +2413,14 @@ class _LitmusRow extends StatelessWidget {
   const _LitmusRow({
     required this.report,
     required this.waiting,
+    required this.readingTime,
     required this.badgeKey,
     required this.detailKey,
   });
 
   final LitmusReport report;
   final bool waiting;
+  final String readingTime;
   final Key badgeKey;
   final Key detailKey;
 
@@ -2429,6 +2443,15 @@ class _LitmusRow extends StatelessWidget {
               ),
             ),
             _QualityBadge(key: badgeKey, report: report, waiting: waiting),
+            Tooltip(
+              message: 'Estimated time to read the front',
+              child: Pill(
+                key: const ValueKey('creator-litmus-reading-time'),
+                readingTime,
+                tone: PillTone.neutral,
+                icon: Icons.schedule_outlined,
+              ),
+            ),
           ],
         ),
         if (!waiting && !report.isClean) ...[

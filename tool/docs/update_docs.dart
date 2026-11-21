@@ -1279,13 +1279,14 @@ const _tableDocs = <String, _TableDoc>{
     'CardRepository',
   ),
   'error_cards': _TableDoc(
-    'Wrong-answer error queue, 48-hour retry, bias/vaccine review, shared card '
-        'review and Anki export.',
+    'Wrong-answer error queue, 48-hour retry, shared read-only feedback, '
+        'bullet-to-card review and Anki export.',
     'ErrorCard',
     'CardRepository',
   ),
   'manual_cards': _TableDoc(
-    'Basic question/answer cards from skipped questions, Ask or a note.',
+    'Basic question/answer cards from skipped questions, Ask, notes or review '
+        'bullets.',
     'ManualCard',
     'CardRepository',
   ),

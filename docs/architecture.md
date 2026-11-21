@@ -107,9 +107,10 @@ of the random queue.
    Contrast, Mechanism, Exam heuristic, Procedure) write the front and back;
    Definition becomes a Cloze concept, the other four become Basic
    `manual_cards` with the matching cognitive type. Every builder card, draft
-   and AI variant carries an advisory quality badge covering yes/no questions,
-   long fronts and cards, answer clues, template mismatches, missing fields, a
-   missing definition and a definition that repeats its term. AI suggestions
+   and AI variant carries an advisory quality badge and the estimated reading
+   time. The badge covers yes/no questions, long fronts and cards, answer clues,
+   template mismatches, missing fields, a missing definition and a definition
+   that repeats its term. AI suggestions
    sit below manual entry: each idea offers up to three wording variants, and
    an error breakdown offers at most two ideas (contrast and heuristic). Saved
    cards keep the topic and subtopic as Anki tags, never in the text; the error
@@ -199,7 +200,7 @@ the error step uses the split studio.
 | Define (web) | Opens DuckDuckGo or Wikipedia in a Custom Tab and keeps an editable definition sheet with Save. A missing concept is saved immediately. | `LookupService.openWeb`, `WebLauncher` | `concepts`, `settings` |
 | Ask | Sends the selected passage, its question and the learner message to AI. The answer can become a concept card or a basic card; the basic front places the question context above the learner question. | `ask_sheet.dart`, `LookupService.ask`, `ReviewService.createConcept/createBasicCard` | `concepts` or `manual_cards` when saved |
 | Concept cards | Cloze text `Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Topic and subtopic travel as tags only. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
-| Basic cards | Question/answer cards from skipped questions, Ask or a note, with optional context above the front and a cognitive type (fact, heuristic, contrast). | `CardRepository.createManualCard`, `new_card_dialog.dart` | `manual_cards` |
+| Basic cards | Question/answer cards from skipped questions, Ask, a note or a review bullet, with optional context above the front and a cognitive type (fact, heuristic, contrast). | `CardRepository.createManualCard`, `card_creator_sheet.dart`, `review_service.dart` | `manual_cards` |
 | Skipped queue | Every skipped/unknown answer is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
 | Notes (`notes` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it is shown again whenever that question is practised. Tapping a note offers Define, Ask and **Delete note**; deletion is immediate with no confirmation. At review a note can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one at a time and works without AI; optional AI suggestions offer up to three variants per idea and the learner keeps any combination. Each saved variant becomes a Basic card (or a Cloze concept for a Definition idea) with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards: **Review notes** walks them one at a time through the shared view. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createNote/notesForQuestion/keepNote/markNoteConverted/deleteNotes`, `LookupService.suggestArchetypeCards`, `note_review_page.dart`, `note_review_view.dart`, `card_creator_sheet.dart` | `notes`, `manual_cards` |
 | Note download | **Download all** writes a plain-text file through the system share sheet. | `CardsPage._downloadNotes`, `ExportService.shareNotes` | `notes` |
@@ -315,9 +316,10 @@ See [AnkiDroid export](anki.md).
 `BackupService` writes one checksummed JSON document with every local table:
 topics (including archived topics, decks and score bands), practices, questions
 (including subtopics), sessions, session questions, attempts (including legacy
-mistake chips and wrong-answer bullets), concepts (including subtopic), error
-cards (including cognitive type, subtopic, legacy mistake chips, distracted flag
-and bullets), basic cards (including cognitive type and subtopic), skipped
+mistake classifications and wrong-answer bullets), concepts (including
+subtopic), error cards (including cognitive type, subtopic, legacy mistake
+classifications, distracted flag and bullets), basic cards (including cognitive
+type and subtopic), skipped
 questions, notes (the `notes` table) and settings.
 
 - Format **v3** keeps the canonical checksum over the `tables` object and

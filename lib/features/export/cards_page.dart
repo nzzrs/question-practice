@@ -601,7 +601,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       if (mounted) {
         await _statusDialog(
           title: 'AnkiDroid API is off',
-          message: 'Open AnkiDroid, go to Settings → Advanced, and enable the AnkiDroid API. Then try again.',
+          message: 'In AnkiDroid, open Settings → Advanced, and enable the AnkiDroid API. Then try again.',
         );
       }
       return;
@@ -824,7 +824,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           card.needsDetails ? 'Needs review' : 'Reviewed',
           tone: card.needsDetails ? PillTone.error : PillTone.success,
         ),
-        for (final kind in card.mistakeKinds) Pill(kind.label),
       ]),
       const SizedBox(height: 14),
       TonalBox(
@@ -1018,7 +1017,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               Navigator.of(context).pop();
               await ref.read(ankiGatewayProvider).openAnkiDroid();
             },
-            child: const Text('Open AnkiDroid'),
+            child: const Text('Open in AnkiDroid'),
           ),
         ],
       ),

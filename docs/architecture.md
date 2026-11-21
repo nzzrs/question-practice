@@ -317,13 +317,14 @@ See [User guide: Backup and restore](user-guide.md#backup-and-restore).
   seed color; system light/dark; practice sounds on/off with volume and a test
   cue.
 - **Looking up terms:** web (DuckDuckGo or Wikipedia) or AI. AI provider
-  (OpenAI, Groq, OpenRouter, Gemini or custom), model loaded from the provider,
-  API key saved automatically to Android secure storage, and **Test
+  (OpenAI, Groq, OpenRouter, Gemini or custom) chosen from a single-choice
+  picker, model chosen from a searchable list loaded from the provider, and
+  API key saved automatically to Android secure storage, with **Test
   connection**. Custom shows the base URL. OpenAI-compatible providers use
   `/chat/completions` with a Bearer key; Gemini uses native
   `models/{model}:generateContent`.
-- **AnkiDroid:** install/API/permission/Cloze status, permission request, open
-  AnkiDroid, default deck name and live deck browsing.
+- **AnkiDroid:** install/API/permission/Cloze status, a refresh action, the
+  permission request, default deck name and live deck browsing.
 - **Data:** export backup, restore backup and erase all data.
 - **About:** app version `0.9.11`. Backup metadata records the same app version
   and build number (`BackupService.appVersion/buildNumber`).

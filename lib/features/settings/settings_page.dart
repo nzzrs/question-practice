@@ -17,6 +17,7 @@ import '../../core/ui/widgets.dart';
 import '../backup/domain/backup_service.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../topics/anki_deck_picker.dart';
+import 'settings_pickers.dart';
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -33,10 +34,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   AiProvider _provider = AiProvider.openai;
   List<String> _models = const [];
   bool _loadingModels = false;
+  bool _modelsLoaded = false;
+  int _modelLoadRequest = 0;
   bool _loaded = false;
   bool _busy = false;
   bool _apiKeyEdited = false;
   double _soundVolume = const AppSettings().soundVolume;
+  final _modelCatalog = ValueNotifier<ModelCatalogState>(
+    const ModelCatalogState(),
+  );
   Timer? _baseUrlSaveTimer;
   Timer? _apiKeySaveTimer;
 
@@ -44,6 +50,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void dispose() {
     _baseUrlSaveTimer?.cancel();
     _apiKeySaveTimer?.cancel();
+    _modelCatalog.dispose();
     _baseUrl.dispose();
     _model.dispose();
     _deck.dispose();
@@ -202,29 +209,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
               ] else ...[
                 Text('Provider', style: theme.typography.baseline.labelMedium),
                 const SizedBox(height: 8),
-                M3EDropdownMenu<AiProvider>(
-                  items: [
-                    for (final provider in AiProvider.values)
-                      M3EDropdownItem(
-                        label: _providerLabel(provider),
-                        value: provider,
-                        selected: _provider == provider,
-                      ),
-                  ],
-                  singleSelect: true,
-                  fieldStyle: const M3EDropdownFieldStyle(
-                    hintText: 'Choose a provider',
-                  ),
-                  onSelectionChanged: (selection) {
-                    if (selection.isEmpty) return;
-                    setState(() {
-                      _provider = selection.first.value;
-                      _models = const [];
-                      _model.text = '';
-                      _baseUrl.text = _baseUrlFor(_provider, _baseUrl.text);
-                    });
-                    unawaited(_persistAiSettings());
-                  },
+                SettingsChoiceField(
+                  key: const ValueKey('ai-provider-field'),
+                  value: _providerLabel(_provider),
+                  hint: 'Choose a provider',
+                  semanticLabel: 'Provider',
+                  onTap: _pickProvider,
                 ),
                 if (_provider == AiProvider.custom) ...[
                   const SizedBox(height: 12),
@@ -234,7 +224,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     placeholder: 'https://api.openai.com/v1',
                     keyboardType: TextInputType.url,
                     onChanged: (_) {
-                      setState(() => _models = const []);
+                      setState(() {
+                        _models = const [];
+                        _modelsLoaded = false;
+                        _loadingModels = false;
+                      });
+                      _modelLoadRequest++;
+                      _publishModelState();
                       _scheduleBaseUrlSave();
                     },
                   ),
@@ -242,48 +238,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 const SizedBox(height: 12),
                 Text('Model', style: theme.typography.baseline.labelMedium),
                 const SizedBox(height: 8),
-                Listener(
-                  onPointerDown: (_) => unawaited(_ensureModelsLoaded()),
-                  child: M3EDropdownMenu<String>(
-                    key: const ValueKey('model-menu'),
-                    items: [
-                      for (final model in _modelOptions)
-                        M3EDropdownItem(
-                          label: model,
-                          value: model,
-                          selected: model == _model.text.trim(),
-                        ),
-                    ],
-                    singleSelect: true,
-                    searchEnabled: true,
-                    fieldStyle: const M3EDropdownFieldStyle(
-                      hintText: 'Open to load available models',
-                    ),
-                    emptyBuilder: (context) => Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        _loadingModels ? 'Loading models…' : 'Open this menu to load models from the provider.',
-                        style: theme.typography.baseline.bodySmall.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    onSelectionChanged: (selection) {
-                      if (selection.isEmpty) return;
-                      setState(() => _model.text = selection.first.value);
-                      unawaited(_persistAiSettings());
-                    },
-                  ),
+                SettingsChoiceField(
+                  key: const ValueKey('ai-model-field'),
+                  value: _model.text.trim(),
+                  hint: 'Choose a model',
+                  semanticLabel: 'Model',
+                  onTap: _pickModel,
                 ),
-                if (_model.text.trim().isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _model.text.trim(),
-                    style: theme.typography.baseline.labelSmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
                 const SizedBox(height: 12),
                 M3ETextField(
                   controller: _apiKey,
@@ -311,7 +272,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 Text(
                   'The app sends the selected term, question and topic to the endpoint you choose. It never logs the key. '
                   'OpenAI, Groq and OpenRouter use their chat-completions endpoint; Gemini uses its native generateContent API. '
-                  'Open the model menu to load the provider list. Changes save automatically.',
+                  'Open the model picker to load the provider list. Changes save automatically.',
                   style: theme.typography.baseline.bodySmall.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                     height: 1.4,
@@ -337,8 +298,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       status: status,
                       onCheck: () => ref.invalidate(ankiStatusProvider),
                       onPermission: _requestAnkiPermission,
-                      onOpen: () =>
-                          ref.read(ankiGatewayProvider).openAnkiDroid(),
                     ),
                   ),
               const SizedBox(height: 14),
@@ -484,6 +443,57 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ..sort(compareNatural);
   }
 
+  void _publishModelState() {
+    _modelCatalog.value = ModelCatalogState(
+      models: _modelOptions,
+      selected: _model.text.trim(),
+      loading: _loadingModels,
+      loaded: _modelsLoaded,
+    );
+  }
+
+  Future<void> _pickProvider() async {
+    final selected = await showSettingsChoicePicker<AiProvider>(
+      context,
+      pickerId: 'ai-provider',
+      title: 'AI provider',
+      choices: [
+        for (final provider in AiProvider.values)
+          SettingsChoice(
+            id: provider.name,
+            value: provider,
+            label: _providerLabel(provider),
+          ),
+      ],
+      selected: _provider,
+    );
+    if (selected == null || selected == _provider || !mounted) return;
+    setState(() {
+      _provider = selected;
+      _models = const [];
+      _modelsLoaded = false;
+      _loadingModels = false;
+      _model.text = '';
+      _baseUrl.text = _baseUrlFor(_provider, _baseUrl.text);
+    });
+    _modelLoadRequest++;
+    _publishModelState();
+    unawaited(_persistAiSettings());
+  }
+
+  Future<void> _pickModel() async {
+    _publishModelState();
+    unawaited(_ensureModelsLoaded());
+    final selected = await showSettingsModelPicker(
+      context,
+      catalog: _modelCatalog,
+    );
+    if (selected == null || !mounted) return;
+    setState(() => _model.text = selected);
+    _publishModelState();
+    unawaited(_persistAiSettings());
+  }
+
   AppSettings get _currentSettings =>
       ref.read(settingsProvider).value ?? const AppSettings();
 
@@ -536,14 +546,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _loadModels() async {
+    if (_loadingModels) return;
+    final request = ++_modelLoadRequest;
+    final requestProvider = _provider;
+    bool isCurrent() =>
+        mounted && request == _modelLoadRequest && requestProvider == _provider;
+
     final rawBaseUrl = _baseUrl.text.trim();
     final baseUrl = rawBaseUrl.isEmpty
-        ? _baseUrlFor(_provider, rawBaseUrl)
+        ? _baseUrlFor(requestProvider, rawBaseUrl)
         : rawBaseUrl;
     final uri = Uri.tryParse(baseUrl);
     if (uri == null ||
         !(uri.isScheme('http') || uri.isScheme('https')) ||
         uri.host.isEmpty) {
+      _modelsLoaded = true;
+      _publishModelState();
       await showSnack(context, 'Enter a valid http(s) base URL first.');
       return;
     }
@@ -551,16 +569,21 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ? _apiKey.text.trim()
         : await ref.read(settingsRepositoryProvider).readApiKey();
     if (!mounted) return;
+    if (!isCurrent()) return;
     if (key == null || key.trim().isEmpty) {
+      _modelsLoaded = true;
+      _publishModelState();
       await showSnack(context, 'Enter an API key first.');
       return;
     }
     setState(() => _loadingModels = true);
+    _publishModelState();
     try {
       final models = await ref
           .read(lookupServiceProvider)
-          .listModels(provider: _provider, baseUrl: baseUrl, apiKey: key);
+          .listModels(provider: requestProvider, baseUrl: baseUrl, apiKey: key);
       if (!mounted) return;
+      if (!isCurrent()) return;
       var selectedFirst = false;
       setState(() {
         _models = models;
@@ -569,14 +592,22 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           selectedFirst = true;
         }
       });
+      _publishModelState();
       if (selectedFirst) unawaited(_persistAiSettings());
       if (models.isEmpty) {
         await showSnack(context, 'The provider returned no models.');
       }
     } on LookupException catch (error) {
-      if (mounted) await showSnack(context, error.message);
+      if (!mounted) return;
+      if (isCurrent()) await showSnack(context, error.message);
     } finally {
-      if (mounted) setState(() => _loadingModels = false);
+      if (request == _modelLoadRequest) {
+        _modelsLoaded = true;
+        if (mounted) {
+          setState(() => _loadingModels = false);
+          _publishModelState();
+        }
+      }
     }
   }
 
@@ -835,13 +866,11 @@ class _AnkiStatusCard extends StatelessWidget {
     required this.status,
     required this.onCheck,
     required this.onPermission,
-    required this.onOpen,
   });
 
   final AnkiStatus status;
   final VoidCallback onCheck;
   final VoidCallback onPermission;
-  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -866,20 +895,28 @@ class _AnkiStatusCard extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
+          alignment: WrapAlignment.start,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            M3EButton.text(
-              onPressed: onCheck,
-              child: const Text('Check again'),
+            Semantics(
+              container: true,
+              button: true,
+              label: 'Check again',
+              onTap: onCheck,
+              excludeSemantics: true,
+              child: M3EIconButton(
+                key: const ValueKey('anki-check-again'),
+                variant: M3EIconButtonVariant.standard,
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Check again',
+                semanticLabel: 'Check again',
+                onPressed: onCheck,
+              ),
             ),
             if (installed && !permission)
               M3EButton.tonal(
                 onPressed: onPermission,
                 child: const Text('Grant permission'),
-              ),
-            if (installed)
-              M3EButton.text(
-                onPressed: onOpen,
-                child: const Text('Open AnkiDroid'),
               ),
           ],
         ),

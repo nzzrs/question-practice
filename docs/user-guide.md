@@ -166,8 +166,8 @@ Review opens fullscreen.
 ## Settings
 
 - **Appearance**: wallpaper colors, practice sounds and sound volume.
-- **Looking up terms**: web engine or AI provider, model and API key. **Test connection** checks the AI setup.
-- **AnkiDroid**: install, API and permission status, default deck, and **Browse decks**.
+- **Looking up terms**: web engine or AI. Pick the AI provider from a single-choice list; the model comes from a searchable list loaded from the provider. Add the API key and use **Test connection** to check the setup.
+- **AnkiDroid**: install, API and permission status, a refresh action, default deck, and **Browse decks**.
 - **Data**: **Export backup**, **Restore backup** and **Erase all data**.
 - **About**: app version and build type.
 

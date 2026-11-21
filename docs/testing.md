@@ -21,7 +21,7 @@ The suite runs on the Dart VM. Drift uses an in-memory SQLite database; HTTP and
 | Ask | AI request carries passage/context/message, plain-text answer, ask sheet and card action |
 | Cards browser | Cognitive filters (facts, heuristics, contrasts, concepts), separate error/skipped and note queues, long-press selection and pencils, unified review all/selected, note review surface, formatted previews including the **Error preview** title, editor switches between concept and basic fields |
 | Past errors | Due queue and resolved history collapsed by default, review action above the list |
-| Settings | AI key handling, data actions keep visible labels |
+| Settings | AI key handling, AI provider/model pickers, AnkiDroid status refresh, data actions keep visible labels |
 | Skipped queue | Persistence across the session, unknown toggle, early finish, late reasoning, combined Cards section and conversion |
 | Lookup | OpenAI-compatible and Gemini requests, AI JSON parsing, fenced JSON, 401 fallback, missing key/model, provider model lists, web URL selection, auto-saved concepts |
 | Export | Cloze format with topic/subtopic prefix, Basic front/back for facts/heuristics/contrasts, HTML/cloze escaping, hierarchical topic/subtopic tags, TSV content, per-topic deck routing, default deck fallback, permission/status failures, partial failures |

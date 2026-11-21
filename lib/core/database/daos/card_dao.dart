@@ -145,19 +145,57 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   Stream<List<ErrorCardRow>> watchErrorCardsNeedingDetails() {
     return (select(errorCards)
           ..where(
-            (e) => e.status.equals('active') & e.detailsCompletedAt.isNull(),
+            (e) =>
+                e.status.equals('active') &
+                (e.detailsCompletedAt.isNull() |
+                    e.lastWrongAt.isBiggerThan(e.detailsCompletedAt)),
           )
           ..orderBy([(e) => OrderingTerm.desc(e.lastWrongAt)]))
         .watch();
+  }
+
+  /// Active cards for [questionIds] in one query.
+  Future<List<ErrorCardRow>> activeErrorCardsForQuestions(
+    Iterable<int> questionIds,
+  ) {
+    final ids = questionIds.toSet().toList(growable: false);
+    if (ids.isEmpty) return Future.value(const []);
+    return (select(
+      errorCards,
+    )..where((e) => e.status.equals('active') & e.questionId.isIn(ids))).get();
   }
 
   Future<int> insertErrorCard(ErrorCardsCompanion card) {
     return into(errorCards).insert(card);
   }
 
+  /// Counts active cards missed in [sessionId] that still need review.
+  ///
+  /// The card's original `session_id` is deliberately ignored: a question
+  /// missed again in a later session belongs to that later review. The
+  /// `EXISTS` clause also excludes correct answers, skips, "didn't know this"
+  /// answers and distracted-only attempts.
   Future<int> countErrorCardsNeedingDetailsForSession(int sessionId) async {
     final query = customSelect(
-      "SELECT COUNT(*) AS amount FROM error_cards WHERE session_id = ? AND status = 'active' AND details_completed_at IS NULL AND exported_at IS NULL",
+      '''
+      SELECT COUNT(*) AS amount
+      FROM error_cards e
+      WHERE e.status = 'active'
+        AND (
+          e.details_completed_at IS NULL
+          OR e.last_wrong_at > e.details_completed_at
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM attempts a
+          WHERE a.session_id = ?
+            AND a.question_id = e.question_id
+            AND a.is_correct = 0
+            AND a.distracted = 0
+            AND a.unknown = 0
+            AND a.selected_indexes_json != '[]'
+        )
+      ''',
       variables: [Variable.withInt(sessionId)],
       readsFrom: {errorCards},
     );
@@ -236,6 +274,10 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
         lastWrongAt: Value(wrongAt),
         dueAt: Value(dueAt),
         distracted: const Value(false),
+        // A new mistake reopens a card that was already exported, so the
+        // Errors flow offers it for review and export again. The learner's
+        // completed details and earlier history are kept.
+        exportedAt: const Value(null),
       ),
     );
   }

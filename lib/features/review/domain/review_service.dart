@@ -98,7 +98,15 @@ class ReviewService {
     };
     final topicNames = {for (final topic in topics) topic.id: topic.name};
 
+    final wrongQuestionIds = [
+      for (final attempt in attempts)
+        if (!attempt.isSkipped && !attempt.isCorrect && !attempt.distracted)
+          attempt.questionId,
+    ];
+    final activeCards = await _cards.activeErrorsForQuestions(wrongQuestionIds);
+
     final steps = <ReviewStep>[];
+    final addedErrorCardIds = <int>{};
     for (final attempt in attempts) {
       if (attempt.isSkipped) {
         final question = questionsById[attempt.questionId];
@@ -119,8 +127,10 @@ class ReviewService {
           ),
         );
       } else if (!attempt.isCorrect && !attempt.distracted) {
-        final card = await _cards.activeErrorForQuestion(attempt.questionId);
-        if (card != null && card.needsDetails && card.exportedAt == null) {
+        final card = activeCards[attempt.questionId];
+        if (card != null &&
+            card.needsReview &&
+            addedErrorCardIds.add(card.id)) {
           steps.add(ErrorReviewStep(card));
         }
       }

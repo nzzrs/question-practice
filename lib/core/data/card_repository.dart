@@ -67,6 +67,14 @@ class CardRepository {
     return row == null ? null : errorCardFromRow(row);
   }
 
+  /// Active cards for [questionIds], keyed by question, in one query.
+  Future<Map<int, ErrorCard>> activeErrorsForQuestions(
+    Iterable<int> questionIds,
+  ) async {
+    final rows = await _db.cardDao.activeErrorCardsForQuestions(questionIds);
+    return {for (final row in rows) row.questionId: errorCardFromRow(row)};
+  }
+
   Future<ErrorCard?> errorCardById(int id) async {
     final row = await _db.cardDao.errorCardById(id);
     return row == null ? null : errorCardFromRow(row);

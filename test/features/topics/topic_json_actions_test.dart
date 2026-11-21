@@ -102,7 +102,8 @@ void main() {
     );
     await _openEditor(tester);
 
-    expect(find.text('TOPIC JSON'), findsOneWidget);
+    expect(find.text('TOPIC FILE'), findsOneWidget);
+    expect(find.textContaining('One file with this topic'), findsOneWidget);
     expect(find.text('Download topic JSON'), findsOneWidget);
     expect(
       find.text('Share every practice in this topic as a file'),

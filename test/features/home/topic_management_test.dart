@@ -89,6 +89,8 @@ void main() {
     expect(find.text('Download topic JSON'), findsOneWidget);
     expect(find.text('Update topic JSON'), findsOneWidget);
     expect(find.text('Browse decks'), findsNothing);
+    await tester.ensureVisible(find.text('AnkiDroid deck'));
+    await pumpFrames(tester);
     await tester.tap(find.text('AnkiDroid deck'));
     await pumpFrames(tester);
     expect(find.text('Browse decks'), findsOneWidget);

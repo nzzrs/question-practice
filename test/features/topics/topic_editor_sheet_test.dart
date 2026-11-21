@@ -42,6 +42,30 @@ Finder _targetScoreField() =>
 Finder _deckField() => find.byKey(const ValueKey('topic-editor-deck'));
 Finder _saveButton() => find.byKey(const ValueKey('topic-editor-save'));
 Finder _tile(String field) => find.byKey(ValueKey('topic-editor-tile-$field'));
+Finder _group(String name) => find.byKey(ValueKey('topic-editor-group-$name'));
+
+const _groupNames = ['details', 'study-targets', 'ankidroid', 'topic-file'];
+
+/// Asserts the four group headings exist, are real headings and read in order.
+void _expectGroups(WidgetTester tester) {
+  var previousTop = double.negativeInfinity;
+  for (final name in _groupNames) {
+    final group = _group(name);
+    expect(group, findsOneWidget);
+    expect(
+      find.descendant(
+        of: group,
+        matching: find.byWidgetPredicate(
+          (widget) => widget is Semantics && widget.properties.header == true,
+        ),
+      ),
+      findsOneWidget,
+    );
+    final top = tester.getTopLeft(group).dy;
+    expect(top, greaterThan(previousTop));
+    previousTop = top;
+  }
+}
 
 Finder _sheetScrollable() => find
     .descendant(
@@ -138,12 +162,33 @@ void main() {
       expect(find.text('Edit topic'), findsOneWidget);
       expect(find.byType(M3EDialog), findsNothing);
       expect(find.byType(OptionTile), findsNWidgets(8));
+      _expectGroups(tester);
+      expect(find.text('DETAILS'), findsOneWidget);
+      expect(find.text('STUDY TARGETS'), findsOneWidget);
+      expect(find.text('ANKIDROID'), findsOneWidget);
+      expect(find.text('TOPIC FILE'), findsOneWidget);
+      expect(find.textContaining('Priority 1 is highest'), findsOneWidget);
+      expect(find.textContaining('shown in red'), findsOneWidget);
+      expect(find.textContaining('shown in green'), findsOneWidget);
+      expect(
+        find.textContaining('Blank uses the default deck'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('One file with this topic'), findsOneWidget);
       expect(_tile('name'), findsOneWidget);
       expect(_tile('description'), findsOneWidget);
       expect(_tile('priority'), findsOneWidget);
       expect(_tile('minimumScore'), findsOneWidget);
       expect(_tile('targetScore'), findsOneWidget);
       expect(_tile('deck'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('topic-editor-download-json')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('topic-editor-update-json')),
+        findsOneWidget,
+      );
 
       expect(
         find.descendant(of: _tile('name'), matching: find.text('Cloud')),
@@ -496,6 +541,62 @@ void main() {
     await pumpFrames(tester);
     expect(_saveButton().hitTestable(), findsOneWidget);
     expect(tester.getRect(_saveButton()).bottom, lessThanOrEqualTo(720 - 260));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the grouped sheet stays readable at 360 dp and 2x text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+    final topic = Topic(
+      id: seeded.topicId,
+      name: 'Cloud',
+      description: 'Topic description',
+      priority: 1,
+      ankiDeck: null,
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: _TopicEditHost(topic: topic),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await tester.tap(find.text('edit'));
+    await pumpFrames(tester);
+    _expectTopicSheet(tester);
+
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    for (final name in _groupNames) {
+      await tester.scrollUntilVisible(
+        _group(name),
+        200,
+        scrollable: _sheetScrollable(),
+      );
+      await pumpFrames(tester);
+      expect(_group(name), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
+
+    await tester.scrollUntilVisible(
+      find.text('Update topic JSON'),
+      200,
+      scrollable: _sheetScrollable(),
+    );
+    await pumpFrames(tester);
+    expect(find.text('Update topic JSON'), findsOneWidget);
+    expect(_saveButton(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

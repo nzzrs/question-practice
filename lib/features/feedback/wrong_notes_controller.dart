@@ -27,13 +27,13 @@ class WrongNotesController extends ChangeNotifier {
   final List<String> _rows;
 
   Timer? _timer;
-  bool _saving = false;
+  Completer<void>? _savingDone;
   bool _failed = false;
   bool _disposed = false;
   String _saved = '';
 
   List<String> get rows => List<String>.unmodifiable(_rows);
-  WrongNotesSaveState get saveState => _saving
+  WrongNotesSaveState get saveState => _savingDone != null
       ? WrongNotesSaveState.saving
       : _failed
       ? WrongNotesSaveState.failed
@@ -118,10 +118,18 @@ class WrongNotesController extends ChangeNotifier {
     return save();
   }
 
+  /// Saves the latest rows, waiting for any save already in flight.
+  ///
+  /// A debounce can fire just before navigation, and the latest keystrokes can
+  /// arrive while that write is still running. Waiting here keeps both writes
+  /// ordered instead of returning before the newest text reaches the database.
   Future<bool> save() async {
-    if (_saving) return !_failed;
+    while (_savingDone != null) {
+      await _savingDone!.future;
+    }
+    if (_disposed) return !isDirty;
     if (!isDirty) return true;
-    _saving = true;
+    final done = _savingDone = Completer<void>();
     _failed = false;
     notifyListeners();
     final notes = _rows.map((row) => row.trim()).toList(growable: false);
@@ -129,15 +137,14 @@ class WrongNotesController extends ChangeNotifier {
     try {
       await onSave(notes);
       _saved = canonical;
-      _saving = false;
-      _failed = false;
-      notifyListeners();
       return true;
     } on Object {
-      _saving = false;
       _failed = true;
-      notifyListeners();
       return false;
+    } finally {
+      _savingDone = null;
+      done.complete();
+      notifyListeners();
     }
   }
 

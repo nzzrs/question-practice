@@ -97,13 +97,13 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
     final limited = value.length > WrongNotes.maxNoteLength;
     _controller.setRow(index, value);
     if (limited && !_wasLimited && mounted) {
-      _wasLimited = true;
       showSnack(context, 'A bullet can keep up to 500 characters.');
-      _wasLimited = false;
     }
+    _wasLimited = limited;
   }
 
   void _handleSplit(int index, String before, List<String> after) {
+    if (!mounted) return;
     _controller.replaceRow(index, before);
     if (after.isEmpty) {
       _controller.addRow();
@@ -117,7 +117,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
       if (!mounted || focusIndex >= _fields.length) return;
       _focusField(focusIndex, atEnd: !focusStart);
     });
-    if (mounted) setState(() {});
+    setState(() {});
   }
 
   void _focusField(int index, {bool atEnd = true}) {
@@ -144,7 +144,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusField(_controller.rows.length - 1);
     });
-    if (mounted) setState(() {});
+    setState(() {});
   }
 
   void _removeBullet(int index) {
@@ -154,7 +154,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _fields.isNotEmpty) _focusField(focusIndex);
     });
-    if (mounted) setState(() {});
+    setState(() {});
   }
 
   void _handleBlur(int index) {
@@ -330,25 +330,29 @@ class _BulletRowState extends State<_BulletRow> {
                         ),
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: EditableText(
-                          key: ValueKey('wrong-notes-field-${widget.index}'),
-                          controller: field.controller,
-                          focusNode: field.focusNode,
-                          style: theme.typography.baseline.bodyMedium.copyWith(
-                            color: theme.colorScheme.onSurface,
-                            height: 1.45,
+                        child: Semantics(
+                          label: 'Wrong answer bullet ${widget.index + 1}',
+                          child: EditableText(
+                            key: ValueKey('wrong-notes-field-${widget.index}'),
+                            controller: field.controller,
+                            focusNode: field.focusNode,
+                            style: theme.typography.baseline.bodyMedium
+                                .copyWith(
+                                  color: theme.colorScheme.onSurface,
+                                  height: 1.45,
+                                ),
+                            cursorColor: theme.colorScheme.primary,
+                            backgroundCursorColor: Colors.transparent,
+                            maxLines: null,
+                            keyboardType: TextInputType.multiline,
+                            textInputAction: TextInputAction.newline,
+                            keyboardAppearance: theme.colorScheme.brightness,
+                            inputFormatters: [
+                              _BulletSplitFormatter(onSplit: widget.onSplit),
+                            ],
+                            onChanged: widget.onChanged,
+                            onTapOutside: (_) => field.focusNode.unfocus(),
                           ),
-                          cursorColor: theme.colorScheme.primary,
-                          backgroundCursorColor: Colors.transparent,
-                          maxLines: null,
-                          keyboardType: TextInputType.multiline,
-                          textInputAction: TextInputAction.newline,
-                          keyboardAppearance: theme.colorScheme.brightness,
-                          inputFormatters: [
-                            _BulletSplitFormatter(onSplit: widget.onSplit),
-                          ],
-                          onChanged: widget.onChanged,
-                          onTapOutside: (_) => field.focusNode.unfocus(),
                         ),
                       ),
                     ],

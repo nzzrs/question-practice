@@ -237,24 +237,27 @@ class _SessionPageState extends ConsumerState<SessionPage>
       return;
     }
     if (_wrongNotes != null) return;
+    final questionItem = item;
     _wrongNotes = WrongNotesController(
       initial: WrongNotes.parse(attempt.reasoning),
-      onSave: (notes) => _saveWrongNotes(notes),
+      onSave: (notes) => _saveWrongNotes(questionItem, notes),
     );
   }
 
-  Future<void> _saveWrongNotes(List<String> notes) async {
-    final item = _item;
-    if (item == null) return;
+  Future<void> _saveWrongNotes(
+    SessionQuestionItem item,
+    List<String> notes,
+  ) async {
     final attempt = await ref
         .read(sessionServiceProvider)
         .setWrongNotes(start: _start, item: item, notes: notes);
     if (!mounted) return;
     _start.attempts[item.question.id] = attempt;
+    ref.invalidate(dueErrorsProvider);
+    if (_item?.question.id != item.question.id) return;
     setState(() {
       _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
     });
-    ref.invalidate(dueErrorsProvider);
   }
 
   /// Persists a pending bullet edit before leaving the question.
@@ -391,6 +394,13 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final item = _item;
     if (item == null || _submitting) return;
     setState(() => _submitting = true);
+    if (!await _flushWrongNotes()) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      await showSnack(context, 'Your notes are not saved. Try again.');
+      return;
+    }
+    if (!mounted) return;
     try {
       final attempt = await ref
           .read(sessionServiceProvider)
@@ -414,6 +424,13 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final item = _item;
     if (item == null || _submitting) return;
     setState(() => _submitting = true);
+    if (!await _flushWrongNotes()) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      await showSnack(context, 'Your notes are not saved. Try again.');
+      return;
+    }
+    if (!mounted) return;
     try {
       final attempt = await ref
           .read(sessionServiceProvider)
@@ -546,8 +563,12 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _requestExit() async {
-    await _flushWrongNotes();
+    final saved = await _flushWrongNotes();
     if (!mounted) return;
+    if (!saved) {
+      await showSnack(context, 'Your notes are not saved. Try again.');
+      return;
+    }
     if (_summary != null) {
       _openSummary(_summary!);
       return;
@@ -680,6 +701,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
               onPressed: _submitting ? null : _finishEarly,
             ),
             M3EIconButton(
+              key: const ValueKey('session-leave'),
               variant: M3EIconButtonVariant.standard,
               icon: const Icon(Icons.close),
               tooltip: 'Leave practice',

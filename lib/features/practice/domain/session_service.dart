@@ -454,10 +454,13 @@ class SessionService {
       throw const SessionException('This question has no answer to update.');
     }
     final canonical = WrongNotes.format(notes);
-    if (canonical == attempt.reasoning) return attempt;
-    await _sessions.updateAttemptReasoning(attempt.id, canonical);
+    // Each target is written only when it differs, so a retry after a partial
+    // failure can still repair the card instead of returning early.
+    if (canonical != attempt.reasoning) {
+      await _sessions.updateAttemptReasoning(attempt.id, canonical);
+    }
     final card = await _cards.activeErrorForQuestion(item.question.id);
-    if (card != null) {
+    if (card != null && card.reasoning != canonical) {
       await _cards.updateErrorCardReasoning(card.id, canonical);
     }
     await _cards.updateSkippedReasoning(

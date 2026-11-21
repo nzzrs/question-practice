@@ -272,5 +272,14 @@ void main() {
     final indexes = {for (final row in schemaObjects) row.read<String>('name')};
     expect(indexes, contains('notes_session'));
     expect(indexes, contains('notes_question'));
+
+    final errorColumns = await database
+        .customSelect('PRAGMA table_info(error_cards)')
+        .get();
+    final distracted = errorColumns.singleWhere(
+      (row) => row.read<String>('name') == 'distracted',
+    );
+    expect(distracted.read<int>('notnull'), 1);
+    expect(distracted.read<String>('dflt_value'), '0');
   });
 }

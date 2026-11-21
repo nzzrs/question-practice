@@ -70,6 +70,13 @@ void main() {
     expect(find.text('What went wrong?'), findsOneWidget);
     expect(find.byKey(const ValueKey('wrong-notes-editor')), findsOneWidget);
     expect(find.byKey(const ValueKey('wrong-notes-field-0')), findsOneWidget);
+    expect(
+      tester
+          .getSemantics(find.byKey(const ValueKey('wrong-notes-field-0')))
+          .getSemanticsData()
+          .label,
+      contains('Wrong answer bullet 1'),
+    );
     expect(find.byType(QuestionFeedbackView), findsOneWidget);
     expect(find.byType(FeedbackOptionCard), findsNWidgets(2));
     expect(find.byKey(const ValueKey('feedback-status')), findsOneWidget);
@@ -279,6 +286,12 @@ void main() {
       find.byKey(const ValueKey('wrong-notes-field-0')),
     );
     expect(field.controller.text, 'Draft that will not save');
+
+    await tester.tap(find.byKey(const ValueKey('session-leave')));
+    await pumpFrames(tester, frames: 20);
+    expect(find.text('Leave this practice?'), findsNothing);
+    expect(find.text('Question 1?'), findsOneWidget);
+    expect(find.text('Your notes are not saved. Try again.'), findsOneWidget);
   });
 
   testWidgets('the feedback fits 360 dp at 2.0 text scale', (tester) async {

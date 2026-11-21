@@ -434,6 +434,36 @@ void main() {
     expect(cleared!.reasoning, '');
   });
 
+  test(
+    'a repeated save repairs a card left behind by a partial failure',
+    () async {
+      final practice = await harness.seedPractice(count: 1);
+      final start = await service.startPractice(practice.practiceId);
+      final item = start.items.single;
+      await service.submitAnswer(
+        start: start,
+        item: item,
+        selectedIndexes: const [1],
+        reasoning: 'Saved on the attempt.',
+        distracted: false,
+      );
+
+      final card = await harness.cards.activeErrorForQuestion(item.question.id);
+      await harness.cards.updateErrorCardReasoning(card!.id, 'Stale card text');
+
+      await service.setWrongNotes(
+        start: start,
+        item: item,
+        notes: const ['Saved on the attempt.'],
+      );
+
+      final repaired = await harness.cards.activeErrorForQuestion(
+        item.question.id,
+      );
+      expect(repaired!.reasoning, 'Saved on the attempt.');
+    },
+  );
+
   test('wrong notes update an earlier-session active card', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await service.startPractice(practice.practiceId);

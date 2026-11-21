@@ -276,7 +276,7 @@ void main() {
     final question = (await harness.practices.questionsForPractice(
       seeded.practiceId,
     )).single;
-    final highlightId = await harness.cards.createHighlight(
+    final noteId = await harness.cards.createNote(
       sessionId: null,
       questionId: question.id,
       text: 'A VPC is a private network.',
@@ -286,9 +286,9 @@ void main() {
       subtopic: 'Networking',
       createdAt: harness.clock.now().toUtc(),
     );
-    final highlight = (await tester.runAsync(
-      () => harness.cards.watchHighlights().first,
-    ))!.singleWhere((item) => item.id == highlightId);
+    final note = (await tester.runAsync(
+      () => harness.cards.watchNotes().first,
+    ))!.singleWhere((item) => item.id == noteId);
 
     int? created;
     await pumpTestApp(
@@ -308,8 +308,8 @@ void main() {
                     topicName: 'Topic',
                     subtopic: 'Networking',
                     initialKind: CardCreatorKind.concept,
-                    initialTerm: highlight.text,
-                    note: highlight,
+                    initialTerm: note.text,
+                    note: note,
                   ),
                 );
               },
@@ -355,9 +355,9 @@ void main() {
     expect(cards!.single.question, 'What exactly is a VPC?');
     expect(cards.single.cognitiveType, CognitiveType.fact);
     expect(cards.single.subtopic, 'Networking');
-    final savedHighlight = await tester.runAsync(
-      () => harness.cards.watchHighlights().first,
+    final savedNote = await tester.runAsync(
+      () => harness.cards.watchNotes().first,
     );
-    expect(savedHighlight!.single.hasCard, isTrue);
+    expect(savedNote!.single.hasCard, isTrue);
   });
 }

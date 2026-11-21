@@ -9,7 +9,7 @@ import '../errors/error_card_review_view.dart';
 import '../export/card_creator_sheet.dart';
 import '../export/cards_page.dart';
 import 'domain/review_service.dart';
-import 'highlight_review_view.dart';
+import 'note_review_view.dart';
 import 'skipped_question_view.dart';
 
 class ReviewPage extends ConsumerStatefulWidget {
@@ -141,11 +141,11 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     }
   }
 
-  Future<void> _keepHighlight(HighlightReviewStep step) async {
+  Future<void> _keepNote(NoteReviewStep step) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await ref.read(reviewServiceProvider).keepHighlight(step.highlight.id);
+      await ref.read(reviewServiceProvider).keepNote(step.note.id);
       _kept++;
       _advance();
     } finally {
@@ -153,20 +153,20 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     }
   }
 
-  Future<void> _createHighlightCards(HighlightReviewStep step) async {
-    final highlight = step.highlight;
+  Future<void> _createNoteCards(NoteReviewStep step) async {
+    final note = step.note;
     final created = await showCardCreator(
       context,
       request: CardCreatorRequest(
         title: 'Create cards',
-        sessionId: highlight.sessionId,
-        questionId: highlight.questionId,
-        questionContext: highlight.context,
-        topicName: highlight.topicName,
-        subtopic: highlight.subtopic,
+        sessionId: note.sessionId,
+        questionId: note.questionId,
+        questionContext: note.context,
+        topicName: note.topicName,
+        subtopic: note.subtopic,
         initialKind: CardCreatorKind.concept,
-        initialTerm: highlight.text,
-        note: highlight,
+        initialTerm: note.text,
+        note: note,
       ),
     );
     if (!mounted || created == 0) return;
@@ -271,7 +271,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       ErrorReviewStep() => 'Analyse the error',
       SkippedReviewStep() => 'What was missing?',
       ConceptDefinitionStep() => 'Complete the concept',
-      HighlightReviewStep() => 'Keep this note?',
+      NoteReviewStep() => 'Keep this note?',
     };
     return AppPage(
       title: 'Review',
@@ -301,13 +301,13 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                             _createSkippedCards(step);
                           case ConceptDefinitionStep():
                             _saveConceptDefinition(step);
-                          case HighlightReviewStep():
-                            _keepHighlight(step);
+                          case NoteReviewStep():
+                            _keepNote(step);
                         }
                       },
                 label: _busy
                     ? 'Saving…'
-                    : step is HighlightReviewStep
+                    : step is NoteReviewStep
                     ? 'Keep & save'
                     : step is ErrorReviewStep
                     ? 'Continue'
@@ -369,9 +369,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             concept: concept,
             definition: _definition,
           ),
-          HighlightReviewStep(:final highlight) => HighlightReviewView(
-            highlight: highlight,
-            onCreateCards: () => _createHighlightCards(step),
+          NoteReviewStep(:final note) => NoteReviewView(
+            note: note,
+            onCreateCards: () => _createNoteCards(step),
           ),
         },
       ],

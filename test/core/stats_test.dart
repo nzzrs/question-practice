@@ -530,10 +530,10 @@ void main() {
       source: ConceptSource.manual,
       createdAt: harness.clock.now().toUtc(),
     );
-    await harness.cards.createHighlight(
+    await harness.cards.createNote(
       sessionId: first.session.id,
       questionId: questions[0].id,
-      text: 'Highlighted phrase',
+      text: 'Saved phrase',
       context: 'Context',
       topicName: 'Topic',
       practiceName: 'Practice',
@@ -636,7 +636,7 @@ void main() {
       isEmpty,
     );
     expect(
-      await harness.database.select(harness.database.highlights).get(),
+      await harness.database.select(harness.database.notes).get(),
       isEmpty,
     );
     expect(

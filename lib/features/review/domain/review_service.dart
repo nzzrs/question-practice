@@ -43,10 +43,10 @@ class ConceptDefinitionStep extends ReviewStep {
   final Concept concept;
 }
 
-class HighlightReviewStep extends ReviewStep {
-  const HighlightReviewStep(this.highlight);
+class NoteReviewStep extends ReviewStep {
+  const NoteReviewStep(this.note);
 
-  final StudyHighlight highlight;
+  final Note note;
 }
 
 class ReviewData {
@@ -83,7 +83,7 @@ class ReviewService {
     final questions = await _sessions.questionsForSession(sessionId);
     final attempts = await _sessions.attemptsForSession(sessionId);
     final concepts = await _cards.conceptsForSession(sessionId);
-    final highlights = await _cards.highlightsForSession(sessionId);
+    final notes = await _cards.notesForSession(sessionId);
     final skippedRecords = await _cards.skippedQuestionsForSession(sessionId);
     final skippedByQuestion = {
       for (final record in skippedRecords) record.questionId: record,
@@ -130,8 +130,8 @@ class ReviewService {
       steps.add(ConceptDefinitionStep(concept));
     }
 
-    for (final highlight in highlights.where((item) => item.needsReview)) {
-      steps.add(HighlightReviewStep(highlight));
+    for (final note in notes.where((item) => item.needsReview)) {
+      steps.add(NoteReviewStep(note));
     }
 
     return ReviewData(
@@ -210,13 +210,13 @@ class ReviewService {
     return _cards.updateConceptDefinition(conceptId, definition.trim());
   }
 
-  Future<void> keepHighlight(int highlightId) {
-    return _cards.keepHighlight(highlightId, _clock.now().toUtc());
+  Future<void> keepNote(int noteId) {
+    return _cards.keepNote(noteId, _clock.now().toUtc());
   }
 
-  Future<void> markHighlightConverted(int highlightId, {int? manualCardId}) {
-    return _cards.markHighlightConverted(
-      highlightId,
+  Future<void> markNoteConverted(int noteId, {int? manualCardId}) {
+    return _cards.markNoteConverted(
+      noteId,
       cardCreatedAt: _clock.now().toUtc(),
       manualCardId: manualCardId,
     );

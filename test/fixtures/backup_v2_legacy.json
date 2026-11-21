@@ -1,0 +1,117 @@
+{
+  "app": "question_practice",
+  "formatVersion": 2,
+  "exportedAt": "2025-06-01T10:00:00.000Z",
+  "metadata": {
+    "formatVersion": 2,
+    "appVersion": "0.9.8",
+    "buildNumber": 9,
+    "schemaVersion": 11,
+    "exportedAt": "2025-06-01T10:00:00.000Z",
+    "tableCounts": {
+      "topics": 1,
+      "practices": 1,
+      "questions": 1,
+      "sessions": 1,
+      "sessionQuestions": 0,
+      "attempts": 0,
+      "concepts": 0,
+      "errorCards": 0,
+      "manualCards": 1,
+      "skippedQuestions": 0,
+      "settings": 0,
+      "highlights": 1
+    }
+  },
+  "checksum": "1682ffba5bf208d19fe2ce161fdc6dfbb5067f8e1a0a619bdd8712f59978c0d1",
+  "tables": {
+    "topics": [
+      {
+        "id": 1,
+        "name": "Cloud",
+        "description": "Cloud fundamentals",
+        "priority": 1,
+        "ankiDeck": "Cloud deck",
+        "createdAt": "2025-05-01T08:00:00.000Z",
+        "minimumScore": 70,
+        "targetScore": 80,
+        "archived": false
+      }
+    ],
+    "practices": [
+      {
+        "id": 1,
+        "topicId": 1,
+        "name": "Core",
+        "description": "Core practice",
+        "contentHash": "legacy-hash",
+        "importedAt": "2025-05-01T08:05:00.000Z",
+        "isDone": false
+      }
+    ],
+    "questions": [
+      {
+        "id": 1,
+        "practiceId": 1,
+        "prompt": "What is object storage?",
+        "alternativesJson": "[\"A bucket\",\"A queue\"]",
+        "correctIndexesJson": "[0]",
+        "explanation": "Objects live in buckets.",
+        "alternativeExplanationsJson": "[\"Correct\",\"Wrong\"]",
+        "position": 0,
+        "subtopic": "Storage"
+      }
+    ],
+    "sessions": [
+      {
+        "id": 1,
+        "practiceId": 1,
+        "mode": "practice",
+        "status": "completed",
+        "startedAt": "2025-06-01T09:00:00.000Z",
+        "finishedAt": "2025-06-01T09:20:00.000Z",
+        "total": 1,
+        "correct": 0,
+        "skipped": 0,
+        "distracted": 0
+      }
+    ],
+    "sessionQuestions": [],
+    "attempts": [],
+    "concepts": [],
+    "errorCards": [],
+    "manualCards": [
+      {
+        "id": 1,
+        "sessionId": 1,
+        "questionId": 1,
+        "question": "What is a bucket?",
+        "answer": "A container for objects.",
+        "context": "What is object storage?",
+        "topicName": "Cloud",
+        "cognitiveType": "fact",
+        "subtopic": "Storage",
+        "createdAt": "2025-06-01T09:30:00.000Z",
+        "exportedAt": null
+      }
+    ],
+    "skippedQuestions": [],
+    "highlights": [
+      {
+        "id": 1,
+        "sessionId": 1,
+        "questionId": 1,
+        "phrase": "object storage",
+        "context": "What is object storage?",
+        "topicName": "Cloud",
+        "subtopic": "Storage",
+        "practiceName": "Core",
+        "createdAt": "2025-06-01T09:10:00.000Z",
+        "keptAt": "2025-06-01T09:15:00.000Z",
+        "cardCreatedAt": "2025-06-01T09:30:00.000Z",
+        "manualCardId": 1
+      }
+    ],
+    "settings": []
+  }
+}

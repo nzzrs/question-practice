@@ -21,7 +21,7 @@ part 'app_database.g.dart';
     ErrorCards,
     ManualCards,
     SkippedQuestions,
-    Highlights,
+    Notes,
     Settings,
   ],
   daos: [TopicDao, SessionDao, CardDao, StatsDao, SettingsDao],
@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 11;
+  int get schemaVersion => 12;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -85,7 +85,22 @@ class AppDatabase extends _$AppDatabase {
         await migrator.createTable(skippedQuestions);
       }
       if (from < 8) {
-        await migrator.createTable(highlights);
+        // Version 8 created the table as `highlights`; version 12 renames it.
+        await customStatement('''
+          CREATE TABLE IF NOT EXISTS highlights (
+            id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NULL REFERENCES sessions (id) ON DELETE CASCADE,
+            question_id INTEGER NULL REFERENCES questions (id) ON DELETE SET NULL,
+            phrase TEXT NOT NULL,
+            context TEXT NOT NULL DEFAULT '',
+            topic_name TEXT NOT NULL DEFAULT '',
+            practice_name TEXT NOT NULL DEFAULT '',
+            created_at INTEGER NOT NULL,
+            kept_at INTEGER NULL,
+            card_created_at INTEGER NULL,
+            manual_card_id INTEGER NULL REFERENCES manual_cards (id) ON DELETE SET NULL
+          )
+        ''');
       }
       if (from < 9) {
         await migrator.addColumn(topics, topics.archived);
@@ -103,7 +118,21 @@ class AppDatabase extends _$AppDatabase {
         await migrator.addColumn(errorCards, errorCards.mistakeKindsJson);
         await migrator.addColumn(manualCards, manualCards.cognitiveType);
         await migrator.addColumn(manualCards, manualCards.subtopic);
-        await migrator.addColumn(highlights, highlights.subtopic);
+        await customStatement(
+          'ALTER TABLE highlights ADD COLUMN subtopic TEXT NOT NULL DEFAULT \'\'',
+        );
+      }
+      if (from < 12) {
+        await customStatement('ALTER TABLE highlights RENAME TO notes');
+        await customStatement('ALTER TABLE notes RENAME COLUMN phrase TO text');
+        await customStatement('DROP INDEX IF EXISTS highlights_session');
+        await customStatement('DROP INDEX IF EXISTS highlights_question');
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS notes_session ON notes (session_id)',
+        );
+        await customStatement(
+          'CREATE INDEX IF NOT EXISTS notes_question ON notes (question_id)',
+        );
       }
     },
     beforeOpen: (details) async {
@@ -117,7 +146,7 @@ class AppDatabase extends _$AppDatabase {
       await delete(concepts).go();
       await delete(manualCards).go();
       await delete(skippedQuestions).go();
-      await delete(highlights).go();
+      await delete(notes).go();
       await delete(errorCards).go();
       await delete(sessionQuestions).go();
       await delete(sessions).go();

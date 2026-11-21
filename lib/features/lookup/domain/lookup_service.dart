@@ -299,19 +299,19 @@ class LookupService {
     return trimmed;
   }
 
-  /// Suggests structured atomic cards from a saved highlight.
+  /// Suggests structured atomic cards from a saved note.
   ///
   /// The AI must classify each proposal as a procedure/operator, a rule or
   /// heuristic, or an atomic fact, so the learner sees the cognitive shape of
   /// every card before adding it. Generic summaries and long paragraphs are
   /// rejected by the prompt.
   Future<List<SuggestedCard>> suggestArchetypeCards({
-    required String highlight,
+    required String note,
     required String questionContext,
     required String topicName,
     String subtopic = '',
   }) async {
-    final passage = highlight.trim();
+    final passage = note.trim();
     if (passage.isEmpty) {
       throw const LookupException('Select a note first.');
     }

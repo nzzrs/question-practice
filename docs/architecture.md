@@ -142,7 +142,7 @@ record handled.
 Skipped questions stay in the combined **Error and skipped** section of Cards
 until handled, where pencils open the same review surface.
 
-Note steps use the shared `HighlightReviewView`, the same view Cards uses for
+Note steps use the shared `NoteReviewView`, the same view Cards uses for
 **Review notes**. **Create cards** opens the card creator for manual entry and
 optional **Suggest with AI**. The provider receives the note, its question
 context and the topic, and must return one JSON object with at most six atomic
@@ -167,8 +167,8 @@ view.
 | Concept cards | Cloze text `[Topic / Subtopic] Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
 | Basic cards | Question/answer cards from skipped questions, Ask or a note, with optional context above the front and a cognitive type (fact, heuristic, contrast). | `CardRepository.createManualCard`, `new_card_dialog.dart` | `manual_cards` |
 | Skipped queue | Every skipped/unknown answer is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
-| Notes (`highlights` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it paints whenever that question is shown again. Tapping a painted note offers Define, Ask and **Delete note**; deletion is immediate with no confirmation. At review a note can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one at a time and works without AI; optional **Suggest with AI** classifies up to six proposals as procedures/rules or atomic facts. Each saved suggestion becomes a Basic card with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards: **Review notes** walks them one at a time through the shared view. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createHighlight/highlightsForQuestion/keepHighlight/markHighlightConverted/deleteHighlights`, `LookupService.suggestArchetypeCards`, `highlight_review_page.dart`, `highlight_review_view.dart`, `suggested_cards_sheet.dart` | `highlights`, `manual_cards` |
-| Note download | **Download all** writes a plain-text file through the system share sheet. | `CardsPage._downloadHighlights`, `ExportService.shareHighlights` | `highlights` |
+| Notes (`notes` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it is shown again whenever that question is practised. Tapping a note offers Define, Ask and **Delete note**; deletion is immediate with no confirmation. At review a note can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one at a time and works without AI; optional **Suggest with AI** classifies up to six proposals as procedures/rules or atomic facts. Each saved suggestion becomes a Basic card with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards: **Review notes** walks them one at a time through the shared view. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createNote/notesForQuestion/keepNote/markNoteConverted/deleteNotes`, `LookupService.suggestArchetypeCards`, `note_review_page.dart`, `note_review_view.dart`, `suggested_cards_sheet.dart` | `notes`, `manual_cards` |
+| Note download | **Download all** writes a plain-text file through the system share sheet. | `CardsPage._downloadNotes`, `ExportService.shareNotes` | `notes` |
 
 ### Statistics and statistics export
 
@@ -251,7 +251,7 @@ Code: `lib/features/topics/topic_stats_page.dart`,
 - **Review notes** sits under the Notes heading and walks every visible note one
   at a time, with Previous, Keep/Skip and Done like the error review. Tapping a
   note row opens the same review at that item. The contextual **Create cards**
-  action opens the shared card creator. The shared `HighlightReviewView` shows
+  action opens the shared card creator. The shared `NoteReviewView` shows
   the phrase, its question context, topic and practice pills, and the card
   actions; the end-of-session note step uses the same view.
 - **Export to AnkiDroid** creates missing decks and note types, bulk-adds notes,
@@ -269,8 +269,8 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   deck and practice JSON never contains one.
 
 Code: `lib/features/export/cards_page.dart`,
-`lib/features/review/highlight_review_page.dart`,
-`lib/features/review/highlight_review_view.dart`,
+`lib/features/review/note_review_page.dart`,
+`lib/features/review/note_review_view.dart`,
 `lib/features/export/domain/export_service.dart`,
 `lib/features/export/domain/anki_note_builder.dart`,
 `lib/core/platform/anki_gateway.dart`, Android `AnkiBridge.kt`.
@@ -283,14 +283,16 @@ topics (including archived topics, decks and score bands), practices, questions
 (including subtopics), sessions, session questions, attempts (including mistake
 chips), concepts (including subtopic), error cards (including cognitive type,
 subtopic and mistake chips), basic cards (including cognitive type and
-subtopic), skipped questions, notes (the `highlights` table) and settings.
+subtopic), skipped questions, notes (the `notes` table) and settings.
 
-- Format **v2** keeps the v1 canonical checksum over the `tables` object and
-  adds `metadata` with format version, app version/build, database schema
-  version, export time and per-table row counts. Required and optional table
-  sets are listed in [Database reference](database.md#backup-coverage).
-- The app imports v1 files (missing metadata and some optional tables) and
-  accepts missing `skippedQuestions` or `highlights` (notes) tables. Unknown
+- Format **v3** keeps the canonical checksum over the `tables` object and
+  writes notes under the `notes` key. `metadata` records format version, app
+  version/build, database schema version, export time and per-table row
+  counts. Required and optional table sets are listed in
+  [Database reference](database.md#backup-coverage).
+- The app imports v1, v2 and v3 files and accepts a missing `skippedQuestions`
+  or `notes` table. v1 and v2 files that stored notes under `highlights`,
+  with a `phrase` column, are read as notes without losing rows. Unknown
   tables are ignored.
 - v1 rows are lenient: missing columns use defaults, and a topic deck is
   accepted from `ankiDeck` or legacy `anki_deck`.

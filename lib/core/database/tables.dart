@@ -238,10 +238,11 @@ class SkippedQuestions extends Table {
   TextColumn get handledKind => text().nullable()();
 }
 
-@DataClassName('HighlightRow')
-@TableIndex(name: 'highlights_session', columns: {#sessionId})
-@TableIndex(name: 'highlights_question', columns: {#questionId})
-class Highlights extends Table {
+/// A passage the learner saved to revisit, tied to the question it came from.
+@DataClassName('NoteRow')
+@TableIndex(name: 'notes_session', columns: {#sessionId})
+@TableIndex(name: 'notes_question', columns: {#questionId})
+class Notes extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get sessionId => integer().nullable().references(
     Sessions,
@@ -253,7 +254,10 @@ class Highlights extends Table {
     #id,
     onDelete: KeyAction.setNull,
   )();
-  TextColumn get phrase => text()();
+
+  /// The passage itself. Stored and exported as `text`.
+  @JsonKey('text')
+  TextColumn get noteText => text().named('text')();
   TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
   TextColumn get subtopic => text().withDefault(const Constant(''))();

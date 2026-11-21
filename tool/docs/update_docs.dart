@@ -524,6 +524,7 @@ ColumnSchema _parseColumn(String table, String name, String expression) {
   var autoIncrement = false;
   String? defaultValue;
   String? length;
+  String? explicitName;
   ColumnReference? reference;
   var index = baseMatch.end;
 
@@ -575,6 +576,8 @@ ColumnSchema _parseColumn(String table, String name, String expression) {
         length = _parseLength(table, name, args);
       case 'withDefault':
         defaultValue = _parseDefault(table, name, args);
+      case 'named':
+        explicitName = _parseNamed(table, name, args);
       case 'references':
         reference = _parseReference(table, name, args);
       default:
@@ -587,7 +590,7 @@ ColumnSchema _parseColumn(String table, String name, String expression) {
 
   return ColumnSchema(
     name: name,
-    sqlName: _snakeCase(name),
+    sqlName: explicitName ?? _snakeCase(name),
     driftType: driftType,
     sqlType: sqlType,
     nullable: nullable,
@@ -613,6 +616,14 @@ String _parseLength(String table, String name, String args) {
   if (min != null && max != null) return 'length $min..$max';
   if (min != null) return 'length ≥ $min';
   return 'length ≤ $max';
+}
+
+String _parseNamed(String table, String name, String args) {
+  final match = RegExp(r"""^'([^']+)'$""").firstMatch(args.trim());
+  if (match == null) {
+    throw FormatException('Could not read named() on $table.$name.');
+  }
+  return match.group(1)!;
 }
 
 String _parseDefault(String table, String name, String args) {
@@ -750,7 +761,13 @@ List<TableIndexSchema> _parseCustomIndexes(
   final bySqlName = {for (final table in tables) table.sqlName: table};
   final indexes = <TableIndexSchema>[];
   final seen = <String>{};
-  for (final args in _customStatementArguments(source)) {
+  // Migration statements are documented in the migrations table; only indexes
+  // created outside onUpgrade belong to the current schema summary.
+  final upgradeStart = source.indexOf('onUpgrade:');
+  final schemaSource = upgradeStart < 0
+      ? source
+      : source.substring(0, upgradeStart);
+  for (final args in _customStatementArguments(schemaSource)) {
     final sql = _stringLiterals(args).join(' ');
     final regex = RegExp(
       r'CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+'
@@ -812,6 +829,7 @@ List<MigrationStep> _parseMigrations(
   final body = source.substring(open + 1, close);
 
   final steps = <MigrationStep>[];
+  final renames = <String, String>{};
   final stepRegex = RegExp(r'if\s*\(\s*from\s*<\s*(\d+)\s*\)\s*\{');
   var searchStart = 0;
   while (true) {
@@ -866,6 +884,8 @@ List<MigrationStep> _parseMigrations(
     }
 
     final backfilled = <String>{};
+    final createdIndexes = <String>[];
+    final droppedIndexes = <String>[];
     var otherStatements = 0;
     for (final args in _customStatementArguments(stepBody)) {
       final sql = _stringLiterals(args).join(' ');
@@ -873,11 +893,81 @@ List<MigrationStep> _parseMigrations(
         r'UPDATE\s+([A-Za-z_]\w*)',
         caseSensitive: false,
       ).allMatches(sql).map((match) => match.group(1)!.toLowerCase()).toSet();
-      if (updates.isEmpty) {
-        otherStatements++;
-      } else {
+      if (updates.isNotEmpty) {
         backfilled.addAll(updates);
+        continue;
       }
+      final createTable = RegExp(
+        r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_]\w*)',
+        caseSensitive: false,
+      ).firstMatch(sql);
+      if (createTable != null) {
+        final name = createTable.group(1)!;
+        createdTables.add(name);
+        changes.add('Created table `$name`.');
+        continue;
+      }
+      final renameTable = RegExp(
+        r'ALTER\s+TABLE\s+([A-Za-z_]\w*)\s+RENAME\s+TO\s+([A-Za-z_]\w*)',
+        caseSensitive: false,
+      ).firstMatch(sql);
+      if (renameTable != null) {
+        final from = renameTable.group(1)!;
+        final to = renameTable.group(2)!;
+        renames[from] = to;
+        changes.add('Renamed table `$from` to `$to`.');
+        continue;
+      }
+      final renameColumn = RegExp(
+        r'ALTER\s+TABLE\s+([A-Za-z_]\w*)\s+RENAME\s+COLUMN\s+'
+        r'([A-Za-z_]\w*)\s+TO\s+([A-Za-z_]\w*)',
+        caseSensitive: false,
+      ).firstMatch(sql);
+      if (renameColumn != null) {
+        changes.add(
+          'Renamed column `${renameColumn.group(2)}` to '
+          '`${renameColumn.group(3)}` in `${renameColumn.group(1)}`.',
+        );
+        continue;
+      }
+      final addColumn = RegExp(
+        r'ALTER\s+TABLE\s+([A-Za-z_]\w*)\s+ADD\s+COLUMN\s+([A-Za-z_]\w*)',
+        caseSensitive: false,
+      ).firstMatch(sql);
+      if (addColumn != null) {
+        changes.add(
+          'Added `${addColumn.group(2)}` to `${addColumn.group(1)}`.',
+        );
+        continue;
+      }
+      final createIndex = RegExp(
+        r'CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?'
+        r'([A-Za-z_]\w*)',
+        caseSensitive: false,
+      ).firstMatch(sql);
+      if (createIndex != null) {
+        createdIndexes.add(createIndex.group(1)!);
+        continue;
+      }
+      final dropIndex = RegExp(
+        r'DROP\s+INDEX\s+(?:IF\s+EXISTS\s+)?([A-Za-z_]\w*)',
+        caseSensitive: false,
+      ).firstMatch(sql);
+      if (dropIndex != null) {
+        droppedIndexes.add(dropIndex.group(1)!);
+        continue;
+      }
+      otherStatements++;
+    }
+    if (createdIndexes.isNotEmpty) {
+      changes.add(
+        'Created index ${createdIndexes.map((name) => '`$name`').join(', ')}.',
+      );
+    }
+    if (droppedIndexes.isNotEmpty) {
+      changes.add(
+        'Dropped index ${droppedIndexes.map((name) => '`$name`').join(', ')}.',
+      );
     }
     if (backfilled.isNotEmpty) {
       final ordered = [
@@ -934,7 +1024,28 @@ List<MigrationStep> _parseMigrations(
       );
     }
   }
-  return steps;
+
+  /// Follows table renames so a table created under an old name still counts
+  /// as created by migrations after it is renamed.
+  String resolvedTable(String name) {
+    var current = name;
+    final seen = <String>{};
+    while (renames.containsKey(current) && seen.add(current)) {
+      current = renames[current]!;
+    }
+    return current;
+  }
+
+  return [
+    for (final step in steps)
+      MigrationStep(
+        version: step.version,
+        changes: step.changes,
+        createdTables: {
+          for (final name in step.createdTables) resolvedTable(name),
+        },
+      ),
+  ];
 }
 
 TableSchema _tableByClass(List<TableSchema> tables, String identifier) {
@@ -1174,7 +1285,7 @@ const _tableDocs = <String, _TableDoc>{
     'CardRepository',
   ),
   'manual_cards': _TableDoc(
-    'Basic question/answer cards from skipped questions, Ask or a highlight.',
+    'Basic question/answer cards from skipped questions, Ask or a note.',
     'ManualCard',
     'CardRepository',
   ),
@@ -1184,10 +1295,10 @@ const _tableDocs = <String, _TableDoc>{
     'SkippedQuestion',
     'CardRepository',
   ),
-  'highlights': _TableDoc(
-    'Selected passages painted during practice, kept or converted into a '
-        'concept/basic card, downloaded as plain text.',
-    'StudyHighlight',
+  'notes': _TableDoc(
+    'Passages saved from a question, kept or converted into a concept/basic '
+        'card, downloaded as plain text.',
+    'Note',
     'CardRepository',
   ),
   'settings': _TableDoc(

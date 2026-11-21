@@ -59,11 +59,12 @@ Future<bool> confirmDiscardTopicChanges(BuildContext context) {
 
 /// Bottom-sheet editor for a topic's name, description, priority and deck.
 ///
-/// The sheet lists the fields as option-style tiles. Tapping a tile expands its
-/// inline editor in place, matching the long-press topic and practice menus.
-/// It re-reads the topic by id when it opens: a caller may hold a summary from
-/// before a backup restore or another database replacement, and saving that
-/// stale snapshot back would silently clear newer fields.
+/// The sheet is one continuous form of option-style tiles, with no section
+/// headings or guidance paragraphs. Tapping a tile expands its inline editor
+/// in place, matching the long-press topic and practice menus. It re-reads the
+/// topic by id when it opens: a caller may hold a summary from before a backup
+/// restore or another database replacement, and saving that stale snapshot
+/// back would silently clear newer fields.
 class TopicEditorSheet extends ConsumerStatefulWidget {
   const TopicEditorSheet({required this.topic, required this.guard, super.key});
 
@@ -532,7 +533,6 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       ];
     }
     return [
-      const _GroupLabel('Details', key: ValueKey('topic-editor-group-details')),
       _fieldTile(
         field: _TopicField.name,
         icon: Icons.label_outline,
@@ -569,15 +569,6 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
           textCapitalization: TextCapitalization.sentences,
         ),
       ),
-      const SizedBox(height: 16),
-      const _GroupLabel(
-        'Study targets',
-        key: ValueKey('topic-editor-group-study-targets'),
-        description:
-            'Priority 1 is highest and 5 is lowest; leave it blank when order '
-            'does not matter. Scores are red below the minimum, normal between '
-            'the two and green at or above the target.',
-      ),
       _fieldTile(
         field: _TopicField.priority,
         icon: Icons.flag_outlined,
@@ -601,7 +592,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       _fieldTile(
         field: _TopicField.minimumScore,
         icon: Icons.flag_circle_outlined,
-        title: 'Minimum approval score',
+        title: 'Minimum score',
         value: _minimumScoreValue,
         editor: M3ETextField(
           key: const ValueKey('topic-editor-minimum-score'),
@@ -623,33 +614,20 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
         icon: Icons.gps_fixed,
         title: 'Target score',
         value: _targetScoreValue,
-        editor: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            M3ETextField(
-              key: const ValueKey('topic-editor-target-score'),
-              controller: _targetScore,
-              label: 'Target (%)',
-              placeholder: '80',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              errorText: _targetScoreError,
-              onChanged: (_) {
-                if (_targetScoreError != null) {
-                  setState(() => _targetScoreError = null);
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            const _HelperText('The target must be at least the minimum score.'),
-          ],
+        editor: M3ETextField(
+          key: const ValueKey('topic-editor-target-score'),
+          controller: _targetScore,
+          label: 'Target (%)',
+          placeholder: '80',
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          errorText: _targetScoreError,
+          onChanged: (_) {
+            if (_targetScoreError != null) {
+              setState(() => _targetScoreError = null);
+            }
+          },
         ),
-      ),
-      const SizedBox(height: 16),
-      const _GroupLabel(
-        'AnkiDroid',
-        key: ValueKey('topic-editor-group-ankidroid'),
-        description: 'Blank uses the default deck from Settings.',
       ),
       _fieldTile(
         field: _TopicField.deck,
@@ -677,12 +655,6 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
           ],
         ),
       ),
-      const SizedBox(height: 16),
-      const _GroupLabel(
-        'Topic file',
-        key: ValueKey('topic-editor-group-topic-file'),
-        description: 'One file with this topic and every practice inside it.',
-      ),
       OptionTile(
         key: const ValueKey('topic-editor-download-json'),
         icon: Icons.download_outlined,
@@ -690,7 +662,6 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
         subtitle: 'Share every practice in this topic as a file',
         onTap: _busy ? null : _downloadJson,
       ),
-      const SizedBox(height: 8),
       OptionTile(
         key: const ValueKey('topic-editor-update-json'),
         icon: Icons.upload_file_outlined,
@@ -717,52 +688,6 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       expanded: expanded,
       onTap: _busy ? null : () => _toggle(field),
       details: expanded ? editor : null,
-    );
-  }
-}
-
-/// Section heading that separates the editor's groups of options.
-///
-/// The label is exposed as a heading to assistive technology; the optional
-/// [description] carries guidance shared by every tile in the group.
-class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.text, {this.description, super.key});
-
-  final String text;
-  final String? description;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Semantics(
-            container: true,
-            header: true,
-            child: Text(
-              text.toUpperCase(),
-              style: theme.typography.baseline.labelSmall.copyWith(
-                color: theme.colorScheme.primary,
-                letterSpacing: 0.8,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          if (description != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              description!,
-              style: theme.typography.baseline.bodySmall.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }
@@ -798,25 +723,6 @@ class _SheetHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// Small helper line shown under an inline editor field.
-class _HelperText extends StatelessWidget {
-  const _HelperText(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Text(
-      text,
-      style: theme.typography.baseline.bodySmall.copyWith(
-        color: theme.colorScheme.onSurfaceVariant,
-        height: 1.35,
       ),
     );
   }

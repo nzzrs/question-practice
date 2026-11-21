@@ -102,8 +102,12 @@ void main() {
     );
     await _openEditor(tester);
 
-    expect(find.text('TOPIC FILE'), findsOneWidget);
-    expect(find.textContaining('One file with this topic'), findsOneWidget);
+    expect(find.text('TOPIC FILE'), findsNothing);
+    expect(find.textContaining('One file with this topic'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('topic-editor-group-topic-file')),
+      findsNothing,
+    );
     expect(find.text('Download topic JSON'), findsOneWidget);
     expect(
       find.text('Share every practice in this topic as a file'),
@@ -114,6 +118,7 @@ void main() {
       find.text('Add or modify practices and questions from a file'),
       findsOneWidget,
     );
+    expect(find.byType(OptionTile), findsNWidgets(8));
 
     await _reveal(tester, find.text('Download topic JSON'));
     await tester.tap(find.text('Download topic JSON'));

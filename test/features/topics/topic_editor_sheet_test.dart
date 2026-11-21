@@ -42,29 +42,72 @@ Finder _targetScoreField() =>
 Finder _deckField() => find.byKey(const ValueKey('topic-editor-deck'));
 Finder _saveButton() => find.byKey(const ValueKey('topic-editor-save'));
 Finder _tile(String field) => find.byKey(ValueKey('topic-editor-tile-$field'));
-Finder _group(String name) => find.byKey(ValueKey('topic-editor-group-$name'));
 
-const _groupNames = ['details', 'study-targets', 'ankidroid', 'topic-file'];
+/// The eight controls the compact editor shows, in display order.
+const _controlKeys = [
+  'topic-editor-tile-name',
+  'topic-editor-tile-description',
+  'topic-editor-tile-priority',
+  'topic-editor-tile-minimumScore',
+  'topic-editor-tile-targetScore',
+  'topic-editor-tile-deck',
+  'topic-editor-download-json',
+  'topic-editor-update-json',
+];
 
-/// Asserts the four group headings exist, are real headings and read in order.
-void _expectGroups(WidgetTester tester) {
-  var previousTop = double.negativeInfinity;
-  for (final name in _groupNames) {
-    final group = _group(name);
-    expect(group, findsOneWidget);
-    expect(
-      find.descendant(
-        of: group,
-        matching: find.byWidgetPredicate(
-          (widget) => widget is Semantics && widget.properties.header == true,
-        ),
-      ),
-      findsOneWidget,
-    );
-    final top = tester.getTopLeft(group).dy;
-    expect(top, greaterThan(previousTop));
-    previousTop = top;
+const _removedGroupKeys = [
+  'topic-editor-group-details',
+  'topic-editor-group-study-targets',
+  'topic-editor-group-ankidroid',
+  'topic-editor-group-topic-file',
+];
+
+Finder _sectionHeaders() => find.descendant(
+  of: find.byType(TopicEditorSheet),
+  matching: find.byWidgetPredicate(
+    (widget) => widget is Semantics && widget.properties.header == true,
+  ),
+);
+
+/// Asserts the sheet is one continuous form: every control is present in
+/// order, adjacent controls touch, and no section heading or description is
+/// left between them.
+void _expectCompactForm(WidgetTester tester) {
+  var previousBottom = double.negativeInfinity;
+  for (final (index, key) in _controlKeys.indexed) {
+    final control = find.byKey(ValueKey(key));
+    expect(control, findsOneWidget);
+    final rect = tester.getRect(control);
+    if (index > 0) {
+      expect(rect.top, greaterThanOrEqualTo(previousBottom - 0.5));
+      // No leftover section spacer: the rows form one continuous column.
+      expect(rect.top - previousBottom, lessThanOrEqualTo(0.5));
+    }
+    previousBottom = rect.bottom;
   }
+  for (final key in _removedGroupKeys) {
+    expect(find.byKey(ValueKey(key)), findsNothing);
+  }
+  for (final label in const [
+    'DETAILS',
+    'STUDY TARGETS',
+    'ANKIDROID',
+    'TOPIC FILE',
+  ]) {
+    expect(find.text(label), findsNothing);
+  }
+  expect(
+    find.textContaining('Priority 1 is highest'),
+    findsNothing,
+    reason: 'the study-target guidance paragraph must be gone',
+  );
+  expect(find.textContaining('red below the minimum'), findsNothing);
+  expect(find.textContaining('normal between the two'), findsNothing);
+  expect(find.textContaining('green at or above the target'), findsNothing);
+  expect(find.textContaining('Blank uses the default deck'), findsNothing);
+  expect(find.textContaining('One file with this topic'), findsNothing);
+  expect(find.textContaining('target must be at least'), findsNothing);
+  expect(_sectionHeaders(), findsNothing);
 }
 
 Finder _sheetScrollable() => find
@@ -135,143 +178,104 @@ Future<void> _loadTestFont() async {
 void main() {
   setUpAll(_loadTestFont);
 
-  testWidgets(
-    'the sheet shows current values and expands one field at a time',
-    (tester) async {
-      tester.view.physicalSize = const Size(480, 1000);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
+  testWidgets('the sheet shows every control as one compact form', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
 
-      final harness = TestHarness();
-      addTearDown(harness.close);
-      await harness.seedPractice(
-        topicName: 'Cloud',
-        practiceName: 'Core',
-        count: 1,
-        ankiDeck: 'Cloud deck',
-      );
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(
+      topicName: 'Cloud',
+      practiceName: 'Core',
+      count: 1,
+      ankiDeck: 'Cloud deck',
+    );
 
-      await pumpTestApp(
-        tester,
-        home: const HomePage(),
-        harness: harness,
-        fontFamily: 'Roboto',
-      );
-      await _openFromLongPress(tester);
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
 
-      expect(find.text('Edit topic'), findsOneWidget);
-      expect(find.byType(M3EDialog), findsNothing);
-      expect(find.byType(OptionTile), findsNWidgets(8));
-      _expectGroups(tester);
-      final details = tester
-          .getSemantics(find.text('DETAILS'))
-          .getSemanticsData();
-      expect(details.label, 'DETAILS');
-      expect(details.flagsCollection.isHeader, isTrue);
-      expect(find.text('DETAILS'), findsOneWidget);
-      expect(find.text('STUDY TARGETS'), findsOneWidget);
-      expect(find.text('ANKIDROID'), findsOneWidget);
-      expect(find.text('TOPIC FILE'), findsOneWidget);
-      expect(find.textContaining('Priority 1 is highest'), findsOneWidget);
-      expect(find.textContaining('red below the minimum'), findsOneWidget);
-      expect(find.textContaining('normal between the two'), findsOneWidget);
-      expect(
-        find.textContaining('green at or above the target'),
-        findsOneWidget,
-      );
-      expect(
-        find.textContaining('Blank uses the default deck'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('One file with this topic'), findsOneWidget);
-      expect(_tile('name'), findsOneWidget);
-      expect(_tile('description'), findsOneWidget);
-      expect(_tile('priority'), findsOneWidget);
-      expect(_tile('minimumScore'), findsOneWidget);
-      expect(_tile('targetScore'), findsOneWidget);
-      expect(_tile('deck'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('topic-editor-download-json')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('topic-editor-update-json')),
-        findsOneWidget,
-      );
+    expect(find.text('Edit topic'), findsOneWidget);
+    expect(find.byType(M3EDialog), findsNothing);
+    expect(find.byType(OptionTile), findsNWidgets(8));
+    _expectCompactForm(tester);
 
-      expect(
-        find.descendant(of: _tile('name'), matching: find.text('Cloud')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: _tile('description'),
-          matching: find.text('Topic description'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: _tile('priority'),
-          matching: find.text('1 · highest'),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: _tile('minimumScore'), matching: find.text('70%')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: _tile('targetScore'), matching: find.text('80%')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: _tile('deck'), matching: find.text('Cloud deck')),
-        findsOneWidget,
-      );
-      expect(find.text('Minimum approval score'), findsOneWidget);
-      expect(find.text('Target score'), findsOneWidget);
-      expect(find.text('AnkiDroid deck'), findsOneWidget);
-      expect(find.text('Browse decks'), findsNothing);
+    expect(
+      find.descendant(of: _tile('name'), matching: find.text('Cloud')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: _tile('description'),
+        matching: find.text('Topic description'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: _tile('priority'),
+        matching: find.text('1 · highest'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: _tile('minimumScore'), matching: find.text('70%')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: _tile('targetScore'), matching: find.text('80%')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: _tile('deck'), matching: find.text('Cloud deck')),
+      findsOneWidget,
+    );
+    expect(find.text('Minimum score'), findsOneWidget);
+    expect(find.text('Target score'), findsOneWidget);
+    expect(find.text('AnkiDroid deck'), findsOneWidget);
+    expect(find.text('Browse decks'), findsNothing);
 
-      await _openField(tester, 'name', 'Name');
-      expect(_nameField(), findsOneWidget);
-      expect(_descriptionField(), findsNothing);
-      expect(_priorityField(), findsNothing);
-      expect(_deckField(), findsNothing);
+    await _openField(tester, 'name', 'Name');
+    expect(_nameField(), findsOneWidget);
+    expect(_descriptionField(), findsNothing);
+    expect(_priorityField(), findsNothing);
+    expect(_deckField(), findsNothing);
 
-      await _openField(tester, 'description', 'Description');
-      expect(_nameField(), findsNothing);
-      expect(_descriptionField(), findsOneWidget);
+    await _openField(tester, 'description', 'Description');
+    expect(_nameField(), findsNothing);
+    expect(_descriptionField(), findsOneWidget);
 
-      await _tapTileHeader(tester, 'description', 'Description');
-      expect(_descriptionField(), findsNothing);
+    await _tapTileHeader(tester, 'description', 'Description');
+    expect(_descriptionField(), findsNothing);
 
-      await _openField(tester, 'minimumScore', 'Minimum approval score');
-      expect(_minimumScoreField(), findsOneWidget);
-      expect(
-        tester.widget<M3ETextField>(_minimumScoreField()).controller!.text,
-        '70',
-      );
-      expect(find.textContaining('red below the minimum'), findsOneWidget);
+    await _openField(tester, 'minimumScore', 'Minimum score');
+    expect(_minimumScoreField(), findsOneWidget);
+    expect(
+      tester.widget<M3ETextField>(_minimumScoreField()).controller!.text,
+      '70',
+    );
 
-      await _openField(tester, 'targetScore', 'Target score');
-      expect(_targetScoreField(), findsOneWidget);
-      expect(
-        tester.widget<M3ETextField>(_targetScoreField()).controller!.text,
-        '80',
-      );
-      expect(
-        find.textContaining('green at or above the target'),
-        findsOneWidget,
-      );
+    await _openField(tester, 'targetScore', 'Target score');
+    expect(_targetScoreField(), findsOneWidget);
+    expect(
+      tester.widget<M3ETextField>(_targetScoreField()).controller!.text,
+      '80',
+    );
+    expect(find.textContaining('target must be at least'), findsNothing);
 
-      await _openField(tester, 'deck', 'AnkiDroid deck');
-      expect(_deckField(), findsOneWidget);
-      expect(find.text('Browse decks'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    },
-  );
+    await _openField(tester, 'deck', 'AnkiDroid deck');
+    expect(_deckField(), findsOneWidget);
+    expect(find.text('Browse decks'), findsOneWidget);
+    _expectCompactForm(tester);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('long-press menu opens the sheet and saves every field', (
     tester,
@@ -556,10 +560,10 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('the grouped sheet stays readable at 360 dp and 2x text', (
+  testWidgets('the compact sheet stays readable at 320 dp and 2x text', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(360, 720);
+    tester.view.physicalSize = const Size(320, 640);
     tester.view.devicePixelRatio = 1;
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.view.reset);
@@ -590,25 +594,60 @@ void main() {
     expect(find.byType(TopicEditorSheet), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    for (final name in _groupNames) {
+    for (final key in _controlKeys) {
       await tester.scrollUntilVisible(
-        _group(name),
+        find.byKey(ValueKey(key)),
         200,
         scrollable: _sheetScrollable(),
       );
       await pumpFrames(tester);
-      expect(_group(name), findsOneWidget);
+      expect(find.byKey(ValueKey(key)), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
 
-    await tester.scrollUntilVisible(
-      find.text('Update topic JSON'),
-      200,
-      scrollable: _sheetScrollable(),
-    );
-    await pumpFrames(tester);
-    expect(find.text('Update topic JSON'), findsOneWidget);
     expect(_saveButton(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the compact sheet stays usable in landscape with the keyboard', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(640, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+    final topic = Topic(
+      id: seeded.topicId,
+      name: 'Cloud',
+      description: 'Topic description',
+      priority: 1,
+      ankiDeck: null,
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: _TopicEditHost(topic: topic),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await tester.tap(find.text('edit'));
+    await pumpFrames(tester);
+    _expectTopicSheet(tester);
+
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await _openField(tester, 'name', 'Name');
+    expect(_nameField(), findsOneWidget);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 160);
+    await pumpFrames(tester);
+    expect(_saveButton().hitTestable(), findsOneWidget);
+    expect(tester.getRect(_saveButton()).bottom, lessThanOrEqualTo(360 - 160));
     expect(tester.takeException(), isNull);
   });
 
@@ -688,7 +727,7 @@ void main() {
     );
     await _openFromLongPress(tester);
 
-    await _openField(tester, 'minimumScore', 'Minimum approval score');
+    await _openField(tester, 'minimumScore', 'Minimum score');
     await _enter(tester, _minimumScoreField(), '60');
     await _openField(tester, 'targetScore', 'Target score');
     await _enter(tester, _targetScoreField(), '90');
@@ -722,9 +761,9 @@ void main() {
     );
     await _openFromLongPress(tester);
 
-    await _openField(tester, 'minimumScore', 'Minimum approval score');
+    await _openField(tester, 'minimumScore', 'Minimum score');
     await _enter(tester, _minimumScoreField(), '101');
-    await _tapTileHeader(tester, 'minimumScore', 'Minimum approval score');
+    await _tapTileHeader(tester, 'minimumScore', 'Minimum score');
     expect(_minimumScoreField(), findsNothing);
     await tester.tap(_saveButton());
     await pumpFrames(tester);

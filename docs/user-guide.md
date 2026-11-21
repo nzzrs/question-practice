@@ -109,8 +109,8 @@ Review opens fullscreen.
 
 ## Notes
 
-- Select any question, answer or explanation text during practice and choose **Save as note**. The phrase is painted in place and belongs to the question, so it appears whenever that question is practised again.
-- Tap a painted note to **Define**, **Ask** or **Delete note**. Deleting is immediate and asks no confirmation.
+- Select any question, answer or explanation text during practice and choose **Save as note**. The phrase is shown in place and belongs to the question, so it appears whenever that question is practised again.
+- Tap a note to **Define**, **Ask** or **Delete note**. Deleting is immediate and asks no confirmation.
 - Notes stay in **Cards** and can be reviewed one at a time from **Review notes** or by tapping one.
 - **Create cards** sits inside the note review and opens the card creator. Manual entry adds cards one at a time and works without AI. **Suggest with AI** is optional and classifies up to six proposals as procedures/rules or atomic facts; check the ones to add.
 - A note with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete note** removes only the saved phrase.

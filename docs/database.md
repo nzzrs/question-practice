@@ -21,7 +21,7 @@ land without regenerated documentation.
 ## Tables, columns and indexes
 
 <!-- BEGIN GENERATED: database -->
-Current schema version: **11** (`AppDatabase.schemaVersion`).
+Current schema version: **12** (`AppDatabase.schemaVersion`).
 
 Table names below are the SQL names Drift creates. Every column, default, reference, cascade, primary key, unique key and index is read from `lib/core/database/tables.dart` and `app_database.dart`; the feature/model/repository notes come from the documented mapping in `tool/docs/update_docs.dart`.
 
@@ -250,7 +250,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 
 **Drift class:** `ManualCards` · **Row class:** `ManualCardRow`
 
-**Feature use:** Basic question/answer cards from skipped questions, Ask or a highlight.
+**Feature use:** Basic question/answer cards from skipped questions, Ask or a note.
 
 **Domain model:** `ManualCard` · **Repository:** `CardRepository` · **DAO:** `CardDao`, `StatsDao`
 
@@ -305,20 +305,20 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 - Index `skipped_questions_handled`: (`handled_at`)
 - Index `skipped_questions_session`: (`session_id`)
 
-#### `highlights`
+#### `notes`
 
-**Drift class:** `Highlights` · **Row class:** `HighlightRow`
+**Drift class:** `Notes` · **Row class:** `NoteRow`
 
-**Feature use:** Selected passages painted during practice, kept or converted into a concept/basic card, downloaded as plain text.
+**Feature use:** Passages saved from a question, kept or converted into a concept/basic card, downloaded as plain text.
 
-**Domain model:** `StudyHighlight` · **Repository:** `CardRepository` · **DAO:** `CardDao`
+**Domain model:** `Note` · **Repository:** `CardRepository` · **DAO:** `CardDao`
 
 | Column | Type | Null | Default | Constraints | References |
 |---|---|---|---|---|---|
 | `id` | INTEGER | NOT NULL | — | AUTOINCREMENT, PRIMARY KEY | — |
 | `session_id` | INTEGER | NULL | — | — | `sessions.id` ON DELETE CASCADE |
 | `question_id` | INTEGER | NULL | — | — | `questions.id` ON DELETE SET NULL |
-| `phrase` | TEXT | NOT NULL | — | — | — |
+| `text` | TEXT | NOT NULL | — | — | — |
 | `context` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
 | `subtopic` | TEXT | NOT NULL | `''` | — | — |
@@ -331,8 +331,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `highlights_session`: (`session_id`)
-- Index `highlights_question`: (`question_id`)
+- Index `notes_session`: (`session_id`)
+- Index `notes_question`: (`question_id`)
 
 #### `settings`
 
@@ -370,8 +370,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `manual_cards_exported` | `manual_cards` | `exported_at` | INDEX | — |
 | `skipped_questions_handled` | `skipped_questions` | `handled_at` | INDEX | — |
 | `skipped_questions_session` | `skipped_questions` | `session_id` | INDEX | — |
-| `highlights_session` | `highlights` | `session_id` | INDEX | — |
-| `highlights_question` | `highlights` | `question_id` | INDEX | — |
+| `notes_session` | `notes` | `session_id` | INDEX | — |
+| `notes_question` | `notes` | `question_id` | INDEX | — |
 | `error_cards_active_question` | `error_cards` | `question_id` | UNIQUE | `status = 'active'` |
 <!-- END GENERATED: database -->
 
@@ -379,22 +379,22 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 
 - `topics` own `practices`; deleting a topic deletes its practices and
   questions, and every session belonging to those practices. Session-linked
-  cards, skipped questions and highlights go with the session; question-only
+  cards, skipped questions and notes go with the session; question-only
   snapshots lose their question link as described below. There is no soft
   delete for content.
 - `practices` own `questions`. Deleting a practice or topic removes its
   questions, attempts, session links, error cards and skipped records.
 - `sessions` own `session_questions` and `attempts`. Deleting a session removes
-  those rows, plus cards, concepts, skipped questions and highlights that
+  those rows, plus cards, concepts, skipped questions and notes that
   captured that session. Resolved error history tied to the session is removed
   too; error cards are history for a question, not an independent archive.
-- `concepts`, `manual_cards`, `skipped_questions` and `highlights` reference a
+- `concepts`, `manual_cards`, `skipped_questions` and `notes` reference a
   question only while it exists. When a question is deleted, concepts, basic
-  cards and highlights keep their snapshot and their `question_id` becomes
+  cards and notes keep their snapshot and their `question_id` becomes
   `NULL` (`ON DELETE SET NULL`). Skipped-question and error-card rows are
   deleted with the question (`ON DELETE CASCADE`).
-- `highlights.manual_card_id` becomes `NULL` if the basic card made from the
-  highlight is deleted; the highlight itself remains.
+- `notes.manual_card_id` becomes `NULL` if the basic card made from the
+  note is deleted; the note itself remains.
 - The partial unique index `error_cards_active_question` allows at most one
   `active` error card per question while leaving any number of resolved rows.
 - `PRAGMA foreign_keys = ON` is executed in `beforeOpen`, so SQLite enforces all
@@ -436,7 +436,7 @@ without changing its topic.
    with `subtopic`, question/attempted/answered/correct counts, accuracy and
    progress when at least one group is named. See
    [Architecture](architecture.md#statistics-and-statistics-export).
-7. **Backup.** Backup v2 serialises `questions` as database rows, so
+7. **Backup.** Backup v3 serialises `questions` as database rows, so
    `subtopic` travels with every question. A v1 backup without that column
    restores it as `NULL`; the question then appears under Uncategorized.
 
@@ -465,7 +465,7 @@ The AI API key is not in this table. It lives in Android secure storage through
 ## Migration history
 
 <!-- BEGIN GENERATED: migrations -->
-Current schema version: **11**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
+Current schema version: **12**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
 
 | Version | Changes |
 |---|---|
@@ -480,40 +480,43 @@ Current schema version: **11**. Migration steps are read from `AppDatabase.migra
 | 9 | Added `archived` to `topics`. |
 | 10 | Added `subtopic` to `questions`. |
 | 11 | Added `minimum_score` to `topics`. Added `target_score` to `topics`. Added `mistake_kinds_json` to `attempts`. Added `subtopic` to `concepts`. Added `cognitive_type` to `error_cards`. Added `subtopic` to `error_cards`. Added `mistake_kinds_json` to `error_cards`. Added `cognitive_type` to `manual_cards`. Added `subtopic` to `manual_cards`. Added `subtopic` to `highlights`. |
+| 12 | Renamed table `highlights` to `notes`. Renamed column `phrase` to `text` in `notes`. Created index `notes_session`, `notes_question`. Dropped index `highlights_session`, `highlights_question`. |
 
-The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 11.
+The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 12.
 <!-- END GENERATED: migrations -->
 
 ## Backup coverage
 
 <!-- BEGIN GENERATED: backup -->
-Backup format **v2**; minimum readable format **v1**. Files record app version **0.9.11** build **12**, the database schema version, export time and per-table row counts.
+Backup format **v3**; minimum readable format **v1**. Files record app version **0.9.11** build **12**, the database schema version, export time and per-table row counts.
 
 | Coverage | Backup keys |
 |---|---|
 | Required in every backup | `topics`, `practices`, `questions`, `sessions`, `sessionQuestions`, `attempts`, `concepts`, `errorCards`, `manualCards`, `settings` |
-| Optional for older files | `skippedQuestions`, `highlights` |
+| Optional for older files | `skippedQuestions`, `notes` |
 
 The required and optional sets together cover every database table exactly once. `settings` stores preferences as key/value rows; the AI API key is in Android secure storage and is never exported.
 <!-- END GENERATED: backup -->
 
 ## Backup format and restore rules
 
-- `BackupService` writes format **v2**. The `tables` object contains every
+- `BackupService` writes format **v3**. The `tables` object contains every
   database table; the canonical SHA-256 checksum is computed over that object
   with sorted keys, so formatting changes do not alter it.
 - The `metadata` block records format version, app version and build, database
   schema version, export time and per-table row counts. The app rejects a file
   whose recorded counts do not match the rows it contains.
-- Required tables must exist. `skippedQuestions` and `highlights` are optional
+- Required tables must exist. `skippedQuestions` and `notes` are optional
   so a file from an older install still restores; unknown tables are ignored.
+  Older files store the notes table and its text column under the legacy
+  `highlights` and `phrase` keys, which import still reads.
 - Rows are read leniently for v1: missing columns use database defaults, and a
   topic deck may arrive as `ankiDeck`, `anki_deck` or `deck`.
 - Validation runs before any write: UTF-8 and 50 MB limit, JSON shape, enum
   values, JSON-array columns, duplicate identities, the one-active-error-card
   rule, and referential integrity for practices, questions, session questions,
-  attempts, concepts, error cards, basic cards, skipped questions and
-  highlights. Each failure reports the table, row and field.
+  attempts, concepts, error cards, basic cards, skipped questions and notes.
+  Each failure reports the table, row and field.
 - Restore replaces all local tables inside one transaction and then refreshes
   every data provider. A failure leaves the previous database untouched.
   **Erase all data** uses the same replacement path and also deletes the

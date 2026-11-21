@@ -8,6 +8,16 @@ class CardScaffold {
   final String back;
 }
 
+/// A term and definition parsed from the raw Definition cloze.
+class ParsedDefinitionCloze {
+  const ParsedDefinitionCloze({required this.term, required this.definition});
+
+  final String term;
+  final String definition;
+
+  bool get isComplete => term.isNotEmpty && definition.isNotEmpty;
+}
+
 const _contrastFront =
     'What is the key difference between [option A] and [option B] on '
     '[criterion]?';
@@ -15,7 +25,7 @@ const _contrastBack =
     '[Option A] does [behavior A], while [Option B] does [behavior B].';
 const _mechanismFront =
     'Why does [technology or concept] cause or require [effect]?';
-const _mechanismBack = '[One-line causal mechanism].';
+const _mechanismBack = '[One-line cause and effect].';
 const _heuristicFront =
     'If a scenario asks [X] but restricts with [Y], which option is always '
     'discarded?';
@@ -26,8 +36,8 @@ const _procedureBack = '[Condition or command].';
 
 /// Returns the exact scaffold for a basic template.
 ///
-/// [CardTemplate.definition] has no basic scaffold: its front is generated
-/// from the term and the resolved meaning, so this returns null for it.
+/// [CardTemplate.definition] has no basic scaffold: it is written as a raw
+/// cloze sentence, so this returns null for it.
 ///
 /// When [wrongAnswer] and [correctAnswer] are supplied (the error context),
 /// the contrast scaffold names the chosen wrong option as A and the correct
@@ -63,10 +73,71 @@ String _option(String value, String fallback) {
   return trimmed.isEmpty ? fallback : trimmed;
 }
 
-/// Builds the read-only Anki Cloze field preview for a Definition card.
+/// Seeds a raw Definition cloze.
+///
+/// A term and definition become the exact Anki cloze sentence. A sentence such
+/// as a note is split at "is" / "are" / "means" when that reads naturally.
+/// Nothing usable produces the empty scaffold, whose placeholders parse as
+/// empty so Save stays disabled until the learner writes real text.
+String seedDefinitionCloze({
+  String term = '',
+  String definition = '',
+  String source = '',
+}) {
+  final safeTerm = term.trim();
+  final safeDefinition = definition.trim();
+  if (safeTerm.isNotEmpty && safeDefinition.isNotEmpty) {
+    return 'Definition of {{c1::$safeTerm}}: {{c2::$safeDefinition}}';
+  }
+
+  final text = safeTerm.isNotEmpty ? safeTerm : source.trim();
+  if (text.isNotEmpty) {
+    final split = _splitDefinitionSentence(text);
+    if (split != null) {
+      return '{{c1::${split.term}}} ${split.connector} '
+          '{{c2::${split.definition}}}';
+    }
+    if (safeTerm.isNotEmpty && _wordCount(safeTerm) <= 4) {
+      return 'Definition of {{c1::$safeTerm}}: {{c2::…}}';
+    }
+    return 'Definition of {{c1::term}}: {{c2::$text}}';
+  }
+  return 'Definition of {{c1::term}}: {{c2::…}}';
+}
+
+/// Parses the raw Definition cloze into the Concept model fields.
+///
+/// `{{c1::VPC}}` is the term; everything after it is the definition, with
+/// remaining clozes resolved. Placeholder words from the seed count as empty.
+ParsedDefinitionCloze parseDefinitionCloze(String raw) {
+  final matches = RegExp(r'\{\{c(\d+)::(.*?)\}\}').allMatches(raw).toList();
+  if (matches.isEmpty) {
+    return const ParsedDefinitionCloze(term: '', definition: '');
+  }
+
+  final termMatch = matches.firstWhere(
+    (match) => match.group(1) == '1',
+    orElse: () => matches.first,
+  );
+  final term = _cleanValue(termMatch.group(2) ?? '');
+  final tail = raw.substring(termMatch.end);
+  var definition = _cleanDefinition(stripCloze(tail));
+
+  if (definition.isEmpty) {
+    final others = [
+      for (final match in matches)
+        if (!identical(match, termMatch)) _cleanValue(match.group(2) ?? ''),
+    ].where((value) => value.isNotEmpty);
+    definition = others.join(' ');
+  }
+
+  return ParsedDefinitionCloze(term: term, definition: definition);
+}
+
+/// Builds the read-only Anki Cloze front field for a Definition card.
 ///
 /// The meaning is shown as an ellipsis while it is pending, so the learner can
-/// see where the answer will go without an editable definition field.
+/// see where the answer will go.
 String definitionPreview(String term, String meaning) {
   final safeTerm = term.trim();
   final safeMeaning = meaning.trim();
@@ -74,9 +145,80 @@ String definitionPreview(String term, String meaning) {
       '{{c2::${safeMeaning.isEmpty ? '…' : safeMeaning}}}';
 }
 
+/// Normalizes card text for duplicate detection.
+///
+/// Cloze markup, HTML and punctuation are removed so two wordings of the same
+/// front compare closely.
+String normalizeCardText(String value) {
+  return stripCloze(value)
+      .replaceAll(RegExp(r'<[^>]*>'), ' ')
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+      .trim();
+}
+
+/// Whether [candidate] repeats or closely paraphrases [existing].
+///
+/// Near duplicates share at least 82% of their words, or one wording contains
+/// every word of the other while both have at least four words.
+bool isDuplicateCardText(String candidate, String existing) {
+  final safeCandidate = normalizeCardText(candidate);
+  final safeExisting = normalizeCardText(existing);
+  if (safeCandidate.isEmpty || safeExisting.isEmpty) return false;
+  if (safeCandidate == safeExisting) return true;
+
+  final candidateWords = safeCandidate.split(' ').toSet();
+  final existingWords = safeExisting.split(' ').toSet();
+  final union = candidateWords.union(existingWords).length;
+  if (union == 0) return false;
+  final shared = candidateWords.intersection(existingWords).length;
+  if (shared / union >= 0.82) return true;
+
+  final smaller = candidateWords.length < existingWords.length
+      ? candidateWords.length
+      : existingWords.length;
+  if (smaller >= 4 &&
+      (candidateWords.containsAll(existingWords) ||
+          existingWords.containsAll(candidateWords))) {
+    return true;
+  }
+  return false;
+}
+
+/// Drops AI ideas and variants that repeat [existingTexts] or each other.
+///
+/// The first accepted wording is remembered so a later idea in the same reply
+/// cannot repeat it.
+List<SuggestedCardIdea> filterDuplicateIdeas(
+  Iterable<SuggestedCardIdea> ideas, {
+  Iterable<String> existingTexts = const [],
+}) {
+  final known = [
+    for (final text in existingTexts)
+      if (text.trim().isNotEmpty) text,
+  ];
+  final filtered = <SuggestedCardIdea>[];
+  for (final idea in ideas) {
+    final variants = <SuggestedCard>[];
+    for (final variant in idea.variants) {
+      final duplicate = known.any(
+        (existing) => isDuplicateCardText(variant.front, existing),
+      );
+      if (duplicate) continue;
+      variants.add(variant);
+    }
+    if (variants.isEmpty) continue;
+    known.addAll(variants.map((variant) => variant.front));
+    filtered.add(
+      SuggestedCardIdea(template: idea.template, variants: variants),
+    );
+  }
+  return filtered;
+}
+
 /// Maps a legacy AI `type` value to the template that now represents it.
 ///
-/// Missing values fall back to Mechanism, the generic factual Basic template.
+/// Missing values fall back to Cause and effect, the generic factual template.
 /// Unknown values return null so callers skip the proposal instead of guessing.
 CardTemplate? templateFromLegacyType(String? value) {
   final type = value?.trim().toLowerCase() ?? '';
@@ -84,22 +226,98 @@ CardTemplate? templateFromLegacyType(String? value) {
     'definition' => CardTemplate.definition,
     'contrast' => CardTemplate.contrast,
     'heuristic' || 'rule' => CardTemplate.heuristic,
-    'procedure' => CardTemplate.procedure,
-    'fact' || 'mechanism' || '' => CardTemplate.mechanism,
+    'procedure' || 'steps' => CardTemplate.procedure,
+    'fact' || 'mechanism' || 'cause and effect' || '' => CardTemplate.mechanism,
     _ => null,
   };
 }
 
-/// Reads a current AI `template` value, skipping unknown values.
-CardTemplate? templateFromName(String? value) {
+/// Reads a current AI `template` value.
+///
+/// Missing or unknown values fall back to Cause and effect so one malformed
+/// suggestion never hides the whole reply.
+CardTemplate templateFromName(String? value) {
   final name = value?.trim().toLowerCase() ?? '';
   for (final template in CardTemplate.values) {
     if (template.name == name) return template;
   }
-  return null;
+  return switch (name) {
+    'rule' || 'exam tip' => CardTemplate.heuristic,
+    'steps' || 'procedure' => CardTemplate.procedure,
+    'cause and effect' || 'mechanism' || 'fact' => CardTemplate.mechanism,
+    'definition' => CardTemplate.definition,
+    'contrast' => CardTemplate.contrast,
+    _ => CardTemplate.mechanism,
+  };
 }
 
 /// Removes Cloze markup, for human-readable previews and accessibility labels.
 String stripCloze(String value) {
-  return value.replaceAll(RegExp(r'\{\{c\d+::(.*?)\}\}'), r'$1');
+  return value
+      .replaceAllMapped(
+        RegExp(r'\{\{c\d+::(.*?)\}\}'),
+        (match) => match.group(1) ?? '',
+      )
+      .replaceAll('{{', '')
+      .replaceAll('}}', '');
+}
+
+String _cleanValue(String value) {
+  final trimmed = value.trim();
+  const placeholders = {'term', 'meaning', '…', '...'};
+  if (placeholders.contains(trimmed.toLowerCase())) return '';
+  return trimmed;
+}
+
+String _cleanDefinition(String value) {
+  var text = value.trim();
+  text = text.replaceFirst(RegExp(r'^[:;,\-–—=|]+\s*'), '');
+  text = text.replaceFirst(
+    RegExp(
+      r'^(is|are|means|refers to|describes|defines)\s+',
+      caseSensitive: false,
+    ),
+    '',
+  );
+  return _cleanValue(text);
+}
+
+class _DefinitionSplit {
+  const _DefinitionSplit({
+    required this.term,
+    required this.connector,
+    required this.definition,
+  });
+
+  final String term;
+  final String connector;
+  final String definition;
+}
+
+_DefinitionSplit? _splitDefinitionSentence(String value) {
+  final match = RegExp(
+    r'^(.+?)\s+(is|are|means|refers to|describes|defines)\s+(.+)$',
+    caseSensitive: false,
+  ).firstMatch(value.trim());
+  if (match == null) return null;
+  final term = _stripArticle(match.group(1)!.trim());
+  final connector = match.group(2)!.toLowerCase();
+  final definition = match.group(3)!.trim();
+  if (term.isEmpty || definition.isEmpty) return null;
+  return _DefinitionSplit(
+    term: term,
+    connector: connector,
+    definition: definition,
+  );
+}
+
+String _stripArticle(String value) {
+  return value.replaceFirst(
+    RegExp(r'^(a|an|the)\s+', caseSensitive: false),
+    '',
+  );
+}
+
+int _wordCount(String value) {
+  return value.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
 }

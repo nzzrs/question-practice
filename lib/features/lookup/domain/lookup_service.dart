@@ -671,7 +671,6 @@ class LookupService {
     final template = templateFromName(
       rawTemplate is String ? rawTemplate : null,
     );
-    if (template == null) return null;
     if (allowedTemplates != null && !allowedTemplates.contains(template)) {
       return null;
     }

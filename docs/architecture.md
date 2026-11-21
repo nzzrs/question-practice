@@ -60,11 +60,11 @@ testable.
 | Session modes | `practice` (one practice, all its questions), `mixed` (shuffled practice across topics) and `pastErrors` (due error cards). | `SessionMode`, `SessionService.startPractice/startMixed/startPastErrors` | `sessions`, `session_questions`, `questions` |
 | Session lifecycle | A row is created as `inProgress` with its ordered question list. Completing writes scores and `finishedAt`; abandoning marks `abandoned`; discarding deletes the session and its dependent rows. | `SessionRepository.startSession/completeSession/abandonSession/discardSession` | `sessions`, `session_questions` |
 | Paused sessions | Home watches every `inProgress` session, not only the newest. Each card offers **Resume** and **Discard**. Save for later keeps the session; discard deletes it and the error cards it created. | `SessionDao.watchInProgressSessions`, Home | `sessions`, `attempts`, `error_cards` |
-| Question navigation | The question index lives in the session page. Arrow controls move without answering; submitted attempts reload their selection, reasoning and feedback. | `session_page.dart`, `SessionStart.attempts` | `session_questions`, `attempts` |
+| Question navigation | The question index lives in the session page. Arrow controls move without answering; submitted attempts reload their selection and feedback. | `session_page.dart`, `SessionStart.attempts` | `session_questions`, `attempts` |
 | Alternatives | Each session shuffles alternative order and keeps it per question. Original letters stay hidden until feedback or the eye toggle; the toggle reveals letters without reordering. | `SessionQuestionItem.alternativeOrder` | none (session state) |
-| Mistake chips | After a wrong answer, one-tap chips classify the error as forgotten fact, confusion between two options, misinterpretation or distraction. The choice is saved on the attempt and mirrored to its active error card for the card creator. | `SessionService.setMistakeKinds`, `session_page.dart` | `attempts`, `error_cards` |
+| What went wrong | After a wrong, non-skipped answer, a Logseq-style bullet editor collects one atomic note per line. Enter splits at the caret, a pasted outline becomes one bullet per line with its marker stripped, empty bullets are dropped on blur, and the list caps at 30 bullets of 500 characters. Edits autosave after 600 ms and flush on blur, navigation, finish, exit and app pause. | `WrongNotes`, `WrongNotesController`, `SessionService.setWrongNotes`, `session_page.dart` | `attempts.reasoning`, `error_cards.reasoning` |
 | Skip and unknown | **Skip** records an empty selection. **I didn't know this** marks a submitted wrong answer as unknown. Both count as skipped and create/mark a skipped-question record, not an error card. | `Attempt.isSkipped`, `SessionService.setUnknown`, `_trackSkipped` | `attempts`, `skipped_questions` |
-| Distraction | After a wrong answer, checking **I was distracted or read too fast** updates the attempt, removes an error card created by this session and refreshes completed counts. Unchecking restores or updates the card. A card from an earlier session is not deleted. | `SessionService.setDistracted` | `attempts`, `error_cards` |
+| Distraction | After a wrong answer, checking **I was distracted or read too fast** updates the attempt, removes an error card created by this session and refreshes completed counts. A card from an earlier session stays due and is marked `distracted`, so the review can warn. Unchecking clears the flag and restores or updates the card. | `SessionService.setDistracted`, `CardRepository.setErrorCardDistracted` | `attempts`, `error_cards` |
 | Finish early | **Finish practice** offers **Leave unanswered** or **Mark skipped**. Left-out questions are excluded from score and statistics; marked ones get an empty attempt and skipped record. A question answered in an earlier attempt is never treated as unanswered again. | `SessionService.finishEarly`, `SessionStart.pendingUnanswered`, `SessionDao.questionsLeftUnanswered` | `sessions`, `attempts`, `session_questions` |
 | Results | Percentage, correct/total, wrong, skipped, distinct looked-up terms, review prompt and Cards shortcut. | `lib/features/practice/summary_page.dart` | `sessions`, `attempts`, `concepts`, `error_cards` |
 | Practice sounds | Correct, wrong and finished cues, with a settings toggle and volume; failures never block practice. | `lib/core/platform/practice_sound_player.dart` | `settings` |
@@ -93,8 +93,8 @@ of the random queue.
 
 1. A wrong answer with a non-empty selection, not distracted and not unknown,
    creates an `active` error card. The card snapshots the prompt, alternatives,
-   correct and wrong indexes, reasoning, overall explanation, per-alternative
-   explanations, topic and practice names.
+   correct and wrong indexes, the newline-joined wrong-answer bullets, overall
+   explanation, per-alternative explanations, topic and practice names.
 2. `dueAt` is the last wrong time plus 48 hours. One active card per question is
    enforced by the partial unique index `error_cards_active_question`.
 3. The end-of-session review and Cards offer a contextual **Create cards**
@@ -111,11 +111,12 @@ of the random queue.
 4. After the delay, the card appears in Past errors. A correct re-test sets
    `status = resolved` and `resolvedAt`, keeping the row for history. A wrong
    re-test updates `lastWrongAt` and pushes `dueAt` another 48 hours.
-5. Distraction on a re-test does not resolve the card; it stays active. Skipped
-   answers never create error cards.
-6. The card editor updates the stored question, alternatives, overall
-   explanation and per-alternative explanations without changing
-   `question_id`, correct/wrong indexes or the practice history link.
+5. Distraction on a re-test does not resolve the card; it stays active and is
+   flagged `distracted = 1`. A later non-distracted wrong answer clears the flag.
+   Skipped answers never create error cards.
+6. The review no longer edits the card's question or alternatives. It shows the
+   same read-only feedback surface as practice, so the original question stays a
+   stable history link.
 
 Deleting an active error card removes it from the queue. Deleting a question
 cascades to its error cards. Deleting a session cascades to cards captured by
@@ -153,9 +154,16 @@ with the first created card id.
 
 Review pages run inside `ImmersiveReview`, which hides the system bars while the
 review is visible, restores them while another page covers it, and re-enters on
-resume or when the learner returns. The end-of-session review and the Cards
-review use the same error-card view; the card editor is a dialog from that
-view.
+resume or when the learner returns. The end-of-session review, the Cards review
+and practice all render `QuestionFeedbackView`: topic and subtopic, question,
+alternatives with correct/wrong state and expandable explanations, the status
+banner, **Why this answer**, and Define / Ask / Save as note / URL actions. The
+review passes read-only bullets and the notes for the question; practice passes
+the editable bullet editor and the distraction checks. A distracted card adds
+**You were distracted or misread. This card stays due.** Notes in the review can
+be copied or used to seed the existing card creator with **Create card with AI**.
+The old card-content editor has no entry point. There is no split view yet; the
+card creator remains the existing sheet.
 
 ### Concepts, basic cards, skipped questions and notes
 
@@ -280,10 +288,11 @@ See [AnkiDroid export](anki.md).
 
 `BackupService` writes one checksummed JSON document with every local table:
 topics (including archived topics, decks and score bands), practices, questions
-(including subtopics), sessions, session questions, attempts (including mistake
-chips), concepts (including subtopic), error cards (including cognitive type,
-subtopic and mistake chips), basic cards (including cognitive type and
-subtopic), skipped questions, notes (the `notes` table) and settings.
+(including subtopics), sessions, session questions, attempts (including legacy
+mistake chips and wrong-answer bullets), concepts (including subtopic), error
+cards (including cognitive type, subtopic, legacy mistake chips, distracted flag
+and bullets), basic cards (including cognitive type and subtopic), skipped
+questions, notes (the `notes` table) and settings.
 
 - Format **v3** keeps the canonical checksum over the `tables` object and
   writes notes under the `notes` key. `metadata` records format version, app

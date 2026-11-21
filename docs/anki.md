@@ -61,7 +61,7 @@ the definition bubble in the app.
 
 ### Atomic error cards
 
-The end-of-session review and the Cards screen show the mistake, the chosen wrong answer, the correct answer, your reasoning and the explanation. There are no free-text bias or vaccine fields and no "Check with AI" button.
+The end-of-session review and the Cards screen show the same feedback as practice: the question, every alternative with its correct/wrong state and explanation, the status, and your read-only wrong-answer bullets. Notes saved for the question can be copied or used with **Create card with AI**. A distracted re-test keeps the card due and adds a warning. The review no longer edits the question or options. There are no free-text bias or vaccine fields and no "Check with AI" button.
 
 **Create cards** sits inside the error review and opens the card creator as a draggable half-height sheet, keeping the error visible. Manual entry adds cards one at a time and works offline without AI, so error review no longer depends on an AI provider. **Suggest with AI** is optional and proposes at most two Basic cards:
 

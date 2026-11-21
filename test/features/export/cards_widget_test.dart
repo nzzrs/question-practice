@@ -26,6 +26,7 @@ void main() {
     TestHarness harness,
     Question question, {
     required bool complete,
+    List<MistakeKind> mistakeKinds = const [],
   }) async {
     final cardId = await harness.cards.createErrorCard(
       questionId: question.id,
@@ -39,6 +40,7 @@ void main() {
       alternativeExplanations: question.alternativeExplanations,
       topicName: 'Topic',
       practiceName: 'Practice',
+      mistakeKinds: mistakeKinds,
       lastWrongAt: harness.clock.now().toUtc(),
       dueAfter: const Duration(hours: 48),
     );
@@ -175,6 +177,33 @@ void main() {
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
     expect(find.text('Review all'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
+  });
+
+  testWidgets('legacy mistake kinds stay out of the error preview', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final cardId = await seedError(
+      harness,
+      question,
+      complete: true,
+      mistakeKinds: const [MistakeKind.forgottenFact, MistakeKind.confusion],
+    );
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    final row = find.byKey(ValueKey('error-row-$cardId'));
+    await tester.ensureVisible(row);
+    await pumpFrames(tester);
+    await tester.tap(row);
+    await pumpFrames(tester);
+
+    expect(find.text('Error preview'), findsOneWidget);
+    expect(find.text('Forgotten fact'), findsNothing);
+    expect(find.text('Confusion between 2 options'), findsNothing);
+    expect(find.text('Misinterpretation'), findsNothing);
   });
 
   testWidgets('skipped questions stay in cards and can become a card', (

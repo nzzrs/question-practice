@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -136,6 +136,36 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 13) {
         await migrator.addColumn(errorCards, errorCards.distracted);
+      }
+      if (from < 14) {
+        // Reopen active cards that were missed again after their details were
+        // completed, or whose details are still missing. Older versions did
+        // not clear the export marker, so these rows stayed hidden from the
+        // Errors flow. Rows, notes and history are preserved. The guard keeps
+        // partial or hand-built databases from failing the upgrade.
+        final errorCardColumns = await customSelect(
+          'PRAGMA table_info(error_cards)',
+        ).get();
+        final errorCardNames = {
+          for (final row in errorCardColumns) row.read<String>('name'),
+        };
+        if (errorCardNames.containsAll(const [
+          'exported_at',
+          'status',
+          'details_completed_at',
+          'last_wrong_at',
+        ])) {
+          await customStatement('''
+            UPDATE error_cards
+            SET exported_at = NULL
+            WHERE status = 'active'
+              AND exported_at IS NOT NULL
+              AND (
+                details_completed_at IS NULL
+                OR last_wrong_at > details_completed_at
+              )
+          ''');
+        }
       }
     },
     beforeOpen: (details) async {

@@ -154,21 +154,24 @@ class AppPage extends StatelessWidget {
           child: CustomScrollView(
             controller: scrollController,
             slivers: [
-              M3EAppBar.sliver(
-                title: titleWidget,
-                titleText: titleWidget == null ? title : null,
-                subtitleText: subtitle,
-                variant: variant,
-                leading: showBack
-                    ? M3EIconButton(
-                        variant: M3EIconButtonVariant.standard,
-                        icon: const Icon(M3EIcons.arrow_back),
-                        tooltip: 'Back',
-                        onPressed:
-                            onBack ?? () => Navigator.of(context).maybePop(),
-                      )
-                    : null,
-                actions: actions,
+              _RouteAwareAppBar(
+                builder: (context) => M3EAppBar.sliver(
+                  title: titleWidget,
+                  titleText: titleWidget == null ? title : null,
+                  subtitleText: subtitle,
+                  variant: variant,
+                  leading: showBack
+                      ? M3EIconButton(
+                          key: const ValueKey('app-page-back'),
+                          variant: M3EIconButtonVariant.standard,
+                          icon: const Icon(M3EIcons.arrow_back),
+                          tooltip: 'Back',
+                          onPressed:
+                              onBack ?? () => Navigator.of(context).maybePop(),
+                        )
+                      : null,
+                  actions: actions,
+                ),
               ),
               SliverPadding(
                 padding: contentPadding,
@@ -183,6 +186,62 @@ class AppPage extends StatelessWidget {
       floatingActionButtonLocation: floatingActionButtonLocation,
     );
   }
+}
+
+/// Rebuilds the app bar when the page's route finishes entering or leaving.
+///
+/// [M3EAppBar] decides on its own whether to show a back button by asking
+/// `Navigator.canPop()` while it builds. A page below a route that is being
+/// popped can rebuild mid-transition, see `canPop == true`, and then keep the
+/// stale arrow because nothing rebuilds once the pop completes. Listening to
+/// the route animations rebuilds the bar at the settled state, so the root
+/// page never keeps a back control.
+class _RouteAwareAppBar extends StatefulWidget {
+  const _RouteAwareAppBar({required this.builder});
+
+  final WidgetBuilder builder;
+
+  @override
+  State<_RouteAwareAppBar> createState() => _RouteAwareAppBarState();
+}
+
+class _RouteAwareAppBarState extends State<_RouteAwareAppBar> {
+  ModalRoute<Object?>? _route;
+  Animation<double>? _animation;
+  Animation<double>? _secondaryAnimation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route == _route) return;
+    _detach();
+    _route = route;
+    _animation = route?.animation;
+    _secondaryAnimation = route?.secondaryAnimation;
+    _animation?.addStatusListener(_onStatusChanged);
+    _secondaryAnimation?.addStatusListener(_onStatusChanged);
+  }
+
+  void _onStatusChanged(AnimationStatus status) {
+    if (mounted) setState(() {});
+  }
+
+  void _detach() {
+    _animation?.removeStatusListener(_onStatusChanged);
+    _secondaryAnimation?.removeStatusListener(_onStatusChanged);
+    _animation = null;
+    _secondaryAnimation = null;
+  }
+
+  @override
+  void dispose() {
+    _detach();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context);
 }
 
 /// Slim top row used by [AppPage] focus mode: one clear exit and the title.

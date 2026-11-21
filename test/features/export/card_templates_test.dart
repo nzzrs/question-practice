@@ -143,8 +143,9 @@ void main() {
     final noC1 = parseDefinitionCloze(
       '{{c2::VPC}} is {{c3::a private network}}',
     );
-    expect(noC1.term, 'VPC');
-    expect(noC1.definition, 'a private network');
+    expect(noC1.term, isEmpty);
+    expect(noC1.definition, isEmpty);
+    expect(noC1.isComplete, isFalse);
 
     final multiple = parseDefinitionCloze(
       '{{c1::VPC}} is {{c2::a private}} {{c3::network}}.',

@@ -119,10 +119,18 @@ ParsedDefinitionCloze parseDefinitionCloze(String raw) {
     return const ParsedDefinitionCloze(term: '', definition: '');
   }
 
-  final termMatch = matches.firstWhere(
-    (match) => match.group(1) == '1',
-    orElse: () => matches.first,
-  );
+  Match? termMatch;
+  for (final match in matches) {
+    if (match.group(1) == '1') {
+      termMatch = match;
+      break;
+    }
+  }
+  // Without a c1 cloze there is no reliable way to tell the term from the
+  // definition, so block the card instead of guessing and saving it inverted.
+  if (termMatch == null) {
+    return const ParsedDefinitionCloze(term: '', definition: '');
+  }
   final term = _cleanValue(termMatch.group(2) ?? '');
   // Read the definition from everything around the term, so text before the
   // term is kept as well. The term cloze is removed before cleaning.

@@ -76,14 +76,14 @@ Questions is an offline Android app for practising questions and exporting study
 Review opens fullscreen.
 
 - **Wrong questions** show your wrong answer, the correct answer and the explanations.
-- **Create cards** sits inside the error review and opens the card creator as a draggable half-height sheet, so the error stays visible above it; drag it up for more room. Manual entry adds cards one at a time and works offline without AI. **Suggest with AI** is optional: it proposes at most two cards, a contrast between your choice and the correct option and/or a condition-action heuristic written as "Given requirement X with restriction Y, what rule applies?".
-- Suggestions carry a Litmus quality badge that warns about binary questions, fronts over 30 words, syntactic clues or a heuristic front that does not use the rule template. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
+- **Create cards** sits inside the error review and opens the card creator as a draggable half-height sheet, so the error stays visible above it; drag it up for more room. Manual entry adds cards one at a time and works offline without AI. Five templates write the front and back: Definition / term, Contrast / difference, Mechanism / cause-effect, Exam heuristic and Phase transition / procedure. AI suggestions are optional: each idea offers up to three wording variants, and the error breakdown proposes a contrast between your choice and the correct option and/or an exam heuristic.
+- Every builder card, draft and AI variant carries an advisory quality badge. It warns about yes/no questions, fronts over 30 words, cards over 15 seconds to read, answer clues, template mismatches, empty fronts or backs, a missing definition, and a definition that repeats its term. It never blocks saving. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
 - **Skipped questions** ask **What was missing here?**.
   - **A concept** creates a concept card from a term and definition.
   - **Another question** creates a basic card from a question and answer.
-- **Create cards** also sits inside the skipped review and opens the same creator for the concept or basic card. Manual entry adds one card at a time; AI is not required.
+- **Create cards** also sits inside the skipped review and opens the same creator with the question and correct answer prefilled as a custom card. Manual entry adds one card at a time; AI is not required.
 - **Concepts without a definition** get a definition field.
-- **Notes** from the session can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one by one; **Suggest with AI** classifies up to six proposals as procedures/rules or atomic facts. Check the ones to add.
+- **Notes** from the session can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one by one and needs no AI provider. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
 - **Skip** leaves a step for later. Missing card details can be finished from **Cards**.
 
 ## Past errors
@@ -106,13 +106,15 @@ Review opens fullscreen.
 - **Share as files** creates Anki-compatible text files.
 - **Delete selected** removes the chosen cards, skipped questions and notes. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a note removes only the saved phrase; cards already made from it stay.
 - Errors are never exported directly: review them into atomic cards with **Create cards** first. Concepts without a definition block export until completed. Skipped questions and notes cannot be exported, but they can still be selected and deleted.
+- Concept cards in the creator need only a term. The meaning is looked up from your saved concepts first, then from AI when a provider is configured. There is no definition field to type in the creator. Without a provider the concept is saved as **Definition pending** and is not exported until a definition is added.
+- Topic and subtopic are never written inside card text. They travel as `question-practice`, `topic::<slug>` and `subtopic::<slug>` Anki tags. File exports put them in a third `Tags` column with `#tags column:3`.
 
 ## Notes
 
 - Select any question, answer or explanation text during practice and choose **Save as note**. The phrase is shown in place and belongs to the question, so it appears whenever that question is practised again.
 - Tap a note to **Define**, **Ask** or **Delete note**. Deleting is immediate and asks no confirmation.
 - Notes stay in **Cards** and can be reviewed one at a time from **Review notes** or by tapping one.
-- **Create cards** sits inside the note review and opens the card creator. Manual entry adds cards one at a time and works without AI. **Suggest with AI** is optional and classifies up to six proposals as procedures/rules or atomic facts; check the ones to add.
+- **Create cards** sits inside the note review and opens the card creator. Manual entry adds cards one at a time and works without AI. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
 - A note with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete note** removes only the saved phrase.
 - **Download all** saves notes as plain text.
 - Notes are never sent to AnkiDroid.

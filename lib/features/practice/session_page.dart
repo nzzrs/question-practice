@@ -45,7 +45,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
   bool _submitted = false;
   bool _submitting = false;
   bool _distracted = false;
-  bool _unknown = false;
   bool _showOriginalLetters = false;
   AnswerOutcome? _outcome;
   SessionSummary? _summary;
@@ -306,7 +305,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _outcome = null;
     _submitted = false;
     _distracted = false;
-    _unknown = false;
     _wrongNotes?.dispose();
     _wrongNotes = null;
     if (item == null) {
@@ -321,7 +319,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _selectedIndexes.addAll(attempt.selectedIndexes);
     _submitted = true;
     _distracted = attempt.distracted;
-    _unknown = attempt.unknown;
     _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
     _syncWrongNotes(attempt);
     _restartQuestionTimer();
@@ -408,37 +405,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
       if (!mounted) return;
       _start.attempts[item.question.id] = attempt;
       setState(() {
-        _distracted = attempt.distracted;
-        _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
-        _syncWrongNotes(attempt);
-      });
-      ref.invalidate(dueErrorsProvider);
-    } on SessionException catch (error) {
-      if (mounted) await showSnack(context, error.message);
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
-  }
-
-  Future<void> _setUnknown(bool value) async {
-    final item = _item;
-    if (item == null || _submitting) return;
-    setState(() => _submitting = true);
-    if (!await _flushWrongNotes()) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      await showSnack(context, 'Your notes are not saved. Try again.');
-      return;
-    }
-    if (!mounted) return;
-    try {
-      final attempt = await ref
-          .read(sessionServiceProvider)
-          .setUnknown(start: _start, item: item, unknown: value);
-      if (!mounted) return;
-      _start.attempts[item.question.id] = attempt;
-      setState(() {
-        _unknown = attempt.unknown;
         _distracted = attempt.distracted;
         _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
         _syncWrongNotes(attempt);
@@ -759,13 +725,13 @@ class _SessionPageState extends ConsumerState<SessionPage>
                       _submitted &&
                           _outcome!.attempt.selectedIndexes.isNotEmpty &&
                           !_outcome!.attempt.isCorrect
-                      ? _FeedbackChecks(
-                          distracted: _distracted,
-                          unknown: _unknown,
-                          onDistractedChanged: _submitting
-                              ? null
-                              : _setDistracted,
-                          onUnknownChanged: _submitting ? null : _setUnknown,
+                      ? _FeedbackCheckRow(
+                          controlKey: const ValueKey('distracted-answer-check'),
+                          value: _distracted,
+                          title: 'I was distracted or read too fast',
+                          supportingText:
+                              'No error card; it does not count as skipped.',
+                          onChanged: _submitting ? null : _setDistracted,
                         )
                       : null,
                   showLetters: _submitted || _showOriginalLetters,
@@ -1070,43 +1036,6 @@ class _NoteActionsSheet extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _FeedbackChecks extends StatelessWidget {
-  const _FeedbackChecks({
-    required this.distracted,
-    required this.unknown,
-    required this.onDistractedChanged,
-    required this.onUnknownChanged,
-  });
-
-  final bool distracted;
-  final bool unknown;
-  final ValueChanged<bool>? onDistractedChanged;
-  final ValueChanged<bool>? onUnknownChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _FeedbackCheckRow(
-          controlKey: const ValueKey('distracted-answer-check'),
-          value: distracted,
-          title: 'I was distracted or read too fast',
-          supportingText: 'No error card; it does not count as skipped.',
-          onChanged: onDistractedChanged,
-        ),
-        const SizedBox(height: 8),
-        _FeedbackCheckRow(
-          controlKey: const ValueKey('unknown-answer-check'),
-          value: unknown,
-          title: "I didn't know this",
-          supportingText: 'No error card; counts as skipped and the review asks for the concept.',
-          onChanged: onUnknownChanged,
-        ),
-      ],
     );
   }
 }

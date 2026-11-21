@@ -92,7 +92,7 @@ void main() {
       find.byKey(const ValueKey('distracted-answer-check')),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('unknown-answer-check')), findsOneWidget);
+    expect(find.byKey(const ValueKey('unknown-answer-check')), findsNothing);
   });
 
   testWidgets('a correct answer keeps the bullets hidden', (tester) async {

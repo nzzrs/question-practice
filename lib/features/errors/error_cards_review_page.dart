@@ -243,6 +243,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
 
     final step = _step!;
     final isSkipped = step is _SkippedStep;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return AppPage(
       title: widget.title,
       showBack: true,
@@ -292,6 +293,8 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
       body: switch (step) {
         _ErrorStep(:final card) => AdaptiveSplitView(
           storageKey: _splitStorageKey,
+          minLeading: keyboardOpen ? 96 : 160,
+          minTrailing: keyboardOpen ? 240 : 220,
           leading: ErrorCardReviewView(
             card: card,
             creator: _creator,

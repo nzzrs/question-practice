@@ -755,6 +755,28 @@ void main() {
     expect(find.text('Continue'), findsNothing);
   });
 
+  testWidgets('the keyboard leaves the creator room to type', (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+    addTearDown(tester.view.reset);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getSize(find.byType(CardCreatorPane)).height,
+      greaterThanOrEqualTo(240),
+    );
+  });
+
   for (final config in const [
     (label: '320 dp', size: Size(320, 640), scale: 1.0),
     (label: '360 dp at 2.0', size: Size(360, 800), scale: 2.0),

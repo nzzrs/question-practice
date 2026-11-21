@@ -339,6 +339,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final step = _step!;
     final errorStep = step is ErrorReviewStep ? step : null;
     final isError = errorStep != null;
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     final heading = switch (step) {
       ErrorReviewStep() => 'Analyse the error',
       SkippedReviewStep() => 'What was missing?',
@@ -406,6 +407,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       body: isError
           ? AdaptiveSplitView(
               storageKey: _splitStorageKey,
+              minLeading: keyboardOpen ? 96 : 160,
+              minTrailing: keyboardOpen ? 240 : 220,
               leading: ErrorCardReviewView(
                 card: errorStep.card,
                 creator: _creator,

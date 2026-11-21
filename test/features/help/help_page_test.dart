@@ -54,11 +54,11 @@ void main() {
         'Shuffled practice',
         'JSON example',
         'Copy JSON example',
-        'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection.',
+        'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. Rows have no checkboxes or action icons.',
       ]),
     );
     expect(
-      texts.any((text) => text.contains('Tap a note to review it')),
+      texts.any((text) => text.contains('Tap a note to open Note preview')),
       isTrue,
     );
     expect(
@@ -77,7 +77,8 @@ void main() {
     expect(
       texts.any(
         (text) => text.contains(
-          'Facts, heuristics and contrasts use the Basic note type',
+          'Contrast, Cause and effect, Exam tip and Steps cards use the Basic '
+          'note type',
         ),
       ),
       isTrue,
@@ -108,6 +109,9 @@ void main() {
     expect(texts.any((text) => text.contains('native API')), isFalse);
     expect(texts.any((text) => text.contains('database')), isFalse);
     expect(texts.any((text) => text.contains("I didn't know this")), isFalse);
+    expect(texts.any((text) => text.contains('Facts, heuristics')), isFalse);
+    expect(texts.any((text) => text.contains('Review notes')), isFalse);
+    expect(texts.any((text) => text.contains('Keep for later')), isFalse);
   });
 
   testWidgets('copy example puts valid JSON with every format feature on the '

@@ -165,11 +165,12 @@ persistent skipped record handled.
 Skipped questions stay in the combined **Error and skipped** section of Cards
 until handled, where their previews open the same review surface.
 
-Note steps use the shared `NoteReviewView`, the same view Cards opens when a
-note row is tapped. **Create cards** opens the card creator for manual entry and
-optional AI suggestions. The provider receives the note, its question context
-and the topic, and must return one JSON object with at most three ideas and
-three variants per idea. The parser tolerates fenced JSON, trims values, drops
+Note steps use the shared `NoteReviewView`, the same view Cards opens from a
+note preview's **Review** action. **Create cards** opens the card creator for
+manual entry and optional AI suggestions. The provider receives the note, its
+question context and the topic, and must return one JSON object with at most
+three ideas and three variants per idea. The parser tolerates fenced JSON,
+trims values, drops
 empty or duplicate variants, skips unknown templates and caps ideas and
 variants. Accepted variants become Basic cards (or a Cloze concept for a
 Definition idea) through `ReviewService`; the note is then marked converted
@@ -202,7 +203,7 @@ the error step uses the split studio.
 | Concept cards | Cloze text `Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Topic and subtopic travel as tags only. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
 | Basic cards | Question/answer cards from skipped questions, Ask, a note or a review bullet, with optional context above the front and a cognitive type (fact, heuristic, contrast). | `CardRepository.createManualCard`, `card_creator_sheet.dart`, `review_service.dart` | `manual_cards` |
 | Skipped queue | Every skipped/unknown answer is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
-| Notes (`notes` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it is shown again whenever that question is practised. Tapping a note offers Define, Ask and **Delete note**; deletion is immediate with no confirmation. At review a note can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one at a time and works without AI; optional AI suggestions offer up to three variants per idea and the learner keeps any combination. Each saved variant becomes a Basic card (or a Cloze concept for a Definition idea) with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards, where tapping one walks them one at a time through the shared view. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createNote/notesForQuestion/keepNote/markNoteConverted/deleteNotes`, `LookupService.suggestArchetypeCards`, `note_review_page.dart`, `note_review_view.dart`, `card_creator_sheet.dart` | `notes`, `manual_cards` |
+| Notes (`notes` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it is shown again whenever that question is practised. Tapping a note offers Define, Ask and **Delete note**; deletion is immediate with no confirmation. At review a note can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one at a time and works without AI; optional AI suggestions offer up to three variants per idea and the learner keeps any combination. Each saved variant becomes a Basic card (or a Cloze concept for a Definition idea) with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards, where tapping one opens a read-only preview; **Review** walks them one at a time through the shared view. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createNote/notesForQuestion/keepNote/markNoteConverted/deleteNotes`, `LookupService.suggestArchetypeCards`, `note_review_page.dart`, `note_review_view.dart`, `card_creator_sheet.dart` | `notes`, `manual_cards` |
 | Note download | The download action in the Notes header writes a plain-text file through the system share sheet. | `CardsPage._downloadNotes`, `ExportService.shareNotes` | `notes` |
 
 ### Statistics and statistics export
@@ -276,12 +277,13 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   also includes skipped questions.
 - Selection uses long-press, not checkboxes. Long-press any row to enter
   selection mode and select it; while selection mode is active a tap toggles
-  that row, and a normal tap otherwise previews it (or opens the note review
-  for a note). The subtitle counts the selection, the app-bar close clears it,
-  and no banner or extra row is inserted, so rows keep their positions as the
-  selection grows. Select all in the app bar covers the rows the current filter
-  shows and ignores rows that cannot be selected. An error row preview is
-  titled **Error preview** and offers **Review** beside **Close**.
+  that row, and a normal tap otherwise previews it. A note preview offers
+  **Review** to open the note review. The subtitle counts the selection, the
+  app-bar close clears it, and no banner or extra row is inserted, so rows keep
+  their positions as the selection grows. Select all in the app bar covers the
+  rows the current filter shows and ignores rows that cannot be selected. An
+  error row preview is titled **Error preview** and offers **Review** beside
+  **Close**.
 - Selection is global across families and persists in settings as versioned
   JSON keyed by family. It starts empty, is pruned against currently selectable
   rows on load and on list changes, and is removed when it becomes empty or
@@ -297,11 +299,13 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   pending error or skipped question it becomes **Review pending** and opens the
   combined error/skipped review. A separate app-bar **Review all pending**
   action opens every pending error and skipped question.
-- There is no **Review notes** button: tapping a note walks the notes one at a
-  time, with Previous, Keep/Skip and Done like the error review. The contextual
-  **Create cards** action opens the shared card creator. The shared
-  `NoteReviewView` shows the phrase, its question context, topic and practice
-  pills, and the card actions; the end-of-session note step uses the same view.
+- There is no **Review notes** button: tapping a note opens a read-only
+  **Note preview** with the saved text and its question context. **Review**
+  walks the notes one at a time, with Previous, Keep/Skip and Done like the
+  error review. The contextual **Create cards** action opens the shared card
+  creator. The shared `NoteReviewView` shows the phrase, its question context,
+  topic and practice pills, and the card actions; the end-of-session note step
+  uses the same view.
 - **Export to AnkiDroid** creates missing decks and note types, bulk-adds notes,
   marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
 - **Share as files** writes Anki-compatible cloze `.txt` and basic `.tsv` files. File export does not encode a deck or tags and never includes notes. Exported Anki notes carry hierarchical `topic::` and `subtopic::` tags in the direct AnkiDroid path.

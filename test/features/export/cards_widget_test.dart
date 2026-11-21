@@ -390,6 +390,9 @@ void main() {
     await tester.ensureVisible(row);
     await tester.tap(row);
     await pumpFrames(tester);
+    expect(find.text('Note preview'), findsOneWidget);
+    await tester.tap(find.text('Review'));
+    await pumpFrames(tester);
 
     final create = find.byKey(const ValueKey('note-make-card'));
     expect(create, findsOneWidget);
@@ -474,6 +477,10 @@ void main() {
     await tester.tap(row);
     await pumpFrames(tester);
 
+    expect(find.text('Note preview'), findsOneWidget);
+    await tester.tap(find.text('Review'));
+    await pumpFrames(tester);
+
     expect(find.text('Item 1 of 1'), findsOneWidget);
     expect(find.text('Review the note'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
@@ -507,6 +514,10 @@ void main() {
     final row = find.byKey(ValueKey('note-row-$noteId'));
     await tester.ensureVisible(row);
     await tester.tap(row);
+    await pumpFrames(tester);
+
+    expect(find.text('Note preview'), findsOneWidget);
+    await tester.tap(find.text('Review'));
     await pumpFrames(tester);
 
     await tester.tap(find.byKey(const ValueKey('note-make-card')));
@@ -737,6 +748,7 @@ void main() {
     expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
     expect(find.text('Review the note'), findsNothing);
+    expect(find.text('Note preview'), findsNothing);
   });
 
   testWidgets('selected skipped questions enable delete without export', (

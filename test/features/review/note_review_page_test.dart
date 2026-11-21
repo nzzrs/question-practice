@@ -33,7 +33,8 @@ void main() {
     return (await tester.runAsync(() => harness.cards.watchNotes().first))!;
   }
 
-  testWidgets('skips through notes and reports the completion', (tester) async {
+  testWidgets('moves through notes with the forward arrow and reports the '
+      'completion', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final notes = await seedNotes(tester, harness);
@@ -46,14 +47,17 @@ void main() {
 
     expect(find.text('Item 1 of 2'), findsOneWidget);
     expect(find.text('second note'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+    expect(find.text('Save and finish'), findsNothing);
+    expect(find.text('Skip'), findsNothing);
 
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
     await pumpFrames(tester);
 
     expect(find.text('Item 2 of 2'), findsOneWidget);
     expect(find.text('first note'), findsOneWidget);
 
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
     await pumpFrames(tester);
 
     expect(find.text('Note review complete'), findsOneWidget);
@@ -74,11 +78,11 @@ void main() {
       harness: harness,
     );
 
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
     await pumpFrames(tester);
     expect(find.text('Item 2 of 2'), findsOneWidget);
 
-    await tester.tap(find.text('Keep & done'));
+    await tester.tap(find.text('Save and finish'));
     await pumpFrames(tester, frames: 24);
 
     expect(find.text('Note review complete'), findsOneWidget);
@@ -106,6 +110,28 @@ void main() {
     expect(find.text('first note'), findsOneWidget);
   });
 
+  testWidgets('the note dock fits 320 dp at 2.0 text scale', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final notes = await seedNotes(tester, harness);
+
+    await pumpTestApp(
+      tester,
+      home: NoteReviewPage(notes: notes),
+      harness: harness,
+    );
+
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('review-dock-delete')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+  });
+
   testWidgets('deleting the current note advances safely', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
@@ -118,7 +144,7 @@ void main() {
     );
 
     expect(find.text('second note'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('note-delete')));
+    await tester.tap(find.byKey(const ValueKey('review-dock-delete')));
     await pumpFrames(tester);
     expect(find.text('Delete note?'), findsOneWidget);
     await tester.tap(find.text('Delete'));

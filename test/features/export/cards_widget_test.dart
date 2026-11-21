@@ -248,7 +248,7 @@ void main() {
     expect(find.text('Review the skipped question'), findsOneWidget);
     expect(find.text('Item 1 of 1'), findsOneWidget);
 
-    await tester.tap(find.text('Create cards'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     expect(find.byKey(const ValueKey('creator-front')), findsOneWidget);
@@ -257,9 +257,11 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    final close = find.byKey(const ValueKey('creator-close'));
+    await tester.ensureVisible(close);
+    await tester.tap(close);
+    await pumpFrames(tester, frames: 24);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
     final manuals = await tester.runAsync(
@@ -296,7 +298,7 @@ void main() {
     expect(find.text('Item 1 of 2'), findsOneWidget);
     expect(find.text('Complete the error card'), findsOneWidget);
 
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
     await pumpFrames(tester);
 
     expect(find.text('Item 2 of 2'), findsOneWidget);
@@ -394,7 +396,7 @@ void main() {
     await tester.tap(find.text('Review'));
     await pumpFrames(tester);
 
-    final create = find.byKey(const ValueKey('note-make-card'));
+    final create = find.byKey(const ValueKey('review-dock-create'));
     expect(create, findsOneWidget);
     await tester.ensureVisible(create);
     await tester.tap(create);
@@ -428,9 +430,11 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    final close = find.byKey(const ValueKey('creator-close'));
+    await tester.ensureVisible(close);
+    await tester.tap(close);
+    await pumpFrames(tester, frames: 24);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
     final manuals = await tester.runAsync(
@@ -484,14 +488,16 @@ void main() {
     expect(find.text('Item 1 of 1'), findsOneWidget);
     expect(find.text('Review the note'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
-    expect(find.text('From the question'), findsOneWidget);
+    expect(find.text('From the question'), findsNothing);
+    expect(find.byKey(const ValueKey('note-see-context')), findsOneWidget);
     expect(find.text('Suggest with AI'), findsNothing);
-    expect(find.text('Create cards'), findsOneWidget);
-    expect(find.text('Keep for later'), findsOneWidget);
-    expect(find.text('Keep & done'), findsOneWidget);
-    expect(find.text('Delete note'), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.text('Keep for later'), findsNothing);
+    expect(find.text('Save and finish'), findsOneWidget);
+    expect(find.text('Delete note'), findsNothing);
+    expect(find.byKey(const ValueKey('review-dock-delete')), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('note-delete')));
+    await tester.tap(find.byKey(const ValueKey('review-dock-delete')));
     await pumpFrames(tester);
     expect(find.text('Delete note?'), findsOneWidget);
     expect(
@@ -520,7 +526,7 @@ void main() {
     await tester.tap(find.text('Review'));
     await pumpFrames(tester);
 
-    await tester.tap(find.byKey(const ValueKey('note-make-card')));
+    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 
@@ -558,9 +564,11 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    final close = find.byKey(const ValueKey('creator-close'));
+    await tester.ensureVisible(close);
+    await tester.tap(close);
+    await pumpFrames(tester, frames: 24);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
     final concepts = await tester.runAsync(

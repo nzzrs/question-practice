@@ -4,7 +4,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
-import '../../core/ui/adaptive_split_view.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_card_review_view.dart';
 import '../export/card_creator_controller.dart';
@@ -14,6 +13,7 @@ import '../feedback/domain/wrong_notes.dart';
 import '../feedback/feedback_step_header.dart';
 import 'domain/review_service.dart';
 import 'note_review_view.dart';
+import 'review_action_dock.dart';
 import 'skipped_question_view.dart';
 
 class ReviewPage extends ConsumerStatefulWidget {
@@ -34,13 +34,11 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   bool _busy = false;
   bool _finished = false;
 
-  static const _splitStorageKey = ValueKey<String>('session-review-split');
-
   final _definition = TextEditingController();
   final _scroll = ScrollController();
-  final _feedbackScroll = ScrollController();
   final _creator = CardCreatorController();
-  int _draftCount = 0;
+  final _conceptDrafts = <int, String>{};
+  final _savedConceptIds = <int>{};
 
   @override
   void initState() {
@@ -52,7 +50,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   void dispose() {
     _definition.dispose();
     _scroll.dispose();
-    _feedbackScroll.dispose();
     _creator.dispose();
     super.dispose();
   }
@@ -81,7 +78,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final step = _step;
     _definition.clear();
     if (step is ConceptDefinitionStep) {
-      _definition.text = step.concept.definition;
+      _definition.text =
+          _conceptDrafts[step.concept.id] ?? step.concept.definition;
     }
   }
 
@@ -95,90 +93,58 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     }
     setState(() {
       _index++;
+      _creator.resetForStep();
       _prepareStep();
     });
-    _resetStepState();
+    _resetScroll();
   }
 
   void _goBack() {
     if (_index == 0) return;
     setState(() {
       _index--;
+      _creator.resetForStep();
       _prepareStep();
     });
-    _resetStepState();
-  }
-
-  void _resetStepState() {
-    _creator.resetForStep();
-    _draftCount = 0;
     _resetScroll();
-    if (_feedbackScroll.hasClients) _feedbackScroll.jumpTo(0);
   }
 
   void _resetScroll() {
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
-  Future<bool> _confirmDiscard() async {
-    if (_draftCount <= 0) return true;
-    final count = _draftCount;
-    return confirmDialog(
-      context,
-      title: 'Discard unsaved cards?',
-      message:
-          '$count card${count == 1 ? ' is' : 's are'} not saved yet. '
-          'Leaving this step discards ${count == 1 ? 'it' : 'them'}.',
-      confirmLabel: 'Discard cards',
-      cancelLabel: 'Keep editing',
-    );
+  String _itemKey(ReviewStep step) {
+    return switch (step) {
+      ErrorReviewStep(:final card) => 'review-error-${card.id}',
+      SkippedReviewStep(:final skippedQuestionId, :final question) =>
+        'review-skipped-${skippedQuestionId ?? question.id}',
+      ConceptDefinitionStep(:final concept) => 'review-concept-${concept.id}',
+      NoteReviewStep(:final note) => 'review-note-${note.id}',
+    };
   }
 
-  Future<void> _requestAdvance() async {
-    if (_busy) return;
-    if (!await _confirmDiscard() || !mounted) return;
-    _advance();
-  }
-
-  Future<void> _requestBack() async {
-    if (_busy) return;
-    if (!await _confirmDiscard() || !mounted) return;
-    _goBack();
-  }
-
-  Future<void> _requestClose() async {
-    if (!await _confirmDiscard() || !mounted) return;
-    // Pop directly: the focus shell's PopScope delegates back here, so
-    // maybePop would re-enter this guard.
-    Navigator.of(context).pop();
-  }
-
-  CardCreatorRequest _requestFor(ErrorCard card) {
-    return CardCreatorRequest(
-      title: 'Create cards',
-      sessionId: card.sessionId,
-      questionId: card.questionId,
-      questionContext: card.question,
-      topicName: card.topicName,
-      subtopic: card.subtopic,
-      existingFronts: ref.watch(existingCardTextsProvider),
-      error: CardCreatorErrorSource(
-        card: card,
-        question: card.question,
-        wrongAnswer: card.wrongAnswer,
-        correctAnswer: card.correctAnswer,
-        reasoning: card.reasoning,
-        explanation: card.explanation,
-        wrongNotes: WrongNotes.parse(card.reasoning),
+  CardCreatorRequest _requestForStep(ReviewStep step) {
+    return switch (step) {
+      ErrorReviewStep(:final card) => CardCreatorRequest(
+        title: 'Create cards',
+        sessionId: card.sessionId,
+        questionId: card.questionId,
+        questionContext: card.question,
+        topicName: card.topicName,
+        subtopic: card.subtopic,
+        existingFronts: ref.read(existingCardTextsProvider),
+        itemKey: _itemKey(step),
+        error: CardCreatorErrorSource(
+          card: card,
+          question: card.question,
+          wrongAnswer: card.wrongAnswer,
+          correctAnswer: card.correctAnswer,
+          reasoning: card.reasoning,
+          explanation: card.explanation,
+          wrongNotes: WrongNotes.parse(card.reasoning),
+        ),
       ),
-    );
-  }
-
-  Future<void> _createSkippedCards(SkippedReviewStep step) async {
-    if (_busy) return;
-    final created = await showCardCreator(
-      context,
-      request: CardCreatorRequest(
+      SkippedReviewStep() => CardCreatorRequest(
         title: 'Create cards',
         sessionId: widget.sessionId,
         questionId: step.question.id,
@@ -189,47 +155,22 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         initialBack: step.question.correctAnswer,
         existingFronts: ref.read(existingCardTextsProvider),
         skippedQuestionId: step.skippedQuestionId,
+        itemKey: _itemKey(step),
       ),
-    );
-    if (!mounted || created == 0) return;
-    _created += created;
-    _advance();
-  }
-
-  Future<void> _saveConceptDefinition(ConceptDefinitionStep step) async {
-    if (_definition.text.trim().isEmpty) {
-      await showSnack(context, 'Write a definition before saving.');
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await ref
-          .read(reviewServiceProvider)
-          .saveConceptDefinition(step.concept.id, _definition.text);
-      _created++;
-      _advance();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _keepNote(NoteReviewStep step) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      await ref.read(reviewServiceProvider).keepNote(step.note.id);
-      _kept++;
-      _advance();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _createNoteCards(NoteReviewStep step) async {
-    final note = step.note;
-    final created = await showCardCreator(
-      context,
-      request: CardCreatorRequest(
+      ConceptDefinitionStep(:final concept) => CardCreatorRequest(
+        title: 'Create cards',
+        sessionId: concept.sessionId,
+        questionId: concept.questionId,
+        questionContext: concept.context,
+        topicName: concept.topicName,
+        subtopic: concept.subtopic,
+        initialTemplate: CardTemplate.definition,
+        initialTerm: concept.term,
+        initialDefinition: _definition.text,
+        existingFronts: ref.read(existingCardTextsProvider),
+        itemKey: _itemKey(step),
+      ),
+      NoteReviewStep(:final note) => CardCreatorRequest(
         title: 'Create cards',
         sessionId: note.sessionId,
         questionId: note.questionId,
@@ -240,11 +181,213 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         initialTerm: note.text,
         existingFronts: ref.read(existingCardTextsProvider),
         note: note,
+        itemKey: _itemKey(step),
       ),
+    };
+  }
+
+  Future<void> _openCreator(ReviewStep step) async {
+    if (_busy) return;
+    await showReviewCardCreator(
+      context,
+      request: _requestForStep(step),
+      controller: _creator,
     );
-    if (!mounted || created == 0) return;
-    _created += created;
+  }
+
+  Future<bool> _saveCachedDrafts(
+    ReviewStep step,
+    CardCreatorRequest request,
+    CardCreatorSnapshot? snapshot,
+  ) async {
+    if (snapshot == null) return true;
+    if (snapshot.hasUnsavedComposerWork) {
+      await showSnack(context, 'Add this card to the list before saving.');
+      if (!mounted) return false;
+      await _openCreator(step);
+      return false;
+    }
+    if (!snapshot.hasDrafts) return true;
+    final key = _itemKey(step);
+    setState(() => _busy = true);
+    try {
+      final result = await saveCardCreatorDrafts(
+        request: request,
+        drafts: snapshot.drafts,
+        service: ref.read(reviewServiceProvider),
+        noteToConvertId: snapshot.noteToConvert?.id,
+      );
+      if (!mounted) return false;
+      if (result.failure != null) {
+        _creator.storeSnapshot(key, snapshot.withDrafts(result.remaining));
+        _created += result.created;
+        await showSnack(
+          context,
+          result.created > 0
+              ? '${result.created} card${result.created == 1 ? '' : 's'} '
+                    'saved, but the rest could not be saved: ${result.failure}'
+              : 'Could not create the cards: ${result.failure}',
+        );
+        return false;
+      }
+      _creator.clearSnapshot(key);
+      _creator.clearSeed();
+      _created += result.created;
+      return true;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _saveCurrentStep() async {
+    if (_busy) return;
+    final step = _step;
+    if (step == null) return;
+    if (step is ConceptDefinitionStep && _definition.text.trim().isEmpty) {
+      await showSnack(context, 'Write a definition before saving.');
+      return;
+    }
+    final request = _requestForStep(step);
+    final snapshot = _creator.snapshotFor(_itemKey(step));
+    if (!await _saveCachedDrafts(step, request, snapshot)) return;
+    if (!mounted) return;
+
+    switch (step) {
+      case ErrorReviewStep():
+      case SkippedReviewStep():
+        await _requestNext();
+        return;
+      case ConceptDefinitionStep(:final concept):
+        setState(() => _busy = true);
+        try {
+          await ref
+              .read(reviewServiceProvider)
+              .saveConceptDefinition(concept.id, _definition.text);
+          if (!mounted) return;
+          _conceptDrafts[concept.id] = _definition.text;
+          _savedConceptIds.add(concept.id);
+          _created++;
+        } on Object catch (error) {
+          if (mounted) await showSnack(context, 'Could not save: $error');
+          return;
+        } finally {
+          if (mounted) setState(() => _busy = false);
+        }
+      case NoteReviewStep(:final note):
+        setState(() => _busy = true);
+        try {
+          await ref.read(reviewServiceProvider).keepNote(note.id);
+          if (!mounted) return;
+          _kept++;
+        } on Object catch (error) {
+          if (mounted) await showSnack(context, 'Could not save: $error');
+          return;
+        } finally {
+          if (mounted) setState(() => _busy = false);
+        }
+    }
+    if (mounted) await _requestNext();
+  }
+
+  bool get _hasUnsavedConceptText {
+    final step = _step;
+    return step is ConceptDefinitionStep &&
+        !_savedConceptIds.contains(step.concept.id) &&
+        _definition.text.trim().isNotEmpty;
+  }
+
+  Future<void> _deleteNote(ReviewStep step, Note note) async {
+    if (_busy) return;
+    final snapshot = _creator.snapshotFor(_itemKey(step));
+    final hasDrafts = snapshot?.hasDrafts ?? false;
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Delete note?',
+      message:
+          'The saved note "${note.text}" is removed from Cards. '
+          'Cards already made from it stay.'
+          '${hasDrafts ? ' Unsaved card drafts for this note are discarded.' : ''}',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(cardRepositoryProvider).deleteNote(note.id);
+      if (!mounted) return;
+      _creator.clearSnapshot(_itemKey(step));
+      final data = _data;
+      if (data == null) return;
+      data.steps.remove(step);
+      final finished = data.steps.isEmpty;
+      setState(() {
+        _creator.resetForStep();
+        if (finished) {
+          _finished = true;
+        } else {
+          if (_index >= data.steps.length) {
+            _index = data.steps.length - 1;
+          }
+          _prepareStep();
+        }
+      });
+      if (finished) ref.invalidate(homeStatsProvider);
+      _resetScroll();
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not delete the note: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _requestNext() async {
+    if (_busy) return;
+    final data = _data;
+    if (data == null) return;
+    final last = _index + 1 >= data.steps.length;
+    if (last && (_creator.hasPendingWork || _hasUnsavedConceptText)) {
+      final leave = await confirmDialog(
+        context,
+        title: 'Leave review?',
+        message: 'Drafts and edits for this review are discarded.',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Keep editing',
+        destructive: true,
+      );
+      if (!leave || !mounted) return;
+      _creator.clearSnapshots();
+    }
     _advance();
+  }
+
+  Future<void> _requestClose() async {
+    if (_busy) return;
+    if (_creator.hasPendingWork || _hasUnsavedConceptText) {
+      final leave = await confirmDialog(
+        context,
+        title: 'Leave review?',
+        message: 'Drafts and edits for this review are discarded.',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Keep editing',
+        destructive: true,
+      );
+      if (!leave || !mounted) return;
+    }
+    _creator.clearSnapshots();
+    // Pop directly: the focus shell's PopScope delegates back here, so
+    // maybePop would re-enter this guard.
+    Navigator.of(context).pop();
+  }
+
+  String _headingFor(ReviewStep step) {
+    return switch (step) {
+      ErrorReviewStep() => 'Analyse the error',
+      SkippedReviewStep() => 'What was missing?',
+      ConceptDefinitionStep() => 'Complete the concept',
+      NoteReviewStep() => 'Review the note',
+    };
   }
 
   @override
@@ -340,244 +483,112 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     }
 
     final step = _step!;
-    final errorStep = step is ErrorReviewStep ? step : null;
-    final isError = errorStep != null;
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
-    final heading = switch (step) {
-      ErrorReviewStep() => 'Analyse the error',
-      SkippedReviewStep() => 'What was missing?',
-      ConceptDefinitionStep() => 'Complete the concept',
-      NoteReviewStep() => 'Keep this note?',
-    };
+    final heading = _headingFor(step);
+    final last = _index + 1 >= data.steps.length;
     return AppPage(
       title: 'Review',
       showBack: true,
       focus: true,
-      maxWidth: isError ? 1200 : 720,
       onBack: _requestClose,
       scrollController: _scroll,
       variant: M3EAppBarVariant.small,
-      bottomBar: AppActionDock(
-        child: Row(
-          children: [
-            if (_index > 0) ...[
-              M3EButton.text(
-                onPressed: _busy ? null : _requestBack,
-                child: const Text('Previous'),
-              ),
-              const SizedBox(width: 4),
-            ],
-            Expanded(
-              child: AppPrimaryButton(
-                onPressed: _busy
-                    ? null
-                    : () {
-                        switch (step) {
-                          case ErrorReviewStep():
-                            _requestAdvance();
-                          case SkippedReviewStep():
-                            _createSkippedCards(step);
-                          case ConceptDefinitionStep():
-                            _saveConceptDefinition(step);
-                          case NoteReviewStep():
-                            _keepNote(step);
-                        }
-                      },
-                label: _busy
-                    ? 'Saving…'
-                    : step is NoteReviewStep
-                    ? 'Keep & save'
-                    : step is ErrorReviewStep
-                    ? 'Continue'
-                    : step is SkippedReviewStep
-                    ? 'Create cards'
-                    : 'Save',
-                icon: step is ErrorReviewStep
-                    ? Icons.arrow_forward
-                    : step is SkippedReviewStep
-                    ? Icons.add_card
-                    : Icons.check,
-              ),
-            ),
-            const SizedBox(width: 8),
-            M3EButton.text(
-              onPressed: _busy ? null : _requestAdvance,
-              child: const Text('Skip'),
-            ),
-          ],
-        ),
+      bottomBar: ReviewActionDock(
+        busy: _busy,
+        saveLabel: last
+            ? (step is NoteReviewStep ? 'Save and finish' : 'Finish')
+            : 'Save',
+        onSave: _saveCurrentStep,
+        onBack: _goBack,
+        onNext: _requestNext,
+        canGoBack: _index > 0,
+        canGoNext: true,
+        onCreateCards: () => _openCreator(step),
+        onDelete: step is NoteReviewStep
+            ? () => _deleteNote(step, step.note)
+            : null,
       ),
-      body: isError
-          ? AdaptiveSplitView(
-              storageKey: _splitStorageKey,
-              minLeading: keyboardOpen ? 96 : 160,
-              minTrailing: keyboardOpen ? 240 : 220,
-              leading: ErrorCardReviewView(
-                card: errorStep.card,
-                creator: _creator,
-                onSeedRequested: () {},
-                leading: FeedbackStepHeader(
-                  label: 'Step ${_index + 1} of ${data.steps.length}',
-                  progress: (_index + 1) / data.steps.length,
-                  heading: heading,
-                ),
-                scrollController: _feedbackScroll,
-              ),
-              trailing: CardCreatorPane(
-                key: ValueKey('creator-${errorStep.card.id}'),
-                request: _requestFor(errorStep.card),
-                controller: _creator,
-                onSaved: (count) {
-                  if (!mounted || count <= 0) return;
-                  setState(() => _created += count);
-                  _creator.clearSeed();
-                  _advance();
-                },
-                onDraftCountChanged: (count) {
-                  if (!mounted || count == _draftCount) return;
-                  setState(() => _draftCount = count);
-                },
-              ),
-            )
-          : null,
-      children: isError
-          ? const []
-          : [
-              Text(
-                'Step ${_index + 1} of ${data.steps.length}',
-                style: theme.typography.baseline.labelMedium.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              LinearScore(value: (_index + 1) / data.steps.length),
-              const SizedBox(height: 22),
-              Text(heading, style: theme.typography.emphasized.headlineSmall),
-              const SizedBox(height: 16),
-              switch (step) {
-                ErrorReviewStep() => const SizedBox.shrink(),
-                SkippedReviewStep(
-                  :final question,
-                  :final topicName,
-                  :final reasoning,
-                  :final unknown,
-                ) =>
-                  _SkippedStep(
-                    question: question,
-                    topicName: topicName,
-                    reasoning: reasoning,
-                    unknown: unknown,
-                  ),
-                ConceptDefinitionStep(:final concept) => _ConceptStep(
-                  concept: concept,
-                  definition: _definition,
-                ),
-                NoteReviewStep(:final note) => NoteReviewView(
-                  note: note,
-                  onCreateCards: () => _createNoteCards(step),
-                ),
-              },
-            ],
+      children: [..._buildStep(theme, step, data, heading)],
     );
   }
-}
 
-class _SkippedStep extends StatelessWidget {
-  const _SkippedStep({
-    required this.question,
-    required this.topicName,
-    required this.reasoning,
-    required this.unknown,
-  });
-
-  final Question question;
-  final String topicName;
-  final String reasoning;
-  final bool unknown;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SkippedQuestionView(
-          prompt: question.prompt,
-          alternatives: question.alternatives,
-          correctIndexes: question.correctIndexes,
-          alternativeExplanations: question.alternativeExplanations,
-          explanation: question.explanation,
-          reasoning: reasoning,
-          topicName: topicName,
-          unknown: unknown,
-        ),
-        const SizedBox(height: 20),
-        TonalBox(
-          key: const ValueKey('skipped-review-missing'),
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'What was missing?',
-                style: theme.typography.emphasized.titleSmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Create cards from the right answer, or skip to leave it in '
-                'the queue.',
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
+  List<Widget> _buildStep(
+    M3EThemeData theme,
+    ReviewStep step,
+    ReviewData data,
+    String heading,
+  ) {
+    final header = FeedbackStepHeader(
+      label: 'Step ${_index + 1} of ${data.steps.length}',
+      progress: (_index + 1) / data.steps.length,
+      heading: heading,
+    );
+    return switch (step) {
+      ErrorReviewStep(:final card) => [
+        ErrorCardReviewView(
+          card: card,
+          creator: _creator,
+          onSeedRequested: () => _openCreator(step),
+          hasUnsavedComposerWork: () =>
+              _creator.snapshotFor(_itemKey(step))?.hasUnsavedComposerWork ??
+              false,
+          leading: header,
         ),
       ],
-    );
-  }
-}
-
-class _ConceptStep extends StatelessWidget {
-  const _ConceptStep({required this.concept, required this.definition});
-
-  final Concept concept;
-  final TextEditingController definition;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        TonalBox(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                concept.term,
-                style: theme.typography.emphasized.titleMedium,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                concept.context,
-                style: theme.typography.baseline.bodySmall.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+      SkippedReviewStep(
+        :final question,
+        :final topicName,
+        :final reasoning,
+        :final unknown,
+      ) =>
+        [
+          header,
+          SkippedQuestionView(
+            prompt: question.prompt,
+            alternatives: question.alternatives,
+            correctIndexes: question.correctIndexes,
+            alternativeExplanations: question.alternativeExplanations,
+            explanation: question.explanation,
+            reasoning: reasoning,
+            topicName: topicName,
+            unknown: unknown,
+          ),
+        ],
+      ConceptDefinitionStep(:final concept) => [
+        header,
+        SelectionArea(
+          child: TonalBox(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  concept.term,
+                  style: theme.typography.emphasized.titleMedium,
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  concept.context,
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 16),
         M3ETextField(
-          controller: definition,
+          controller: _definition,
           label: 'Definition of ${concept.term}',
           minLines: 2,
           maxLines: 4,
           isRequired: true,
+          onChanged: (value) {
+            _conceptDrafts[concept.id] = value;
+            _savedConceptIds.remove(concept.id);
+          },
         ),
       ],
-    );
+      NoteReviewStep(:final note) => [header, NoteReviewView(note: note)],
+    };
   }
 }

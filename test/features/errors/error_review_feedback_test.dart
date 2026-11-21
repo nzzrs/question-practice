@@ -165,9 +165,10 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(ValueKey('feedback-note-card-$noteId')));
     await pumpFrames(tester);
-    expect(find.byType(CardCreatorSheet), findsNothing);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
-    expect(find.text('From this note'), findsOneWidget);
+    expect(find.byType(CardCreatorSheet), findsOneWidget);
+    expect(find.byType(CardCreatorPane), findsNothing);
+    expect(find.text('From this note'), findsNothing);
+    expect(find.byKey(const ValueKey('creator-context')), findsNothing);
     expect(find.byKey(const ValueKey('creator-seed-hint')), findsOneWidget);
 
     final cloze = tester.widget<M3ETextField>(
@@ -192,8 +193,52 @@ void main() {
 
     expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);
     expect(find.text('Edit card content'), findsNothing);
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
+    expect(find.byType(AdaptiveSplitView), findsNothing);
+    expect(find.byType(CardCreatorPane), findsNothing);
+    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+  });
+
+  testWidgets('deleting a note from the error review asks first', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: seeded.card.sessionId,
+      questionId: seeded.question.id,
+      text: 'keep this until I confirm',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final more = find.byKey(ValueKey('feedback-note-more-$noteId'));
+    await tester.ensureVisible(more);
+    await pumpFrames(tester);
+    await tester.tap(more);
+    await pumpFrames(tester);
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester);
+
+    expect(find.text('Delete note?'), findsOneWidget);
+    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsOneWidget);
+
+    await tester.tap(find.text('Delete').last);
+    await pumpFrames(tester, frames: 24);
+
+    final notes = await tester.runAsync(
+      () => harness.cards.notesForQuestion(seeded.question.id),
+    );
+    expect(notes, isEmpty);
+    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsNothing);
   });
 
   testWidgets('the review fits 360 dp at 2.0 text scale', (tester) async {
@@ -221,9 +266,10 @@ void main() {
       harness: harness,
     );
     expect(tester.takeException(), isNull);
-    expect(find.byType(AdaptiveSplitView), findsOneWidget);
-    expect(find.byType(CardCreatorPane), findsOneWidget);
+    expect(find.byType(AdaptiveSplitView), findsNothing);
+    expect(find.byType(CardCreatorPane), findsNothing);
     expect(find.byKey(const ValueKey('wrong-notes-list')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

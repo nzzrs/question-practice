@@ -35,13 +35,9 @@ void main() {
     );
     await pumpFrames(tester);
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('skipped-review-missing')),
-    );
-    await pumpFrames(tester);
-    expect(find.text('What was missing?'), findsWidgets);
+    expect(find.text('What was missing?'), findsOneWidget);
 
-    await tester.tap(find.text('Create cards'));
+    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 
@@ -54,9 +50,9 @@ void main() {
     await pumpFrames(tester);
     expect(find.text('Cards to save · 1'), findsOneWidget);
 
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
+    await tester.tap(find.byKey(const ValueKey('creator-close')));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
     final cards = await tester.runAsync(

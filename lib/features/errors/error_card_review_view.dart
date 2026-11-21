@@ -28,6 +28,7 @@ class ErrorCardReviewView extends ConsumerStatefulWidget {
     required this.card,
     required this.creator,
     required this.onSeedRequested,
+    this.hasUnsavedComposerWork,
     this.leading,
     this.scrollController,
     super.key,
@@ -40,6 +41,12 @@ class ErrorCardReviewView extends ConsumerStatefulWidget {
 
   /// Lets the page reveal the creator after a bullet or note seed.
   final VoidCallback onSeedRequested;
+
+  /// Whether a closed creator still holds text or a seed draft for this card.
+  ///
+  /// The live controller forgets seeded edits when the review moves to another
+  /// step, so the page answers from the stored snapshot instead.
+  final bool Function()? hasUnsavedComposerWork;
 
   /// Review step header, scrolled with the feedback.
   final Widget? leading;
@@ -125,8 +132,12 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
     if (mounted) await showSnack(context, 'Note copied.');
   }
 
+  bool get _hasUnsavedComposerWork =>
+      widget.creator.seedDirty ||
+      (widget.hasUnsavedComposerWork?.call() ?? false);
+
   Future<void> _createCardFromNote(Note note) async {
-    if (widget.creator.seedDirty) {
+    if (_hasUnsavedComposerWork) {
       final replace = await confirmDialog(
         context,
         title: 'Replace the draft you started?',
@@ -143,7 +154,7 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
   }
 
   Future<void> _turnBulletIntoCard(String bulletId, String bullet) async {
-    if (widget.creator.seedDirty) {
+    if (_hasUnsavedComposerWork) {
       final replace = await confirmDialog(
         context,
         title: 'Replace the draft you started?',
@@ -160,6 +171,16 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
   }
 
   Future<void> _deleteNote(Note note) async {
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Delete note?',
+      message:
+          'The saved note "${note.text}" is removed from Cards. '
+          'Cards already made from it stay.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
     try {
       await ref.read(cardRepositoryProvider).deleteNote(note.id);
       if (!mounted) return;
@@ -351,7 +372,7 @@ class _NoteActionsSheet extends StatelessWidget {
               ),
             OptionTile(
               icon: Icons.delete_outline,
-              title: 'Delete note',
+              title: 'Delete',
               subtitle: 'Remove it everywhere for this question',
               destructive: true,
               onTap: () => Navigator.of(context).pop(_NoteAction.delete),

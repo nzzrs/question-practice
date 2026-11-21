@@ -98,7 +98,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('review-all-pending')));
       await pumpFrames(tester);
 
-      await tester.tap(find.text('Skip'));
+      await tester.tap(find.text('Finish'));
       await pumpFrames(tester);
       expect(find.text('Review complete'), findsWidgets);
 
@@ -131,6 +131,10 @@ void main() {
       harness: harness,
     );
 
+    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
+
     await tester.enterText(
       find.byKey(const ValueKey('creator-front')),
       'Which layer owns IP addresses?',
@@ -144,7 +148,9 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await tester.tap(find.byKey(const ValueKey('creator-close')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
     expect(find.text('Item 2 of 2'), findsOneWidget);

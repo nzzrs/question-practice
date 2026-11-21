@@ -90,29 +90,28 @@ class WrongNotesReadonly extends StatelessWidget {
                                 : active
                                 ? 'Drafting a card from this bullet'
                                 : 'Turn this bullet into a card',
-                            child: M3EButton.tonal(
+                            child: M3EIconButton(
                               key: ValueKey('wrong-note-card-$index'),
-                              size: M3EButtonSize.md,
+                              variant: M3EIconButtonVariant.standard,
+                              size: M3EIconButtonSize.sm,
+                              icon: Icon(
+                                added
+                                    ? Icons.check
+                                    : active
+                                    ? Icons.hourglass_top
+                                    : Icons.auto_awesome_outlined,
+                              ),
+                              tooltip: added
+                                  ? 'Bullet added to cards'
+                                  : active
+                                  ? 'Drafting a card from this bullet'
+                                  : 'Turn this bullet into a card',
                               onPressed: added || bulletBusy
                                   ? null
                                   : () => onTurnBulletIntoCard!(
                                       bulletId,
                                       notes[index],
                                     ),
-                              icon: Icon(
-                                added
-                                    ? Icons.check
-                                    : active
-                                    ? Icons.hourglass_top
-                                    : Icons.add_card,
-                              ),
-                              label: Text(
-                                added
-                                    ? 'Added to cards'
-                                    : active
-                                    ? 'Drafting…'
-                                    : 'Turn bullet into card',
-                              ),
                             ),
                           ),
                         ),

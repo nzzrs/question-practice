@@ -51,117 +51,126 @@ class _SkippedQuestionViewState extends State<SkippedQuestionView> {
       for (var index = 0; index < widget.alternatives.length; index++)
         if (!widget.correctIndexes.contains(index)) index,
     ];
-    return TonalBox(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (widget.showStatus) ...[
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: [
-                Pill(
-                  widget.unknown ? "I didn't know this" : 'Skipped',
-                  tone: widget.unknown ? PillTone.secondary : PillTone.neutral,
-                ),
-                if (widget.topicName.trim().isNotEmpty) Pill(widget.topicName),
-              ],
+    return SelectionArea(
+      child: TonalBox(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (widget.showStatus) ...[
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                children: [
+                  Pill(
+                    widget.unknown ? "I didn't know this" : 'Skipped',
+                    tone: widget.unknown
+                        ? PillTone.secondary
+                        : PillTone.neutral,
+                  ),
+                  if (widget.topicName.trim().isNotEmpty)
+                    Pill(widget.topicName),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            Text(
+              widget.prompt,
+              style: theme.typography.baseline.titleMedium.copyWith(
+                height: 1.35,
+              ),
             ),
-            const SizedBox(height: 12),
-          ],
-          Text(
-            widget.prompt,
-            style: theme.typography.baseline.titleMedium.copyWith(height: 1.35),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            decoration: BoxDecoration(
-              color: AppSuccess.container(context),
-              borderRadius: BorderRadius.circular(16),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+              decoration: BoxDecoration(
+                color: AppSuccess.container(context),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    size: 20,
+                    color: AppSuccess.foreground(context),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Correct answer',
+                          style: theme.typography.baseline.labelSmall.copyWith(
+                            color: AppSuccess.onContainer(context)
+                                .withValues(alpha: 0.8),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          _correctAnswers.join('\n'),
+                          style: theme.typography.baseline.bodyMedium.copyWith(
+                            color: AppSuccess.onContainer(context),
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 20,
-                  color: AppSuccess.foreground(context),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            if (others.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: M3EButton.text(
+                  key: const ValueKey('skipped-review-other-alternatives'),
+                  onPressed: () =>
+                      setState(() => _showAlternatives = !_showAlternatives),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        'Correct answer',
-                        style: theme.typography.baseline.labelSmall.copyWith(
-                          color: AppSuccess.onContainer(context)
-                              .withValues(alpha: 0.8),
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Icon(
+                        _showAlternatives
+                            ? Icons.expand_less
+                            : Icons.expand_more,
+                        size: 18,
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(width: 6),
                       Text(
-                        _correctAnswers.join('\n'),
-                        style: theme.typography.baseline.bodyMedium.copyWith(
-                          color: AppSuccess.onContainer(context),
-                          height: 1.4,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        _showAlternatives
+                            ? 'Hide other alternatives'
+                            : 'See other alternatives',
                       ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          if (others.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: M3EButton.text(
-                key: const ValueKey('skipped-review-other-alternatives'),
-                onPressed: () =>
-                    setState(() => _showAlternatives = !_showAlternatives),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _showAlternatives ? Icons.expand_less : Icons.expand_more,
-                      size: 18,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _showAlternatives
-                          ? 'Hide other alternatives'
-                          : 'See other alternatives',
-                    ),
-                  ],
-                ),
               ),
-            ),
-            if (_showAlternatives)
-              for (final index in others)
-                _AlternativeRow(
-                  index: index,
-                  text: widget.alternatives[index],
-                  explanation: index < widget.alternativeExplanations.length
-                      ? widget.alternativeExplanations[index]
-                      : '',
-                ),
+              if (_showAlternatives)
+                for (final index in others)
+                  _AlternativeRow(
+                    index: index,
+                    text: widget.alternatives[index],
+                    explanation: index < widget.alternativeExplanations.length
+                        ? widget.alternativeExplanations[index]
+                        : '',
+                  ),
+            ],
+            if (widget.reasoning.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _Note(label: 'Your reasoning', text: widget.reasoning),
+            ],
+            if (widget.explanation.trim().isNotEmpty) ...[
+              const SizedBox(height: 12),
+              _Note(label: 'Why', text: widget.explanation),
+            ],
           ],
-          if (widget.reasoning.trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _Note(label: 'Your reasoning', text: widget.reasoning),
-          ],
-          if (widget.explanation.trim().isNotEmpty) ...[
-            const SizedBox(height: 12),
-            _Note(label: 'Why', text: widget.explanation),
-          ],
-        ],
+        ),
       ),
     );
   }

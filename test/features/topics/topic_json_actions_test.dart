@@ -8,7 +8,9 @@ import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/import/domain/import_service.dart';
 import 'package:question_practice/features/home/home_page.dart';
 import 'package:question_practice/features/topics/domain/topic_edit_service.dart';
+import 'package:question_practice/features/topics/domain/topic_update_models.dart';
 import 'package:question_practice/features/topics/topic_editor_sheet.dart';
+import 'package:question_practice/features/topics/topic_update_preview_page.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -72,6 +74,34 @@ void main() {
     expect(find.text('Delete topic'), findsOneWidget);
     expect(find.text('Download topic JSON'), findsNothing);
     expect(find.text('Update topic JSON'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the topic update preview labels the minimum as Minimum score', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await pumpTestApp(
+      tester,
+      home: const TopicUpdatePreviewPage(
+        preview: TopicUpdatePreview(
+          topicId: 1,
+          topicName: 'Cloud',
+          fileName: 'cloud.json',
+          practices: [],
+          minimumScore: 70,
+          targetScore: 80,
+          hasMetadataChanges: true,
+        ),
+      ),
+      harness: harness,
+    );
+
+    expect(find.text('Minimum approval score'), findsNothing);
+    expect(find.text('Minimum score'), findsOneWidget);
+    expect(find.text('70%'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

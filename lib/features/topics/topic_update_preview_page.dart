@@ -116,7 +116,7 @@ class _TopicUpdatePreviewPageState
               if (preview.minimumScore != null)
                 _DetailRow(
                   icon: Icons.flag_circle_outlined,
-                  label: 'Minimum approval score',
+                  label: 'Minimum score',
                   value: '${preview.minimumScore}%',
                 ),
               if (preview.targetScore != null)

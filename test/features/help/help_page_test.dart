@@ -57,7 +57,10 @@ void main() {
         'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection.',
       ]),
     );
-    expect(texts.any((text) => text.contains('Review notes')), isTrue);
+    expect(
+      texts.any((text) => text.contains('Tap a note to review it')),
+      isTrue,
+    );
     expect(
       texts.any(
         (text) => text.contains(

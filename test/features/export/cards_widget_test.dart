@@ -124,7 +124,7 @@ void main() {
   }
 
   testWidgets(
-    'incomplete selection disables export but keeps review selected',
+    'incomplete error selection switches the primary action to review',
     (tester) async {
       final harness = TestHarness();
       addTearDown(harness.close);
@@ -141,14 +141,14 @@ void main() {
       await tester.longPress(row);
       await pumpFrames(tester);
 
-      expect(find.text('Review all'), findsOneWidget);
-      expect(find.text('Review selected'), findsOneWidget);
-      expect(find.text('Export to AnkiDroid'), findsOneWidget);
+      expect(find.text('Review pending'), findsOneWidget);
+      expect(find.text('Review all'), findsNothing);
+      expect(find.text('Review selected'), findsNothing);
 
-      final export = tester.widget<AppPrimaryButton>(
-        find.widgetWithText(AppPrimaryButton, 'Export to AnkiDroid'),
+      final review = tester.widget<AppPrimaryButton>(
+        find.widgetWithText(AppPrimaryButton, 'Review pending'),
       );
-      expect(export.onPressed, isNull);
+      expect(review.onPressed, isNotNull);
       final share = tester.widget<AppDockIconButton>(
         find.ancestor(
           of: find.byIcon(Icons.ios_share),
@@ -156,11 +156,18 @@ void main() {
         ),
       );
       expect(share.onPressed, isNull);
+      final delete = tester.widget<AppDockIconButton>(
+        find.ancestor(
+          of: find.byIcon(Icons.delete_outline),
+          matching: find.byType(AppDockIconButton),
+        ),
+      );
+      expect(delete.onPressed, isNotNull);
 
       await tester.tap(row);
       await pumpFrames(tester);
 
-      expect(find.text('Review selected'), findsNothing);
+      expect(find.text('Review pending'), findsNothing);
       expect(find.text('Export to AnkiDroid'), findsOneWidget);
       expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
     },
@@ -171,12 +178,23 @@ void main() {
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
     final question = await onlyQuestion(harness, seeded);
-    await seedError(harness, question, complete: true);
+    final cardId = await seedError(harness, question, complete: true);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
-    expect(find.text('Review all'), findsOneWidget);
+    expect(find.text('Review all'), findsNothing);
     expect(find.byType(M3ECheckbox), findsNothing);
+
+    final row = find.byKey(ValueKey('error-row-$cardId'));
+    await tester.ensureVisible(row);
+    await tester.longPress(row);
+    await pumpFrames(tester);
+
+    expect(find.text('1 selected'), findsOneWidget);
+    final export = tester.widget<AppPrimaryButton>(
+      find.widgetWithText(AppPrimaryButton, 'Export to AnkiDroid'),
+    );
+    expect(export.onPressed, isNull);
   });
 
   testWidgets('legacy mistake kinds stay out of the error preview', (
@@ -218,8 +236,14 @@ void main() {
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     expect(find.textContaining('Error and skipped'), findsOneWidget);
     expect(find.text('Question 1?'), findsOneWidget);
+    expect(find.byTooltip('Review skipped question'), findsNothing);
 
-    await tester.tap(find.byIcon(Icons.edit_outlined));
+    final skippedRow = find.text('Question 1?');
+    await tester.ensureVisible(skippedRow);
+    await tester.tap(skippedRow);
+    await pumpFrames(tester);
+    expect(find.text('Skipped question preview'), findsOneWidget);
+    await tester.tap(find.text('Review'));
     await pumpFrames(tester);
     expect(find.text('Review the skipped question'), findsOneWidget);
     expect(find.text('Item 1 of 1'), findsOneWidget);
@@ -253,7 +277,7 @@ void main() {
     expect(find.textContaining('Basic cards ·'), findsOneWidget);
   });
 
-  testWidgets('review all walks error cards and skipped questions', (
+  testWidgets('global pending review walks error cards and skipped questions', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -262,15 +286,15 @@ void main() {
     final questions = await harness.practices.questionsForPractice(
       seeded.practiceId,
     );
-    await seedError(harness, questions.first, complete: true);
+    await seedError(harness, questions.first, complete: false);
     await seedSkipped(harness, questions.last);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    await tester.tap(find.text('Review all'));
+    await tester.tap(find.byKey(const ValueKey('review-all-pending')));
     await pumpFrames(tester);
 
     expect(find.text('Item 1 of 2'), findsOneWidget);
-    expect(find.text('Check the error card'), findsOneWidget);
+    expect(find.text('Complete the error card'), findsOneWidget);
 
     await tester.tap(find.text('Skip'));
     await pumpFrames(tester);
@@ -289,8 +313,8 @@ void main() {
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     expect(find.textContaining('Notes ·'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
-    expect(find.text('Download all'), findsOneWidget);
-    expect(find.text('Review notes'), findsOneWidget);
+    expect(find.byKey(const ValueKey('notes-download')), findsOneWidget);
+    expect(find.text('Review notes'), findsNothing);
   });
 
   testWidgets('AI suggests grouped atomic cards and saves their type', (
@@ -433,7 +457,7 @@ void main() {
     final noteId = await seedNote(harness, question);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    expect(find.text('Review notes'), findsOneWidget);
+    expect(find.text('Review notes'), findsNothing);
     expect(find.byTooltip('Suggest cards with AI'), findsNothing);
     expect(find.byTooltip('Make a card'), findsNothing);
     expect(find.byTooltip('Delete note'), findsNothing);
@@ -518,7 +542,7 @@ void main() {
     expect(notes!.single.hasCard, isTrue);
   });
 
-  testWidgets('cognitive filters show only matching card types', (
+  testWidgets('cards filters group concepts, basic cards, errors and notes', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(800, 1600);
@@ -552,7 +576,9 @@ void main() {
     final noteId = await seedNote(harness, question);
 
     Future<void> choose(String filter) async {
-      await tester.tap(find.byKey(ValueKey('cards-filter-$filter')));
+      final chip = find.byKey(ValueKey('cards-filter-$filter'));
+      await tester.ensureVisible(chip);
+      await tester.tap(chip);
       await pumpFrames(tester);
     }
 
@@ -566,28 +592,11 @@ void main() {
     expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsOneWidget);
     expect(find.byKey(ValueKey('note-row-$noteId')), findsOneWidget);
 
-    await choose('facts');
+    await choose('cards');
     expect(find.byKey(ValueKey('basic-row-$factId')), findsOneWidget);
-    expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsNothing);
-    expect(find.byKey(ValueKey('basic-row-$contrastId')), findsNothing);
-    expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
-    expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
-    expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsNothing);
-    expect(find.byKey(ValueKey('note-row-$noteId')), findsNothing);
-
-    await choose('heuristics');
     expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsOneWidget);
-    expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
-
-    await choose('contrasts');
     expect(find.byKey(ValueKey('basic-row-$contrastId')), findsOneWidget);
-    expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
-
-    await choose('concepts');
     expect(find.byKey(ValueKey('concept-row-$conceptId')), findsOneWidget);
-    expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
-    expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsNothing);
-    expect(find.byKey(ValueKey('basic-row-$contrastId')), findsNothing);
     expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
     expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsNothing);
     expect(find.byKey(ValueKey('note-row-$noteId')), findsNothing);
@@ -597,6 +606,7 @@ void main() {
     expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsOneWidget);
     expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
     expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
+    expect(find.byKey(ValueKey('note-row-$noteId')), findsNothing);
 
     await choose('notes');
     expect(find.byKey(ValueKey('note-row-$noteId')), findsOneWidget);
@@ -645,7 +655,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
-    expect(find.text('1 selected · review to export'), findsOneWidget);
+    expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
 
@@ -699,7 +709,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
-    expect(find.text('1 selected · review to export'), findsOneWidget);
+    expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
     expect(find.text('Review the note'), findsNothing);
   });
@@ -722,10 +732,11 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('1 selected · review to export'), findsOneWidget);
-    final export = tester.widget<AppPrimaryButton>(
-      find.widgetWithText(AppPrimaryButton, 'Export to AnkiDroid'),
+    expect(find.text('Export to AnkiDroid'), findsNothing);
+    final review = tester.widget<AppPrimaryButton>(
+      find.widgetWithText(AppPrimaryButton, 'Review pending'),
     );
-    expect(export.onPressed, isNull);
+    expect(review.onPressed, isNotNull);
     final share = tester.widget<AppDockIconButton>(
       find.ancestor(
         of: find.byIcon(Icons.ios_share),
@@ -800,7 +811,7 @@ void main() {
     await tester.tap(second);
     await pumpFrames(tester);
 
-    expect(find.text('2 selected · review to export'), findsOneWidget);
+    expect(find.text('2 selected'), findsOneWidget);
 
     await tester.tap(find.byIcon(Icons.delete_outline));
     await pumpFrames(tester);

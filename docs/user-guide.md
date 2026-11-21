@@ -108,7 +108,7 @@ Review opens fullscreen.
 - The selection is global and survives leaving Cards and restarting the app. It starts empty, and ids of deleted or exported rows are dropped.
 - The main action exports ready cards. When the selection includes pending errors or skipped questions it becomes **Review pending** and opens that review instead. **Review all pending** in the app bar opens every pending error and skipped question, even ones not selected.
 - Tap a card to preview it. Error and skipped previews include **Review** beside **Close**. A concept without a definition can be completed from its preview.
-- Tap a note to review it. In the error review, **Create cards** creates the cards to export; the question and alternatives stay read-only.
+- Tap a note to preview it. The preview shows the note text and its question context in selectable text; **Review** opens the note review and **Close** returns to Cards. In the error review, **Create cards** creates the cards to export; the question and alternatives stay read-only.
 - **Export to AnkiDroid** sends the selected cards to AnkiDroid.
 - **Share as files** creates Anki-compatible text files.
 - **Delete selected** removes the chosen cards, skipped questions and notes. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a note removes only the saved phrase; cards already made from it stay.

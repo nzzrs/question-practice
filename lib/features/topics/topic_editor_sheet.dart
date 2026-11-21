@@ -581,8 +581,8 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
         key: ValueKey('topic-editor-group-study-targets'),
         description:
             'Priority 1 is highest and 5 is lowest; leave it blank when order '
-            'does not matter. Scores below the minimum are shown in red; '
-            'scores at or above the target are shown in green.',
+            'does not matter. Scores are red below the minimum, normal between '
+            'the two and green at or above the target.',
       ),
       _fieldTile(
         field: _TopicField.priority,

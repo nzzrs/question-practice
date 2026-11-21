@@ -163,13 +163,22 @@ void main() {
       expect(find.byType(M3EDialog), findsNothing);
       expect(find.byType(OptionTile), findsNWidgets(8));
       _expectGroups(tester);
+      final details = tester
+          .getSemantics(find.text('DETAILS'))
+          .getSemanticsData();
+      expect(details.label, 'DETAILS');
+      expect(details.flagsCollection.isHeader, isTrue);
       expect(find.text('DETAILS'), findsOneWidget);
       expect(find.text('STUDY TARGETS'), findsOneWidget);
       expect(find.text('ANKIDROID'), findsOneWidget);
       expect(find.text('TOPIC FILE'), findsOneWidget);
       expect(find.textContaining('Priority 1 is highest'), findsOneWidget);
-      expect(find.textContaining('shown in red'), findsOneWidget);
-      expect(find.textContaining('shown in green'), findsOneWidget);
+      expect(find.textContaining('red below the minimum'), findsOneWidget);
+      expect(find.textContaining('normal between the two'), findsOneWidget);
+      expect(
+        find.textContaining('green at or above the target'),
+        findsOneWidget,
+      );
       expect(
         find.textContaining('Blank uses the default deck'),
         findsOneWidget,
@@ -244,7 +253,7 @@ void main() {
         tester.widget<M3ETextField>(_minimumScoreField()).controller!.text,
         '70',
       );
-      expect(find.textContaining('shown in red'), findsOneWidget);
+      expect(find.textContaining('red below the minimum'), findsOneWidget);
 
       await _openField(tester, 'targetScore', 'Target score');
       expect(_targetScoreField(), findsOneWidget);
@@ -252,7 +261,10 @@ void main() {
         tester.widget<M3ETextField>(_targetScoreField()).controller!.text,
         '80',
       );
-      expect(find.textContaining('shown in green'), findsOneWidget);
+      expect(
+        find.textContaining('green at or above the target'),
+        findsOneWidget,
+      );
 
       await _openField(tester, 'deck', 'AnkiDroid deck');
       expect(_deckField(), findsOneWidget);

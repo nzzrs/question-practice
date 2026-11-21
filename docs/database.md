@@ -21,7 +21,7 @@ land without regenerated documentation.
 ## Tables, columns and indexes
 
 <!-- BEGIN GENERATED: database -->
-Current schema version: **13** (`AppDatabase.schemaVersion`).
+Current schema version: **14** (`AppDatabase.schemaVersion`).
 
 Table names below are the SQL names Drift creates. Every column, default, reference, cascade, primary key, unique key and index is read from `lib/core/database/tables.dart` and `app_database.dart`; the feature/model/repository notes come from the documented mapping in `tool/docs/update_docs.dart`.
 
@@ -466,7 +466,7 @@ The AI API key is not in this table. It lives in Android secure storage through
 ## Migration history
 
 <!-- BEGIN GENERATED: migrations -->
-Current schema version: **13**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
+Current schema version: **14**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
 
 | Version | Changes |
 |---|---|
@@ -483,8 +483,9 @@ Current schema version: **13**. Migration steps are read from `AppDatabase.migra
 | 11 | Added `minimum_score` to `topics`. Added `target_score` to `topics`. Added `mistake_kinds_json` to `attempts`. Added `subtopic` to `concepts`. Added `cognitive_type` to `error_cards`. Added `subtopic` to `error_cards`. Added `mistake_kinds_json` to `error_cards`. Added `cognitive_type` to `manual_cards`. Added `subtopic` to `manual_cards`. Added `subtopic` to `highlights`. |
 | 12 | Renamed table `highlights` to `notes`. Renamed column `phrase` to `text` in `notes`. Created index `notes_session`, `notes_question`. Dropped index `highlights_session`, `highlights_question`. |
 | 13 | Added `distracted` to `error_cards`. |
+| 14 | Custom SQL backfilled `error_cards`. |
 
-The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 13.
+The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 14.
 <!-- END GENERATED: migrations -->
 
 ## Backup coverage

@@ -634,7 +634,22 @@ class ErrorCard {
   final bool distracted;
 
   bool get isResolved => status == ErrorCardStatus.resolved;
-  bool get needsDetails => detailsCompletedAt == null;
+
+  /// Whether the learner has completed the card's details at least once.
+  bool get hasCompletedDetails => detailsCompletedAt != null;
+
+  /// Whether the card needs the learner's review again.
+  ///
+  /// A card is pending when its details were never completed, or when the
+  /// question was missed again after the last completed review. Exporting a
+  /// card does not clear or set this state. The field name is kept for the
+  /// existing Cards flow, which uses it for the review badge and selection.
+  bool get needsDetails =>
+      detailsCompletedAt == null || lastWrongAt.isAfter(detailsCompletedAt!);
+
+  /// Alias that names the pending state without implying missing notes.
+  bool get needsReview => needsDetails;
+
   bool isDueAt(DateTime now) => !isResolved && !now.isBefore(dueAt);
 
   int? get correctIndex => correctIndexes.isEmpty ? null : correctIndexes.first;
@@ -807,17 +822,25 @@ class SessionSummary {
     required this.session,
     required this.lookupCount,
     required this.conceptCount,
-    required this.errorCardsNeedingNotes,
+    required this.errorCardsNeedingReview,
   });
 
   final PracticeSession session;
   final int lookupCount;
   final int conceptCount;
-  final int errorCardsNeedingNotes;
+
+  /// Error cards missed in this session that still need review.
+  ///
+  /// Derived from this session's wrong attempts, not from the session that
+  /// originally created each card, so a repeated error is counted here.
+  final int errorCardsNeedingReview;
+
+  /// Backwards-compatible name used by the session summary page.
+  int get errorCardsNeedingNotes => errorCardsNeedingReview;
 
   int get wrongCount => session.total - session.correct - session.skipped;
   bool get hasReviewableIssues =>
-      errorCardsNeedingNotes > 0 || session.skipped > 0;
+      errorCardsNeedingReview > 0 || session.skipped > 0;
 }
 
 @immutable

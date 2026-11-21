@@ -579,7 +579,9 @@ class SessionService {
       if (card != null && card.sessionId == session.id) {
         await _cards.deleteErrorCard(card.id);
       }
-    } else if (!attempt.isCorrect && attempt.selectedIndexes.isNotEmpty) {
+    } else if (!attempt.isCorrect &&
+        attempt.selectedIndexes.isNotEmpty &&
+        !attempt.distracted) {
       final now = _clock.now().toUtc();
       if (card == null) {
         await _cards.createErrorCard(
@@ -705,14 +707,14 @@ class SessionService {
     }
     final lookupCount = await _sessions.lookupCountForSession(sessionId);
     final conceptCount = await _sessions.conceptCountForSession(sessionId);
-    final needingNotes = await _cards.countErrorCardsNeedingDetailsForSession(
+    final needingReview = await _cards.countErrorCardsNeedingDetailsForSession(
       sessionId,
     );
     return SessionSummary(
       session: session,
       lookupCount: lookupCount,
       conceptCount: conceptCount,
-      errorCardsNeedingNotes: needingNotes,
+      errorCardsNeedingReview: needingReview,
     );
   }
 

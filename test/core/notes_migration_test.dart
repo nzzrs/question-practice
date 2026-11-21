@@ -96,7 +96,7 @@ void main() {
     expect(names, contains('notes_question'));
     expect(names, isNot(contains('highlights_session')));
     expect(names, isNot(contains('highlights_question')));
-    expect(database.schemaVersion, 13);
+    expect(database.schemaVersion, 14);
 
     // Renaming keeps the foreign keys attached to the new table.
     final foreignKeys = await database
@@ -145,7 +145,7 @@ void main() {
   });
 
   test(
-    'upgrading from schema 7 builds notes through versions 8 to 13',
+    'upgrading from schema 7 builds notes through versions 8 to 14',
     () async {
       final sqlite = sqlite3.openInMemory();
       for (final table in [
@@ -236,7 +236,7 @@ void main() {
     expect(rows, hasLength(1));
     expect(rows.single.distracted, isFalse);
     expect(rows.single.reasoning, 'I read too fast.');
-    expect(database.schemaVersion, 13);
+    expect(database.schemaVersion, 14);
 
     final columns = await database
         .customSelect('PRAGMA table_info(error_cards)')

@@ -7,6 +7,7 @@ import '../../core/data/practice_repository.dart';
 import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
+import '../../core/domain/plural.dart';
 import '../../core/domain/score_band.dart';
 import '../../core/ui/score_band_style.dart';
 import '../../core/ui/sort_dialog.dart';
@@ -17,6 +18,31 @@ import 'practice_actions.dart';
 import 'topic_stats_page.dart';
 
 enum _ResumeChoice { continueSession, discardAndStart }
+
+/// App-bar title for a topic.
+///
+/// Long topic names get a second line instead of an early ellipsis. The title
+/// scale is capped so two lines still fit the compact bar at platform text
+/// sizes up to 2x; body copy keeps the learner's full scale.
+class _TopicTitle extends StatelessWidget {
+  const _TopicTitle({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.15,
+      child: Text(
+        name,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: theme.typography.baseline.titleLarge.copyWith(height: 1.2),
+      ),
+    );
+  }
+}
 
 class TopicPage extends ConsumerStatefulWidget {
   const TopicPage({required this.topicId, super.key});
@@ -40,16 +66,14 @@ class _TopicPageState extends ConsumerState<TopicPage> {
         ListSort.defaultByName;
     final defaultDeck =
         ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
+    final topicName = summary.value?.topic.name;
 
     return AppPage(
-      title: summary.value?.topic.name ?? 'Topic',
-      titleWidget: summary.value == null
-          ? null
-          : Text(
-              summary.value!.topic.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+      title: topicName ?? 'Topic',
+      titleWidget: topicName == null ? null : _TopicTitle(name: topicName),
+      // A compact bar gives the two-line title enough height at large text
+      // sizes; the flexible large bar only leaves room for one ellipsized line.
+      variant: M3EAppBarVariant.small,
       showBack: true,
       actions: [
         M3EIconButton(
@@ -96,7 +120,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                       const SizedBox(width: 8),
                     ],
                     Pill(
-                      '${data.sessionCount} sessions',
+                      formatCount(data.sessionCount, 'session'),
                       tone: PillTone.neutral,
                     ),
                   ],
@@ -510,7 +534,7 @@ class _TopicHero extends StatelessWidget {
                   label: 'Correct answers',
                   value: '${summary.correctCount}/${summary.answeredCount}',
                   icon: Icons.check_circle_outline,
-                  caption: '${summary.sessionCount} sessions',
+                  caption: formatCount(summary.sessionCount, 'session'),
                   tone: MetricTone.success,
                 ),
               ),
@@ -557,7 +581,7 @@ class _PracticeTrailing extends StatelessWidget {
           const SizedBox(height: 4),
         ],
         Text(
-          '${summary.questionCount} questions',
+          formatCount(summary.questionCount, 'question'),
           style: theme.typography.baseline.labelSmall.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),

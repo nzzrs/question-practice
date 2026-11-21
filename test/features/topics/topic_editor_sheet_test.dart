@@ -277,6 +277,65 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('every control keeps an accessible name and value', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(
+      topicName: 'Cloud',
+      practiceName: 'Core',
+      count: 1,
+      ankiDeck: 'Cloud deck',
+    );
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    const labels = {
+      'name': ('Name', 'Cloud'),
+      'description': ('Description', 'Topic description'),
+      'priority': ('Priority', '1 · highest'),
+      'minimumScore': ('Minimum score', '70%'),
+      'targetScore': ('Target score', '80%'),
+      'deck': ('AnkiDroid deck', 'Cloud deck'),
+      'download-json': (
+        'Download topic JSON',
+        'Share every practice in this topic as a file',
+      ),
+      'update-json': (
+        'Update topic JSON',
+        'Add or modify practices and questions from a file',
+      ),
+    };
+    for (final MapEntry(key: field, value: (title, value)) in labels.entries) {
+      final data = tester
+          .getSemantics(
+            find.byKey(
+              ValueKey(
+                field.endsWith('-json')
+                    ? 'topic-editor-$field'
+                    : 'topic-editor-tile-$field',
+              ),
+            ),
+          )
+          .getSemanticsData();
+      expect(data.label, title);
+      expect(data.value, value);
+      expect(data.flagsCollection.isButton, isTrue);
+    }
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('long-press menu opens the sheet and saves every field', (
     tester,
   ) async {

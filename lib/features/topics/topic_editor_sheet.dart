@@ -538,6 +538,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       ];
     }
     return [
+      const _GroupLabel('Details', key: ValueKey('topic-editor-group-details')),
       _fieldTile(
         field: _TopicField.name,
         icon: Icons.label_outline,
@@ -574,34 +575,33 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
           textCapitalization: TextCapitalization.sentences,
         ),
       ),
+      const SizedBox(height: 16),
+      const _GroupLabel(
+        'Study targets',
+        key: ValueKey('topic-editor-group-study-targets'),
+        description:
+            'Priority 1 is highest and 5 is lowest; leave it blank when order '
+            'does not matter. Scores below the minimum are shown in red; '
+            'scores at or above the target are shown in green.',
+      ),
       _fieldTile(
         field: _TopicField.priority,
         icon: Icons.flag_outlined,
         title: 'Priority',
         value: _priorityValue,
-        editor: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            M3ETextField(
-              key: const ValueKey('topic-editor-priority'),
-              controller: _priority,
-              label: 'Priority (1–5, optional)',
-              placeholder: 'Blank',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              errorText: _priorityError,
-              onChanged: (_) {
-                if (_priorityError != null) {
-                  setState(() => _priorityError = null);
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            _HelperText(
-              '1 is the highest priority, 5 is the lowest. '
-              'Leave blank when order does not matter.',
-            ),
-          ],
+        editor: M3ETextField(
+          key: const ValueKey('topic-editor-priority'),
+          controller: _priority,
+          label: 'Priority (1–5, optional)',
+          placeholder: 'Blank',
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          errorText: _priorityError,
+          onChanged: (_) {
+            if (_priorityError != null) {
+              setState(() => _priorityError = null);
+            }
+          },
         ),
       ),
       _fieldTile(
@@ -609,29 +609,19 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
         icon: Icons.flag_circle_outlined,
         title: 'Minimum approval score',
         value: _minimumScoreValue,
-        editor: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            M3ETextField(
-              key: const ValueKey('topic-editor-minimum-score'),
-              controller: _minimumScore,
-              label: 'Minimum (%)',
-              placeholder: '70',
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              errorText: _minimumScoreError,
-              onChanged: (_) {
-                if (_minimumScoreError != null) {
-                  setState(() => _minimumScoreError = null);
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-            const _HelperText(
-              'A score below this is shown in red. From here up to the target '
-              'it uses the normal color.',
-            ),
-          ],
+        editor: M3ETextField(
+          key: const ValueKey('topic-editor-minimum-score'),
+          controller: _minimumScore,
+          label: 'Minimum (%)',
+          placeholder: '70',
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          errorText: _minimumScoreError,
+          onChanged: (_) {
+            if (_minimumScoreError != null) {
+              setState(() => _minimumScoreError = null);
+            }
+          },
         ),
       ),
       _fieldTile(
@@ -657,12 +647,15 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
               },
             ),
             const SizedBox(height: 8),
-            const _HelperText(
-              'Scores at or above the target are shown in green. The target '
-              'must be at least the minimum score.',
-            ),
+            const _HelperText('The target must be at least the minimum score.'),
           ],
         ),
+      ),
+      const SizedBox(height: 16),
+      const _GroupLabel(
+        'AnkiDroid',
+        key: ValueKey('topic-editor-group-ankidroid'),
+        description: 'Blank uses the default deck from Settings.',
       ),
       _fieldTile(
         field: _TopicField.deck,
@@ -676,7 +669,6 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
               key: const ValueKey('topic-editor-deck'),
               controller: _deck,
               label: 'Deck name',
-              supportingText: 'Blank uses the default deck from Settings.',
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 12),
@@ -691,8 +683,12 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
           ],
         ),
       ),
-      const SizedBox(height: 14),
-      const _GroupLabel('Topic JSON'),
+      const SizedBox(height: 16),
+      const _GroupLabel(
+        'Topic file',
+        key: ValueKey('topic-editor-group-topic-file'),
+        description: 'One file with this topic and every practice inside it.',
+      ),
       OptionTile(
         key: const ValueKey('topic-editor-download-json'),
         icon: Icons.download_outlined,
@@ -731,24 +727,47 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
   }
 }
 
-/// Small section heading that separates the JSON actions from the fields.
+/// Section heading that separates the editor's groups of options.
+///
+/// The label is exposed as a heading to assistive technology; the optional
+/// [description] carries guidance shared by every tile in the group.
 class _GroupLabel extends StatelessWidget {
-  const _GroupLabel(this.text);
+  const _GroupLabel(this.text, {this.description, super.key});
 
   final String text;
+  final String? description;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      child: Text(
-        text.toUpperCase(),
-        style: theme.typography.baseline.labelSmall.copyWith(
-          color: theme.colorScheme.primary,
-          letterSpacing: 0.8,
-          fontWeight: FontWeight.w700,
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
+            container: true,
+            header: true,
+            child: Text(
+              text.toUpperCase(),
+              style: theme.typography.baseline.labelSmall.copyWith(
+                color: theme.colorScheme.primary,
+                letterSpacing: 0.8,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          if (description != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              description!,
+              style: theme.typography.baseline.bodySmall.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

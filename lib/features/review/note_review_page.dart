@@ -43,6 +43,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
   int _cards = 0;
   bool _busy = false;
   bool _finished = false;
+  final _completionPending = <String>{};
 
   @override
   void initState() {
@@ -123,8 +124,10 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
       await _openCreator(note);
       return false;
     }
-    if (!snapshot.hasDrafts) return true;
     final key = _itemKey(note);
+    final retryCompletion =
+        !snapshot.hasDrafts && _completionPending.contains(key);
+    if (!snapshot.hasDrafts && !retryCompletion) return true;
     setState(() => _busy = true);
     try {
       final result = await saveCardCreatorDrafts(
@@ -132,20 +135,21 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
         drafts: snapshot.drafts,
         service: ref.read(reviewServiceProvider),
         noteToConvertId: snapshot.noteToConvert?.id,
+        retryCompletion: retryCompletion,
       );
       if (!mounted) return false;
       if (result.failure != null) {
         _creator.storeSnapshot(key, snapshot.withDrafts(result.remaining));
+        if (result.completionPending) {
+          _completionPending.add(key);
+        } else {
+          _completionPending.remove(key);
+        }
         _cards += result.created;
-        await showSnack(
-          context,
-          result.created > 0
-              ? '${result.created} card${result.created == 1 ? '' : 's'} '
-                    'saved, but the rest could not be saved: ${result.failure}'
-              : 'Could not create the cards: ${result.failure}',
-        );
+        await showSnack(context, cardCreatorSaveFailureMessage(result));
         return false;
       }
+      _completionPending.remove(key);
       _creator.clearSnapshot(key);
       _creator.clearSeed();
       _cards += result.created;
@@ -194,14 +198,18 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
     try {
       await ref.read(cardRepositoryProvider).deleteNote(note.id);
       if (!mounted) return;
+      _creator.forgetNote(note.id);
       _creator.clearSnapshot(_itemKey(note));
+      _completionPending.remove(_itemKey(note));
       final remaining = math.max(0, length - 1);
       setState(() {
         _ids.remove(note.id);
         if (remaining == 0) {
           _finished = true;
-        } else if (_index >= remaining) {
-          _index = remaining - 1;
+        } else {
+          if (_index >= remaining) {
+            _index = remaining - 1;
+          }
           _creator.resetForStep();
         }
       });
@@ -229,6 +237,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
       );
       if (!leave || !mounted) return;
       _creator.clearSnapshots();
+      _completionPending.clear();
     }
     _advanceFrom(index, length);
   }
@@ -247,6 +256,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
       if (!leave || !mounted) return;
     }
     _creator.clearSnapshots();
+    _completionPending.clear();
     Navigator.of(context).pop();
   }
 

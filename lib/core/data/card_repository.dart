@@ -230,13 +230,23 @@ class CardRepository {
     required String reasoning,
     required DateTime wrongAt,
     required Duration dueAfter,
-  }) {
+  }) async {
+    // A mistake recorded at the exact instant the details were completed must
+    // still reopen the card. Without the nudge `needsDetails` would compare
+    // equal timestamps and silently keep the repeated error reviewed. A full
+    // second is used because date-time columns round to whole seconds.
+    var effectiveWrongAt = wrongAt;
+    final existing = await _db.cardDao.errorCardById(id);
+    final completedAt = existing?.detailsCompletedAt;
+    if (completedAt != null && !effectiveWrongAt.isAfter(completedAt)) {
+      effectiveWrongAt = completedAt.add(const Duration(seconds: 1));
+    }
     return _db.cardDao.touchWrongError(
       id: id,
       wrongIndexes: wrongIndexes,
       reasoning: reasoning,
-      wrongAt: wrongAt,
-      dueAt: wrongAt.add(dueAfter),
+      wrongAt: effectiveWrongAt,
+      dueAt: effectiveWrongAt.add(dueAfter),
     );
   }
 

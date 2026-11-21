@@ -108,6 +108,34 @@ void main() {
   );
 
   test(
+    'a repeated wrong at the completion instant still reopens the card',
+    () async {
+      final practice = await harness.seedPractice(count: 1);
+      final question = await onlyQuestion(practice.practiceId);
+
+      final first = await sessions.startPractice(practice.practiceId);
+      await answerWrong(first);
+      final card = await harness.cards.activeErrorForQuestion(question.id);
+      await review.saveErrorDetails(cardId: card!.id, bias: '', vaccine: '');
+      final completed = await harness.cards.errorCardById(card.id);
+      expect(completed!.needsDetails, isFalse);
+
+      final second = await sessions.startPractice(practice.practiceId);
+      await answerWrong(second, reasoning: 'Again immediately');
+
+      final repeated = await harness.cards.activeErrorForQuestion(question.id);
+      expect(repeated, isNotNull);
+      expect(repeated!.needsDetails, isTrue);
+      expect(
+        repeated.lastWrongAt.isAfter(repeated.detailsCompletedAt!),
+        isTrue,
+      );
+      final data = await review.load(second.session.id);
+      expect(data!.steps.whereType<ErrorReviewStep>(), hasLength(1));
+    },
+  );
+
+  test(
     'the later session summary counts the repeated error and offers review',
     () async {
       final practice = await harness.seedPractice(count: 1);

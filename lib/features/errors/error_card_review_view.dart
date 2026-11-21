@@ -184,6 +184,7 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
     try {
       await ref.read(cardRepositoryProvider).deleteNote(note.id);
       if (!mounted) return;
+      widget.creator.forgetNote(note.id);
       setState(() {
         _notes = [
           for (final item in _notes)

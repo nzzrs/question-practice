@@ -443,6 +443,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   void _publishModelState() {
     _modelCatalog.value = ModelCatalogState(
       models: _modelOptions,
+      selected: _model.text.trim(),
       loading: _loadingModels,
       loaded: _modelsLoaded,
     );
@@ -478,11 +479,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Future<void> _pickModel() async {
     _publishModelState();
     unawaited(_ensureModelsLoaded());
-    final current = _model.text.trim();
     final selected = await showSettingsModelPicker(
       context,
       catalog: _modelCatalog,
-      selected: current.isEmpty ? null : current,
     );
     if (selected == null || !mounted) return;
     setState(() => _model.text = selected);

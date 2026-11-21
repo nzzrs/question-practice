@@ -159,20 +159,35 @@ void main() {
       settings: const AppSettings(
         lookupMode: LookupMode.ai,
         aiProvider: AiProvider.openai,
-        aiModel: 'gpt-5',
+        aiModel: 'claude-3',
       ),
     );
 
     final field = find.byKey(const ValueKey('ai-model-field'));
     await tester.ensureVisible(field);
     await pumpFrames(tester);
-    expect(find.text('gpt-5'), findsOneWidget);
+    expect(find.text('claude-3'), findsOneWidget);
 
     await tester.tap(field);
     await pumpFrames(tester);
 
     final search = find.byKey(const ValueKey('ai-model-search'));
     expect(search, findsOneWidget);
+
+    final selectedRow = find.byKey(const ValueKey('ai-model-option-claude-3'));
+    expect(selectedRow, findsOneWidget);
+    final scheme = M3ETheme.of(tester.element(selectedRow)).colorScheme;
+    expect(
+      tester
+          .widget<Material>(
+            find
+                .descendant(of: selectedRow, matching: find.byType(Material))
+                .first,
+          )
+          .color,
+      scheme.primaryContainer,
+    );
+
     await tester.enterText(search, 'gpt');
     await pumpFrames(tester);
 

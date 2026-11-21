@@ -186,11 +186,13 @@ class _ChoiceRow extends StatelessWidget {
 class ModelCatalogState {
   const ModelCatalogState({
     this.models = const [],
+    this.selected = '',
     this.loading = false,
     this.loaded = false,
   });
 
   final List<String> models;
+  final String selected;
   final bool loading;
   final bool loaded;
 }
@@ -202,14 +204,13 @@ class ModelCatalogState {
 Future<String?> showSettingsModelPicker(
   BuildContext context, {
   required ValueListenable<ModelCatalogState> catalog,
-  required String? selected,
 }) {
   return M3EDialog.show<String>(
     context,
     dialog: M3EDialog(
       title: 'Choose a model',
       subhead: 'Loaded from the provider.',
-      content: _ModelPickerBody(catalog: catalog, selected: selected),
+      content: _ModelPickerBody(catalog: catalog),
       actions: [
         M3EButton.text(
           onPressed: () => Navigator.of(context).pop(),
@@ -221,10 +222,9 @@ Future<String?> showSettingsModelPicker(
 }
 
 class _ModelPickerBody extends StatefulWidget {
-  const _ModelPickerBody({required this.catalog, required this.selected});
+  const _ModelPickerBody({required this.catalog});
 
   final ValueListenable<ModelCatalogState> catalog;
-  final String? selected;
 
   @override
   State<_ModelPickerBody> createState() => _ModelPickerBodyState();
@@ -319,7 +319,7 @@ class _ModelPickerBodyState extends State<_ModelPickerBody> {
                     return _ChoiceRow(
                       key: ValueKey('ai-model-option-$model'),
                       label: model,
-                      selected: model == widget.selected,
+                      selected: model == catalog.selected,
                       onTap: () => Navigator.of(context).pop(model),
                     );
                   },

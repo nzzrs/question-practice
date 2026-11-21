@@ -169,7 +169,12 @@ class ErrorCards extends Table {
   TextColumn get subtopic => text().withDefault(const Constant(''))();
 
   /// Quick classifications chosen after the wrong answer.
+  ///
+  /// Legacy data only: practice no longer collects mistake kinds.
   TextColumn get mistakeKindsJson => text().withDefault(const Constant('[]'))();
+
+  /// A distracted re-test kept the card due instead of counting a new error.
+  BoolColumn get distracted => boolean().withDefault(const Constant(false))();
   TextColumn get practiceName => text().withDefault(const Constant(''))();
   TextColumn get status => text()();
   DateTimeColumn get createdAt => dateTime()();

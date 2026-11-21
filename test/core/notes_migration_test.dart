@@ -17,6 +17,9 @@ void main() {
       CREATE TABLE manual_cards (id INTEGER PRIMARY KEY AUTOINCREMENT)
     ''');
     sqlite.execute('''
+      CREATE TABLE error_cards (id INTEGER PRIMARY KEY AUTOINCREMENT)
+    ''');
+    sqlite.execute('''
       CREATE TABLE highlights (
         id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
         session_id INTEGER NULL REFERENCES sessions (id) ON DELETE CASCADE,
@@ -93,7 +96,7 @@ void main() {
     expect(names, contains('notes_question'));
     expect(names, isNot(contains('highlights_session')));
     expect(names, isNot(contains('highlights_question')));
-    expect(database.schemaVersion, 12);
+    expect(database.schemaVersion, 13);
 
     // Renaming keeps the foreign keys attached to the new table.
     final foreignKeys = await database
@@ -142,7 +145,7 @@ void main() {
   });
 
   test(
-    'upgrading from schema 7 builds notes through versions 8 to 12',
+    'upgrading from schema 7 builds notes through versions 8 to 13',
     () async {
       final sqlite = sqlite3.openInMemory();
       for (final table in [
@@ -184,6 +187,66 @@ void main() {
       expect(saved.noteText, 'upgraded note');
     },
   );
+
+  test('schema 13 adds the distracted flag with a false default', () async {
+    final sqlite = sqlite3.openInMemory();
+    sqlite.execute('''
+      CREATE TABLE error_cards (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        question_id INTEGER NOT NULL,
+        session_id INTEGER NULL,
+        question TEXT NOT NULL,
+        alternatives_json TEXT NOT NULL,
+        correct_indexes_json TEXT NOT NULL DEFAULT '[0]',
+        wrong_indexes_json TEXT NOT NULL DEFAULT '[0]',
+        reasoning TEXT NOT NULL DEFAULT '',
+        explanation TEXT NOT NULL DEFAULT '',
+        alternative_explanations_json TEXT NOT NULL DEFAULT '[]',
+        bias TEXT NOT NULL DEFAULT '',
+        vaccine TEXT NOT NULL DEFAULT '',
+        topic_name TEXT NOT NULL DEFAULT '',
+        cognitive_type TEXT NOT NULL DEFAULT 'contrast',
+        subtopic TEXT NOT NULL DEFAULT '',
+        mistake_kinds_json TEXT NOT NULL DEFAULT '[]',
+        practice_name TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        last_wrong_at INTEGER NOT NULL,
+        due_at INTEGER NOT NULL,
+        details_completed_at INTEGER NULL,
+        resolved_at INTEGER NULL,
+        exported_at INTEGER NULL
+      )
+    ''');
+    sqlite.execute('''
+      INSERT INTO error_cards (
+        id, question_id, question, alternatives_json, status, created_at,
+        last_wrong_at, due_at, reasoning
+      ) VALUES (
+        1, 7, 'Question?', '["A"]', 'active', 1700000000, 1700000000,
+        1700000000, 'I read too fast.'
+      )
+    ''');
+    sqlite.execute('PRAGMA user_version = 12');
+
+    final database = AppDatabase(NativeDatabase.opened(sqlite));
+    addTearDown(database.close);
+
+    final rows = await database.select(database.errorCards).get();
+    expect(rows, hasLength(1));
+    expect(rows.single.distracted, isFalse);
+    expect(rows.single.reasoning, 'I read too fast.');
+    expect(database.schemaVersion, 13);
+
+    final columns = await database
+        .customSelect('PRAGMA table_info(error_cards)')
+        .get();
+    final distracted = columns.singleWhere(
+      (row) => row.read<String>('name') == 'distracted',
+    );
+    expect(distracted.read<int>('notnull'), 1);
+    expect(distracted.read<String>('dflt_value'), '0');
+  });
 
   test('a fresh database creates notes with the new indexes', () async {
     final database = AppDatabase(NativeDatabase.memory());

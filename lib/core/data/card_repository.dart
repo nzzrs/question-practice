@@ -129,6 +129,7 @@ class CardRepository {
     String subtopic = '',
     CognitiveType cognitiveType = CognitiveType.contrast,
     List<MistakeKind> mistakeKinds = const [],
+    bool distracted = false,
   }) {
     return _db.cardDao.insertErrorCard(
       ErrorCardsCompanion.insert(
@@ -148,6 +149,7 @@ class CardRepository {
         cognitiveType: Value(cognitiveType.name),
         subtopic: Value(subtopic),
         mistakeKindsJson: Value(mistakeKindsToJson(mistakeKinds)),
+        distracted: Value(distracted),
         status: ErrorCardStatus.active.name,
         createdAt: lastWrongAt,
         lastWrongAt: lastWrongAt,
@@ -202,6 +204,10 @@ class CardRepository {
       id,
       mistakeKindsToJson(mistakeKinds),
     );
+  }
+
+  Future<void> setErrorCardDistracted(int id, bool distracted) {
+    return _db.cardDao.updateErrorCardDistracted(id, distracted);
   }
 
   Future<void> touchWrongError({

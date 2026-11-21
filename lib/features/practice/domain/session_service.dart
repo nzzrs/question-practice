@@ -7,6 +7,7 @@ import '../../../core/data/practice_repository.dart';
 import '../../../core/data/session_repository.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/domain/question_progress.dart';
+import '../../feedback/domain/wrong_notes.dart';
 
 const errorReviewDelay = Duration(hours: 48);
 
@@ -353,7 +354,10 @@ class SessionService {
       if (card != null) {
         if (isCorrect) {
           await _cards.resolveError(card.id, now);
-        } else if (!wasDistracted && selected.isNotEmpty) {
+        } else if (wasDistracted) {
+          // A distracted re-test keeps the earlier card due and records why.
+          await _cards.setErrorCardDistracted(card.id, true);
+        } else if (selected.isNotEmpty) {
           await _cards.touchWrongError(
             id: card.id,
             wrongIndexes: selected,
@@ -363,7 +367,12 @@ class SessionService {
           );
         }
       }
-    } else if (!isCorrect && !wasDistracted && selected.isNotEmpty) {
+    } else if (wasDistracted) {
+      final active = await _cards.activeErrorForQuestion(item.question.id);
+      if (active != null && active.sessionId != session.id) {
+        await _cards.setErrorCardDistracted(active.id, true);
+      }
+    } else if (!isCorrect && selected.isNotEmpty) {
       final active = await _cards.activeErrorForQuestion(item.question.id);
       if (active == null) {
         await _cards.createErrorCard(
@@ -425,14 +434,17 @@ class SessionService {
     );
   }
 
-  /// Updates the note left on an answered question.
+  /// Replaces the learner's "What went wrong?" bullets for an answered
+  /// question.
   ///
-  /// The error card created from the same answer is kept in sync with the
-  /// attempt, so late notes appear during review too.
-  Future<Attempt> updateReasoning({
+  /// The canonical one-line-per-bullet text is stored on the attempt and on
+  /// the active error card for the question, even when that card came from an
+  /// earlier session. Editing an old card in practice therefore writes through
+  /// to the card the review shows.
+  Future<Attempt> setWrongNotes({
     required SessionStart start,
     required SessionQuestionItem item,
-    required String reasoning,
+    required List<String> notes,
   }) async {
     final attempt = await _sessions.attemptForQuestion(
       start.session.id,
@@ -441,54 +453,18 @@ class SessionService {
     if (attempt == null) {
       throw const SessionException('This question has no answer to update.');
     }
-    final trimmed = reasoning.trim();
-    if (trimmed == attempt.reasoning) return attempt;
-    await _sessions.updateAttemptReasoning(attempt.id, trimmed);
+    final canonical = WrongNotes.format(notes);
+    if (canonical == attempt.reasoning) return attempt;
+    await _sessions.updateAttemptReasoning(attempt.id, canonical);
     final card = await _cards.activeErrorForQuestion(item.question.id);
-    if (card != null && card.sessionId == start.session.id) {
-      await _cards.updateErrorCardReasoning(card.id, trimmed);
+    if (card != null) {
+      await _cards.updateErrorCardReasoning(card.id, canonical);
     }
     await _cards.updateSkippedReasoning(
       start.session.id,
       item.question.id,
-      trimmed,
+      canonical,
     );
-    final updated = await _sessions.attemptForQuestion(
-      start.session.id,
-      item.question.id,
-    );
-    return updated ?? attempt;
-  }
-
-  /// Stores the one-tap mistake classifications for an answered question.
-  Future<Attempt> setMistakeKinds({
-    required SessionStart start,
-    required SessionQuestionItem item,
-    required Iterable<MistakeKind> kinds,
-  }) async {
-    final attempt = await _sessions.attemptForQuestion(
-      start.session.id,
-      item.question.id,
-    );
-    if (attempt == null) {
-      throw const SessionException('This question has no answer to update.');
-    }
-    final ordered = <MistakeKind>[
-      for (final kind in MistakeKind.values)
-        if (kinds.contains(kind)) kind,
-    ];
-    if (ordered.length == attempt.mistakeKinds.length &&
-        ordered.every(attempt.mistakeKinds.contains)) {
-      return attempt;
-    }
-    await _sessions.updateAttemptMistakeKinds(
-      attempt.id,
-      mistakeKindsToJson(ordered),
-    );
-    final card = await _cards.activeErrorForQuestion(item.question.id);
-    if (card != null && card.sessionId == start.session.id) {
-      await _cards.updateErrorCardMistakeKinds(card.id, ordered);
-    }
     final updated = await _sessions.attemptForQuestion(
       start.session.id,
       item.question.id,
@@ -524,6 +500,10 @@ class SessionService {
     if (effective) {
       if (card != null && card.sessionId == session.id) {
         await _cards.deleteErrorCard(card.id);
+      } else if (card != null) {
+        // A re-test of an earlier error stays due, but the review warns that
+        // this attempt was distracted instead of counting as a new mistake.
+        await _cards.setErrorCardDistracted(card.id, true);
       }
     } else if (!attempt.isCorrect && !attempt.isSkipped) {
       final now = _clock.now().toUtc();

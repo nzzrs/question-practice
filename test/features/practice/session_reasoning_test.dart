@@ -38,7 +38,7 @@ void main() {
     expect(find.byType(EditableText), findsNothing);
   });
 
-  test('updating reasoning also refreshes the linked error card', () async {
+  test('updating wrong notes also refreshes the linked error card', () async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
@@ -58,10 +58,10 @@ void main() {
       reasoning: '',
       distracted: false,
     );
-    await service.updateReasoning(
+    await service.setWrongNotes(
       start: start,
       item: item,
-      reasoning: 'I rushed the second line.',
+      notes: const ['I rushed the second line.'],
     );
 
     final attempt = await harness.sessions.attemptForQuestion(

@@ -1,0 +1,105 @@
+import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:material_ui/material_ui.dart';
+
+import '../practice/selectable_linkified_text.dart';
+import 'feedback_actions.dart';
+
+/// Read-only bullet list used by the error review.
+class WrongNotesReadonly extends StatelessWidget {
+  const WrongNotesReadonly({
+    required this.notes,
+    required this.actions,
+    this.onTurnBulletIntoCard,
+    this.bulletBusy = false,
+    this.addedBulletIds = const {},
+    super.key,
+  });
+
+  final List<String> notes;
+  final FeedbackActions actions;
+  final void Function(int index, String note)? onTurnBulletIntoCard;
+  final bool bulletBusy;
+  final Set<int> addedBulletIds;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Column(
+      key: const ValueKey('wrong-notes-list'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('What went wrong?', style: theme.typography.emphasized.titleSmall),
+        const SizedBox(height: 8),
+        if (notes.isEmpty)
+          Text(
+            'Nothing was written for this attempt.',
+            key: const ValueKey('wrong-notes-empty'),
+            style: theme.typography.baseline.labelMedium.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          )
+        else
+          for (var index = 0; index < notes.length; index++)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    key: ValueKey('wrong-notes-readonly-$index'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, top: 8),
+                        child: Icon(
+                          Icons.circle,
+                          size: 6,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: SelectableLinkifiedText(
+                          text: notes[index],
+                          style: theme.typography.baseline.bodyMedium.copyWith(
+                            height: 1.45,
+                          ),
+                          useSelectionArea: false,
+                          onDefine: actions.onDefine,
+                          onOpenUrl: actions.onOpenUrl,
+                          onNote: actions.onSaveNote,
+                          onAsk: actions.onAsk,
+                          onNoteTap: actions.onNoteTap,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (onTurnBulletIntoCard != null)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 20, top: 2),
+                      child: M3EButton.tonal(
+                        key: ValueKey('wrong-note-card-$index'),
+                        onPressed: bulletBusy
+                            ? null
+                            : () => onTurnBulletIntoCard!(index, notes[index]),
+                        icon: Icon(
+                          addedBulletIds.contains(index)
+                              ? Icons.check
+                              : Icons.add_card,
+                        ),
+                        child: Text(
+                          addedBulletIds.contains(index)
+                              ? 'Added to cards'
+                              : bulletBusy
+                              ? 'Drafting…'
+                              : 'Turn bullet into card',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+      ],
+    );
+  }
+}

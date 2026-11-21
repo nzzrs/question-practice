@@ -198,6 +198,12 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     );
   }
 
+  Future<void> updateErrorCardDistracted(int id, bool distracted) {
+    return (update(errorCards)..where((e) => e.id.equals(id))).write(
+      ErrorCardsCompanion(distracted: Value(distracted)),
+    );
+  }
+
   Future<void> touchWrongError({
     required int id,
     required List<int> wrongIndexes,
@@ -211,6 +217,7 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
         reasoning: Value(reasoning),
         lastWrongAt: Value(wrongAt),
         dueAt: Value(dueAt),
+        distracted: const Value(false),
       ),
     );
   }

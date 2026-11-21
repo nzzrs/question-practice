@@ -115,6 +115,8 @@ void main() {
         .select(harness.database.errorCards)
         .get();
     expect(errors.single.question, question.prompt);
+    expect(errors.single.distracted, isTrue);
+    expect(errors.single.reasoning, 'I misread the prompt.');
     final manuals = await harness.database
         .select(harness.database.manualCards)
         .get();
@@ -792,6 +794,7 @@ Future<SeededPractice> _seedAllData(TestHarness harness) async {
     practiceName: 'Core',
     lastWrongAt: harness.clock.now().toUtc(),
     dueAfter: const Duration(hours: 48),
+    distracted: true,
   );
   await harness.cards.createManualCard(
     sessionId: session.id,

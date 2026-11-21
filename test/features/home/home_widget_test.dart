@@ -179,22 +179,28 @@ void main() {
     await pumpFrames(tester);
 
     expect(
-      find.text('Not quite. The error card will ask what went wrong.'),
+      find.text('Not quite. Write what went wrong, then turn it into cards.'),
       findsOneWidget,
     );
     await tester.scrollUntilVisible(
       find.textContaining('Wrong: 1 is a distractor.'),
       120,
+      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     expect(find.textContaining('Wrong: 1 is a distractor.'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Why this answer'), 120);
+    await tester.scrollUntilVisible(
+      find.text('Why this answer'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     await pumpFrames(tester);
     expect(find.text('Why this answer'), findsOneWidget);
     expect(find.text('Because 1 is correct.'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('I was distracted or read too fast'),
       120,
+      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     expect(find.text('I was distracted or read too fast'), findsOneWidget);

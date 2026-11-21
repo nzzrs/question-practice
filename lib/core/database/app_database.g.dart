@@ -4026,6 +4026,21 @@ class $ErrorCardsTable extends ErrorCards
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _distractedMeta = const VerificationMeta(
+    'distracted',
+  );
+  @override
+  late final GeneratedColumn<bool> distracted = GeneratedColumn<bool>(
+    'distracted',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("distracted" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _practiceNameMeta = const VerificationMeta(
     'practiceName',
   );
@@ -4129,6 +4144,7 @@ class $ErrorCardsTable extends ErrorCards
     cognitiveType,
     subtopic,
     mistakeKindsJson,
+    distracted,
     practiceName,
     status,
     createdAt,
@@ -4270,6 +4286,12 @@ class $ErrorCardsTable extends ErrorCards
         ),
       );
     }
+    if (data.containsKey('distracted')) {
+      context.handle(
+        _distractedMeta,
+        distracted.isAcceptableOrUnknown(data['distracted']!, _distractedMeta),
+      );
+    }
     if (data.containsKey('practice_name')) {
       context.handle(
         _practiceNameMeta,
@@ -4408,6 +4430,10 @@ class $ErrorCardsTable extends ErrorCards
         DriftSqlType.string,
         data['${effectivePrefix}mistake_kinds_json'],
       )!,
+      distracted: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}distracted'],
+      )!,
       practiceName: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}practice_name'],
@@ -4471,7 +4497,12 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
   final String subtopic;
 
   /// Quick classifications chosen after the wrong answer.
+  ///
+  /// Legacy data only: practice no longer collects mistake kinds.
   final String mistakeKindsJson;
+
+  /// A distracted re-test kept the card due instead of counting a new error.
+  final bool distracted;
   final String practiceName;
   final String status;
   final DateTime createdAt;
@@ -4497,6 +4528,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     required this.cognitiveType,
     required this.subtopic,
     required this.mistakeKindsJson,
+    required this.distracted,
     required this.practiceName,
     required this.status,
     required this.createdAt,
@@ -4529,6 +4561,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     map['cognitive_type'] = Variable<String>(cognitiveType);
     map['subtopic'] = Variable<String>(subtopic);
     map['mistake_kinds_json'] = Variable<String>(mistakeKindsJson);
+    map['distracted'] = Variable<bool>(distracted);
     map['practice_name'] = Variable<String>(practiceName);
     map['status'] = Variable<String>(status);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -4566,6 +4599,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       cognitiveType: Value(cognitiveType),
       subtopic: Value(subtopic),
       mistakeKindsJson: Value(mistakeKindsJson),
+      distracted: Value(distracted),
       practiceName: Value(practiceName),
       status: Value(status),
       createdAt: Value(createdAt),
@@ -4609,6 +4643,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       cognitiveType: serializer.fromJson<String>(json['cognitiveType']),
       subtopic: serializer.fromJson<String>(json['subtopic']),
       mistakeKindsJson: serializer.fromJson<String>(json['mistakeKindsJson']),
+      distracted: serializer.fromJson<bool>(json['distracted']),
       practiceName: serializer.fromJson<String>(json['practiceName']),
       status: serializer.fromJson<String>(json['status']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -4643,6 +4678,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       'cognitiveType': serializer.toJson<String>(cognitiveType),
       'subtopic': serializer.toJson<String>(subtopic),
       'mistakeKindsJson': serializer.toJson<String>(mistakeKindsJson),
+      'distracted': serializer.toJson<bool>(distracted),
       'practiceName': serializer.toJson<String>(practiceName),
       'status': serializer.toJson<String>(status),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -4671,6 +4707,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     String? cognitiveType,
     String? subtopic,
     String? mistakeKindsJson,
+    bool? distracted,
     String? practiceName,
     String? status,
     DateTime? createdAt,
@@ -4697,6 +4734,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     cognitiveType: cognitiveType ?? this.cognitiveType,
     subtopic: subtopic ?? this.subtopic,
     mistakeKindsJson: mistakeKindsJson ?? this.mistakeKindsJson,
+    distracted: distracted ?? this.distracted,
     practiceName: practiceName ?? this.practiceName,
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
@@ -4742,6 +4780,9 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
       mistakeKindsJson: data.mistakeKindsJson.present
           ? data.mistakeKindsJson.value
           : this.mistakeKindsJson,
+      distracted: data.distracted.present
+          ? data.distracted.value
+          : this.distracted,
       practiceName: data.practiceName.present
           ? data.practiceName.value
           : this.practiceName,
@@ -4782,6 +4823,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
           ..write('cognitiveType: $cognitiveType, ')
           ..write('subtopic: $subtopic, ')
           ..write('mistakeKindsJson: $mistakeKindsJson, ')
+          ..write('distracted: $distracted, ')
           ..write('practiceName: $practiceName, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
@@ -4812,6 +4854,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
     cognitiveType,
     subtopic,
     mistakeKindsJson,
+    distracted,
     practiceName,
     status,
     createdAt,
@@ -4842,6 +4885,7 @@ class ErrorCardRow extends DataClass implements Insertable<ErrorCardRow> {
           other.cognitiveType == this.cognitiveType &&
           other.subtopic == this.subtopic &&
           other.mistakeKindsJson == this.mistakeKindsJson &&
+          other.distracted == this.distracted &&
           other.practiceName == this.practiceName &&
           other.status == this.status &&
           other.createdAt == this.createdAt &&
@@ -4869,6 +4913,7 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
   final Value<String> cognitiveType;
   final Value<String> subtopic;
   final Value<String> mistakeKindsJson;
+  final Value<bool> distracted;
   final Value<String> practiceName;
   final Value<String> status;
   final Value<DateTime> createdAt;
@@ -4894,6 +4939,7 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     this.cognitiveType = const Value.absent(),
     this.subtopic = const Value.absent(),
     this.mistakeKindsJson = const Value.absent(),
+    this.distracted = const Value.absent(),
     this.practiceName = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -4920,6 +4966,7 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     this.cognitiveType = const Value.absent(),
     this.subtopic = const Value.absent(),
     this.mistakeKindsJson = const Value.absent(),
+    this.distracted = const Value.absent(),
     this.practiceName = const Value.absent(),
     required String status,
     required DateTime createdAt,
@@ -4952,6 +4999,7 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     Expression<String>? cognitiveType,
     Expression<String>? subtopic,
     Expression<String>? mistakeKindsJson,
+    Expression<bool>? distracted,
     Expression<String>? practiceName,
     Expression<String>? status,
     Expression<DateTime>? createdAt,
@@ -4980,6 +5028,7 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
       if (cognitiveType != null) 'cognitive_type': cognitiveType,
       if (subtopic != null) 'subtopic': subtopic,
       if (mistakeKindsJson != null) 'mistake_kinds_json': mistakeKindsJson,
+      if (distracted != null) 'distracted': distracted,
       if (practiceName != null) 'practice_name': practiceName,
       if (status != null) 'status': status,
       if (createdAt != null) 'created_at': createdAt,
@@ -5009,6 +5058,7 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     Value<String>? cognitiveType,
     Value<String>? subtopic,
     Value<String>? mistakeKindsJson,
+    Value<bool>? distracted,
     Value<String>? practiceName,
     Value<String>? status,
     Value<DateTime>? createdAt,
@@ -5036,6 +5086,7 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
       cognitiveType: cognitiveType ?? this.cognitiveType,
       subtopic: subtopic ?? this.subtopic,
       mistakeKindsJson: mistakeKindsJson ?? this.mistakeKindsJson,
+      distracted: distracted ?? this.distracted,
       practiceName: practiceName ?? this.practiceName,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
@@ -5100,6 +5151,9 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
     if (mistakeKindsJson.present) {
       map['mistake_kinds_json'] = Variable<String>(mistakeKindsJson.value);
     }
+    if (distracted.present) {
+      map['distracted'] = Variable<bool>(distracted.value);
+    }
     if (practiceName.present) {
       map['practice_name'] = Variable<String>(practiceName.value);
     }
@@ -5148,6 +5202,7 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
           ..write('cognitiveType: $cognitiveType, ')
           ..write('subtopic: $subtopic, ')
           ..write('mistakeKindsJson: $mistakeKindsJson, ')
+          ..write('distracted: $distracted, ')
           ..write('practiceName: $practiceName, ')
           ..write('status: $status, ')
           ..write('createdAt: $createdAt, ')
@@ -12324,6 +12379,7 @@ typedef $$ErrorCardsTableCreateCompanionBuilder = ErrorCardsCompanion Function({
   Value<String> cognitiveType,
   Value<String> subtopic,
   Value<String> mistakeKindsJson,
+  Value<bool> distracted,
   Value<String> practiceName,
   required String status,
   required DateTime createdAt,
@@ -12350,6 +12406,7 @@ typedef $$ErrorCardsTableUpdateCompanionBuilder = ErrorCardsCompanion Function({
   Value<String> cognitiveType,
   Value<String> subtopic,
   Value<String> mistakeKindsJson,
+  Value<bool> distracted,
   Value<String> practiceName,
   Value<String> status,
   Value<DateTime> createdAt,
@@ -12475,6 +12532,11 @@ class $$ErrorCardsTableFilterComposer
 
   ColumnFilters<String> get mistakeKindsJson => $composableBuilder(
     column: $table.mistakeKindsJson,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get distracted => $composableBuilder(
+    column: $table.distracted,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12644,6 +12706,11 @@ class $$ErrorCardsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get distracted => $composableBuilder(
+    column: $table.distracted,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get practiceName => $composableBuilder(
     column: $table.practiceName,
     builder: (column) => ColumnOrderings(column),
@@ -12796,6 +12863,11 @@ class $$ErrorCardsTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<bool> get distracted => $composableBuilder(
+    column: $table.distracted,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<String> get practiceName => $composableBuilder(
     column: $table.practiceName,
     builder: (column) => column,
@@ -12922,6 +12994,7 @@ class $$ErrorCardsTableTableManager
                 Value<String> cognitiveType = const Value.absent(),
                 Value<String> subtopic = const Value.absent(),
                 Value<String> mistakeKindsJson = const Value.absent(),
+                Value<bool> distracted = const Value.absent(),
                 Value<String> practiceName = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -12947,6 +13020,7 @@ class $$ErrorCardsTableTableManager
                 cognitiveType: cognitiveType,
                 subtopic: subtopic,
                 mistakeKindsJson: mistakeKindsJson,
+                distracted: distracted,
                 practiceName: practiceName,
                 status: status,
                 createdAt: createdAt,
@@ -12975,6 +13049,7 @@ class $$ErrorCardsTableTableManager
                 Value<String> cognitiveType = const Value.absent(),
                 Value<String> subtopic = const Value.absent(),
                 Value<String> mistakeKindsJson = const Value.absent(),
+                Value<bool> distracted = const Value.absent(),
                 Value<String> practiceName = const Value.absent(),
                 required String status,
                 required DateTime createdAt,
@@ -13000,6 +13075,7 @@ class $$ErrorCardsTableTableManager
                 cognitiveType: cognitiveType,
                 subtopic: subtopic,
                 mistakeKindsJson: mistakeKindsJson,
+                distracted: distracted,
                 practiceName: practiceName,
                 status: status,
                 createdAt: createdAt,

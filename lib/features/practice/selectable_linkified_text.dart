@@ -16,6 +16,7 @@ class SelectableLinkifiedText extends StatefulWidget {
     this.onNoteTap,
     this.notes = const [],
     this.selectable = true,
+    this.useSelectionArea = true,
     super.key,
   });
 
@@ -36,6 +37,9 @@ class SelectableLinkifiedText extends StatefulWidget {
   /// Phrases shown with a note tint inside [text].
   final List<String> notes;
   final bool selectable;
+
+  /// When false the host owns one [SelectionArea] around several widgets.
+  final bool useSelectionArea;
 
   @override
   State<SelectableLinkifiedText> createState() =>
@@ -174,7 +178,7 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
       TextSpan(children: spans),
       style: widget.style,
     );
-    if (!widget.selectable) return textWidget;
+    if (!widget.selectable || !widget.useSelectionArea) return textWidget;
 
     return SelectionArea(
       onSelectionChanged: (content) {

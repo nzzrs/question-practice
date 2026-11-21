@@ -16,7 +16,7 @@ import 'wrong_notes_readonly.dart';
 
 /// One feedback presentation for practice and the error review.
 ///
-/// Practice passes an editable [controller] and its distraction checks; the
+/// Practice passes an editable [controller] and its distraction check; the
 /// review passes read-only notes and its own host footer. Both get the same
 /// topic, question, alternatives, explanations, status and bullets.
 class QuestionFeedbackView extends StatefulWidget {
@@ -53,7 +53,7 @@ class QuestionFeedbackView extends StatefulWidget {
   /// Practice only: the live bullet editor state.
   final WrongNotesController? controller;
 
-  /// Practice only: distraction and unknown checkboxes.
+  /// Practice only: the distraction checkbox.
   final Widget? checks;
   final Widget? hostFooter;
   final List<Note> notes;

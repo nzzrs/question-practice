@@ -766,7 +766,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     onTap: () => _handleRowTap(
                       _selectedNotes,
                       note.id,
-                      () => _reviewNotes(notes, initialNoteId: note.id),
+                      () => _previewNote(note, notes),
                     ),
                     onLongPress: () =>
                         _handleRowLongPress(_selectedNotes, note.id),
@@ -1144,6 +1144,48 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         showStatus: false,
       ),
     ], onReview: () => _reviewCards(const [], [question]));
+  }
+
+  Future<void> _previewNote(Note note, List<Note> notes) {
+    final theme = M3ETheme.of(context);
+    return _previewDialog('Note preview', [
+      _previewMeta([
+        const Pill('Note', tone: PillTone.primary),
+        if (note.topicName.trim().isNotEmpty) Pill(note.topicName),
+        if (note.subtopic.trim().isNotEmpty)
+          Pill('subtopic: ${note.subtopic.trim()}'),
+        if (note.practiceName.trim().isNotEmpty) Pill(note.practiceName),
+        if (note.isKept) const Pill('Kept', tone: PillTone.success),
+        if (note.hasCard) const Pill('Card made', tone: PillTone.success),
+      ]),
+      const SizedBox(height: 14),
+      TonalBox(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _PreviewLabel('Highlight'),
+            const SizedBox(height: 4),
+            SelectableText(
+              note.text,
+              key: const ValueKey('note-preview-text'),
+              style: theme.typography.baseline.titleMedium.copyWith(
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (note.context.trim().isNotEmpty) ...[
+        const SizedBox(height: 10),
+        _PreviewNote(
+          label: 'From the question',
+          text: note.context,
+          selectable: true,
+        ),
+      ],
+    ], onReview: () => _reviewNotes(notes, initialNoteId: note.id));
   }
 
   Widget _previewMeta(List<Widget> children) {
@@ -1903,10 +1945,15 @@ class _PreviewAnswer extends StatelessWidget {
 }
 
 class _PreviewNote extends StatelessWidget {
-  const _PreviewNote({required this.label, required this.text});
+  const _PreviewNote({
+    required this.label,
+    required this.text,
+    this.selectable = false,
+  });
 
   final String label;
   final String text;
+  final bool selectable;
 
   @override
   Widget build(BuildContext context) {
@@ -1923,10 +1970,16 @@ class _PreviewNote extends StatelessWidget {
         children: [
           _PreviewLabel(label),
           const SizedBox(height: 3),
-          Text(
-            text,
-            style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
-          ),
+          if (selectable)
+            SelectableText(
+              text,
+              style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
+            )
+          else
+            Text(
+              text,
+              style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
+            ),
         ],
       ),
     );

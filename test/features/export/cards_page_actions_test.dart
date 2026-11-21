@@ -430,7 +430,9 @@ void main() {
     expect(find.byType(ErrorCardsReviewPage), findsOneWidget);
   });
 
-  testWidgets('tapping a note opens the shared note review', (tester) async {
+  testWidgets('tapping a note previews it, then opens the shared note review', (
+    tester,
+  ) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
@@ -441,6 +443,14 @@ void main() {
     final row = find.byKey(ValueKey('note-row-$noteId'));
     await tester.ensureVisible(row);
     await tester.tap(row);
+    await pumpFrames(tester);
+
+    expect(find.text('Note preview'), findsOneWidget);
+    expect(find.text('Close'), findsOneWidget);
+    expect(find.text('Review'), findsOneWidget);
+    expect(find.byType(NoteReviewPage), findsNothing);
+
+    await tester.tap(find.text('Review'));
     await pumpFrames(tester);
 
     expect(find.byType(NoteReviewPage), findsOneWidget);

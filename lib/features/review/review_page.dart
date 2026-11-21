@@ -31,7 +31,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   bool _finished = false;
 
   final _definition = TextEditingController();
-  final _edits = <int, ErrorCardContent>{};
   final _scroll = ScrollController();
 
   @override
@@ -344,9 +343,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         switch (step) {
           ErrorReviewStep(:final card) => ErrorCardReviewView(
             card: card,
-            editedContent: _edits[card.id],
-            onContentChanged: (content) =>
-                setState(() => _edits[card.id] = content),
             onCardsAdded: (count) {
               if (!mounted) return;
               setState(() => _created += count);

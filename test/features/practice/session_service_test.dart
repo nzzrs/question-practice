@@ -392,7 +392,7 @@ void main() {
     );
   });
 
-  test('mistake kinds persist to the attempt and its error card', () async {
+  test('wrong notes persist to the attempt and its error card', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await service.startPractice(practice.practiceId);
     final item = start.items.single;
@@ -404,40 +404,138 @@ void main() {
       distracted: false,
     );
 
-    final updated = await service.setMistakeKinds(
+    final updated = await service.setWrongNotes(
       start: start,
       item: item,
-      kinds: const [MistakeKind.confusion, MistakeKind.forgottenFact],
+      notes: const ['I confused X with Y.', ' - I read too fast. ', ''],
     );
-    expect(updated.mistakeKinds, const [
-      MistakeKind.forgottenFact,
-      MistakeKind.confusion,
-    ]);
+    expect(updated.reasoning, 'I confused X with Y.\nI read too fast.');
 
     final attempt = await harness.sessions.attemptForQuestion(
       start.session.id,
       item.question.id,
     );
-    expect(attempt!.mistakeKinds, const [
-      MistakeKind.forgottenFact,
-      MistakeKind.confusion,
-    ]);
+    expect(attempt!.reasoning, updated.reasoning);
     final card = await harness.cards.activeErrorForQuestion(item.question.id);
-    expect(card!.mistakeKinds, const [
-      MistakeKind.forgottenFact,
-      MistakeKind.confusion,
-    ]);
+    expect(card!.reasoning, updated.reasoning);
+    expect(card.mistakeKinds, isEmpty);
 
-    final cleared = await service.setMistakeKinds(
+    final unchanged = await service.setWrongNotes(
       start: start,
       item: item,
-      kinds: const [MistakeKind.distraction],
+      notes: const ['I confused X with Y.', 'I read too fast.'],
     );
-    expect(cleared.mistakeKinds, const [MistakeKind.distraction]);
-    final clearedCard = await harness.cards.activeErrorForQuestion(
+    expect(unchanged.reasoning, updated.reasoning);
+
+    await service.setWrongNotes(start: start, item: item, notes: const []);
+    final cleared = await harness.cards.activeErrorForQuestion(
       item.question.id,
     );
-    expect(clearedCard!.mistakeKinds, const [MistakeKind.distraction]);
+    expect(cleared!.reasoning, '');
+  });
+
+  test(
+    'a repeated save repairs a card left behind by a partial failure',
+    () async {
+      final practice = await harness.seedPractice(count: 1);
+      final start = await service.startPractice(practice.practiceId);
+      final item = start.items.single;
+      await service.submitAnswer(
+        start: start,
+        item: item,
+        selectedIndexes: const [1],
+        reasoning: 'Saved on the attempt.',
+        distracted: false,
+      );
+
+      final card = await harness.cards.activeErrorForQuestion(item.question.id);
+      await harness.cards.updateErrorCardReasoning(card!.id, 'Stale card text');
+
+      await service.setWrongNotes(
+        start: start,
+        item: item,
+        notes: const ['Saved on the attempt.'],
+      );
+
+      final repaired = await harness.cards.activeErrorForQuestion(
+        item.question.id,
+      );
+      expect(repaired!.reasoning, 'Saved on the attempt.');
+    },
+  );
+
+  test('wrong notes update an earlier-session active card', () async {
+    final practice = await harness.seedPractice(count: 1);
+    final start = await service.startPractice(practice.practiceId);
+    final item = start.items.single;
+    final cardId = await harness.cards.createErrorCard(
+      questionId: item.question.id,
+      sessionId: null,
+      question: item.question.prompt,
+      alternatives: item.question.alternatives,
+      correctIndexes: item.question.correctIndexes,
+      wrongIndexes: const [1],
+      reasoning: 'Old note',
+      explanation: item.question.explanation,
+      alternativeExplanations: item.question.alternativeExplanations,
+      topicName: item.topicName,
+      practiceName: item.practiceName,
+      lastWrongAt: harness.clock.now().toUtc(),
+      dueAfter: const Duration(hours: 48),
+    );
+    await service.submitAnswer(
+      start: start,
+      item: item,
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: false,
+    );
+
+    await service.setWrongNotes(
+      start: start,
+      item: item,
+      notes: const ['Fresh bullet from practice.'],
+    );
+
+    final card = await harness.cards.errorCardById(cardId);
+    expect(card!.reasoning, 'Fresh bullet from practice.');
+  });
+
+  test('a distracted re-test keeps an earlier card due and flags it', () async {
+    final practice = await harness.seedPractice(count: 1);
+    final start = await service.startPractice(practice.practiceId);
+    final item = start.items.single;
+    final cardId = await harness.cards.createErrorCard(
+      questionId: item.question.id,
+      sessionId: null,
+      question: item.question.prompt,
+      alternatives: item.question.alternatives,
+      correctIndexes: item.question.correctIndexes,
+      wrongIndexes: const [1],
+      reasoning: 'Old note',
+      explanation: item.question.explanation,
+      alternativeExplanations: item.question.alternativeExplanations,
+      topicName: item.topicName,
+      practiceName: item.practiceName,
+      lastWrongAt: harness.clock.now().toUtc(),
+      dueAfter: const Duration(hours: 48),
+    );
+    await service.submitAnswer(
+      start: start,
+      item: item,
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: true,
+    );
+
+    final flagged = await harness.cards.errorCardById(cardId);
+    expect(flagged!.distracted, isTrue);
+    expect(flagged.status, ErrorCardStatus.active);
+
+    await service.setDistracted(start: start, item: item, distracted: false);
+    final cleared = await harness.cards.errorCardById(cardId);
+    expect(cleared!.distracted, isFalse);
+    expect(cleared.status, ErrorCardStatus.active);
   });
 
   test('summary counts distinct looked-up terms', () async {

@@ -123,7 +123,7 @@ void main() {
     expect(find.text('Untouched wrong explanation.'), findsNothing);
 
     await tester.tap(
-      find.byKey(const ValueKey('error-alternative-explanation-2-toggle')),
+      find.byKey(const ValueKey('alternative-explanation-2-toggle')),
     );
     await pumpFrames(tester);
     expect(find.text('Untouched wrong explanation.'), findsOneWidget);

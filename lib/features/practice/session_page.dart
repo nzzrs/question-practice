@@ -9,10 +9,14 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/platform/practice_sound_player.dart';
 import '../../core/ui/widgets.dart';
+import '../feedback/domain/wrong_notes.dart';
+import '../feedback/feedback_actions.dart';
+import '../feedback/feedback_snapshot.dart';
+import '../feedback/question_feedback_view.dart';
+import '../feedback/wrong_notes_controller.dart';
 import '../lookup/lookup_actions.dart';
 import '../lookup/ask_sheet.dart';
 import '../practice/domain/session_service.dart';
-import '../practice/selectable_linkified_text.dart';
 import '../practice/summary_page.dart';
 
 enum _ExitChoice { save, discard }
@@ -37,10 +41,9 @@ class _SessionPageState extends ConsumerState<SessionPage>
   int _index = 0;
   final _selectedIndexes = <int>{};
   final _notes = <int, List<Note>>{};
-  final _mistakeKinds = <MistakeKind>{};
+  WrongNotesController? _wrongNotes;
   bool _submitted = false;
   bool _submitting = false;
-  bool _mistakeBusy = false;
   bool _distracted = false;
   bool _unknown = false;
   bool _showOriginalLetters = false;
@@ -92,10 +95,6 @@ class _SessionPageState extends ConsumerState<SessionPage>
       }
     }
   }
-
-  List<String> _noteTexts(int questionId) => [
-    for (final note in _notes[questionId] ?? const <Note>[]) note.text,
-  ];
 
   Future<void> _reloadNotes(int questionId) async {
     final notes = await ref
@@ -212,6 +211,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     WidgetsBinding.instance.removeObserver(this);
     _questionTimer?.cancel();
     _toast?.dismiss();
+    _wrongNotes?.dispose();
     unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     super.dispose();
   }
@@ -224,7 +224,47 @@ class _SessionPageState extends ConsumerState<SessionPage>
       _questionTimer?.cancel();
       _toast?.dismiss();
       _toast = null;
+      unawaited(_wrongNotes?.flush());
     }
+  }
+
+  /// Creates the bullet editor only for a wrong, non-skipped answer.
+  void _syncWrongNotes(Attempt attempt) {
+    final item = _item;
+    if (item == null || attempt.isCorrect || attempt.isSkipped) {
+      _wrongNotes?.dispose();
+      _wrongNotes = null;
+      return;
+    }
+    if (_wrongNotes != null) return;
+    final questionItem = item;
+    _wrongNotes = WrongNotesController(
+      initial: WrongNotes.parse(attempt.reasoning),
+      onSave: (notes) => _saveWrongNotes(questionItem, notes),
+    );
+  }
+
+  Future<void> _saveWrongNotes(
+    SessionQuestionItem item,
+    List<String> notes,
+  ) async {
+    final attempt = await ref
+        .read(sessionServiceProvider)
+        .setWrongNotes(start: _start, item: item, notes: notes);
+    if (!mounted) return;
+    _start.attempts[item.question.id] = attempt;
+    ref.invalidate(dueErrorsProvider);
+    if (_item?.question.id != item.question.id) return;
+    setState(() {
+      _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+    });
+  }
+
+  /// Persists a pending bullet edit before leaving the question.
+  Future<bool> _flushWrongNotes() async {
+    final notes = _wrongNotes;
+    if (notes == null) return true;
+    return notes.flush();
   }
 
   void _restartQuestionTimer() {
@@ -263,11 +303,12 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final item = _start.items.isEmpty ? null : _start.items[_index];
     _item = item;
     _selectedIndexes.clear();
-    _mistakeKinds.clear();
     _outcome = null;
     _submitted = false;
     _distracted = false;
     _unknown = false;
+    _wrongNotes?.dispose();
+    _wrongNotes = null;
     if (item == null) {
       _restartQuestionTimer();
       return;
@@ -281,13 +322,14 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _submitted = true;
     _distracted = attempt.distracted;
     _unknown = attempt.unknown;
-    _mistakeKinds.addAll(attempt.mistakeKinds);
     _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+    _syncWrongNotes(attempt);
     _restartQuestionTimer();
   }
 
   Future<void> _goTo(int index) async {
     if (index < 0 || index >= _start.items.length || index == _index) return;
+    if (!await _flushWrongNotes()) return;
     setState(() {
       _index = index;
       _loadQuestionState();
@@ -316,10 +358,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
       setState(() {
         _submitted = true;
         _outcome = outcome;
-        _mistakeKinds
-          ..clear()
-          ..addAll(outcome.attempt.mistakeKinds);
         if (outcome.summary != null) _summary = outcome.summary;
+        _syncWrongNotes(outcome.attempt);
       });
       _questionTimer?.cancel();
       _toast?.dismiss();
@@ -350,52 +390,17 @@ class _SessionPageState extends ConsumerState<SessionPage>
         );
   }
 
-  Future<void> _setMistakeKind(MistakeKind kind, bool selected) async {
-    final item = _item;
-    if (item == null || _mistakeBusy) return;
-    final previous = {..._mistakeKinds};
-    final next = {..._mistakeKinds};
-    if (selected) {
-      next.add(kind);
-    } else {
-      next.remove(kind);
-    }
-    setState(() {
-      _mistakeKinds
-        ..clear()
-        ..addAll(next);
-      _mistakeBusy = true;
-    });
-    try {
-      final attempt = await ref
-          .read(sessionServiceProvider)
-          .setMistakeKinds(start: _start, item: item, kinds: next);
-      if (!mounted) return;
-      _start.attempts[item.question.id] = attempt;
-      setState(() {
-        _mistakeKinds
-          ..clear()
-          ..addAll(attempt.mistakeKinds);
-        _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
-      });
-      ref.invalidate(dueErrorsProvider);
-    } on SessionException catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _mistakeKinds
-          ..clear()
-          ..addAll(previous);
-      });
-      await showSnack(context, error.message);
-    } finally {
-      if (mounted) setState(() => _mistakeBusy = false);
-    }
-  }
-
   Future<void> _setDistracted(bool value) async {
     final item = _item;
     if (item == null || _submitting) return;
     setState(() => _submitting = true);
+    if (!await _flushWrongNotes()) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      await showSnack(context, 'Your notes are not saved. Try again.');
+      return;
+    }
+    if (!mounted) return;
     try {
       final attempt = await ref
           .read(sessionServiceProvider)
@@ -404,10 +409,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
       _start.attempts[item.question.id] = attempt;
       setState(() {
         _distracted = attempt.distracted;
-        _mistakeKinds
-          ..clear()
-          ..addAll(attempt.mistakeKinds);
         _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+        _syncWrongNotes(attempt);
       });
       ref.invalidate(dueErrorsProvider);
     } on SessionException catch (error) {
@@ -421,6 +424,13 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final item = _item;
     if (item == null || _submitting) return;
     setState(() => _submitting = true);
+    if (!await _flushWrongNotes()) {
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      await showSnack(context, 'Your notes are not saved. Try again.');
+      return;
+    }
+    if (!mounted) return;
     try {
       final attempt = await ref
           .read(sessionServiceProvider)
@@ -430,10 +440,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
       setState(() {
         _unknown = attempt.unknown;
         _distracted = attempt.distracted;
-        _mistakeKinds
-          ..clear()
-          ..addAll(attempt.mistakeKinds);
         _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
+        _syncWrongNotes(attempt);
       });
       ref.invalidate(dueErrorsProvider);
     } on SessionException catch (error) {
@@ -444,6 +452,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _next() async {
+    if (!await _flushWrongNotes()) return;
     if (_summary != null && _index >= _start.items.length - 1) {
       _openSummary(_summary!);
       return;
@@ -468,6 +477,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
 
   Future<void> _finishEarly() async {
     if (_submitting) return;
+    if (!await _flushWrongNotes()) return;
+    if (!mounted) return;
     final unanswered = _start.pendingUnanswered.length;
     if (unanswered <= 0) {
       final summary =
@@ -552,6 +563,12 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _requestExit() async {
+    final saved = await _flushWrongNotes();
+    if (!mounted) return;
+    if (!saved) {
+      await showSnack(context, 'Your notes are not saved. Try again.');
+      return;
+    }
     if (_summary != null) {
       _openSummary(_summary!);
       return;
@@ -684,6 +701,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
               onPressed: _submitting ? null : _finishEarly,
             ),
             M3EIconButton(
+              key: const ValueKey('session-leave'),
               variant: M3EIconButtonVariant.standard,
               icon: const Icon(Icons.close),
               tooltip: 'Leave practice',
@@ -711,140 +729,58 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   onOpenList: _openQuestionList,
                 ),
                 const SizedBox(height: 22),
-                if (item.topicName.isNotEmpty)
-                  Text(
-                    item.topicName.toUpperCase(),
-                    style: theme.typography.baseline.labelSmall.copyWith(
-                      color: theme.colorScheme.primary,
-                      letterSpacing: 0.8,
-                      fontWeight: FontWeight.w700,
-                    ),
+                QuestionFeedbackView(
+                  snapshot: _submitted
+                      ? FeedbackSnapshot.fromAttempt(
+                          item: item,
+                          attempt: _outcome!.attempt,
+                          mode: FeedbackMode.practice,
+                          pastErrors:
+                              _start.session.mode == SessionMode.pastErrors,
+                          notes: _notes[item.question.id] ?? const [],
+                        )
+                      : FeedbackSnapshot.fromQuestion(
+                          item: item,
+                          selectedIndexes: _selectedIndexes,
+                          pastErrors:
+                              _start.session.mode == SessionMode.pastErrors,
+                          notes: _notes[item.question.id] ?? const [],
+                        ),
+                  actions: FeedbackActions(
+                    onDefine: _openLookup,
+                    onOpenUrl: _openUrl,
+                    onAsk: _openAsk,
+                    onSaveNote: _addNote,
+                    onNoteTap: _openNoteActions,
                   ),
-                const SizedBox(height: 6),
-                SelectableLinkifiedText(
-                  text: item.question.prompt,
-                  style: theme.typography.baseline.headlineSmall.copyWith(
-                    height: 1.3,
-                  ),
-                  onDefine: _openLookup,
-                  onOpenUrl: _openUrl,
-                  onNote: _addNote,
-                  onAsk: _openAsk,
-                  onNoteTap: _openNoteActions,
-                  notes: _noteTexts(item.question.id),
+                  controller: _wrongNotes,
+                  notes: _notes[item.question.id] ?? const [],
+                  checks:
+                      _submitted &&
+                          _outcome!.attempt.selectedIndexes.isNotEmpty &&
+                          !_outcome!.attempt.isCorrect
+                      ? _FeedbackChecks(
+                          distracted: _distracted,
+                          unknown: _unknown,
+                          onDistractedChanged: _submitting
+                              ? null
+                              : _setDistracted,
+                          onUnknownChanged: _submitting ? null : _setUnknown,
+                        )
+                      : null,
+                  showLetters: _submitted || _showOriginalLetters,
+                  onOptionTap: _submitted
+                      ? null
+                      : (index) => setState(() {
+                          if (!item.question.allowsMultiple) {
+                            _selectedIndexes
+                              ..clear()
+                              ..add(index);
+                          } else if (!_selectedIndexes.remove(index)) {
+                            _selectedIndexes.add(index);
+                          }
+                        }),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.text_fields,
-                      size: 14,
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        item.question.allowsMultiple
-                            ? 'Select every correct alternative. Select text to define a term.'
-                            : 'Select text to define a term.',
-                        style: theme.typography.baseline.labelSmall.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                for (final index in item.displayOrder)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _OptionCard(
-                      key: ValueKey(
-                        'alternative-card-${item.question.id}-$index',
-                      ),
-                      originalIndex: index,
-                      text: item.question.alternatives[index],
-                      selected: _selectedIndexes.contains(index),
-                      submitted: _submitted,
-                      isCorrect: item.question.correctIndexes.contains(index),
-                      multiSelect: item.question.allowsMultiple,
-                      showLetter: _submitted || _showOriginalLetters,
-                      explanation:
-                          item.question.alternativeExplanations.length > index
-                          ? item.question.alternativeExplanations[index]
-                          : '',
-                      onDefine: _openLookup,
-                      onOpenUrl: _openUrl,
-                      onNote: _addNote,
-                      onAsk: _openAsk,
-                      onNoteTap: _openNoteActions,
-                      notes: _noteTexts(item.question.id),
-                      onPressed: _submitted
-                          ? null
-                          : () => setState(() {
-                              if (!item.question.allowsMultiple) {
-                                _selectedIndexes
-                                  ..clear()
-                                  ..add(index);
-                              } else if (!_selectedIndexes.remove(index)) {
-                                _selectedIndexes.add(index);
-                              }
-                            }),
-                    ),
-                  ),
-                const SizedBox(height: 6),
-                if (_submitted) ...[
-                  const SizedBox(height: 16),
-                  _FeedbackStatus(
-                    outcome: _outcome!,
-                    distracted: _distracted,
-                    pastErrors: _start.session.mode == SessionMode.pastErrors,
-                  ),
-                  const SizedBox(height: 12),
-                  TonalBox(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Why this answer',
-                          style: theme.typography.emphasized.titleSmall,
-                        ),
-                        const SizedBox(height: 6),
-                        SelectableLinkifiedText(
-                          text: item.question.explanation,
-                          style: theme.typography.baseline.bodyMedium.copyWith(
-                            height: 1.45,
-                          ),
-                          onDefine: _openLookup,
-                          onOpenUrl: _openUrl,
-                          onNote: _addNote,
-                          onAsk: _openAsk,
-                          onNoteTap: _openNoteActions,
-                          notes: _noteTexts(item.question.id),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_outcome!.attempt.selectedIndexes.isNotEmpty &&
-                      !_outcome!.attempt.isCorrect) ...[
-                    const SizedBox(height: 10),
-                    _FeedbackChecks(
-                      distracted: _distracted,
-                      unknown: _unknown,
-                      onDistractedChanged: _submitting ? null : _setDistracted,
-                      onUnknownChanged: _submitting ? null : _setUnknown,
-                    ),
-                  ],
-                  if (!_outcome!.attempt.isSkipped &&
-                      !_outcome!.attempt.isCorrect) ...[
-                    const SizedBox(height: 12),
-                    _MistakeChips(
-                      selected: _mistakeKinds,
-                      busy: _mistakeBusy,
-                      onToggle: _setMistakeKind,
-                    ),
-                  ],
-                ],
               ],
             ),
           ),
@@ -1074,53 +1010,6 @@ class _QuestionPickerRow extends StatelessWidget {
   }
 }
 
-class _MistakeChips extends StatelessWidget {
-  const _MistakeChips({
-    required this.selected,
-    required this.busy,
-    required this.onToggle,
-  });
-
-  final Set<MistakeKind> selected;
-  final bool busy;
-  final void Function(MistakeKind kind, bool selected) onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'What went wrong? Optional, feeds the card generator.',
-          style: theme.typography.baseline.labelSmall.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
-        M3ETheme(
-          data: theme.copyWith(chipTheme: theme.chipTheme.copyWith(height: 48)),
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final kind in MistakeKind.values)
-                M3EChip(
-                  type: M3EChipType.filter,
-                  label: kind.label,
-                  selected: selected.contains(kind),
-                  onPressed: busy
-                      ? null
-                      : () => onToggle(kind, !selected.contains(kind)),
-                ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _NoteActionsSheet extends StatelessWidget {
   const _NoteActionsSheet({required this.phrase, required this.showAsk});
 
@@ -1273,361 +1162,6 @@ class _FeedbackCheckRow extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _FeedbackStatus extends StatelessWidget {
-  const _FeedbackStatus({
-    required this.outcome,
-    required this.distracted,
-    required this.pastErrors,
-  });
-
-  final AnswerOutcome outcome;
-  final bool distracted;
-  final bool pastErrors;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final attempt = outcome.attempt;
-    final skipped = attempt.isSkipped;
-    final (color, icon, text) = attempt.unknown
-        ? (
-            theme.colorScheme.secondaryContainer,
-            Icons.help_outline,
-            "You didn't know this. No error card was created; the review asks "
-                'which concept was missing.',
-          )
-        : switch ((pastErrors, attempt.isCorrect, skipped, distracted)) {
-            (true, true, _, _) => (
-              AppSuccess.container(context),
-              Icons.check_circle_outline,
-              'Error resolved. It stays in your history.',
-            ),
-            (true, false, _, true) => (
-              theme.colorScheme.secondaryContainer,
-              Icons.pause_circle_outline,
-              'Not counted because you were distracted. The card stays due.',
-            ),
-            (true, false, _, false) => (
-              theme.colorScheme.errorContainer,
-              Icons.schedule,
-              'Still in the error queue. Next attempt in 48 hours.',
-            ),
-            (false, true, _, _) => (
-              AppSuccess.container(context),
-              Icons.check_circle_outline,
-              'Correct.',
-            ),
-            (false, false, true, _) => (
-              theme.colorScheme.secondaryContainer,
-              Icons.skip_next_outlined,
-              'Skipped. No error card is created; the review asks what was missing.',
-            ),
-            (false, false, false, true) => (
-              theme.colorScheme.secondaryContainer,
-              Icons.pause_circle_outline,
-              'Marked as distracted. No error card was created.',
-            ),
-            _ => (
-              theme.colorScheme.errorContainer,
-              Icons.error_outline,
-              'Not quite. The error card will ask what went wrong.',
-            ),
-          };
-    return TonalBox(
-      color: color,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Row(
-        children: [
-          Icon(icon, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: theme.typography.baseline.bodySmall.copyWith(height: 1.35),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _OptionCard extends StatefulWidget {
-  const _OptionCard({
-    required this.originalIndex,
-    required this.text,
-    required this.selected,
-    required this.submitted,
-    required this.isCorrect,
-    required this.multiSelect,
-    required this.showLetter,
-    required this.explanation,
-    required this.onDefine,
-    required this.onOpenUrl,
-    required this.onNote,
-    required this.onAsk,
-    required this.onNoteTap,
-    required this.notes,
-    required this.onPressed,
-    super.key,
-  });
-
-  final int originalIndex;
-  final String text;
-  final bool selected;
-  final bool submitted;
-  final bool isCorrect;
-  final bool multiSelect;
-  final bool showLetter;
-  final String explanation;
-  final void Function(String selection, Rect? anchor) onDefine;
-  final ValueChanged<String> onOpenUrl;
-  final Future<void> Function(String selection, Rect? anchor) onNote;
-  final Future<void> Function(String selection, Rect? anchor) onAsk;
-  final ValueChanged<String> onNoteTap;
-  final List<String> notes;
-  final VoidCallback? onPressed;
-
-  @override
-  State<_OptionCard> createState() => _OptionCardState();
-}
-
-class _OptionCardState extends State<_OptionCard> {
-  late bool _explanationOpen;
-  int? _pointer;
-  Duration? _pointerDownAt;
-  Offset? _pointerDownPosition;
-
-  bool get _shouldOpenExplanation =>
-      widget.submitted && (widget.isCorrect || widget.selected);
-
-  @override
-  void initState() {
-    super.initState();
-    _explanationOpen = _shouldOpenExplanation;
-  }
-
-  void _handlePointerDown(PointerDownEvent event) {
-    if (_pointer != null) return;
-    _pointer = event.pointer;
-    _pointerDownAt = event.timeStamp;
-    _pointerDownPosition = event.position;
-  }
-
-  void _handlePointerUp(PointerUpEvent event) {
-    if (event.pointer != _pointer) return;
-    final elapsed = _pointerDownAt == null
-        ? Duration.zero
-        : event.timeStamp - _pointerDownAt!;
-    final distance = _pointerDownPosition == null
-        ? 0.0
-        : (event.position - _pointerDownPosition!).distance;
-    _pointer = null;
-    _pointerDownAt = null;
-    _pointerDownPosition = null;
-    if (widget.submitted) return;
-    final isTap = elapsed < const Duration(milliseconds: 500) && distance < 12;
-    if (isTap) widget.onPressed?.call();
-  }
-
-  void _handlePointerCancel(PointerCancelEvent event) {
-    if (event.pointer != _pointer) return;
-    _pointer = null;
-    _pointerDownAt = null;
-    _pointerDownPosition = null;
-  }
-
-  @override
-  void didUpdateWidget(_OptionCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text ||
-        oldWidget.originalIndex != widget.originalIndex ||
-        (!oldWidget.submitted && widget.submitted)) {
-      _explanationOpen = _shouldOpenExplanation;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    final correctNow = widget.submitted && widget.isCorrect;
-    final wrongNow = widget.submitted && widget.selected && !widget.isCorrect;
-    final background = correctNow
-        ? AppSuccess.container(context)
-        : wrongNow
-        ? theme.colorScheme.errorContainer
-        : widget.selected
-        ? theme.colorScheme.secondaryContainer
-        : theme.colorScheme.surfaceContainerLow;
-    final foreground = correctNow
-        ? AppSuccess.onContainer(context)
-        : wrongNow
-        ? theme.colorScheme.onErrorContainer
-        : widget.selected
-        ? theme.colorScheme.onSecondaryContainer
-        : theme.colorScheme.onSurface;
-    final badgeBackground = correctNow
-        ? AppSuccess.foreground(context)
-        : wrongNow
-        ? theme.colorScheme.error
-        : widget.selected
-        ? theme.colorScheme.secondary
-        : theme.colorScheme.surfaceContainerHighest;
-    final badgeForeground = correctNow
-        ? theme.colorScheme.surface
-        : wrongNow
-        ? theme.colorScheme.onError
-        : widget.selected
-        ? theme.colorScheme.onSecondary
-        : theme.colorScheme.onSurfaceVariant;
-    final letter = String.fromCharCode(65 + widget.originalIndex);
-    return Semantics(
-      button: !widget.submitted,
-      selected: widget.selected,
-      label: widget.showLetter
-          ? 'Alternative $letter: ${widget.text}'
-          : 'Alternative: ${widget.text}',
-      child: Listener(
-        onPointerDown: _handlePointerDown,
-        onPointerUp: _handlePointerUp,
-        onPointerCancel: _handlePointerCancel,
-        child: Material(
-          color: background,
-          borderRadius: BorderRadius.circular(22),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            // Text selection owns touches inside the card. Tapping is resolved
-            // from the pointer stream so selecting text and choosing an
-            // alternative can both work before an answer is submitted.
-            onTap: widget.submitted ? null : () {},
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    key: ValueKey(
-                      'alternative-letter-badge-${widget.originalIndex}',
-                    ),
-                    width: 30,
-                    height: 30,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: badgeBackground,
-                      shape: widget.multiSelect
-                          ? BoxShape.rectangle
-                          : BoxShape.circle,
-                      borderRadius: widget.multiSelect
-                          ? BorderRadius.circular(8)
-                          : null,
-                    ),
-                    child: widget.showLetter
-                        ? Text(
-                            letter,
-                            style: theme.typography.baseline.labelMedium
-                                .copyWith(
-                                  color: badgeForeground,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          )
-                        : correctNow
-                        ? Icon(Icons.check, size: 18, color: badgeForeground)
-                        : wrongNow
-                        ? Icon(Icons.close, size: 18, color: badgeForeground)
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SelectableLinkifiedText(
-                          key: ValueKey(
-                            'alternative-${widget.originalIndex}-text',
-                          ),
-                          text: widget.text,
-                          style: theme.typography.baseline.bodyMedium.copyWith(
-                            color: foreground,
-                            height: 1.4,
-                          ),
-                          onDefine: widget.onDefine,
-                          onOpenUrl: widget.onOpenUrl,
-                          onNote: widget.onNote,
-                          onAsk: widget.onAsk,
-                          onNoteTap: widget.onNoteTap,
-                          notes: widget.notes,
-                        ),
-                        if (widget.submitted &&
-                            widget.explanation.isNotEmpty &&
-                            _explanationOpen) ...[
-                          const SizedBox(height: 6),
-                          SelectableLinkifiedText(
-                            text: widget.explanation,
-                            style: theme.typography.baseline.bodySmall.copyWith(
-                              color: foreground.withValues(alpha: 0.82),
-                              height: 1.4,
-                            ),
-                            onDefine: widget.onDefine,
-                            onOpenUrl: widget.onOpenUrl,
-                            onNote: widget.onNote,
-                            onAsk: widget.onAsk,
-                            onNoteTap: widget.onNoteTap,
-                            notes: widget.notes,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (widget.submitted && widget.explanation.isNotEmpty) ...[
-                    const SizedBox(width: 4),
-                    Semantics(
-                      button: true,
-                      label: _explanationOpen
-                          ? 'Hide explanation'
-                          : 'Show explanation',
-                      child: InkResponse(
-                        key: ValueKey(
-                          'alternative-explanation-'
-                          '${widget.originalIndex}-toggle',
-                        ),
-                        onTap: () => setState(
-                          () => _explanationOpen = !_explanationOpen,
-                        ),
-                        radius: 18,
-                        child: Padding(
-                          padding: const EdgeInsets.all(4),
-                          child: Icon(
-                            _explanationOpen
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                            size: 20,
-                            color: foreground.withValues(alpha: 0.82),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (correctNow || wrongNow) ...[
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Icon(
-                        correctNow ? Icons.check : Icons.close,
-                        size: 20,
-                        color: foreground,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
       ),
     );
   }

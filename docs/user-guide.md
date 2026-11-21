@@ -46,7 +46,7 @@ Questions is an offline Android app for practising questions and exporting study
 ## Practice
 
 - Select one alternative, or every correct alternative when the question has several.
-- Reasoning is optional. It saves automatically and appears later in the error review.
+- After a wrong answer, **What went wrong?** keeps one idea per bullet. Enter makes a new bullet, pasting an outline splits it into bullets, and edits save automatically. These bullets appear later in the error review and feed the card creator.
 - Alternative letters stay hidden until feedback. The eye icon shows them early without changing the order.
 - **Check** stays on the same screen. Correct and wrong choices are marked, the correct and selected alternatives open with their explanation, and the overall explanation appears below.
 - The arrows and question list move between questions without answering. Submitted answers keep their feedback. Answered questions get a **Done** tag.
@@ -59,8 +59,8 @@ Questions is an offline Android app for practising questions and exporting study
 ## Check and feedback
 
 - A wrong answer creates an error record with the question, your answer, the correct answer and the explanation.
-- After a wrong answer, one-tap chips classify the mistake: **Forgotten fact**, **Confusion between 2 options**, **Misinterpretation** or **Distraction**. You can pick more than one; the choice feeds the card creator.
-- **I was distracted or read too fast** removes the new error card. Uncheck it to restore the card.
+- **What went wrong?** collects one atomic note per bullet. Add bullets, edit them in place, or delete one; empty bullets disappear when you leave the field. The list keeps up to 30 bullets and 500 characters each.
+- **I was distracted or read too fast** removes a new error card. Uncheck it to restore the card. On a re-test of an older error the card stays due and the review warns that you were distracted or misread.
 - **I didn't know this** counts as skipped and creates no error card.
 - Skipped questions create no error card. The review asks what was missing.
 - Feedback stays on screen while you move between questions.
@@ -75,8 +75,10 @@ Questions is an offline Android app for practising questions and exporting study
 
 Review opens fullscreen.
 
-- **Wrong questions** show your wrong answer, the correct answer and the explanations.
-- **Create cards** sits inside the error review and opens the card creator as a draggable half-height sheet, so the error stays visible above it; drag it up for more room. Manual entry adds cards one at a time and works offline without AI. **Suggest with AI** is optional: it proposes at most two cards, a contrast between your choice and the correct option and/or a condition-action heuristic written as "Given requirement X with restriction Y, what rule applies?".
+- **Wrong questions** use the same feedback as practice: topic and subtopic, the question, every alternative with its correct/wrong state and explanation, the status banner, **Why this answer**, and your read-only **What went wrong?** bullets.
+- If the card was kept because a re-test was distracted, a warning says **You were distracted or misread. This card stays due.**
+- Notes saved for the question appear below the bullets. **Copy** copies a note; **Create card with AI** opens the card creator seeded with it. The note menu also offers Define, Ask and Delete note.
+- The review does not edit the question or options. **Create cards** sits inside the error review and opens the card creator as a draggable half-height sheet, so the error stays visible above it; drag it up for more room. Manual entry adds cards one at a time and works offline without AI. **Suggest with AI** is optional: it proposes at most two cards, a contrast between your choice and the correct option and/or a condition-action heuristic written as "Given requirement X with restriction Y, what rule applies?".
 - Suggestions carry a Litmus quality badge that warns about binary questions, fronts over 30 words, syntactic clues or a heuristic front that does not use the rule template. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
 - **Skipped questions** ask **What was missing here?**.
   - **A concept** creates a concept card from a term and definition.
@@ -101,7 +103,7 @@ Review opens fullscreen.
 - Cards has no checkboxes. Long-press a card to start selecting it, then tap more cards. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. The subtitle counts the selection and rows keep their positions.
 - **Review all** sits above the error and skipped section; **Review selected** appears while cards are selected.
 - **Complete** finishes a missing concept definition; an error is completed by adding cards with **Create cards** or skipping it.
-- Tap a card to preview it. Tapping a note opens the note review at that note. In the error review, the pencil opens the full-page editor for the card's question, alternatives and explanations, and **Create cards** creates the cards to export. An error preview is titled **Error preview**.
+- Tap a card to preview it. Tapping a note opens the note review at that note. In the error review, **Create cards** creates the cards to export; the question and alternatives stay read-only. An error preview is titled **Error preview**.
 - **Export to AnkiDroid** sends the selected cards to AnkiDroid.
 - **Share as files** creates Anki-compatible text files.
 - **Delete selected** removes the chosen cards, skipped questions and notes. Deleting an active error card also removes it from the error queue; a deleted skipped question leaves the queue but stays in its practice. Deleting a note removes only the saved phrase; cards already made from it stay.
@@ -173,7 +175,7 @@ Review opens fullscreen.
 
 ## Backup and restore
 
-- **Export backup** shares one JSON file with topics (including score bands), practices, questions, subtopics, sessions, answers, mistake classifications, cards, skipped questions, notes and settings.
+- **Export backup** shares one JSON file with topics (including score bands), practices, questions, subtopics, sessions, answers, wrong-answer bullets, distraction flags, cards, skipped questions, notes and settings.
 - **Restore backup** validates the file before replacing all local data in one step. An empty, damaged or incompatible file leaves the current data untouched.
 - A restore does not merge: the backup becomes the complete state.
 - A backup is not a practice JSON file. Use **Import** or **Update practice JSON** for practice content.

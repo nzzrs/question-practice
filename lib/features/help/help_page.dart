@@ -45,7 +45,7 @@ class HelpPage extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               Text(
-                'Import a practice file, answer with your reasoning, review '
+                'Import a practice file, write what went wrong, review '
                 'mistakes, and export cards to AnkiDroid.',
                 style: theme.typography.baseline.bodyMedium.copyWith(
                   color: theme.colorScheme.onPrimaryContainer,
@@ -83,7 +83,7 @@ class HelpPage extends StatelessWidget {
           title: 'Practice',
           points: [
             'Select one alternative, or every correct one when the question has several.',
-            'Reasoning is optional and saves automatically.',
+            'After a wrong answer, What went wrong? keeps one idea per bullet and saves automatically.',
             'Check stays on the screen: correct and wrong choices are marked, and explanations open.',
             'The arrows and question list move between questions without answering.',
             'Answered questions get a Done tag. Skip records a skipped question.',
@@ -95,8 +95,10 @@ class HelpPage extends StatelessWidget {
           number: '04',
           title: 'Feedback and error cards',
           points: [
-            'A wrong answer creates an error card with the question, your answer, the correct answer, your reasoning and the explanation.',
-            'Check I was distracted or read too fast to remove the card. Uncheck it to restore the card.',
+            'A wrong answer creates an error card with the question, your answer, the correct answer, your bullets and the explanation.',
+            'Check I was distracted or read too fast to remove a new card. Uncheck it to restore the card. A distracted re-test keeps an older card due and warns you in review.',
+            'The review shows the same feedback as practice, with read-only bullets and the notes saved for the question. Copy a note or create a card from it.',
+            'The review does not edit the question or options.',
             "I didn't know this counts as skipped and creates no error card.",
             'Create cards opens one creator for the error: write cards by hand, or use Suggest with AI when a provider is set.',
             'A small pill shows the estimated time to read the card front.',

@@ -36,6 +36,9 @@ enum CognitiveType {
 }
 
 /// A one-tap classification of why an answer was wrong.
+///
+/// Legacy data only: practice now keeps free-form wrong-answer bullets. The
+/// enum and its columns remain so older backups and cards still render.
 enum MistakeKind {
   forgottenFact('Forgotten fact'),
   confusion('Confusion between 2 options'),
@@ -336,7 +339,7 @@ class Attempt {
   final bool isCorrect;
   final DateTime answeredAt;
 
-  /// One-tap classifications chosen after a wrong answer.
+  /// Legacy one-tap classifications chosen after a wrong answer.
   final List<MistakeKind> mistakeKinds;
 
   bool get isSkipped => selectedIndexes.isEmpty || unknown;
@@ -565,6 +568,7 @@ class ErrorCard {
     this.cognitiveType = CognitiveType.contrast,
     this.subtopic = '',
     this.mistakeKinds = const [],
+    this.distracted = false,
   });
 
   final int id;
@@ -595,8 +599,11 @@ class ErrorCard {
   /// Optional grouping inside the topic, copied from the source question.
   final String subtopic;
 
-  /// Quick classifications chosen after the wrong answer.
+  /// Legacy quick classifications chosen after the wrong answer.
   final List<MistakeKind> mistakeKinds;
+
+  /// A distracted re-test kept this card due instead of counting a new error.
+  final bool distracted;
 
   bool get isResolved => status == ErrorCardStatus.resolved;
   bool get needsDetails => detailsCompletedAt == null;

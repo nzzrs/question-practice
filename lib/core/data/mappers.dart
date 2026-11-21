@@ -157,6 +157,7 @@ ErrorCard errorCardFromRow(ErrorCardRow row) {
     cognitiveType: CognitiveType.fromName(row.cognitiveType),
     subtopic: row.subtopic,
     mistakeKinds: mistakeKindsFromJson(row.mistakeKindsJson),
+    distracted: row.distracted,
   );
 }
 

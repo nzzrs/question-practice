@@ -115,6 +115,8 @@ void main() {
         .select(harness.database.errorCards)
         .get();
     expect(errors.single.question, question.prompt);
+    expect(errors.single.distracted, isTrue);
+    expect(errors.single.reasoning, 'I misread the prompt.');
     final manuals = await harness.database
         .select(harness.database.manualCards)
         .get();
@@ -195,6 +197,31 @@ void main() {
       'Legacy deck',
     );
   });
+
+  test(
+    'a legacy error card without distracted restores as not distracted',
+    () async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      await _seedAllData(harness);
+
+      final service = _service(harness);
+      final payload = _payload(await service.encode());
+      final tables = payload['tables'] as Map<String, dynamic>;
+      final card = (tables['errorCards'] as List<dynamic>).single;
+      (card as Map<String, dynamic>).remove('distracted');
+      _resign(payload);
+
+      await harness.database.clearAll();
+      await service.restoreText(jsonEncode(payload));
+
+      final restored = await harness.database
+          .select(harness.database.errorCards)
+          .get();
+      expect(restored.single.distracted, isFalse);
+      expect(restored.single.reasoning, 'I misread the prompt.');
+    },
+  );
 
   for (final version in [1, 2]) {
     test(
@@ -792,6 +819,7 @@ Future<SeededPractice> _seedAllData(TestHarness harness) async {
     practiceName: 'Core',
     lastWrongAt: harness.clock.now().toUtc(),
     dueAfter: const Duration(hours: 48),
+    distracted: true,
   );
   await harness.cards.createManualCard(
     sessionId: session.id,

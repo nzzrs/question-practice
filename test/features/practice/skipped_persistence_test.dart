@@ -130,10 +130,10 @@ void main() {
       distracted: false,
     );
 
-    await sessions.updateReasoning(
+    await sessions.setWrongNotes(
       start: start,
       item: start.items.single,
-      reasoning: 'I had never seen this term.',
+      notes: const ['I had never seen this term.'],
     );
 
     final queued = await harness.cards.watchUnhandledSkippedQuestions().first;

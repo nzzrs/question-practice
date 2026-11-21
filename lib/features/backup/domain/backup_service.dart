@@ -926,6 +926,7 @@ class BackupService {
       cognitiveType: row.stringOr('cognitiveType', 'contrast'),
       subtopic: row.stringOr('subtopic', ''),
       mistakeKindsJson: row.stringOr('mistakeKindsJson', '[]'),
+      distracted: row.boolOr('distracted', false),
       status: row.requireEnum('status', ErrorCardStatus.values),
       createdAt: row.requireDate('createdAt'),
       lastWrongAt: row.requireDate('lastWrongAt'),

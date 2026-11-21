@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -133,6 +133,9 @@ class AppDatabase extends _$AppDatabase {
         await customStatement(
           'CREATE INDEX IF NOT EXISTS notes_question ON notes (question_id)',
         );
+      }
+      if (from < 13) {
+        await migrator.addColumn(errorCards, errorCards.distracted);
       }
     },
     beforeOpen: (details) async {

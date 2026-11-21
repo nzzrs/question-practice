@@ -88,17 +88,26 @@ void main() {
 
     await _pumpView(tester, harness, card);
 
-    expect(find.text('Wrong answer chosen'), findsOneWidget);
-    expect(find.text('Right answer discarded'), findsOneWidget);
-    expect(find.text('Your reasoning'), findsOneWidget);
+    expect(find.text('Correct 1'), findsOneWidget);
+    expect(find.text('Wrong 1'), findsOneWidget);
+    expect(find.text('What went wrong?'), findsOneWidget);
+    expect(
+      find.text('I assumed both alternatives did the same job.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Not quite. This is the error card from that attempt.'),
+      findsOneWidget,
+    );
     expect(find.text('Network layer'), findsOneWidget);
     expect(find.text('Why this answer'), findsOneWidget);
+    expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);
     expect(find.text('Check with AI'), findsNothing);
     expect(find.text('Flawed assumption (bias)'), findsNothing);
     expect(find.text('Vaccine (rule / protocol)'), findsNothing);
     expect(find.byKey(const ValueKey('error-card-reading-time')), findsNothing);
     expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
-    expect(find.text('Create cards'), findsOneWidget);
+    expect(find.text('Create cards'), findsWidgets);
   });
 
   testWidgets('manual error cards work without an AI provider', (tester) async {

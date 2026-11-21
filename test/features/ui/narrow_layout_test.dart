@@ -182,7 +182,7 @@ void main() {
     await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
-    expect(find.text('Create cards from this error'), findsOneWidget);
+    expect(find.text('What went wrong?'), findsOneWidget);
     expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
     expect(find.text('Check with AI'), findsNothing);
   });
@@ -267,7 +267,7 @@ void main() {
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
   });
 
-  testWidgets('card editor fits 360 with option explanations open', (
+  testWidgets('error review fits 360 with option explanations open', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -285,13 +285,11 @@ void main() {
     );
     await tester.tap(find.text('Review all'));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-card-edit-content')));
-    await pumpFrames(tester);
-    expect(find.text('Edit card content'), findsOneWidget);
+    expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);
     expect(tester.takeException(), isNull);
 
     final toggle = find.byKey(
-      const ValueKey('edit-error-option-0-explanation-toggle'),
+      const ValueKey('alternative-explanation-0-toggle'),
     );
     await tester.ensureVisible(toggle);
     await pumpFrames(tester);
@@ -299,7 +297,7 @@ void main() {
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
     expect(
-      find.byKey(const ValueKey('edit-error-option-0-explanation')),
+      find.byKey(const ValueKey('alternative-explanation-0-toggle')),
       findsOneWidget,
     );
   });

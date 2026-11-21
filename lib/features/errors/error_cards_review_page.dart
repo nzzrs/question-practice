@@ -49,7 +49,6 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
     for (final card in widget.cards) _ErrorStep(card),
     for (final question in widget.skippedQuestions) _SkippedStep(question),
   ];
-  final _edits = <int, ErrorCardContent>{};
   int _index = 0;
   int _saved = 0;
   bool _busy = false;
@@ -241,9 +240,6 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
         switch (step) {
           _ErrorStep(:final card) => ErrorCardReviewView(
             card: card,
-            editedContent: _edits[card.id],
-            onContentChanged: (content) =>
-                setState(() => _edits[card.id] = content),
             onCardsAdded: _cardsAdded,
           ),
           _SkippedStep(:final question) => Column(

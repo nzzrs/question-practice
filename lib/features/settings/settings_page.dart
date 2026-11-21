@@ -35,6 +35,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   List<String> _models = const [];
   bool _loadingModels = false;
   bool _modelsLoaded = false;
+  int _modelLoadRequest = 0;
   bool _loaded = false;
   bool _busy = false;
   bool _apiKeyEdited = false;
@@ -226,7 +227,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                       setState(() {
                         _models = const [];
                         _modelsLoaded = false;
+                        _loadingModels = false;
                       });
+                      _modelLoadRequest++;
                       _publishModelState();
                       _scheduleBaseUrlSave();
                     },
@@ -469,9 +472,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       _provider = selected;
       _models = const [];
       _modelsLoaded = false;
+      _loadingModels = false;
       _model.text = '';
       _baseUrl.text = _baseUrlFor(_provider, _baseUrl.text);
     });
+    _modelLoadRequest++;
     _publishModelState();
     unawaited(_persistAiSettings());
   }
@@ -542,9 +547,14 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   Future<void> _loadModels() async {
     if (_loadingModels) return;
+    final request = ++_modelLoadRequest;
+    final requestProvider = _provider;
+    bool isCurrent() =>
+        mounted && request == _modelLoadRequest && requestProvider == _provider;
+
     final rawBaseUrl = _baseUrl.text.trim();
     final baseUrl = rawBaseUrl.isEmpty
-        ? _baseUrlFor(_provider, rawBaseUrl)
+        ? _baseUrlFor(requestProvider, rawBaseUrl)
         : rawBaseUrl;
     final uri = Uri.tryParse(baseUrl);
     if (uri == null ||
@@ -559,6 +569,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ? _apiKey.text.trim()
         : await ref.read(settingsRepositoryProvider).readApiKey();
     if (!mounted) return;
+    if (!isCurrent()) return;
     if (key == null || key.trim().isEmpty) {
       _modelsLoaded = true;
       _publishModelState();
@@ -570,8 +581,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     try {
       final models = await ref
           .read(lookupServiceProvider)
-          .listModels(provider: _provider, baseUrl: baseUrl, apiKey: key);
+          .listModels(provider: requestProvider, baseUrl: baseUrl, apiKey: key);
       if (!mounted) return;
+      if (!isCurrent()) return;
       var selectedFirst = false;
       setState(() {
         _models = models;
@@ -586,12 +598,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         await showSnack(context, 'The provider returned no models.');
       }
     } on LookupException catch (error) {
-      if (mounted) await showSnack(context, error.message);
+      if (!mounted) return;
+      if (isCurrent()) await showSnack(context, error.message);
     } finally {
-      _modelsLoaded = true;
-      if (mounted) {
-        setState(() => _loadingModels = false);
-        _publishModelState();
+      if (request == _modelLoadRequest) {
+        _modelsLoaded = true;
+        if (mounted) {
+          setState(() => _loadingModels = false);
+          _publishModelState();
+        }
       }
     }
   }
@@ -883,13 +898,20 @@ class _AnkiStatusCard extends StatelessWidget {
           alignment: WrapAlignment.start,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            M3EIconButton(
-              key: const ValueKey('anki-check-again'),
-              variant: M3EIconButtonVariant.standard,
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Check again',
-              semanticLabel: 'Check again',
-              onPressed: onCheck,
+            Semantics(
+              container: true,
+              button: true,
+              label: 'Check again',
+              onTap: onCheck,
+              excludeSemantics: true,
+              child: M3EIconButton(
+                key: const ValueKey('anki-check-again'),
+                variant: M3EIconButtonVariant.standard,
+                icon: const Icon(Icons.refresh),
+                tooltip: 'Check again',
+                semanticLabel: 'Check again',
+                onPressed: onCheck,
+              ),
             ),
             if (installed && !permission)
               M3EButton.tonal(

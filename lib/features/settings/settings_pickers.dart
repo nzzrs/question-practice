@@ -43,7 +43,7 @@ class SettingsChoiceField extends StatelessWidget {
     return Semantics(
       button: true,
       label: semanticLabel,
-      value: hasValue ? value : null,
+      value: hasValue ? value : hint,
       onTap: onTap,
       excludeSemantics: true,
       child: Material(
@@ -145,8 +145,8 @@ class _ChoiceRow extends StatelessWidget {
     final scheme = theme.colorScheme;
     final foreground = selected ? scheme.onPrimaryContainer : scheme.onSurface;
     return Semantics(
-      button: true,
-      selected: selected,
+      checked: selected,
+      inMutuallyExclusiveGroup: true,
       label: label,
       onTap: onTap,
       excludeSemantics: true,
@@ -209,11 +209,26 @@ Future<String?> showSettingsModelPicker(
   BuildContext context, {
   required ValueListenable<ModelCatalogState> catalog,
 }) {
+  final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+  if (largeText) {
+    // The dialog header and actions cannot shrink around the keyboard at large
+    // text sizes, so the searchable list takes the whole screen instead.
+    return M3EDialog.showFullScreen<String>(
+      context,
+      title: 'Model',
+      body: _ModelPickerBody(catalog: catalog, fillHeight: true),
+      bottomActions: [
+        M3EButton.text(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+      ],
+    );
+  }
   return M3EDialog.show<String>(
     context,
     dialog: M3EDialog(
-      title: 'Choose a model',
-      subhead: 'Loaded from the provider.',
+      title: 'Model',
       content: _ModelPickerBody(catalog: catalog),
       actions: [
         M3EButton.text(
@@ -226,9 +241,12 @@ Future<String?> showSettingsModelPicker(
 }
 
 class _ModelPickerBody extends StatefulWidget {
-  const _ModelPickerBody({required this.catalog});
+  const _ModelPickerBody({required this.catalog, this.fillHeight = false});
 
   final ValueListenable<ModelCatalogState> catalog;
+
+  /// Fills the available height, as in the full-screen picker.
+  final bool fillHeight;
 
   @override
   State<_ModelPickerBody> createState() => _ModelPickerBodyState();
@@ -247,92 +265,89 @@ class _ModelPickerBodyState extends State<_ModelPickerBody> {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
-    return SizedBox(
-      width: double.maxFinite,
-      height: 360,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          M3ETextField(
-            key: const ValueKey('ai-model-search'),
-            controller: _search,
-            label: 'Search models',
-            placeholder: 'Type to filter',
-            leading: const Icon(Icons.search),
-            onChanged: (value) => setState(() => _query = value),
-          ),
-          const SizedBox(height: 10),
-          Expanded(
-            child: ValueListenableBuilder<ModelCatalogState>(
-              valueListenable: widget.catalog,
-              builder: (context, catalog, _) {
-                final query = _query.trim().toLowerCase();
-                final models = [
-                  for (final model in catalog.models)
-                    if (query.isEmpty || model.toLowerCase().contains(query))
-                      model,
-                ];
-                if (catalog.models.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (catalog.loading || !catalog.loaded)
-                            const M3ELoadingIndicator()
-                          else
-                            Icon(
-                              Icons.search_off,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          const SizedBox(height: 12),
-                          Text(
-                            catalog.loading || !catalog.loaded
-                                ? 'Loading models…'
-                                : 'No models available from this provider.',
-                            textAlign: TextAlign.center,
-                            style: theme.typography.baseline.bodySmall.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        M3ETextField(
+          key: const ValueKey('ai-model-search'),
+          controller: _search,
+          label: 'Search models',
+          placeholder: 'Type to filter',
+          leading: const Icon(Icons.search),
+          onChanged: (value) => setState(() => _query = value),
+        ),
+        const SizedBox(height: 10),
+        Expanded(
+          child: ValueListenableBuilder<ModelCatalogState>(
+            valueListenable: widget.catalog,
+            builder: (context, catalog, _) {
+              final query = _query.trim().toLowerCase();
+              final models = [
+                for (final model in catalog.models)
+                  if (query.isEmpty || model.toLowerCase().contains(query))
+                    model,
+              ];
+              if (catalog.models.isEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (catalog.loading || !catalog.loaded)
+                          const M3ELoadingIndicator()
+                        else
+                          Icon(
+                            Icons.search_off,
+                            color: theme.colorScheme.onSurfaceVariant,
                           ),
-                        ],
-                      ),
+                        const SizedBox(height: 12),
+                        Text(
+                          catalog.loading || !catalog.loaded
+                              ? 'Loading models…'
+                              : 'No models available from this provider.',
+                          textAlign: TextAlign.center,
+                          style: theme.typography.baseline.bodySmall.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                }
-                if (models.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No models match “${_query.trim()}”.',
-                      textAlign: TextAlign.center,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  );
-                }
-                return ListView.separated(
-                  key: const ValueKey('ai-model-list'),
-                  padding: EdgeInsets.zero,
-                  itemCount: models.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 4),
-                  itemBuilder: (context, index) {
-                    final model = models[index];
-                    return _ChoiceRow(
-                      key: ValueKey('ai-model-option-$model'),
-                      label: model,
-                      selected: model == catalog.selected,
-                      onTap: () => Navigator.of(context).pop(model),
-                    );
-                  },
+                  ),
                 );
-              },
-            ),
+              }
+              if (models.isEmpty) {
+                return Center(
+                  child: Text(
+                    'No models match “${_query.trim()}”.',
+                    textAlign: TextAlign.center,
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
+              }
+              return ListView.separated(
+                key: const ValueKey('ai-model-list'),
+                padding: EdgeInsets.zero,
+                itemCount: models.length,
+                separatorBuilder: (context, index) => const SizedBox(height: 4),
+                itemBuilder: (context, index) {
+                  final model = models[index];
+                  return _ChoiceRow(
+                    key: ValueKey('ai-model-option-$model'),
+                    label: model,
+                    selected: model == catalog.selected,
+                    onTap: () => Navigator.of(context).pop(model),
+                  );
+                },
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
+    if (widget.fillHeight) return content;
+    return SizedBox(width: double.maxFinite, height: 360, child: content);
   }
 }

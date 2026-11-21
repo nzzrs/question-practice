@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/platform/anki_gateway.dart';
 import 'package:question_practice/features/settings/settings_page.dart';
+import 'package:question_practice/features/settings/settings_pickers.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -56,6 +58,10 @@ void main() {
     expect(button.tooltip, 'Check again');
     expect(button.semanticLabel, 'Check again');
     expect(
+      tester.getSemantics(refresh),
+      isSemantics(label: 'Check again', isButton: true, hasTapAction: true),
+    );
+    expect(
       find.descendant(of: refresh, matching: find.byIcon(Icons.refresh)),
       findsOneWidget,
     );
@@ -100,6 +106,27 @@ void main() {
     for (final row in rows.values) {
       expect(row, findsOneWidget);
     }
+
+    expect(
+      tester.getSemantics(rows['openai']!),
+      isSemantics(
+        label: 'OpenAI',
+        hasCheckedState: true,
+        isChecked: true,
+        isInMutuallyExclusiveGroup: true,
+        hasTapAction: true,
+      ),
+    );
+    expect(
+      tester.getSemantics(rows['groq']!),
+      isSemantics(
+        label: 'Groq',
+        hasCheckedState: true,
+        isChecked: false,
+        isInMutuallyExclusiveGroup: true,
+        hasTapAction: true,
+      ),
+    );
 
     final scheme = M3ETheme.of(tester.element(rows['openai']!)).colorScheme;
     final materials = [
@@ -219,5 +246,209 @@ void main() {
     expect(search, findsNothing);
     expect(find.text('gpt-20'), findsOneWidget);
     expect((await harness.settings.load()).aiModel, 'gpt-20');
+  });
+
+  testWidgets('a loaded model keeps the closed field in sync', (tester) async {
+    final client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'data': [
+            {'id': 'zeta-model'},
+            {'id': 'alpha-model'},
+          ],
+        }),
+        200,
+      );
+    });
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await harness.settings.saveApiKey('sk-test');
+    await pumpSettings(
+      tester,
+      harness,
+      settings: const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiProvider: AiProvider.openai,
+      ),
+    );
+
+    final field = find.byKey(const ValueKey('ai-model-field'));
+    await tester.ensureVisible(field);
+    await pumpFrames(tester);
+    expect(find.text('Choose a model'), findsOneWidget);
+    expect(
+      tester.getSemantics(field),
+      isSemantics(
+        label: 'Model',
+        value: 'Choose a model',
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+
+    await tester.tap(field);
+    await pumpFrames(tester);
+
+    expect(find.byType(M3EDialog), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ai-model-option-alpha-model')),
+      findsOneWidget,
+    );
+    // The field behind the open dialog already shows the auto-selected model.
+    expect(find.text('alpha-model'), findsNWidgets(2));
+
+    await tester.tap(find.text('Cancel'));
+    await pumpFrames(tester);
+
+    expect(find.text('alpha-model'), findsOneWidget);
+    expect((await harness.settings.load()).aiModel, 'alpha-model');
+  });
+
+  testWidgets(
+    'model picker fits a 360 dp phone at 2.0 text scale with the keyboard open',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final catalog = ValueNotifier<ModelCatalogState>(
+        ModelCatalogState(
+          models: [for (var index = 1; index <= 12; index++) 'model-$index'],
+          selected: 'model-1',
+          loaded: true,
+        ),
+      );
+      addTearDown(catalog.dispose);
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      await pumpTestApp(
+        tester,
+        harness: harness,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: M3EButton.filled(
+                onPressed: () async {
+                  await showSettingsModelPicker(context, catalog: catalog);
+                },
+                label: const Text('Open models'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open models'));
+      await pumpFrames(tester);
+      expect(tester.takeException(), isNull);
+      expect(find.byType(M3EFullScreenDialog), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai-model-search')), findsOneWidget);
+
+      final target = find.byKey(const ValueKey('ai-model-option-model-12'));
+      await tester.scrollUntilVisible(
+        target,
+        120,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('ai-model-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await pumpFrames(tester);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(target);
+      await pumpFrames(tester);
+      expect(find.byKey(const ValueKey('ai-model-search')), findsNothing);
+    },
+  );
+
+  testWidgets('switching provider discards an older model request', (
+    tester,
+  ) async {
+    final pendingOpenAi = Completer<http.Response>();
+    final openAiStarted = Completer<void>();
+    final client = MockClient((request) async {
+      if (request.url.host == 'api.openai.com') {
+        if (!openAiStarted.isCompleted) openAiStarted.complete();
+        return pendingOpenAi.future;
+      }
+      if (request.url.host == 'api.groq.com') {
+        return http.Response(
+          jsonEncode({
+            'data': [
+              {'id': 'groq-model'},
+            ],
+          }),
+          200,
+        );
+      }
+      return http.Response('{}', 404);
+    });
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await harness.settings.saveApiKey('sk-test');
+    await pumpSettings(
+      tester,
+      harness,
+      settings: const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiProvider: AiProvider.openai,
+      ),
+    );
+
+    final modelField = find.byKey(const ValueKey('ai-model-field'));
+    await tester.ensureVisible(modelField);
+    await tester.tap(modelField);
+    await pumpFrames(tester);
+    expect(openAiStarted.isCompleted, isTrue);
+
+    await tester.tap(find.text('Cancel'));
+    await pumpFrames(tester);
+
+    final providerField = find.byKey(const ValueKey('ai-provider-field'));
+    await tester.ensureVisible(providerField);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 120));
+    await pumpFrames(tester);
+    await tester.tap(providerField);
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('ai-provider-option-groq')));
+    await pumpFrames(tester);
+
+    await tester.ensureVisible(modelField);
+    await tester.tap(modelField);
+    await pumpFrames(tester);
+    expect(
+      find.byKey(const ValueKey('ai-model-option-groq-model')),
+      findsOneWidget,
+    );
+
+    pendingOpenAi.complete(
+      http.Response(
+        jsonEncode({
+          'data': [
+            {'id': 'openai-model'},
+          ],
+        }),
+        200,
+      ),
+    );
+    await pumpFrames(tester);
+
+    expect(
+      find.byKey(const ValueKey('ai-model-option-openai-model')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('ai-model-option-groq-model')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Cancel'));
+    await pumpFrames(tester);
+    expect(find.text('groq-model'), findsOneWidget);
+    expect((await harness.settings.load()).aiModel, 'groq-model');
   });
 }

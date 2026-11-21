@@ -110,7 +110,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
   }
 
   void _resetStepState() {
-    _creator.clearSeed();
+    _creator.resetForStep();
     _draftCount = 0;
     if (_scroll.hasClients) _scroll.jumpTo(0);
     if (_feedbackScroll.hasClients) _feedbackScroll.jumpTo(0);

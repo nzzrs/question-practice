@@ -78,10 +78,12 @@ class CardCreatorController extends ChangeNotifier {
   }
 
   /// Marks the AI request or manual seed as finished.
+  ///
+  /// Edits made while the request was in flight stay dirty, so the next seed
+  /// still asks before replacing them.
   void markSeedSettled() {
-    if (_activeBulletId == null && !_seedDirty) return;
+    if (_activeBulletId == null) return;
     _activeBulletId = null;
-    _seedDirty = false;
     notifyListeners();
   }
 
@@ -89,6 +91,24 @@ class CardCreatorController extends ChangeNotifier {
   void markSeedDirty() {
     if (_seedDirty) return;
     _seedDirty = true;
+  }
+
+  /// Clears every short-lived state before showing another review step.
+  ///
+  /// Bullet ids are stable per card, so the added-chip state must not survive
+  /// a step change or the next card would mark the same bullets as added.
+  void resetForStep() {
+    final changed =
+        _seed != null ||
+        _activeBulletId != null ||
+        _seedDirty ||
+        _addedBulletIds.isNotEmpty;
+    _seed = null;
+    _seedRevision++;
+    _activeBulletId = null;
+    _seedDirty = false;
+    _addedBulletIds.clear();
+    if (changed) notifyListeners();
   }
 
   void markDraftAdded(String bulletId) {

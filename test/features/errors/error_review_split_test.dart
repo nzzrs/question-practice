@@ -8,6 +8,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/ui/adaptive_split_view.dart';
+import 'package:question_practice/core/ui/app_scaffold.dart';
 import 'package:question_practice/features/errors/error_cards_review_page.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/feedback/question_feedback_view.dart';
@@ -301,6 +302,11 @@ void main() {
     await tester.tap(bullet);
     await pumpFrames(tester);
     expect(find.byKey(const ValueKey('creator-seed-loading')), findsOneWidget);
+    expect(tester.widget<M3EButton>(bullet).onPressed, isNull);
+    expect(
+      find.descendant(of: bullet, matching: find.text('Drafting…')),
+      findsOneWidget,
+    );
 
     response.complete(
       _cardResponse(
@@ -404,6 +410,186 @@ void main() {
     expect(_field(tester, 'creator-front'), 'I read reliable as secure.');
   });
 
+  testWidgets('a bullet chip disables when added and re-enables on removal', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
+    await tester.ensureVisible(bullet);
+    await pumpFrames(tester);
+    await tester.tap(bullet);
+    await pumpFrames(tester);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'The network layer owns addressing.',
+    );
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+
+    expect(
+      find.descendant(of: bullet, matching: find.text('Added to cards')),
+      findsOneWidget,
+    );
+    expect(tester.widget<M3EButton>(bullet).onPressed, isNull);
+
+    final remove = find.byIcon(Icons.delete_outline);
+    await tester.ensureVisible(remove);
+    await pumpFrames(tester);
+    await tester.tap(remove);
+    await pumpFrames(tester);
+
+    expect(
+      find.descendant(of: bullet, matching: find.text('Turn bullet into card')),
+      findsOneWidget,
+    );
+    expect(tester.widget<M3EButton>(bullet).onPressed, isNotNull);
+  });
+
+  testWidgets('added bullet state does not leak into the next error step', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final first = await _seedCard(harness);
+    final second = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [first.card, second.card]),
+      harness: harness,
+    );
+
+    final firstBullet = find.byKey(const ValueKey('wrong-note-card-0'));
+    await tester.ensureVisible(firstBullet);
+    await pumpFrames(tester);
+    await tester.tap(firstBullet);
+    await pumpFrames(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'The network layer owns addressing.',
+    );
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await pumpFrames(tester, frames: 24);
+    expect(find.text('Item 2 of 2'), findsOneWidget);
+
+    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
+    await tester.ensureVisible(bullet);
+    await pumpFrames(tester);
+    expect(
+      find.descendant(of: bullet, matching: find.text('Turn bullet into card')),
+      findsOneWidget,
+    );
+    expect(tester.widget<M3EButton>(bullet).onPressed, isNotNull);
+  });
+
+  testWidgets('a late AI reply cannot refill a composer after Add to list', (
+    tester,
+  ) async {
+    final response = Completer<http.Response>();
+    final harness = TestHarness(httpClient: MockClient((_) => response.future));
+    addTearDown(harness.close);
+    await harness.settings.save(_aiSettings);
+    await harness.keyStore.writeApiKey('secret-key');
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
+    await tester.ensureVisible(bullet);
+    await pumpFrames(tester);
+    await tester.tap(bullet);
+    await pumpFrames(tester);
+    expect(find.byKey(const ValueKey('creator-seed-loading')), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Manual front',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'Manual back',
+    );
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+
+    response.complete(_cardResponse('Late AI front', 'Late AI back'));
+    await pumpFrames(tester, frames: 24);
+
+    expect(_field(tester, 'creator-front'), isEmpty);
+    expect(_field(tester, 'creator-back'), isEmpty);
+    expect(find.byKey(const ValueKey('creator-seed-loading')), findsNothing);
+  });
+
+  testWidgets('typing during an AI draft still guards the next bullet', (
+    tester,
+  ) async {
+    final response = Completer<http.Response>();
+    final harness = TestHarness(httpClient: MockClient((_) => response.future));
+    addTearDown(harness.close);
+    await harness.settings.save(_aiSettings);
+    await harness.keyStore.writeApiKey('secret-key');
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final first = find.byKey(const ValueKey('wrong-note-card-0'));
+    await tester.ensureVisible(first);
+    await pumpFrames(tester);
+    await tester.tap(first);
+    await pumpFrames(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'My own answer.',
+    );
+    await pumpFrames(tester);
+
+    response.complete(
+      _cardResponse(
+        'How does the network layer differ?',
+        'It addresses hosts.',
+      ),
+    );
+    await pumpFrames(tester, frames: 24);
+    expect(find.byKey(const ValueKey('creator-seed-loading')), findsNothing);
+
+    final second = find.byKey(const ValueKey('wrong-note-card-1'));
+    await tester.ensureVisible(second);
+    await pumpFrames(tester);
+    await tester.tap(second);
+    await pumpFrames(tester);
+    expect(find.text('Replace the draft you started?'), findsOneWidget);
+    expect(_field(tester, 'creator-back'), 'My own answer.');
+  });
+
   testWidgets('unsaved drafts guard Continue and Skip', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
@@ -468,6 +654,58 @@ void main() {
     expect(find.byType(ErrorCardsReviewPage), findsOneWidget);
   });
 
+  testWidgets('a note seeded card saves and marks the note converted', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: seeded.card.sessionId,
+      questionId: seeded.question.id,
+      text: 'a managed service removes host maintenance',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final create = find.byKey(ValueKey('feedback-note-card-$noteId'));
+    await tester.ensureVisible(create);
+    await pumpFrames(tester);
+    await tester.tap(create);
+    await pumpFrames(tester);
+    expect(
+      tester
+          .widget<M3ETextField>(find.byKey(const ValueKey('creator-term')))
+          .controller!
+          .text,
+      'a managed service removes host maintenance',
+    );
+
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await pumpFrames(tester, frames: 24);
+
+    final notes = await tester.runAsync(
+      () => harness.cards.notesForQuestion(seeded.question.id),
+    );
+    expect(notes!.single.hasCard, isTrue);
+    final concepts = await tester.runAsync(
+      () => harness.cards.watchConcepts().first,
+    );
+    expect(concepts, hasLength(1));
+  });
+
   testWidgets('a skipped step still uses the card creator sheet', (
     tester,
   ) async {
@@ -513,11 +751,14 @@ void main() {
     expect(find.byType(CardCreatorPane), findsOneWidget);
     expect(_feedbackScroll, findsOneWidget);
     expect(_creatorScroll, findsOneWidget);
+    expect(find.byType(AppActionDock), findsNothing);
+    expect(find.text('Continue'), findsNothing);
   });
 
   for (final config in const [
     (label: '320 dp', size: Size(320, 640), scale: 1.0),
     (label: '360 dp at 2.0', size: Size(360, 800), scale: 2.0),
+    (label: '640 dp landscape', size: Size(640, 360), scale: 1.0),
     (label: '720 dp tablet', size: Size(720, 1024), scale: 1.0),
     (label: '720 dp at 2.0', size: Size(720, 1024), scale: 2.0),
   ]) {
@@ -556,7 +797,10 @@ void main() {
       expect(find.byType(AdaptiveSplitView), findsOneWidget);
       expect(find.byType(CardCreatorPane), findsOneWidget);
       final divider = tester.getSize(find.byKey(AdaptiveSplitView.dividerKey));
-      if (config.size.width >= 720) {
+      final horizontal =
+          config.size.width >= 720 ||
+          (config.size.width >= 600 && config.size.width > config.size.height);
+      if (horizontal) {
         expect(divider.width, AdaptiveSplitView.dividerExtent);
       } else {
         expect(divider.height, AdaptiveSplitView.dividerExtent);

@@ -945,6 +945,8 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   }
 
   void _clearSeedComposer() {
+    // Ignore an AI reply that arrives after the composer was added or reset.
+    _seedRequest++;
     _seedBulletId = null;
     _seedNote = null;
     _seedSuggestion = null;
@@ -1345,26 +1347,23 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
           16,
           compact ? 4 : 10,
         ),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (count == 0 && showEmptyHint)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    'Nothing to save yet.',
-                    textAlign: TextAlign.center,
-                    style: theme.typography.baseline.labelSmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (count == 0 && showEmptyHint)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  'Nothing to save yet.',
+                  textAlign: TextAlign.center,
+                  style: theme.typography.baseline.labelSmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
-              _saveButton(count),
-            ],
-          ),
+              ),
+            _saveButton(count),
+          ],
         ),
       ),
     );

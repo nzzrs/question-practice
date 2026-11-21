@@ -93,7 +93,7 @@ class WrongNotesReadonly extends StatelessWidget {
                             child: M3EButton.tonal(
                               key: ValueKey('wrong-note-card-$index'),
                               size: M3EButtonSize.md,
-                              onPressed: bulletBusy && !active
+                              onPressed: added || bulletBusy
                                   ? null
                                   : () => onTurnBulletIntoCard!(
                                       bulletId,

@@ -110,7 +110,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   }
 
   void _resetStepState() {
-    _creator.clearSeed();
+    _creator.resetForStep();
     _draftCount = 0;
     _resetScroll();
     if (_feedbackScroll.hasClients) _feedbackScroll.jumpTo(0);

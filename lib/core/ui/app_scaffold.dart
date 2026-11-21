@@ -87,6 +87,28 @@ class AppPage extends StatelessWidget {
               ],
             )
           : Padding(padding: focusPadding, child: body);
+      final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+      final dockDuration = MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : Duration(milliseconds: keyboardOpen ? 200 : 250);
+      final dock = bottomBar == null
+          ? null
+          : AnimatedSwitcher(
+              duration: dockDuration,
+              switchInCurve: Curves.easeIn,
+              switchOutCurve: Curves.easeOut,
+              transitionBuilder: (child, animation) => SizeTransition(
+                sizeFactor: animation,
+                alignment: Alignment.bottomCenter,
+                child: child,
+              ),
+              child: keyboardOpen
+                  ? const SizedBox.shrink(key: ValueKey('app-dock-hidden'))
+                  : KeyedSubtree(
+                      key: const ValueKey('app-dock-visible'),
+                      child: bottomBar!,
+                    ),
+            );
       return PopScope(
         // Keep the system back gesture aligned with the visible close control,
         // including on the completion screen where closing reports success.
@@ -113,7 +135,7 @@ class AppPage extends StatelessWidget {
                         )
                       : content,
                 ),
-                if (bottomBar != null) bottomBar!,
+                if (dock != null) dock,
               ],
             ),
           ),

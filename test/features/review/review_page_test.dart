@@ -1,40 +1,13 @@
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/core/ui/adaptive_split_view.dart';
+import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/practice/summary_page.dart';
 import 'package:question_practice/features/review/review_page.dart';
 
 import '../../helpers/test_harness.dart';
-
-http.Response _aiResponse(List<Map<String, dynamic>> ideas) {
-  return http.Response(
-    jsonEncode({
-      'choices': [
-        {
-          'message': {
-            'content': jsonEncode({'ideas': ideas}),
-          },
-        },
-      ],
-    }),
-    200,
-  );
-}
-
-Map<String, dynamic> _idea(String template, String front, String back) {
-  return {
-    'template': template,
-    'variants': [
-      {'front': front, 'back': back},
-    ],
-  };
-}
 
 void main() {
   testWidgets('skipped review shows the correct answer and reasoning', (
@@ -243,7 +216,8 @@ void main() {
     );
 
     expect(find.text('Analyse the error'), findsOneWidget);
-    expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
+    expect(find.byType(AdaptiveSplitView), findsOneWidget);
+    expect(find.byType(CardCreatorPane), findsOneWidget);
     expect(find.text('Continue'), findsOneWidget);
     expect(find.text('Check with AI'), findsNothing);
     expect(find.text('Flawed assumption (bias)'), findsNothing);
@@ -258,31 +232,8 @@ void main() {
   testWidgets('adding atomic cards from the error step advances the review', (
     tester,
   ) async {
-    final client = MockClient(
-      (_) async => _aiResponse([
-        _idea(
-          'contrast',
-          'Which layer owns IP addresses?',
-          'The network layer owns addressing.',
-        ),
-        _idea(
-          'heuristic',
-          'If a scenario asks for addressing but restricts with layer, which '
-              'option is always discarded?',
-          'Discard the physical layer because it has no addressing.',
-        ),
-      ]),
-    );
-    final harness = TestHarness(httpClient: client);
+    final harness = TestHarness();
     addTearDown(harness.close);
-    await harness.settings.save(
-      const AppSettings(
-        lookupMode: LookupMode.ai,
-        aiModel: 'test-model',
-        aiBaseUrl: 'https://example.test/v1',
-      ),
-    );
-    await harness.keyStore.writeApiKey('secret-key');
     final seeded = await harness.seedPractice(count: 1);
     final sessions = SessionService(
       practices: harness.practices,
@@ -305,29 +256,23 @@ void main() {
       harness: harness,
     );
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('error-create-cards')),
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Which layer owns IP addresses?',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'The network layer owns addressing.',
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await expandCardCreatorSheet(tester);
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('creator-ai-suggest')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
-    await pumpFrames(tester, frames: 24);
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-ai-add')));
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
-    await pumpFrames(tester);
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
-    expect(find.textContaining('2 cards completed or created'), findsOneWidget);
+    expect(find.textContaining('1 card completed or created'), findsOneWidget);
     final error = await tester.runAsync(
       () =>
           harness.cards.activeErrorForQuestion(start.items.single.question.id),
@@ -336,6 +281,6 @@ void main() {
     final cards = await tester.runAsync(
       () => harness.cards.watchManualCards().first,
     );
-    expect(cards, hasLength(2));
+    expect(cards, hasLength(1));
   });
 }

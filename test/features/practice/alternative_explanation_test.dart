@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/errors/error_card_review_view.dart';
+import 'package:question_practice/features/export/card_creator_controller.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/practice/session_page.dart';
 import 'package:question_practice/features/practice/selectable_linkified_text.dart';
@@ -110,10 +111,18 @@ void main() {
     );
     final card = (await harness.cards.errorCardById(id))!;
 
+    final creator = CardCreatorController();
+    addTearDown(creator.dispose);
     await pumpTestApp(
       tester,
       home: Scaffold(
-        body: SingleChildScrollView(child: ErrorCardReviewView(card: card)),
+        body: SingleChildScrollView(
+          child: ErrorCardReviewView(
+            card: card,
+            creator: creator,
+            onSeedRequested: () {},
+          ),
+        ),
       ),
       harness: harness,
     );

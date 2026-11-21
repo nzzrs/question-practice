@@ -1,8 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
@@ -40,21 +36,6 @@ void main() {
       );
     }
     return (await harness.cards.errorCardById(id))!;
-  }
-
-  http.Response aiResponse(List<Map<String, String>> cards) {
-    return http.Response(
-      jsonEncode({
-        'choices': [
-          {
-            'message': {
-              'content': jsonEncode({'cards': cards}),
-            },
-          },
-        ],
-      }),
-      200,
-    );
   }
 
   testWidgets('cards review opens full screen with a clear exit', (
@@ -135,25 +116,8 @@ void main() {
   testWidgets('adding atomic cards completes the error and advances', (
     tester,
   ) async {
-    final client = MockClient(
-      (_) async => aiResponse([
-        {
-          'type': 'contrast',
-          'front': 'Which layer owns IP addresses?',
-          'back': 'The network layer owns addressing.',
-        },
-      ]),
-    );
-    final harness = TestHarness(httpClient: client);
+    final harness = TestHarness();
     addTearDown(harness.close);
-    await harness.settings.save(
-      const AppSettings(
-        lookupMode: LookupMode.ai,
-        aiModel: 'test-model',
-        aiBaseUrl: 'https://example.test/v1',
-      ),
-    );
-    await harness.keyStore.writeApiKey('secret-key');
     final seeded = await harness.seedPractice(count: 2);
     final questions = await harness.practices.questionsForPractice(
       seeded.practiceId,
@@ -167,24 +131,18 @@ void main() {
       harness: harness,
     );
 
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('error-create-cards')),
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Which layer owns IP addresses?',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'The network layer owns addressing.',
     );
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await expandCardCreatorSheet(tester);
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('creator-ai-suggest')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
-    await pumpFrames(tester, frames: 24);
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-ai-add')));
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
-    await pumpFrames(tester);
-    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);

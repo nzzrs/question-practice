@@ -1066,6 +1066,101 @@ void main() {
     },
   );
 
+  test('a wrong-answer bullet drafts one atomic card', () async {
+    await useAi();
+    String? userPrompt;
+    String? systemPrompt;
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final messages = body['messages'] as List<dynamic>;
+      systemPrompt =
+          ((messages.first as Map<String, dynamic>)['content'] as String?) ??
+          '';
+      userPrompt =
+          ((messages.last as Map<String, dynamic>)['content'] as String?) ?? '';
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'content': jsonEncode({
+                  'cards': [
+                    {
+                      'type': 'contrast',
+                      'front':
+                          'How does the network layer differ from transport?',
+                      'back':
+                          'The network layer addresses hosts; transport moves '
+                          'segments between them.',
+                    },
+                  ],
+                }),
+              },
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    final card = await serviceWith(client).suggestCardFromWrongNote(
+      note: 'I confused the network and transport layers.',
+      question: 'Which layer owns addresses?',
+      wrongAnswer: 'Transport',
+      correctAnswer: 'Network',
+      explanation: 'Addresses belong to the network layer.',
+      topicName: 'Cloud',
+      subtopic: 'Layers',
+      otherNotes: const ['I read reliable as secure.'],
+    );
+
+    expect(card, isNotNull);
+    expect(card!.template, CardTemplate.contrast);
+    expect(card.front, contains('network layer'));
+    expect(userPrompt, contains('Learner note to turn into a card'));
+    expect(
+      userPrompt,
+      contains('I confused the network and transport layers.'),
+    );
+    expect(userPrompt, contains('Chosen wrong answer: Transport'));
+    expect(userPrompt, contains('Other notes from this attempt'));
+    expect(systemPrompt, contains('1-3 candidate cards'));
+  });
+
+  test('a wrong-answer bullet draft needs an API key', () async {
+    await harness.settings.save(
+      const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiModel: 'test-model',
+        aiBaseUrl: 'https://example.test/v1',
+      ),
+    );
+    var called = false;
+    final client = MockClient((request) async {
+      called = true;
+      return http.Response('{}', 200);
+    });
+
+    await expectLater(
+      serviceWith(client).suggestCardFromWrongNote(
+        note: 'I confused two layers.',
+        question: 'Question',
+        wrongAnswer: 'A',
+        correctAnswer: 'B',
+        explanation: 'Because B.',
+        topicName: 'Topic',
+      ),
+      throwsA(
+        isA<LookupException>().having(
+          (error) => error.failure,
+          'failure',
+          LookupFailure.noProvider,
+        ),
+      ),
+    );
+    expect(called, isFalse);
+  });
+
   test('AI card suggestions need a saved API key', () async {
     await harness.settings.save(
       const AppSettings(

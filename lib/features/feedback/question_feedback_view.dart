@@ -33,12 +33,14 @@ class QuestionFeedbackView extends StatefulWidget {
     this.onNoteOverflow,
     this.onTurnBulletIntoCard,
     this.bulletBusy = false,
+    this.activeBulletId,
     this.addedBulletIds = const {},
     this.showLetters = true,
     this.onOptionTap,
     this.scrollable = false,
     this.readOnly = false,
     this.pageStorageKey,
+    this.scrollController,
     super.key,
   });
 
@@ -58,14 +60,16 @@ class QuestionFeedbackView extends StatefulWidget {
   final ValueChanged<Note>? onCopyNote;
   final ValueChanged<Note>? onCreateCardFromNote;
   final ValueChanged<Note>? onNoteOverflow;
-  final void Function(int index, String note)? onTurnBulletIntoCard;
+  final void Function(String bulletId, String note)? onTurnBulletIntoCard;
   final bool bulletBusy;
-  final Set<int> addedBulletIds;
+  final String? activeBulletId;
+  final Set<String> addedBulletIds;
   final bool showLetters;
   final ValueChanged<int>? onOptionTap;
   final bool scrollable;
   final bool readOnly;
   final PageStorageKey<String>? pageStorageKey;
+  final ScrollController? scrollController;
 
   @override
   State<QuestionFeedbackView> createState() => _QuestionFeedbackViewState();
@@ -187,6 +191,7 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> {
             actions: widget.actions,
             onTurnBulletIntoCard: widget.onTurnBulletIntoCard,
             bulletBusy: widget.bulletBusy,
+            activeBulletId: widget.activeBulletId,
             addedBulletIds: widget.addedBulletIds,
           ),
           if (widget.onCopyNote != null || widget.onCreateCardFromNote != null)
@@ -231,6 +236,7 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> {
     if (!widget.scrollable) return content;
     return SingleChildScrollView(
       key: widget.pageStorageKey,
+      controller: widget.scrollController,
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
       child: content,

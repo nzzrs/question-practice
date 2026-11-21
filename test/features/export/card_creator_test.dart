@@ -10,6 +10,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/providers.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/ui/widgets.dart';
+import 'package:question_practice/features/export/card_creator_controller.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/review/domain/review_service.dart';
 
@@ -1078,6 +1079,8 @@ void main() {
   ) async {
     final harness = TestHarness();
     addTearDown(harness.close);
+    final creator = CardCreatorController();
+    addTearDown(creator.dispose);
     int? saved;
 
     await pumpTestApp(
@@ -1089,6 +1092,7 @@ void main() {
             title: 'Create cards',
             topicName: 'Topic',
           ),
+          controller: creator,
           onSaved: (count) => saved = count,
         ),
       ),

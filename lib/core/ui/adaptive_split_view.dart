@@ -167,16 +167,13 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
   TextDirection get _textDirection =>
       Directionality.maybeOf(context) ?? TextDirection.ltr;
 
-  bool _isHorizontal(BoxConstraints constraints, Size window) {
+  bool _isHorizontal(Size window) {
     final override = widget.horizontal;
     if (override != null) return override;
-    final width = constraints.hasBoundedWidth
-        ? constraints.maxWidth
-        : window.width;
-    final height = constraints.hasBoundedHeight
-        ? constraints.maxHeight
-        : window.height;
-    return width >= 720 || (width >= 600 && width > height);
+    // The breakpoint follows the window, not the padded body: a 720dp tablet
+    // loses horizontal padding before the split view sees its constraints.
+    return window.width >= 720 ||
+        (window.width >= 600 && window.width > window.height);
   }
 
   double _resolveRatio(_PaneBounds bounds, bool horizontal) {
@@ -288,7 +285,7 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final horizontal = _isHorizontal(constraints, window);
+        final horizontal = _isHorizontal(window);
         final available = horizontal
             ? (constraints.hasBoundedWidth
                   ? constraints.maxWidth

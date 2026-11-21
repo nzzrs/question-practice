@@ -11,15 +11,17 @@ class WrongNotesReadonly extends StatelessWidget {
     required this.actions,
     this.onTurnBulletIntoCard,
     this.bulletBusy = false,
+    this.activeBulletId,
     this.addedBulletIds = const {},
     super.key,
   });
 
   final List<String> notes;
   final FeedbackActions actions;
-  final void Function(int index, String note)? onTurnBulletIntoCard;
+  final void Function(String bulletId, String note)? onTurnBulletIntoCard;
   final bool bulletBusy;
-  final Set<int> addedBulletIds;
+  final String? activeBulletId;
+  final Set<String> addedBulletIds;
 
   @override
   Widget build(BuildContext context) {
@@ -40,64 +42,84 @@ class WrongNotesReadonly extends StatelessWidget {
           )
         else
           for (var index = 0; index < notes.length; index++)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    key: ValueKey('wrong-notes-readonly-$index'),
+            Builder(
+              builder: (context) {
+                final bulletId = '$index';
+                final added = addedBulletIds.contains(bulletId);
+                final active = activeBulletId == bulletId;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4, top: 8),
-                        child: Icon(
-                          Icons.circle,
-                          size: 6,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: SelectableLinkifiedText(
-                          text: notes[index],
-                          style: theme.typography.baseline.bodyMedium.copyWith(
-                            height: 1.45,
+                      Row(
+                        key: ValueKey('wrong-notes-readonly-$index'),
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 4, top: 8),
+                            child: Icon(
+                              Icons.circle,
+                              size: 6,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
-                          useSelectionArea: false,
-                          onDefine: actions.onDefine,
-                          onOpenUrl: actions.onOpenUrl,
-                          onNote: actions.onSaveNote,
-                          onAsk: actions.onAsk,
-                          onNoteTap: actions.onNoteTap,
-                        ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: SelectableLinkifiedText(
+                              text: notes[index],
+                              style: theme.typography.baseline.bodyMedium
+                                  .copyWith(height: 1.45),
+                              useSelectionArea: false,
+                              onDefine: actions.onDefine,
+                              onOpenUrl: actions.onOpenUrl,
+                              onNote: actions.onSaveNote,
+                              onAsk: actions.onAsk,
+                              onNoteTap: actions.onNoteTap,
+                            ),
+                          ),
+                        ],
                       ),
+                      if (onTurnBulletIntoCard != null)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 20, top: 2),
+                          child: Semantics(
+                            button: true,
+                            label: added
+                                ? 'Bullet added to cards'
+                                : active
+                                ? 'Drafting a card from this bullet'
+                                : 'Turn this bullet into a card',
+                            child: M3EButton.tonal(
+                              key: ValueKey('wrong-note-card-$index'),
+                              size: M3EButtonSize.md,
+                              onPressed: added || bulletBusy
+                                  ? null
+                                  : () => onTurnBulletIntoCard!(
+                                      bulletId,
+                                      notes[index],
+                                    ),
+                              icon: Icon(
+                                added
+                                    ? Icons.check
+                                    : active
+                                    ? Icons.hourglass_top
+                                    : Icons.add_card,
+                              ),
+                              label: Text(
+                                added
+                                    ? 'Added to cards'
+                                    : active
+                                    ? 'Drafting…'
+                                    : 'Turn bullet into card',
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   ),
-                  if (onTurnBulletIntoCard != null)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 20, top: 2),
-                      child: M3EButton.tonal(
-                        key: ValueKey('wrong-note-card-$index'),
-                        onPressed: bulletBusy
-                            ? null
-                            : () => onTurnBulletIntoCard!(index, notes[index]),
-                        icon: Icon(
-                          addedBulletIds.contains(index)
-                              ? Icons.check
-                              : Icons.add_card,
-                        ),
-                        child: Text(
-                          addedBulletIds.contains(index)
-                              ? 'Added to cards'
-                              : bulletBusy
-                              ? 'Drafting…'
-                              : 'Turn bullet into card',
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+                );
+              },
             ),
       ],
     );

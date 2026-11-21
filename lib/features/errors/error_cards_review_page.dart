@@ -4,14 +4,14 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
-import '../../core/ui/adaptive_split_view.dart';
 import '../../core/ui/widgets.dart';
 import '../export/card_creator_controller.dart';
 import '../export/card_creator_sheet.dart';
 import '../feedback/domain/wrong_notes.dart';
 import '../feedback/feedback_step_header.dart';
-import 'error_card_review_view.dart';
+import '../review/review_action_dock.dart';
 import '../review/skipped_question_view.dart';
+import 'error_card_review_view.dart';
 
 /// Reviews error cards and skipped questions together.
 class ErrorCardsReviewPage extends ConsumerStatefulWidget {
@@ -48,10 +48,7 @@ class _SkippedStep extends _ReviewStep {
 }
 
 class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
-  static const _splitStorageKey = ValueKey<String>('error-cards-review-split');
-
   final _scroll = ScrollController();
-  final _feedbackScroll = ScrollController();
   final _creator = CardCreatorController();
   late final List<_ReviewStep> _steps = [
     for (final card in widget.cards) _ErrorStep(card),
@@ -59,129 +56,187 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
   ];
   int _index = 0;
   int _saved = 0;
-  int _draftCount = 0;
   bool _busy = false;
   bool _finished = false;
 
   @override
   void dispose() {
     _scroll.dispose();
-    _feedbackScroll.dispose();
     _creator.dispose();
     super.dispose();
   }
 
   _ReviewStep? get _step => _index < _steps.length ? _steps[_index] : null;
 
-  CardCreatorRequest _requestFor(ErrorCard card) {
-    return CardCreatorRequest(
-      title: 'Create cards',
-      sessionId: card.sessionId,
-      questionId: card.questionId,
-      questionContext: card.question,
-      topicName: card.topicName,
-      subtopic: card.subtopic,
-      existingFronts: ref.watch(existingCardTextsProvider),
-      error: CardCreatorErrorSource(
-        card: card,
-        question: card.question,
-        wrongAnswer: card.wrongAnswer,
-        correctAnswer: card.correctAnswer,
-        reasoning: card.reasoning,
-        explanation: card.explanation,
-        wrongNotes: WrongNotes.parse(card.reasoning),
+  String _itemKey(_ReviewStep step) {
+    return switch (step) {
+      _ErrorStep(:final card) => 'errors-review-${card.id}',
+      _SkippedStep(:final question) => 'errors-review-skipped-${question.id}',
+    };
+  }
+
+  CardCreatorRequest _requestFor(_ReviewStep step) {
+    return switch (step) {
+      _ErrorStep(:final card) => CardCreatorRequest(
+        title: 'Create cards',
+        sessionId: card.sessionId,
+        questionId: card.questionId,
+        questionContext: card.question,
+        topicName: card.topicName,
+        subtopic: card.subtopic,
+        existingFronts: ref.read(existingCardTextsProvider),
+        itemKey: _itemKey(step),
+        error: CardCreatorErrorSource(
+          card: card,
+          question: card.question,
+          wrongAnswer: card.wrongAnswer,
+          correctAnswer: card.correctAnswer,
+          reasoning: card.reasoning,
+          explanation: card.explanation,
+          wrongNotes: WrongNotes.parse(card.reasoning),
+        ),
       ),
+      _SkippedStep(:final question) => CardCreatorRequest(
+        title: 'Create cards',
+        sessionId: question.sessionId,
+        questionId: question.questionId,
+        questionContext: question.question,
+        topicName: question.topicName,
+        initialFront: question.question,
+        initialBack: question.correctAnswer,
+        existingFronts: ref.read(existingCardTextsProvider),
+        skippedQuestionId: question.id,
+        itemKey: _itemKey(step),
+      ),
+    };
+  }
+
+  Future<void> _openCreator(_ReviewStep step) async {
+    if (_busy) return;
+    await showReviewCardCreator(
+      context,
+      request: _requestFor(step),
+      controller: _creator,
     );
   }
 
-  void _advance() {
+  void _goBack() {
+    if (_index == 0 || _busy) return;
+    setState(() {
+      _index--;
+      _creator.resetForStep();
+    });
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  Future<bool> _saveCachedDrafts(
+    _ReviewStep step,
+    CardCreatorRequest request,
+    CardCreatorSnapshot? snapshot,
+  ) async {
+    if (snapshot == null) return true;
+    if (snapshot.composerDirty && snapshot.composerHasText) {
+      await showSnack(context, 'Add this card to the list before saving.');
+      if (!mounted) return false;
+      await _openCreator(step);
+      return false;
+    }
+    if (!snapshot.hasDrafts) return true;
+    final key = _itemKey(step);
+    setState(() => _busy = true);
+    try {
+      final result = await saveCardCreatorDrafts(
+        request: request,
+        drafts: snapshot.drafts,
+        service: ref.read(reviewServiceProvider),
+        noteToConvertId: snapshot.noteToConvert?.id,
+      );
+      if (!mounted) return false;
+      if (result.failure != null) {
+        _creator.storeSnapshot(key, snapshot.withDrafts(result.remaining));
+        _saved += result.created;
+        await showSnack(
+          context,
+          result.created > 0
+              ? '${result.created} card${result.created == 1 ? '' : 's'} '
+                    'saved, but the rest could not be saved: ${result.failure}'
+              : 'Could not create the cards: ${result.failure}',
+        );
+        return false;
+      }
+      _creator.clearSnapshot(key);
+      _creator.clearSeed();
+      _saved += result.created;
+      return true;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Saves cached drafts and advances. Returns false when the step must stay.
+  Future<bool> _saveCurrentStep() async {
+    if (_busy) return false;
+    final step = _step;
+    if (step == null) return false;
+    final snapshot = _creator.snapshotFor(_itemKey(step));
+    return _saveCachedDrafts(step, _requestFor(step), snapshot);
+  }
+
+  void _goNext() {
+    if (_busy) return;
     if (_index + 1 >= _steps.length) {
       setState(() => _finished = true);
       ref.invalidate(homeStatsProvider);
       return;
     }
-    setState(() => _index++);
-    _resetStepState();
-  }
-
-  void _goBack() {
-    if (_index == 0) return;
-    setState(() => _index--);
-    _resetStepState();
-  }
-
-  void _resetStepState() {
-    _creator.resetForStep();
-    _draftCount = 0;
+    setState(() {
+      _index++;
+      _creator.resetForStep();
+    });
     if (_scroll.hasClients) _scroll.jumpTo(0);
-    if (_feedbackScroll.hasClients) _feedbackScroll.jumpTo(0);
   }
 
-  Future<bool> _confirmDiscard() async {
-    if (_draftCount <= 0) return true;
-    final count = _draftCount;
-    return confirmDialog(
-      context,
-      title: 'Discard unsaved cards?',
-      message:
-          '$count card${count == 1 ? ' is' : 's are'} not saved yet. '
-          'Leaving this step discards ${count == 1 ? 'it' : 'them'}.',
-      confirmLabel: 'Discard cards',
-      cancelLabel: 'Keep editing',
-    );
+  Future<void> _saveAndAdvance() async {
+    if (await _saveCurrentStep() && mounted) {
+      await _requestNext();
+    }
   }
 
-  Future<void> _requestAdvance() async {
+  Future<void> _requestNext() async {
     if (_busy) return;
-    if (!await _confirmDiscard() || !mounted) return;
-    _advance();
-  }
-
-  Future<void> _requestBack() async {
-    if (_busy) return;
-    if (!await _confirmDiscard() || !mounted) return;
-    _goBack();
+    final last = _index + 1 >= _steps.length;
+    if (last && _creator.hasPendingWork) {
+      final leave = await confirmDialog(
+        context,
+        title: 'Leave review?',
+        message: 'Drafts and edits for this review are discarded.',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Keep editing',
+        destructive: true,
+      );
+      if (!leave || !mounted) return;
+      _creator.clearSnapshots();
+    }
+    _goNext();
   }
 
   Future<void> _requestClose() async {
-    if (!await _confirmDiscard() || !mounted) return;
+    if (_busy) return;
+    if (_creator.hasPendingWork) {
+      final leave = await confirmDialog(
+        context,
+        title: 'Leave review?',
+        message: 'Drafts and edits for this review are discarded.',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Keep editing',
+        destructive: true,
+      );
+      if (!leave || !mounted) return;
+    }
+    _creator.clearSnapshots();
     // Pop directly: the focus shell's PopScope delegates back here, so
     // maybePop would re-enter this guard.
     Navigator.of(context).pop();
-  }
-
-  void _cardsAdded(int count) {
-    if (!mounted || count <= 0) return;
-    setState(() => _saved += count);
-    _creator.clearSeed();
-    _advance();
-  }
-
-  Future<void> _createSkippedCards(_SkippedStep step) async {
-    if (_busy) return;
-    final question = step.question;
-    setState(() => _busy = true);
-    try {
-      final created = await showCardCreator(
-        context,
-        request: CardCreatorRequest(
-          title: 'Create cards',
-          sessionId: question.sessionId,
-          questionId: question.questionId,
-          questionContext: question.question,
-          topicName: question.topicName,
-          initialFront: question.question,
-          initialBack: question.correctAnswer,
-          existingFronts: ref.read(existingCardTextsProvider),
-          skippedQuestionId: question.id,
-        ),
-      );
-      if (!mounted || created == 0) return;
-      _saved += created;
-      _advance();
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   @override
@@ -244,142 +299,59 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
     }
 
     final step = _step!;
-    final isSkipped = step is _SkippedStep;
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final last = _index + 1 >= _steps.length;
     return AppPage(
       title: widget.title,
       showBack: true,
       focus: true,
-      maxWidth: 1200,
       onBack: _requestClose,
       scrollController: _scroll,
       variant: M3EAppBarVariant.small,
-      bottomBar: AppActionDock(
-        child: Row(
-          children: [
-            if (_index > 0) ...[
-              M3EButton.text(
-                onPressed: _busy ? null : _requestBack,
-                child: const Text('Previous'),
+      bottomBar: ReviewActionDock(
+        busy: _busy,
+        saveLabel: last ? 'Finish' : 'Save',
+        onSave: _saveAndAdvance,
+        onBack: _goBack,
+        onNext: _requestNext,
+        canGoBack: _index > 0,
+        canGoNext: true,
+        onCreateCards: () => _openCreator(step),
+      ),
+      children: [
+        ...switch (step) {
+          _ErrorStep(:final card) => [
+            ErrorCardReviewView(
+              card: card,
+              creator: _creator,
+              onSeedRequested: () => _openCreator(step),
+              leading: FeedbackStepHeader(
+                label: 'Item ${_index + 1} of ${_steps.length}',
+                progress: (_index + 1) / _steps.length,
+                heading: card.needsDetails
+                    ? 'Complete the error card'
+                    : 'Check the error card',
               ),
-              const SizedBox(width: 4),
-            ],
-            Expanded(
-              child: AppPrimaryButton(
-                onPressed: _busy
-                    ? null
-                    : () {
-                        switch (step) {
-                          case _ErrorStep():
-                            _requestAdvance();
-                          case _SkippedStep():
-                            _createSkippedCards(step);
-                        }
-                      },
-                label: _busy
-                    ? 'Saving…'
-                    : isSkipped
-                    ? 'Create cards'
-                    : 'Continue',
-                icon: isSkipped ? Icons.add_card : Icons.arrow_forward,
-              ),
-            ),
-            const SizedBox(width: 8),
-            M3EButton.text(
-              onPressed: _busy ? null : _requestAdvance,
-              child: const Text('Skip'),
             ),
           ],
-        ),
-      ),
-      body: switch (step) {
-        _ErrorStep(:final card) => AdaptiveSplitView(
-          storageKey: _splitStorageKey,
-          minLeading: keyboardOpen ? 96 : 160,
-          minTrailing: keyboardOpen ? 240 : 220,
-          leading: ErrorCardReviewView(
-            card: card,
-            creator: _creator,
-            onSeedRequested: () {},
-            leading: FeedbackStepHeader(
+          _SkippedStep(:final question) => [
+            FeedbackStepHeader(
               label: 'Item ${_index + 1} of ${_steps.length}',
               progress: (_index + 1) / _steps.length,
-              heading: card.needsDetails
-                  ? 'Complete the error card'
-                  : 'Check the error card',
+              heading: 'Review the skipped question',
             ),
-            scrollController: _feedbackScroll,
-          ),
-          trailing: CardCreatorPane(
-            key: ValueKey('creator-${card.id}'),
-            request: _requestFor(card),
-            controller: _creator,
-            onSaved: _cardsAdded,
-            onDraftCountChanged: (count) {
-              if (!mounted || count == _draftCount) return;
-              setState(() => _draftCount = count);
-            },
-          ),
-        ),
-        _SkippedStep() => null,
-      },
-      children: switch (step) {
-        _ErrorStep() => const [],
-        _SkippedStep(:final question) => [
-          Text(
-            'Item ${_index + 1} of ${_steps.length}',
-            style: theme.typography.baseline.labelMedium.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+            SkippedQuestionView(
+              prompt: question.question,
+              alternatives: question.alternatives,
+              correctIndexes: question.correctIndexes,
+              alternativeExplanations: question.alternativeExplanations,
+              explanation: question.explanation,
+              reasoning: question.reasoning,
+              topicName: question.topicName,
+              unknown: question.unknown,
             ),
-          ),
-          const SizedBox(height: 8),
-          LinearScore(value: (_index + 1) / _steps.length),
-          const SizedBox(height: 22),
-          Text(
-            'Review the skipped question',
-            style: theme.typography.emphasized.headlineSmall,
-          ),
-          const SizedBox(height: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SkippedQuestionView(
-                prompt: question.question,
-                alternatives: question.alternatives,
-                correctIndexes: question.correctIndexes,
-                alternativeExplanations: question.alternativeExplanations,
-                explanation: question.explanation,
-                reasoning: question.reasoning,
-                topicName: question.topicName,
-                unknown: question.unknown,
-              ),
-              const SizedBox(height: 18),
-              TonalBox(
-                key: const ValueKey('skipped-review-missing'),
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'What was missing?',
-                      style: theme.typography.emphasized.titleSmall,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Create cards from the right answer, or skip to leave '
-                      'it in the queue.',
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      },
+          ],
+        },
+      ],
     );
   }
 }

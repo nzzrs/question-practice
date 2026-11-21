@@ -7,16 +7,17 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
+import '../export/card_creator_controller.dart';
 import '../export/card_creator_sheet.dart';
 import 'note_review_view.dart';
+import 'review_action_dock.dart';
 
 /// Reviews saved notes one at a time.
 ///
 /// Opened from Cards with every visible note, or with a single note
 /// when its row is tapped. Notes are read live from the database, so a
 /// card made or a note deleted here is reflected without closing the
-/// review. The card-making actions live inside the shared
-/// [NoteReviewView] and disappear once a note has a card.
+/// review.
 class NoteReviewPage extends ConsumerStatefulWidget {
   const NoteReviewPage({
     required this.notes,
@@ -35,6 +36,7 @@ class NoteReviewPage extends ConsumerStatefulWidget {
 
 class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
   final _scroll = ScrollController();
+  final _creator = CardCreatorController();
   late final Set<int> _ids;
   late int _index;
   int _kept = 0;
@@ -56,6 +58,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
   @override
   void dispose() {
     _scroll.dispose();
+    _creator.dispose();
     super.dispose();
   }
 
@@ -64,13 +67,19 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
       setState(() => _finished = true);
       return;
     }
-    setState(() => _index = index + 1);
+    setState(() {
+      _index = index + 1;
+      _creator.resetForStep();
+    });
     _resetScroll();
   }
 
   void _goBack(int index) {
     if (index == 0) return;
-    setState(() => _index = index - 1);
+    setState(() {
+      _index = index - 1;
+      _creator.resetForStep();
+    });
     _resetScroll();
   }
 
@@ -78,39 +87,93 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
-  Future<void> _keep(Note note, int index, int length) async {
+  String _itemKey(Note note) => 'note-review-${note.id}';
+
+  CardCreatorRequest _requestFor(Note note) {
+    return CardCreatorRequest(
+      title: 'Create cards',
+      sessionId: note.sessionId,
+      questionId: note.questionId,
+      questionContext: note.context,
+      topicName: note.topicName,
+      subtopic: note.subtopic,
+      initialTemplate: CardTemplate.definition,
+      initialTerm: note.text,
+      existingFronts: ref.read(existingCardTextsProvider),
+      note: note,
+      itemKey: _itemKey(note),
+    );
+  }
+
+  Future<void> _openCreator(Note note) async {
     if (_busy) return;
+    await showReviewCardCreator(
+      context,
+      request: _requestFor(note),
+      controller: _creator,
+    );
+  }
+
+  Future<bool> _saveCachedDrafts(Note note) async {
+    final snapshot = _creator.snapshotFor(_itemKey(note));
+    if (snapshot == null) return true;
+    if (snapshot.composerDirty && snapshot.composerHasText) {
+      await showSnack(context, 'Add this card to the list before saving.');
+      if (!mounted) return false;
+      await _openCreator(note);
+      return false;
+    }
+    if (!snapshot.hasDrafts) return true;
+    final key = _itemKey(note);
+    setState(() => _busy = true);
+    try {
+      final result = await saveCardCreatorDrafts(
+        request: _requestFor(note),
+        drafts: snapshot.drafts,
+        service: ref.read(reviewServiceProvider),
+        noteToConvertId: snapshot.noteToConvert?.id,
+      );
+      if (!mounted) return false;
+      if (result.failure != null) {
+        _creator.storeSnapshot(key, snapshot.withDrafts(result.remaining));
+        _cards += result.created;
+        await showSnack(
+          context,
+          result.created > 0
+              ? '${result.created} card${result.created == 1 ? '' : 's'} '
+                    'saved, but the rest could not be saved: ${result.failure}'
+              : 'Could not create the cards: ${result.failure}',
+        );
+        return false;
+      }
+      _creator.clearSnapshot(key);
+      _creator.clearSeed();
+      _cards += result.created;
+      return true;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _saveNote(Note note, int index, int length) async {
+    if (_busy) return;
+    if (!await _saveCachedDrafts(note)) return;
+    if (!mounted) return;
+    if (note.isKept) {
+      _advanceFrom(index, length);
+      return;
+    }
     setState(() => _busy = true);
     try {
       await ref.read(reviewServiceProvider).keepNote(note.id);
       _kept++;
       if (!mounted) return;
       _advanceFrom(index, length);
+    } on Object catch (error) {
+      if (mounted) await showSnack(context, 'Could not save: $error');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
-  }
-
-  Future<void> _createCards(Note note, int index, int length) async {
-    if (_busy) return;
-    final created = await showCardCreator(
-      context,
-      request: CardCreatorRequest(
-        title: 'Create cards',
-        sessionId: note.sessionId,
-        questionId: note.questionId,
-        questionContext: note.context,
-        topicName: note.topicName,
-        subtopic: note.subtopic,
-        initialTemplate: CardTemplate.definition,
-        initialTerm: note.text,
-        existingFronts: ref.read(existingCardTextsProvider),
-        note: note,
-      ),
-    );
-    if (!mounted || created == 0) return;
-    _cards += created;
-    _advanceFrom(index, length);
   }
 
   Future<void> _deleteNote(Note note, int length) async {
@@ -129,6 +192,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
     try {
       await ref.read(cardRepositoryProvider).deleteNote(note.id);
       if (!mounted) return;
+      _creator.clearSnapshot(_itemKey(note));
       final remaining = math.max(0, length - 1);
       setState(() {
         _ids.remove(note.id);
@@ -136,12 +200,52 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
           _finished = true;
         } else if (_index >= remaining) {
           _index = remaining - 1;
+          _creator.resetForStep();
         }
       });
       _resetScroll();
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not delete the note: $error');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  Future<void> _requestNext(int index, int length) async {
+    if (_busy) return;
+    final last = index + 1 >= length;
+    if (last && _creator.hasPendingWork) {
+      final leave = await confirmDialog(
+        context,
+        title: 'Leave review?',
+        message: 'Drafts and edits for this review are discarded.',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Keep editing',
+        destructive: true,
+      );
+      if (!leave || !mounted) return;
+      _creator.clearSnapshots();
+    }
+    _advanceFrom(index, length);
+  }
+
+  Future<void> _requestClose() async {
+    if (_busy) return;
+    if (_creator.hasPendingWork) {
+      final leave = await confirmDialog(
+        context,
+        title: 'Leave review?',
+        message: 'Drafts and edits for this review are discarded.',
+        confirmLabel: 'Leave',
+        cancelLabel: 'Keep editing',
+        destructive: true,
+      );
+      if (!leave || !mounted) return;
+    }
+    _creator.clearSnapshots();
+    Navigator.of(context).pop();
   }
 
   @override
@@ -207,52 +311,19 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
       title: widget.title,
       showBack: true,
       focus: true,
+      onBack: _requestClose,
       scrollController: _scroll,
       variant: M3EAppBarVariant.small,
-      bottomBar: AppActionDock(
-        child: Row(
-          children: [
-            if (index > 0) ...[
-              M3EButton.text(
-                onPressed: _busy ? null : () => _goBack(index),
-                child: const Text('Previous'),
-              ),
-              const SizedBox(width: 4),
-            ],
-            Expanded(
-              child: AppPrimaryButton(
-                onPressed: _busy
-                    ? null
-                    : () {
-                        if (!note.isKept) {
-                          _keep(note, index, notes.length);
-                        } else {
-                          _advanceFrom(index, notes.length);
-                        }
-                      },
-                label: _busy
-                    ? 'Saving…'
-                    : !note.isKept
-                    ? last
-                          ? 'Keep & done'
-                          : 'Keep & next'
-                    : last
-                    ? 'Done'
-                    : 'Next',
-                icon: !note.isKept ? Icons.check : Icons.arrow_forward,
-              ),
-            ),
-            if (!note.isKept) ...[
-              const SizedBox(width: 4),
-              M3EButton.text(
-                onPressed: _busy
-                    ? null
-                    : () => _advanceFrom(index, notes.length),
-                child: const Text('Skip'),
-              ),
-            ],
-          ],
-        ),
+      bottomBar: ReviewActionDock(
+        busy: _busy,
+        saveLabel: last ? 'Save and finish' : 'Save',
+        onSave: () => _saveNote(note, index, notes.length),
+        onBack: () => _goBack(index),
+        onNext: () => _requestNext(index, notes.length),
+        canGoBack: index > 0,
+        canGoNext: true,
+        onCreateCards: () => _openCreator(note),
+        onDelete: () => _deleteNote(note, notes.length),
       ),
       children: [
         Text(
@@ -269,13 +340,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
           style: theme.typography.emphasized.headlineSmall,
         ),
         const SizedBox(height: 16),
-        NoteReviewView(
-          key: ValueKey('note-review-${note.id}'),
-          note: note,
-          onCreateCards: () => _createCards(note, index, notes.length),
-          onKeep: note.isKept ? null : () => _keep(note, index, notes.length),
-          onDelete: () => _deleteNote(note, notes.length),
-        ),
+        NoteReviewView(key: ValueKey('note-review-${note.id}'), note: note),
       ],
     );
   }

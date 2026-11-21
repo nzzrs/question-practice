@@ -351,7 +351,7 @@ class _NoteActionsSheet extends StatelessWidget {
               ),
             OptionTile(
               icon: Icons.delete_outline,
-              title: 'Delete note',
+              title: 'Delete',
               subtitle: 'Remove it everywhere for this question',
               destructive: true,
               onTap: () => Navigator.of(context).pop(_NoteAction.delete),

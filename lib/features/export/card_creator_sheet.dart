@@ -8,6 +8,7 @@ import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../review/domain/card_litmus.dart';
+import '../review/domain/review_service.dart';
 import 'card_creator_controller.dart';
 import 'domain/anki_note_builder.dart';
 import 'domain/card_templates.dart';
@@ -76,6 +77,7 @@ class CardCreatorRequest {
     this.error,
     this.skippedQuestionId,
     this.completeErrorOnSave = true,
+    this.itemKey,
   });
 
   final String title;
@@ -109,6 +111,10 @@ class CardCreatorRequest {
 
   /// Whether the error's details step is completed after a card is saved.
   final bool completeErrorOnSave;
+
+  /// Page-scoped cache key. Review hosts set it so the creator can keep a
+  /// snapshot per reviewed item while its sheet is closed.
+  final String? itemKey;
 }
 
 /// Opens the shared card creator in a bottom sheet and returns the number of
@@ -129,6 +135,29 @@ Future<int> showCardCreator(
   return created ?? 0;
 }
 
+/// Opens the creator for a review step and keeps its state on [controller].
+///
+/// The sheet has no save action; the review dock owns the single Save. The
+/// repeated source recap stays out because the review already shows it.
+Future<int> showReviewCardCreator(
+  BuildContext context, {
+  required CardCreatorRequest request,
+  required CardCreatorController controller,
+}) async {
+  final created = await M3EBottomSheet.show<int>(
+    context,
+    initialValue: M3EBottomSheetValue.collapsed,
+    builder: (context) => CardCreatorSheet(
+      request: request,
+      controller: controller,
+      showContextRecap: false,
+      showSeedSource: false,
+      showSaveButton: false,
+    ),
+  );
+  return created ?? 0;
+}
+
 /// One creator for manual cards and optional AI suggestions.
 ///
 /// Lives inside an [M3EBottomSheet], so the review surface behind it keeps the
@@ -136,14 +165,37 @@ Future<int> showCardCreator(
 /// provider. Cards are collected as drafts and saved together, so the learner
 /// can add several ideas little by little.
 class CardCreatorSheet extends StatelessWidget {
-  const CardCreatorSheet({required this.request, super.key});
+  const CardCreatorSheet({
+    required this.request,
+    this.controller,
+    this.showContextRecap = true,
+    this.showSeedSource = true,
+    this.showSaveButton = true,
+    super.key,
+  });
 
   final CardCreatorRequest request;
+  final CardCreatorController? controller;
+
+  /// Whether the sheet repeats the reviewed question, error or note.
+  final bool showContextRecap;
+
+  /// Whether a bullet or note seed repeats its own source line and quote.
+  final bool showSeedSource;
+
+  /// Whether the sheet renders its own Save action.
+  ///
+  /// Review hosts pass false because the review dock owns the single Save.
+  final bool showSaveButton;
 
   @override
   Widget build(BuildContext context) {
     return CardCreatorBody(
       request: request,
+      controller: controller,
+      showContextRecap: showContextRecap,
+      showSeedSource: showSeedSource,
+      showSaveButton: showSaveButton,
       onClose: () => Navigator.of(context).pop(0),
       onSaved: (count) => Navigator.of(context).pop(count),
     );
@@ -229,6 +281,8 @@ class CardCreatorBody extends ConsumerStatefulWidget {
     this.scrollStorageKey,
     this.saveHandle,
     this.showSaveButton = true,
+    this.showContextRecap = true,
+    this.showSeedSource = true,
     super.key,
   });
 
@@ -247,6 +301,17 @@ class CardCreatorBody extends ConsumerStatefulWidget {
   /// Lets the host save drafts from its own action.
   final CardCreatorSaveHandle? saveHandle;
 
+  /// Whether the creator opens with the reviewed question, error or note.
+  ///
+  /// Review hosts pass false because the reading surface behind the sheet
+  /// already shows that source.
+  final bool showContextRecap;
+
+  /// Whether a bullet or note seed shows its own source label and quote.
+  ///
+  /// Review hosts pass false when the review already shows the source.
+  final bool showSeedSource;
+
   /// The page's seed bridge, used by the embedded pane only.
   final CardCreatorController? controller;
 
@@ -261,53 +326,6 @@ class CardCreatorBody extends ConsumerStatefulWidget {
 
   @override
   ConsumerState<CardCreatorBody> createState() => _CardCreatorBodyState();
-}
-
-sealed class _CardDraft {
-  const _CardDraft();
-
-  CardTemplate get template;
-
-  String? get sourceBulletId;
-}
-
-class _BasicDraft extends _CardDraft {
-  const _BasicDraft({
-    required this.front,
-    required this.back,
-    required this.template,
-    this.sourceBulletId,
-  });
-
-  final String front;
-  final String back;
-
-  @override
-  final String? sourceBulletId;
-
-  @override
-  final CardTemplate template;
-}
-
-class _ConceptDraft extends _CardDraft {
-  const _ConceptDraft({
-    required this.term,
-    required this.definition,
-    required this.extra,
-    required this.source,
-    this.sourceBulletId,
-  });
-
-  final String term;
-  final String definition;
-  final String extra;
-  final ConceptSource source;
-
-  @override
-  final String? sourceBulletId;
-
-  @override
-  CardTemplate get template => CardTemplate.definition;
 }
 
 class _SuggestedIdea {
@@ -357,16 +375,16 @@ class _AiVariant {
 
   bool get waiting => front.text.trim().isEmpty && back.text.trim().isEmpty;
 
-  _CardDraft toDraft() {
+  CardCreatorDraft toDraft() {
     if (template == CardTemplate.definition) {
-      return _ConceptDraft(
+      return CardCreatorConceptDraft(
         term: front.text.trim(),
         definition: back.text.trim(),
         extra: '',
         source: ConceptSource.ai,
       );
     }
-    return _BasicDraft(
+    return CardCreatorBasicDraft(
       front: front.text.trim(),
       back: back.text.trim(),
       template: template,
@@ -377,6 +395,100 @@ class _AiVariant {
     front.dispose();
     back.dispose();
   }
+}
+
+/// The outcome of saving a creator draft list.
+class CardCreatorSaveResult {
+  const CardCreatorSaveResult({
+    required this.created,
+    required this.remaining,
+    this.failure,
+  });
+
+  final int created;
+  final List<CardCreatorDraft> remaining;
+  final Object? failure;
+
+  bool get succeeded => failure == null;
+  bool get hasRemaining => remaining.isNotEmpty;
+}
+
+/// Saves [drafts] with the same rules as the creator's own save action.
+///
+/// Review docks call this after the sheet has closed, so a review host can own
+/// the only Save action while every draft still reaches the database.
+Future<CardCreatorSaveResult> saveCardCreatorDrafts({
+  required CardCreatorRequest request,
+  required Iterable<CardCreatorDraft> drafts,
+  required ReviewService service,
+  int? noteToConvertId,
+}) async {
+  final pending = List<CardCreatorDraft>.of(drafts);
+  final remaining = List<CardCreatorDraft>.of(pending);
+  var created = 0;
+  int? manualCardId;
+  Object? failure;
+  for (final draft in pending) {
+    try {
+      switch (draft) {
+        case CardCreatorBasicDraft():
+          final id = await service.createBasicCard(
+            sessionId: request.sessionId,
+            questionId: request.questionId,
+            question: draft.front,
+            answer: draft.back,
+            context: request.questionContext,
+            topicName: request.topicName,
+            subtopic: request.subtopic,
+            cognitiveType: draft.template.cognitiveType,
+            skippedQuestionId: request.skippedQuestionId,
+          );
+          manualCardId ??= id;
+        case CardCreatorConceptDraft():
+          await service.createConcept(
+            sessionId: request.sessionId,
+            questionId: request.questionId,
+            term: draft.term,
+            definition: draft.definition,
+            extra: draft.extra,
+            context: request.questionContext,
+            topicName: request.topicName,
+            subtopic: request.subtopic,
+            source: draft.source,
+            skippedQuestionId: request.skippedQuestionId,
+          );
+      }
+      created++;
+      remaining.remove(draft);
+    } on Object catch (error) {
+      failure = error;
+      break;
+    }
+  }
+
+  if (created > 0) {
+    try {
+      final noteIds = <int>{
+        if (request.note != null) request.note!.id,
+        if (noteToConvertId != null) noteToConvertId,
+      };
+      for (final noteId in noteIds) {
+        await service.markNoteConverted(noteId, manualCardId: manualCardId);
+      }
+      final error = request.error;
+      if (error != null && request.completeErrorOnSave) {
+        await service.completeErrorDetails(error.card.id);
+      }
+    } on Object catch (error) {
+      failure ??= error;
+    }
+  }
+
+  return CardCreatorSaveResult(
+    created: created,
+    remaining: remaining,
+    failure: failure,
+  );
 }
 
 class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
@@ -390,7 +502,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   String _appliedScaffoldBack = '';
   String _appliedDefinitionCloze = '';
 
-  final _drafts = <_CardDraft>[];
+  final _drafts = <CardCreatorDraft>[];
   List<String> _savedCardTexts = const [];
   List<_SuggestedIdea>? _ideas;
   final _retiredIdeas = <_SuggestedIdea>[];
@@ -416,6 +528,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   String? _seedError;
   int _seedRequest = 0;
   int _reportedDraftCount = 0;
+  bool _composerDirty = false;
 
   @override
   void initState() {
@@ -436,11 +549,136 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       _definitionCloze.text = _initialDefinitionCloze();
       _appliedDefinitionCloze = _definitionCloze.text;
     }
+    _restoreSnapshot();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _reportDraftCount(force: true);
       _onControllerChanged();
     });
+  }
+
+  String? get _snapshotKey => widget.request.itemKey;
+
+  void _restoreSnapshot() {
+    final key = _snapshotKey;
+    if (key == null) return;
+    final snapshot = widget.controller?.snapshotFor(key);
+    if (snapshot == null) return;
+    _front.text = snapshot.front;
+    _back.text = snapshot.back;
+    _definitionCloze.text = snapshot.definitionCloze;
+    _template = snapshot.template;
+    _appliedScaffoldFront = snapshot.appliedScaffoldFront;
+    _appliedScaffoldBack = snapshot.appliedScaffoldBack;
+    _appliedDefinitionCloze = snapshot.appliedDefinitionCloze;
+    _drafts
+      ..clear()
+      ..addAll(snapshot.drafts);
+    _aiError = snapshot.aiError;
+    _aiPanelOpen = snapshot.aiPanelOpen;
+    _aiUnavailable = snapshot.aiUnavailable;
+    _appliedSeedRevision = snapshot.appliedSeedRevision;
+    _seedBulletId = snapshot.seedBulletId;
+    _seedNote = snapshot.seedNote;
+    _noteToConvert = snapshot.noteToConvert;
+    _seedInitialFront = snapshot.seedInitialFront;
+    _seedInitialBack = snapshot.seedInitialBack;
+    _seedInitialCloze = snapshot.seedInitialCloze;
+    _seedSuggestion = snapshot.seedSuggestion;
+    _seedTouched = snapshot.seedTouched;
+    _seedHint = snapshot.seedHint;
+    _seedError = snapshot.seedError;
+    _composerDirty = snapshot.composerDirty;
+    final ideas = snapshot.ideas;
+    if (ideas == null) {
+      _ideas = null;
+    } else {
+      _ideas = [
+        for (final idea in ideas)
+          _SuggestedIdea(
+            SuggestedCardIdea(
+              template: idea.template,
+              variants: [
+                for (var index = 0; index < idea.variants.length; index++)
+                  SuggestedCard(
+                    front: idea.variants[index].front,
+                    back: idea.variants[index].back,
+                    template: idea.template,
+                    variantIndex: index,
+                  ),
+              ],
+            ),
+          ),
+      ];
+      for (var ideaIndex = 0; ideaIndex < ideas.length; ideaIndex++) {
+        final variants = _ideas![ideaIndex].variants;
+        final saved = ideas[ideaIndex].variants;
+        for (var index = 0; index < variants.length; index++) {
+          if (index < saved.length) {
+            variants[index].selected = saved[index].selected;
+          }
+        }
+      }
+    }
+    widget.controller?.markDraftsAdded(
+      snapshot.drafts.map((draft) => draft.sourceBulletId),
+    );
+  }
+
+  CardCreatorSnapshot _buildSnapshot() {
+    return CardCreatorSnapshot(
+      front: _front.text,
+      back: _back.text,
+      definitionCloze: _definitionCloze.text,
+      template: _template,
+      appliedScaffoldFront: _appliedScaffoldFront,
+      appliedScaffoldBack: _appliedScaffoldBack,
+      appliedDefinitionCloze: _appliedDefinitionCloze,
+      drafts: List<CardCreatorDraft>.unmodifiable(_drafts),
+      ideas: _ideas == null
+          ? null
+          : [
+              for (final idea in _ideas!)
+                CardCreatorAiIdeaData(
+                  template: idea.template,
+                  variants: [
+                    for (final variant in idea.variants)
+                      CardCreatorAiVariantData(
+                        front: variant.front.text,
+                        back: variant.back.text,
+                        selected: variant.selected,
+                      ),
+                  ],
+                ),
+            ],
+      aiError: _aiError,
+      aiPanelOpen: _aiPanelOpen,
+      aiUnavailable: _aiUnavailable,
+      appliedSeedRevision: _appliedSeedRevision,
+      seedBulletId: _seedBulletId,
+      seedNote: _seedNote,
+      noteToConvert: _noteToConvert,
+      seedInitialFront: _seedInitialFront,
+      seedInitialBack: _seedInitialBack,
+      seedInitialCloze: _seedInitialCloze,
+      seedSuggestion: _seedSuggestion,
+      seedTouched: _seedTouched,
+      seedHint: _seedHint,
+      seedError: _seedError,
+      composerDirty: _composerDirty,
+      canAddDraft: _canAdd,
+      composerHasText:
+          _front.text.trim().isNotEmpty ||
+          _back.text.trim().isNotEmpty ||
+          (_composerDirty && _definitionCloze.text.trim().isNotEmpty),
+    );
+  }
+
+  void _storeSnapshot() {
+    final key = _snapshotKey;
+    final controller = widget.controller;
+    if (key == null || controller == null || _saving) return;
+    controller.storeSnapshot(key, _buildSnapshot());
   }
 
   @override
@@ -483,7 +721,6 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     final seed = controller.seed;
     if (seed == null) {
       _appliedSeedRevision = controller.seedRevision;
-      if (_hasSeedComposer) setState(_clearSeedComposer);
       return;
     }
     if (controller.seedRevision == _appliedSeedRevision) return;
@@ -497,6 +734,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       _seedLoading = false;
       _seedHint = false;
       _seedError = null;
+      _composerDirty = false;
       switch (seed) {
         case BulletCardSeed(:final bulletId, :final bullet):
           _seedBulletId = bulletId;
@@ -531,6 +769,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   }
 
   void _applySuggestion(SuggestedCard suggestion) {
+    _composerDirty = false;
     _template = suggestion.template;
     if (suggestion.template == CardTemplate.definition) {
       _definitionCloze.text = seedDefinitionCloze(
@@ -668,6 +907,13 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   void dispose() {
     widget.controller?.removeListener(_onControllerChanged);
     widget.saveHandle?._detach(_saveHandler);
+    _storeSnapshot();
+    final controller = widget.controller;
+    if (controller != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        controller.markSeedSettled();
+      });
+    }
     _front.dispose();
     _back.dispose();
     _definitionCloze.dispose();
@@ -810,11 +1056,17 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   }
 
   void _onDefinitionChanged(String value) {
-    setState(_markSeedEdited);
+    setState(() {
+      _composerDirty = true;
+      _markSeedEdited();
+    });
   }
 
   void _onFrontBackChanged(String value) {
-    setState(_markSeedEdited);
+    setState(() {
+      _composerDirty = true;
+      _markSeedEdited();
+    });
   }
 
   void _addDraft() {
@@ -825,7 +1077,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       if (!parsed.isComplete) return;
       setState(() {
         _drafts.add(
-          _ConceptDraft(
+          CardCreatorConceptDraft(
             term: parsed.term,
             definition: parsed.definition,
             extra: '',
@@ -836,6 +1088,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         _definitionCloze.text = seedDefinitionCloze();
         _appliedDefinitionCloze = _definitionCloze.text;
         _placeCursorInCloze(_definitionCloze);
+        _composerDirty = false;
         _clearSeedComposer();
       });
       _afterDraftAdded(bulletId);
@@ -844,7 +1097,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     final template = _template ?? CardTemplate.mechanism;
     setState(() {
       _drafts.add(
-        _BasicDraft(
+        CardCreatorBasicDraft(
           front: _front.text.trim(),
           back: _back.text.trim(),
           template: template,
@@ -855,6 +1108,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       _back.clear();
       _appliedScaffoldFront = '';
       _appliedScaffoldBack = '';
+      _composerDirty = false;
       _clearSeedComposer();
     });
     _afterDraftAdded(bulletId);
@@ -914,8 +1168,8 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       widget.request.initialTerm,
     for (final draft in _drafts)
       switch (draft) {
-        _BasicDraft(:final front) => front,
-        _ConceptDraft(:final term) => term,
+        CardCreatorBasicDraft(:final front) => front,
+        CardCreatorConceptDraft(:final term) => term,
       },
   ];
 
@@ -1032,89 +1286,38 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     setState(() => _saving = true);
     final service = ref.read(reviewServiceProvider);
     final request = widget.request;
-    final pending = List<_CardDraft>.of(_drafts);
-    var created = 0;
-    int? manualCardId;
-    Object? failure;
-    for (final draft in pending) {
-      try {
-        switch (draft) {
-          case _BasicDraft():
-            final id = await service.createBasicCard(
-              sessionId: request.sessionId,
-              questionId: request.questionId,
-              question: draft.front,
-              answer: draft.back,
-              context: request.questionContext,
-              topicName: request.topicName,
-              subtopic: request.subtopic,
-              cognitiveType: draft.template.cognitiveType,
-              skippedQuestionId: request.skippedQuestionId,
-            );
-            manualCardId ??= id;
-          case _ConceptDraft():
-            await service.createConcept(
-              sessionId: request.sessionId,
-              questionId: request.questionId,
-              term: draft.term,
-              definition: draft.definition,
-              extra: draft.extra,
-              context: request.questionContext,
-              topicName: request.topicName,
-              subtopic: request.subtopic,
-              source: draft.source,
-              skippedQuestionId: request.skippedQuestionId,
-            );
-        }
-        created++;
-        if (mounted) setState(() => _drafts.remove(draft));
-      } on Object catch (error) {
-        failure = error;
-        break;
-      }
-    }
+    final result = await saveCardCreatorDrafts(
+      request: request,
+      drafts: _drafts,
+      service: service,
+      noteToConvertId: _noteToConvert?.id,
+    );
 
-    if (created > 0) {
-      try {
-        final note = request.note;
-        final seededNote = _noteToConvert;
-        final noteIds = <int>{
-          if (note != null) note.id,
-          if (seededNote != null) seededNote.id,
-        };
-        for (final noteId in noteIds) {
-          await service.markNoteConverted(noteId, manualCardId: manualCardId);
-        }
-        final error = request.error;
-        if (error != null && request.completeErrorOnSave) {
-          await service.completeErrorDetails(error.card.id);
-        }
-      } on Object catch (error) {
-        failure ??= error;
-      }
-    }
-
-    if (!mounted) return created;
+    if (!mounted) return result.created;
     setState(() {
       _saving = false;
-      if (created > 0) {
+      _drafts
+        ..clear()
+        ..addAll(result.remaining);
+      if (result.created > 0) {
         _clearSeedComposer();
         _noteToConvert = null;
+        _composerDirty = false;
       }
     });
     _reportDraftCount();
-    if (failure != null) {
+    if (result.failure != null) {
       await showSnack(
         context,
-        created > 0
-            ? '$created card${created == 1 ? '' : 's'} saved, but the rest '
-                  'could not be saved: $failure'
-            : 'Could not create the cards: $failure',
+        result.created > 0
+            ? '${result.created} card${result.created == 1 ? '' : 's'} saved, '
+                  'but the rest could not be saved: ${result.failure}'
+            : 'Could not create the cards: ${result.failure}',
       );
-      return created;
+      return result.created;
     }
-    widget.onSaved?.call(created);
-    return created;
+    widget.onSaved?.call(result.created);
+    return result.created;
   }
 
   @override
@@ -1171,7 +1374,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             ],
           ),
         if (!widget.embedded) const SizedBox(height: 8),
-        if (!widget.embedded && hasContext) ...[
+        if (!widget.embedded && widget.showContextRecap && hasContext) ...[
           _CreatorContextRecap(request: request),
           const SizedBox(height: 20),
         ],
@@ -1352,11 +1555,12 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              fromBullet ? 'From this bullet' : 'From this note',
-              style: theme.typography.emphasized.titleSmall,
-            ),
-            if (sourceText.trim().isNotEmpty) ...[
+            if (widget.showSeedSource)
+              Text(
+                fromBullet ? 'From this bullet' : 'From this note',
+                style: theme.typography.emphasized.titleSmall,
+              ),
+            if (widget.showSeedSource && sourceText.trim().isNotEmpty) ...[
               const SizedBox(height: 4),
               Text(
                 '“${sourceText.trim()}”',
@@ -1862,50 +2066,52 @@ class _CreatorContextRecap extends StatelessWidget {
     return TonalBox(
       key: const ValueKey('creator-context'),
       padding: const EdgeInsets.all(14),
-      child: Semantics(
-        container: true,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ...fields,
-            if (tags.isNotEmpty) ...[
-              if (fields.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Divider(color: theme.colorScheme.outlineVariant, height: 1),
-                const SizedBox(height: 10),
-              ],
-              Column(
-                key: const ValueKey('creator-tags'),
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _RecapLabel('Anki tags'),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (var index = 0; index < tags.length; index++)
-                        Pill(
-                          tags[index],
-                          tone: index == 0
-                              ? PillTone.primary
-                              : PillTone.secondary,
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Topic and subtopic are saved as tags, never inside the '
-                    'card text.',
-                    style: theme.typography.baseline.bodySmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      height: 1.4,
-                    ),
-                  ),
+      child: SelectionArea(
+        child: Semantics(
+          container: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...fields,
+              if (tags.isNotEmpty) ...[
+                if (fields.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Divider(color: theme.colorScheme.outlineVariant, height: 1),
+                  const SizedBox(height: 10),
                 ],
-              ),
+                Column(
+                  key: const ValueKey('creator-tags'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const _RecapLabel('Anki tags'),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (var index = 0; index < tags.length; index++)
+                          Pill(
+                            tags[index],
+                            tone: index == 0
+                                ? PillTone.primary
+                                : PillTone.secondary,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Topic and subtopic are saved as tags, never inside the '
+                      'card text.',
+                      style: theme.typography.baseline.bodySmall.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -1965,20 +2171,20 @@ class _RecapField extends StatelessWidget {
 class _DraftRow extends StatelessWidget {
   const _DraftRow({required this.draft, required this.onRemove, super.key});
 
-  final _CardDraft draft;
+  final CardCreatorDraft draft;
   final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final (title, body, report, pending) = switch (draft) {
-      _BasicDraft(:final front, :final back, :final template) => (
+      CardCreatorBasicDraft(:final front, :final back, :final template) => (
         front,
         back,
         checkCardLitmus(front: front, back: back, template: template),
         false,
       ),
-      _ConceptDraft(:final term, :final definition) => (
+      CardCreatorConceptDraft(:final term, :final definition) => (
         term,
         definition.trim().isEmpty ? 'Definition pending' : definition,
         checkCardLitmus(

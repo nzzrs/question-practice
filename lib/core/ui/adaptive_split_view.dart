@@ -102,7 +102,7 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
   double? _horizontalRatio;
   bool _loadedStorage = false;
   bool _dragging = false;
-  bool _focusHighlight = false;
+  bool _focusRingVisible = false;
   bool _announcedClamp = false;
 
   @override
@@ -377,7 +377,7 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
 
     // The long side covers the dragging handle (48dp) with a 2dp gap on each
     // end; the short side stays inside the 48dp divider strip.
-    final focusRing = _focusHighlight
+    final focusRing = _focusRingVisible
         ? Container(
             key: AdaptiveSplitView.dividerFocusRingKey,
             width: horizontal ? 16 : 52,
@@ -474,8 +474,8 @@ class _AdaptiveSplitViewState extends State<AdaptiveSplitView> {
         ),
       },
       onShowFocusHighlight: (value) {
-        if (_focusHighlight != value) {
-          setState(() => _focusHighlight = value);
+        if (_focusRingVisible != value) {
+          setState(() => _focusRingVisible = value);
         }
       },
       child: MouseRegion(

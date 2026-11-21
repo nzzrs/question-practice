@@ -52,7 +52,7 @@ void main() {
     await createError(harness, question: question);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    await tester.tap(find.text('Review all'));
+    await tester.tap(find.byKey(const ValueKey('review-all-pending')));
     await pumpFrames(tester);
 
     expect(find.byType(ErrorCardsReviewPage), findsOneWidget);
@@ -76,7 +76,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byType(ErrorCardsReviewPage), findsNothing);
-    expect(find.text('Cards'), findsOneWidget);
+    expect(find.byType(CardsPage), findsOneWidget);
     expect(recorder.modes.last, 'SystemUiMode.edgeToEdge');
   });
 
@@ -91,11 +91,11 @@ void main() {
       final question = (await harness.practices.questionsForPractice(
         seeded.practiceId,
       )).single;
-      await createError(harness, question: question, completed: true);
+      await createError(harness, question: question);
 
       await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-      expect(find.text('Review selected'), findsOneWidget);
-      await tester.tap(find.text('Review all'));
+      expect(find.byKey(const ValueKey('review-all-pending')), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('review-all-pending')));
       await pumpFrames(tester);
 
       await tester.tap(find.text('Skip'));
@@ -107,8 +107,8 @@ void main() {
       await pumpFrames(tester);
 
       expect(find.byType(ErrorCardsReviewPage), findsNothing);
-      // A completed review clears the selection, so only Review all remains.
-      expect(find.text('Review selected'), findsNothing);
+      // The review route returns and the Cards page has no active selection.
+      expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
       expect(recorder.modes.last, 'SystemUiMode.edgeToEdge');
     },
   );

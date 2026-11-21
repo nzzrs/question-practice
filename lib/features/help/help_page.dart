@@ -126,15 +126,15 @@ class HelpPage extends StatelessWidget {
           title: 'Cards',
           points: [
             'Cards holds concepts, facts, heuristics, contrasts, error and skipped questions, and notes.',
-            'Filter by All, Facts, Heuristics, Contrasts or Concepts. Errors & skipped and Notes filter by source. Show exported includes exported cards.',
+            'Filter by All, Cards, Errors or Notes. Cards groups concepts and basic cards; Errors also includes skipped questions. The visibility action includes exported cards.',
             'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection.',
-            'Review all and Review selected sit above the error and skipped section.',
-            "Complete finishes a missing definition or an error card's details.",
-            'Tap a card to preview it. An error preview is read-only; turn it into atomic cards in the review studio.',
+            'Select all in the app bar selects what the current filter shows. Review all pending opens every pending error and skipped question, even ones not selected. Items you finish leave the selection.',
+            'The main action exports ready cards. When selected items still need review it becomes Review pending and opens that review instead.',
+            'Tap a card to preview it. Error and skipped previews include Review. A concept without a definition can be completed from its preview.',
             'Errors are reviewed into atomic cards first; skipped questions stay in Cards until converted.',
             'Delete selected removes the chosen cards, skipped questions and notes. A deleted note leaves cards already made from it in place.',
             'A deleted skipped question leaves the queue but stays in its practice.',
-            'Review notes opens saved notes one at a time, where each can become cards or be kept.',
+            'Tap a note to review it. The download action in the Notes header saves notes as plain text.',
           ],
         ),
         const _Section(
@@ -142,10 +142,10 @@ class HelpPage extends StatelessWidget {
           title: 'Notes',
           points: [
             'Select text during practice and choose Save as note.',
-            'Notes stay in Cards and can be reviewed one at a time from Review notes or by tapping one.',
+            'Notes stay in Cards and can be reviewed one at a time by tapping one.',
             'Create cards opens the same creator: add cards by hand one by one, or open AI suggestions when a provider is set.',
             'A note with a card hides the card-making actions. Keep for later marks it as kept, and Delete note removes only the saved text.',
-            'Download all saves notes as plain text. Notes are never sent to AnkiDroid.',
+            'The download action in the Notes header saves notes as plain text. Notes are never sent to AnkiDroid.',
           ],
         ),
         const _Section(

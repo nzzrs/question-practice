@@ -241,11 +241,8 @@ void main() {
     await _pumpNarrow(tester, home: const CardsPage(), harness: harness);
     expect(tester.takeException(), isNull);
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('cards-filter-heuristics')),
-      findsOneWidget,
-    );
-    await tester.tap(find.byKey(const ValueKey('cards-filter-facts')));
+    expect(find.byKey(const ValueKey('cards-filter-cards')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('cards-filter-errors')));
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const ValueKey('cards-filter-all')));
@@ -277,14 +274,14 @@ void main() {
       topicName: 'A very long topic name that keeps going for a while',
       count: 1,
     );
-    await _seedErrorCard(harness, seeded, complete: true);
+    await _seedErrorCard(harness, seeded);
     await _pumpNarrow(
       tester,
       home: const CardsPage(),
       harness: harness,
       size: const Size(360, 640),
     );
-    await tester.tap(find.text('Review all'));
+    await tester.tap(find.byKey(const ValueKey('review-all-pending')));
     await pumpFrames(tester);
     expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);
     expect(tester.takeException(), isNull);

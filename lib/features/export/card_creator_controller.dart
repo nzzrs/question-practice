@@ -137,13 +137,22 @@ class CardCreatorSnapshot {
 
   bool get hasDrafts => drafts.isNotEmpty;
 
+  /// Whether reopening the creator would show work the dock Save could discard.
+  ///
+  /// Covers typed text, a seeded draft and an AI suggestion that was not yet
+  /// accepted. Plain template defaults and request prefills stay out.
+  bool get hasUnsavedComposerWork =>
+      (composerHasText && (composerDirty || seedTouched)) ||
+      seedSuggestion != null;
+
   /// Whether closing the review would lose work worth guarding.
   bool get hasPendingWork =>
       drafts.isNotEmpty ||
       (composerDirty && composerHasText) ||
       seedHint ||
       seedError != null ||
-      seedSuggestion != null;
+      seedSuggestion != null ||
+      (ideas?.isNotEmpty ?? false);
 
   int get draftCount => drafts.length;
 

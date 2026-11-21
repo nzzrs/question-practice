@@ -117,7 +117,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
   Future<bool> _saveCachedDrafts(Note note) async {
     final snapshot = _creator.snapshotFor(_itemKey(note));
     if (snapshot == null) return true;
-    if (snapshot.composerDirty && snapshot.composerHasText) {
+    if (snapshot.hasUnsavedComposerWork) {
       await showSnack(context, 'Add this card to the list before saving.');
       if (!mounted) return false;
       await _openCreator(note);
@@ -178,12 +178,14 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
 
   Future<void> _deleteNote(Note note, int length) async {
     if (_busy) return;
+    final hasDrafts = _creator.snapshotFor(_itemKey(note))?.hasDrafts ?? false;
     final confirmed = await confirmDialog(
       context,
       title: 'Delete note?',
       message:
           'The saved note "${note.text}" is removed from Cards. '
-          'Cards already made from it stay.',
+          'Cards already made from it stay.'
+          '${hasDrafts ? ' Unsaved card drafts for this note are discarded.' : ''}',
       confirmLabel: 'Delete',
       destructive: true,
     );

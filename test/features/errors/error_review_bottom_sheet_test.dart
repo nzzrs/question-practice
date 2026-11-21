@@ -104,6 +104,33 @@ http.Response _cardResponse(String front, String back) {
   );
 }
 
+http.Response _ideaResponse({
+  String front = 'Why does the network layer own addressing?',
+  String back = 'It routes packets between hosts.',
+}) {
+  return http.Response(
+    jsonEncode({
+      'choices': [
+        {
+          'message': {
+            'content': jsonEncode({
+              'ideas': [
+                {
+                  'template': 'contrast',
+                  'variants': [
+                    {'front': front, 'back': back},
+                  ],
+                },
+              ],
+            }),
+          },
+        },
+      ],
+    }),
+    200,
+  );
+}
+
 Future<void> _openCreator(WidgetTester tester) async {
   await tester.tap(find.byKey(const ValueKey('review-dock-create')));
   await pumpFrames(tester);
@@ -403,6 +430,164 @@ void main() {
     expect(_field(tester, 'creator-front'), isEmpty);
   });
 
+  testWidgets('system back keeps the typed creator draft for its item', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    await _openCreator(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Survives system back?',
+    );
+    await tester.enterText(find.byKey(const ValueKey('creator-back')), 'Yes.');
+    await pumpFrames(tester);
+
+    await tester.binding.handlePopRoute();
+    await pumpFrames(tester, frames: 24);
+    expect(find.byType(CardCreatorSheet), findsNothing);
+
+    await _openCreator(tester);
+    expect(_field(tester, 'creator-front'), 'Survives system back?');
+    expect(_field(tester, 'creator-back'), 'Yes.');
+  });
+
+  testWidgets('dragging the sheet down keeps the typed creator draft', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    await _openCreator(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-front')),
+      'Survives drag down?',
+    );
+    await tester.enterText(find.byKey(const ValueKey('creator-back')), 'Yes.');
+    await pumpFrames(tester);
+
+    final semantics = tester.ensureSemantics();
+    await tester.drag(
+      find.bySemanticsLabel('Drag handle'),
+      const Offset(0, 900),
+    );
+    semantics.dispose();
+    await pumpFrames(tester, frames: 24);
+    expect(find.byType(CardCreatorSheet), findsNothing);
+
+    await _openCreator(tester);
+    expect(_field(tester, 'creator-front'), 'Survives drag down?');
+    expect(_field(tester, 'creator-back'), 'Yes.');
+  });
+
+  testWidgets('edited bullet drafts guard a new seed after a step change', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final first = await _seedCard(harness);
+    final second = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [first.card, second.card]),
+      harness: harness,
+    );
+
+    final firstBullet = find.byKey(const ValueKey('wrong-note-card-0'));
+    await tester.ensureVisible(firstBullet);
+    await pumpFrames(tester);
+    await tester.tap(firstBullet);
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'My own answer.',
+    );
+    await pumpFrames(tester);
+    await _closeCreator(tester);
+
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
+    await pumpFrames(tester);
+    expect(find.text('Item 2 of 2'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('review-dock-back')));
+    await pumpFrames(tester);
+
+    final secondBullet = find.byKey(const ValueKey('wrong-note-card-1'));
+    await tester.ensureVisible(secondBullet);
+    await pumpFrames(tester);
+    await tester.tap(secondBullet);
+    await pumpFrames(tester);
+    expect(find.text('Replace the draft you started?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await pumpFrames(tester);
+
+    await _openCreator(tester);
+    expect(
+      _field(tester, 'creator-front'),
+      'I confused the network and transport layers.',
+    );
+    expect(_field(tester, 'creator-back'), 'My own answer.');
+  });
+
+  testWidgets(
+    'an AI draft filled into the composer still guards the dock Save',
+    (tester) async {
+      final harness = TestHarness(
+        httpClient: MockClient(
+          (_) async => _cardResponse(
+            'Which layer owns IP addresses?',
+            'The network layer owns addressing.',
+          ),
+        ),
+      );
+      addTearDown(harness.close);
+      await harness.settings.save(_aiSettings);
+      await harness.keyStore.writeApiKey('secret-key');
+      final seeded = await _seedCard(harness);
+
+      await pumpTestApp(
+        tester,
+        home: ErrorCardsReviewPage(cards: [seeded.card]),
+        harness: harness,
+      );
+
+      final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
+      await tester.ensureVisible(bullet);
+      await pumpFrames(tester);
+      await tester.tap(bullet);
+      await pumpFrames(tester);
+      await expandCardCreatorSheet(tester);
+      await pumpFrames(tester, frames: 24);
+      expect(_field(tester, 'creator-front'), 'Which layer owns IP addresses?');
+      await _closeCreator(tester);
+
+      await tester.tap(find.byKey(const ValueKey('review-dock-save')));
+      await pumpFrames(tester);
+      expect(
+        find.text('Add this card to the list before saving.'),
+        findsOneWidget,
+      );
+      await expandCardCreatorSheet(tester);
+      expect(_field(tester, 'creator-front'), 'Which layer owns IP addresses?');
+    },
+  );
+
   testWidgets('saving from the dock uses the cached drafts and advances', (
     tester,
   ) async {
@@ -687,6 +872,84 @@ void main() {
     );
     await _openCreator(tester);
     expect(find.text('Cards to save · 1'), findsOneWidget);
+  });
+
+  testWidgets('AI results stay with their item across steps', (tester) async {
+    final harness = TestHarness(
+      httpClient: MockClient((_) async => _ideaResponse()),
+    );
+    addTearDown(harness.close);
+    await harness.settings.save(_aiSettings);
+    await harness.keyStore.writeApiKey('secret-key');
+    final first = await _seedCard(harness);
+    final second = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [first.card, second.card]),
+      harness: harness,
+    );
+
+    await _openCreator(tester);
+    final suggest = find.byKey(const ValueKey('creator-ai-suggest'));
+    await tester.ensureVisible(suggest);
+    await pumpFrames(tester);
+    await tester.tap(suggest);
+    await pumpFrames(tester, frames: 24);
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsOneWidget);
+    await _closeCreator(tester);
+
+    await tester.tap(find.byKey(const ValueKey('review-dock-next')));
+    await pumpFrames(tester);
+    await _openCreator(tester);
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsNothing);
+    await _closeCreator(tester);
+
+    await tester.tap(find.byKey(const ValueKey('review-dock-back')));
+    await pumpFrames(tester);
+    await _openCreator(tester);
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsOneWidget);
+    expect(
+      find.text('Why does the network layer own addressing?'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('closing during an AI request reopens with the panel closed', (
+    tester,
+  ) async {
+    final response = Completer<http.Response>();
+    final harness = TestHarness(httpClient: MockClient((_) => response.future));
+    addTearDown(harness.close);
+    await harness.settings.save(_aiSettings);
+    await harness.keyStore.writeApiKey('secret-key');
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    await _openCreator(tester);
+    final suggest = find.byKey(const ValueKey('creator-ai-suggest'));
+    await tester.ensureVisible(suggest);
+    await pumpFrames(tester);
+    await tester.tap(suggest);
+    await pumpFrames(tester);
+    expect(find.byKey(const ValueKey('creator-ai-loading')), findsOneWidget);
+    await _closeCreator(tester);
+
+    await _openCreator(tester);
+    expect(find.byKey(const ValueKey('creator-ai-section')), findsNothing);
+    await tester.ensureVisible(suggest);
+    await pumpFrames(tester);
+    await tester.tap(suggest);
+    await pumpFrames(tester);
+    expect(find.byKey(const ValueKey('creator-ai-loading')), findsOneWidget);
+    response.complete(_ideaResponse());
+    await pumpFrames(tester, frames: 60);
+    expect(find.byKey(const ValueKey('creator-ai-idea-0')), findsOneWidget);
   });
 
   for (final config in const [

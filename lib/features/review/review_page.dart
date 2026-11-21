@@ -38,6 +38,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   final _scroll = ScrollController();
   final _creator = CardCreatorController();
   final _conceptDrafts = <int, String>{};
+  final _savedConceptIds = <int>{};
 
   @override
   void initState() {
@@ -200,7 +201,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     CardCreatorSnapshot? snapshot,
   ) async {
     if (snapshot == null) return true;
-    if (snapshot.composerDirty && snapshot.composerHasText) {
+    if (snapshot.hasUnsavedComposerWork) {
       await showSnack(context, 'Add this card to the list before saving.');
       if (!mounted) return false;
       await _openCreator(step);
@@ -263,7 +264,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               .read(reviewServiceProvider)
               .saveConceptDefinition(concept.id, _definition.text);
           if (!mounted) return;
-          _conceptDrafts.remove(concept.id);
+          _conceptDrafts[concept.id] = _definition.text;
+          _savedConceptIds.add(concept.id);
           _created++;
         } on Object catch (error) {
           if (mounted) await showSnack(context, 'Could not save: $error');
@@ -287,12 +289,65 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     if (mounted) await _requestNext();
   }
 
+  bool get _hasUnsavedConceptText {
+    final step = _step;
+    return step is ConceptDefinitionStep &&
+        !_savedConceptIds.contains(step.concept.id) &&
+        _definition.text.trim().isNotEmpty;
+  }
+
+  Future<void> _deleteNote(ReviewStep step, Note note) async {
+    if (_busy) return;
+    final snapshot = _creator.snapshotFor(_itemKey(step));
+    final hasDrafts = snapshot?.hasDrafts ?? false;
+    final confirmed = await confirmDialog(
+      context,
+      title: 'Delete note?',
+      message:
+          'The saved note "${note.text}" is removed from Cards. '
+          'Cards already made from it stay.'
+          '${hasDrafts ? ' Unsaved card drafts for this note are discarded.' : ''}',
+      confirmLabel: 'Delete',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(cardRepositoryProvider).deleteNote(note.id);
+      if (!mounted) return;
+      _creator.clearSnapshot(_itemKey(step));
+      final data = _data;
+      if (data == null) return;
+      data.steps.remove(step);
+      final finished = data.steps.isEmpty;
+      setState(() {
+        _creator.resetForStep();
+        if (finished) {
+          _finished = true;
+        } else {
+          if (_index >= data.steps.length) {
+            _index = data.steps.length - 1;
+          }
+          _prepareStep();
+        }
+      });
+      if (finished) ref.invalidate(homeStatsProvider);
+      _resetScroll();
+    } on Object catch (error) {
+      if (mounted) {
+        await showSnack(context, 'Could not delete the note: $error');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _requestNext() async {
     if (_busy) return;
     final data = _data;
     if (data == null) return;
     final last = _index + 1 >= data.steps.length;
-    if (last && _creator.hasPendingWork) {
+    if (last && (_creator.hasPendingWork || _hasUnsavedConceptText)) {
       final leave = await confirmDialog(
         context,
         title: 'Leave review?',
@@ -309,7 +364,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   Future<void> _requestClose() async {
     if (_busy) return;
-    if (_creator.hasPendingWork) {
+    if (_creator.hasPendingWork || _hasUnsavedConceptText) {
       final leave = await confirmDialog(
         context,
         title: 'Leave review?',
@@ -439,13 +494,18 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       variant: M3EAppBarVariant.small,
       bottomBar: ReviewActionDock(
         busy: _busy,
-        saveLabel: last ? 'Finish' : 'Save',
+        saveLabel: last
+            ? (step is NoteReviewStep ? 'Save and finish' : 'Finish')
+            : 'Save',
         onSave: _saveCurrentStep,
         onBack: _goBack,
         onNext: _requestNext,
         canGoBack: _index > 0,
         canGoNext: true,
         onCreateCards: () => _openCreator(step),
+        onDelete: step is NoteReviewStep
+            ? () => _deleteNote(step, step.note)
+            : null,
       ),
       children: [..._buildStep(theme, step, data, heading)],
     );
@@ -468,6 +528,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           card: card,
           creator: _creator,
           onSeedRequested: () => _openCreator(step),
+          hasUnsavedComposerWork: () =>
+              _creator.snapshotFor(_itemKey(step))?.hasUnsavedComposerWork ??
+              false,
           leading: header,
         ),
       ],
@@ -519,7 +582,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           minLines: 2,
           maxLines: 4,
           isRequired: true,
-          onChanged: (value) => _conceptDrafts[concept.id] = value,
+          onChanged: (value) {
+            _conceptDrafts[concept.id] = value;
+            _savedConceptIds.remove(concept.id);
+          },
         ),
       ],
       NoteReviewStep(:final note) => [header, NoteReviewView(note: note)],

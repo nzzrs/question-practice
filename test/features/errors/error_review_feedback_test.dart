@@ -198,6 +198,49 @@ void main() {
     expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
   });
 
+  testWidgets('deleting a note from the error review asks first', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: seeded.card.sessionId,
+      questionId: seeded.question.id,
+      text: 'keep this until I confirm',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final more = find.byKey(ValueKey('feedback-note-more-$noteId'));
+    await tester.ensureVisible(more);
+    await pumpFrames(tester);
+    await tester.tap(more);
+    await pumpFrames(tester);
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester);
+
+    expect(find.text('Delete note?'), findsOneWidget);
+    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsOneWidget);
+
+    await tester.tap(find.text('Delete').last);
+    await pumpFrames(tester, frames: 24);
+
+    final notes = await tester.runAsync(
+      () => harness.cards.notesForQuestion(seeded.question.id),
+    );
+    expect(notes, isEmpty);
+    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsNothing);
+  });
+
   testWidgets('the review fits 360 dp at 2.0 text scale', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;

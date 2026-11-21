@@ -186,8 +186,61 @@ void main() {
     expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
     expect(find.byKey(const ValueKey('note-see-context')), findsOneWidget);
     expect(find.text('Suggest cards with AI'), findsNothing);
-    expect(find.text('Finish'), findsOneWidget);
+    expect(find.text('Save and finish'), findsOneWidget);
+    expect(find.text('Finish'), findsNothing);
     expect(find.text('Keep & save'), findsNothing);
+    expect(find.byKey(const ValueKey('review-dock-delete')), findsOneWidget);
+    expect(find.text('Delete note'), findsNothing);
+  });
+
+  testWidgets('deleting a session note asks before removing it', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final sessions = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await sessions.startPractice(seeded.practiceId);
+    final item = start.items.single;
+    await sessions.submitAnswer(
+      start: start,
+      item: item,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await harness.cards.createNote(
+      sessionId: start.session.id,
+      questionId: item.question.id,
+      text: 'delete this note',
+      context: item.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ReviewPage(sessionId: start.session.id),
+      harness: harness,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('review-dock-delete')));
+    await pumpFrames(tester);
+    expect(find.text('Delete note?'), findsOneWidget);
+    await tester.tap(find.text('Delete'));
+    await pumpFrames(tester, frames: 24);
+
+    final notes = await tester.runAsync(
+      () => harness.cards.notesForSession(start.session.id),
+    );
+    expect(notes, isEmpty);
+    expect(find.text('delete this note'), findsNothing);
   });
 
   testWidgets('error review continues without bias or vaccine notes', (

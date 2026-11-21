@@ -82,7 +82,7 @@ class _NoteReviewViewState extends ConsumerState<NoteReviewView> {
     if (question == null) return;
     await M3EBottomSheet.show<void>(
       context,
-      initialValue: M3EBottomSheetValue.collapsed,
+      initialValue: M3EBottomSheetValue.expanded,
       builder: (context) => _NoteContextSheet(
         note: widget.note,
         question: question,
@@ -152,14 +152,7 @@ class _NoteReviewViewState extends ConsumerState<NoteReviewView> {
           M3EButton.text(
             key: const ValueKey('note-see-context'),
             onPressed: _showContext,
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.menu_book_outlined, size: 18),
-                SizedBox(width: 6),
-                Text('See context'),
-              ],
-            ),
+            child: const Text('See context'),
           ),
         if (note.hasCard) ...[
           const SizedBox(height: 8),

@@ -652,7 +652,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
                 ),
             ],
       aiError: _aiError,
-      aiPanelOpen: _aiPanelOpen,
+      aiPanelOpen: _aiPanelOpen && !_aiLoading,
       aiUnavailable: _aiUnavailable,
       appliedSeedRevision: _appliedSeedRevision,
       seedBulletId: _seedBulletId,
@@ -769,7 +769,9 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   }
 
   void _applySuggestion(SuggestedCard suggestion) {
-    _composerDirty = false;
+    _composerDirty = true;
+    _seedTouched = true;
+    widget.controller?.markSeedDirty();
     _template = suggestion.template;
     if (suggestion.template == CardTemplate.definition) {
       _definitionCloze.text = seedDefinitionCloze(
@@ -1658,7 +1660,6 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
                     _seedInitialBack = suggestion.back;
                     _seedInitialCloze = _definitionCloze.text;
                     _seedSuggestion = null;
-                    _seedTouched = false;
                   });
                 },
                 child: const Text('Use AI draft'),

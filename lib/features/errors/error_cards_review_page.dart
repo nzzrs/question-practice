@@ -135,7 +135,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
     CardCreatorSnapshot? snapshot,
   ) async {
     if (snapshot == null) return true;
-    if (snapshot.composerDirty && snapshot.composerHasText) {
+    if (snapshot.hasUnsavedComposerWork) {
       await showSnack(context, 'Add this card to the list before saving.');
       if (!mounted) return false;
       await _openCreator(step);
@@ -324,6 +324,11 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
               card: card,
               creator: _creator,
               onSeedRequested: () => _openCreator(step),
+              hasUnsavedComposerWork: () =>
+                  _creator
+                      .snapshotFor(_itemKey(step))
+                      ?.hasUnsavedComposerWork ??
+                  false,
               leading: FeedbackStepHeader(
                 label: 'Item ${_index + 1} of ${_steps.length}',
                 progress: (_index + 1) / _steps.length,

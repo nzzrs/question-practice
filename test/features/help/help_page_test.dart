@@ -76,6 +76,7 @@ void main() {
     expect(texts.any((text) => text.contains('chat completions')), isFalse);
     expect(texts.any((text) => text.contains('native API')), isFalse);
     expect(texts.any((text) => text.contains('database')), isFalse);
+    expect(texts.any((text) => text.contains("I didn't know this")), isFalse);
   });
 
   testWidgets('copy example puts valid JSON with every format feature on the '

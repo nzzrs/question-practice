@@ -64,6 +64,19 @@ void main() {
     expect(
       texts.any(
         (text) => text.contains(
+          'Review all pending opens every pending error and skipped question, '
+          'even ones not selected.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any((text) => text.contains('without changing the selection')),
+      isFalse,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
           'Facts, heuristics and contrasts use the Basic note type',
         ),
       ),

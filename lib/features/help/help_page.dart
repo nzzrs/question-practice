@@ -129,7 +129,7 @@ class HelpPage extends StatelessWidget {
             'Cards holds concepts, facts, heuristics, contrasts, error and skipped questions, and notes.',
             'Filter by All, Cards, Errors or Notes. Cards groups concepts and basic cards; Errors also includes skipped questions. The visibility action includes exported cards.',
             'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection.',
-            'Select all in the app bar selects what the current filter shows. Review all pending opens every pending error and skipped question without changing the selection.',
+            'Select all in the app bar selects what the current filter shows. Review all pending opens every pending error and skipped question, even ones not selected. Items you finish leave the selection.',
             'The main action exports ready cards. When selected items still need review it becomes Review pending and opens that review instead.',
             'Tap a card to preview it. Error and skipped previews include Review. A concept without a definition can be completed from its preview.',
             'Errors are reviewed into atomic cards first; skipped questions stay in Cards until converted.',

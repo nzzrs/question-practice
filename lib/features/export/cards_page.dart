@@ -33,6 +33,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   bool _selectionActive = false;
   bool _restoreStarted = false;
   bool _restored = false;
+  int _selectionRevision = 0;
   bool _pruneScheduled = false;
   bool _busy = false;
   bool _showExported = false;
@@ -102,10 +103,18 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   }) {
     return ExportSelection(
       concepts: concepts
-          .where((item) => _selectedConcepts.contains(item.id))
+          .where(
+            (item) =>
+                item.isExportable &&
+                item.exportedAt == null &&
+                _selectedConcepts.contains(item.id),
+          )
           .toList(),
       manualCards: manuals
-          .where((item) => _selectedBasic.contains(item.id))
+          .where(
+            (item) =>
+                item.exportedAt == null && _selectedBasic.contains(item.id),
+          )
           .toList(),
     );
   }
@@ -140,6 +149,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   }
 
   void _persistSelection() {
+    _selectionRevision++;
     unawaited(
       ref
           .read(settingsRepositoryProvider)
@@ -172,10 +182,18 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     required Set<int> skipped,
     required Set<int> notes,
   }) async {
+    final revision = _selectionRevision;
     final stored = await ref
         .read(settingsRepositoryProvider)
         .loadCardsSelection();
     if (!mounted) return;
+    if (revision != _selectionRevision) {
+      // The learner acted while the stored selection loaded. Their fresh
+      // selection wins, and overwriting the key drops the stale value.
+      setState(() => _restored = true);
+      _persistSelection();
+      return;
+    }
     final valid = _validSelection(
       stored ?? CardsSelection.empty,
       concepts: concepts,
@@ -414,7 +432,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       for (final item in concepts)
         if (item.isExportable && item.exportedAt == null) item.id,
     ];
-    final basicSelectableIds = [for (final item in visibleManuals) item.id];
+    final basicSelectableIds = [
+      for (final item in visibleManuals)
+        if (item.exportedAt == null) item.id,
+    ];
     final errorSelectableIds = [
       for (final item in errors)
         if (item.exportedAt == null) item.id,
@@ -580,8 +601,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 allSelected:
                     conceptSelectableIds.isNotEmpty &&
                     conceptSelectableIds.every(_selectedConcepts.contains),
-                onPressed: () =>
-                    _toggleIds(_selectedConcepts, conceptSelectableIds),
+                onPressed: conceptSelectableIds.isEmpty
+                    ? null
+                    : () => _toggleIds(_selectedConcepts, conceptSelectableIds),
               ),
             ),
             AppGroup(
@@ -622,8 +644,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                         skippedSelectableIds.isNotEmpty) &&
                     errorSelectableIds.every(_selectedErrors.contains) &&
                     skippedSelectableIds.every(_selectedSkipped.contains),
-                onPressed: () =>
-                    _toggleErrorIds(errorSelectableIds, skippedSelectableIds),
+                onPressed:
+                    errorSelectableIds.isEmpty && skippedSelectableIds.isEmpty
+                    ? null
+                    : () => _toggleErrorIds(
+                        errorSelectableIds,
+                        skippedSelectableIds,
+                      ),
               ),
             ),
             AppGroup(
@@ -673,7 +700,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 allSelected:
                     basicSelectableIds.isNotEmpty &&
                     basicSelectableIds.every(_selectedBasic.contains),
-                onPressed: () => _toggleIds(_selectedBasic, basicSelectableIds),
+                onPressed: basicSelectableIds.isEmpty
+                    ? null
+                    : () => _toggleIds(_selectedBasic, basicSelectableIds),
               ),
             ),
             AppGroup(

@@ -182,6 +182,13 @@ void main() {
         tester.getCenter(find.byKey(const ValueKey('notes-download'))).dx,
       ),
     );
+
+    // Selection adds the clear action; the app bar must still fit at 320dp
+    // with 2x text.
+    await tester.tap(find.byKey(const ValueKey('select-all')));
+    await pumpFrames(tester);
+    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('select-all')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -207,6 +214,72 @@ void main() {
     expect(find.byKey(const ValueKey('select-all')), findsOneWidget);
   });
 
+  testWidgets('select all ignores visible rows that cannot be selected', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final basicId = await seedBasic(harness, question);
+    await harness.cards.markExported(
+      conceptIds: const [],
+      manualCardIds: [basicId],
+      exportedAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    await tester.tap(find.byKey(const ValueKey('cards-filter-show-exported')));
+    await pumpFrames(tester);
+    expect(find.byKey(ValueKey('basic-row-$basicId')), findsOneWidget);
+
+    final globalSelectAll = tester.widget<M3EIconButton>(
+      find.byKey(const ValueKey('select-all')),
+    );
+    expect(globalSelectAll.onPressed, isNull);
+    final sectionSelectAll = tester.widget<M3EIconButton>(
+      find.descendant(
+        of: find.byKey(const ValueKey('basic-select-all')),
+        matching: find.byType(M3EIconButton),
+      ),
+    );
+    expect(sectionSelectAll.onPressed, isNull);
+  });
+
+  testWidgets('a concept without a definition can be completed from preview', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final conceptId = await seedConcept(harness, question);
+    await harness.cards.updateConceptDefinition(conceptId, '');
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    final row = find.byKey(ValueKey('concept-row-$conceptId'));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await pumpFrames(tester);
+    expect(find.text('Concept preview'), findsOneWidget);
+    expect(find.text('Needs a definition before export.'), findsWidgets);
+
+    await tester.tap(find.text('Complete'));
+    await pumpFrames(tester);
+    expect(find.text('Definition of VPC'), findsWidgets);
+    expect(find.text('Save'), findsOneWidget);
+
+    await tester.enterText(find.byType(EditableText), 'A private network.');
+    await tester.tap(find.text('Save'));
+    await pumpFrames(tester, frames: 24);
+
+    final concepts = await tester.runAsync(
+      () => harness.cards.watchConcepts().first,
+    );
+    expect(concepts!.single.isExportable, isTrue);
+    expect(find.text('1 selected'), findsOneWidget);
+  });
+
   testWidgets('global select all selects every visible row and toggles off', (
     tester,
   ) async {
@@ -223,6 +296,10 @@ void main() {
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     expect(find.text('Ready for AnkiDroid'), findsOneWidget);
     expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(
+      tester.getCenter(find.byKey(const ValueKey('select-all'))).dx,
+      greaterThan(tester.getCenter(find.byIcon(Icons.info_outline)).dx),
+    );
 
     await tester.tap(find.byKey(const ValueKey('select-all')));
     await pumpFrames(tester);

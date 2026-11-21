@@ -56,12 +56,26 @@ class CardsSelection {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) return null;
       if (decoded['version'] != version) return null;
+      // A family that is present but not a list of ids marks the whole value
+      // as corrupt, so the page repairs it instead of silently dropping rows.
+      final concepts = _family(decoded, 'concepts');
+      final basic = _family(decoded, 'basic');
+      final errors = _family(decoded, 'errors');
+      final skipped = _family(decoded, 'skipped');
+      final notes = _family(decoded, 'notes');
+      if (concepts == null ||
+          basic == null ||
+          errors == null ||
+          skipped == null ||
+          notes == null) {
+        return null;
+      }
       return CardsSelection(
-        concepts: _ids(decoded['concepts']) ?? const {},
-        basic: _ids(decoded['basic']) ?? const {},
-        errors: _ids(decoded['errors']) ?? const {},
-        skipped: _ids(decoded['skipped']) ?? const {},
-        notes: _ids(decoded['notes']) ?? const {},
+        concepts: concepts,
+        basic: basic,
+        errors: errors,
+        skipped: skipped,
+        notes: notes,
       );
     } on FormatException {
       return null;
@@ -78,6 +92,12 @@ class CardsSelection {
       ids.add(value);
     }
     return ids;
+  }
+
+  /// Reads one id family; an absent family is empty, a malformed one is null.
+  static Set<int>? _family(Map<String, dynamic> decoded, String key) {
+    if (!decoded.containsKey(key)) return const {};
+    return _ids(decoded[key]);
   }
 
   static bool _sameIds(Set<int> left, Set<int> right) {

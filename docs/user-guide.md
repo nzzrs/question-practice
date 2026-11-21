@@ -83,7 +83,7 @@ Review opens fullscreen.
 - Manual entry adds cards one at a time and works offline without AI. Five templates write the front and back: Definition / term, Contrast / difference, Mechanism / cause-effect, Exam heuristic and Phase transition / procedure.
 - Unsaved drafts ask **Discard unsaved cards?** before Previous, Skip, Continue or closing the review. Save the cards first to advance without a prompt.
 - AI suggestions are optional: each idea offers up to three wording variants, and the error breakdown proposes a contrast between your choice and the correct option and/or an exam heuristic. The refresh icon asks for another try and keeps your drafts.
-- Every builder card, draft and AI variant carries an advisory quality badge. It warns about yes/no questions, fronts over 30 words, cards over 15 seconds to read, answer clues, template mismatches, empty fronts or backs, a missing definition, and a definition that repeats its term. It never blocks saving. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
+- Every builder card, draft and AI variant carries an advisory quality badge and the estimated reading time. The badge warns about yes/no questions, fronts over 30 words, cards over 15 seconds to read, answer clues, template mismatches, empty fronts or backs, a missing definition, and a definition that repeats its term. It never blocks saving. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
 - **Skipped questions** ask **What was missing here?**.
   - **A concept** creates a concept card from a term and definition.
   - **Another question** creates a basic card from a question and answer.

@@ -5,7 +5,7 @@ Question Practice writes to AnkiDroid through its supported Instant-Add API (`co
 ## One-time setup
 
 1. Install AnkiDroid on the same device.
-2. Open AnkiDroid → Settings → Advanced → enable the AnkiDroid API.
+2. In AnkiDroid, open Settings → Advanced → enable the AnkiDroid API.
 3. In Questions → Settings → AnkiDroid, tap **Grant permission**. Android asks for `com.ichi2.anki.permission.READ_WRITE_DATABASE`.
 4. Make sure AnkiDroid has a **Cloze** note type. AnkiDroid ships with one; if it was deleted, create it again in AnkiDroid's note type manager. Questions uses that type for concept cards.
 
@@ -73,11 +73,11 @@ three wording variants, and an error breakdown proposes at most two ideas:
 - a **heuristic** idea whose front follows the mandatory template
   `If a scenario asks X but restricts with Y, which option is always discarded?` and whose back starts with `Discard Z because ...`.
 
-Every builder card, draft and AI variant carries an advisory quality badge. It
-flags a binary front (one answerable with yes/no), a front longer than 30 words,
-a card over 15 seconds to read, syntactic clues that give the answer away,
-template mismatches, missing fronts or backs, and a missing or term-repeating
-definition. It never blocks saving. You choose which cards to save; the error is
+Every builder card, draft and AI variant carries an advisory quality badge and
+the estimated reading time. The badge flags a binary front (one answerable with
+yes/no), a front longer than 30 words, a card over 15 seconds to read,
+syntactic clues that give the answer away, template mismatches, missing fronts
+or backs, and a missing or term-repeating definition. It never blocks saving. You choose which cards to save; the error is
 marked reviewed. Errors are never sent to Anki directly.
 
 ## Tags
@@ -110,7 +110,7 @@ After a successful import the app broadcasts `com.ichi2.anki.DO_SYNC` so AnkiDro
 ## Failure handling
 
 - AnkiDroid missing → the app offers the file fallback.
-- API disabled or permission denied → an explanatory dialog and a button to open AnkiDroid.
+- API disabled or permission denied → an explanatory dialog and a shortcut that opens the AnkiDroid app.
 - No Cloze note type → the app explains what to create.
 - Partial failure → the successfully added note count is reported, but the selected cards stay unexported so nothing is silently lost.
 
@@ -134,12 +134,12 @@ On a connected Android device with AnkiDroid installed:
 1. Import the sample practice and create one concept, one atomic card and one skipped-question basic card.
 2. In Cards, filter by Facts, Heuristics, Contrasts and Concepts and confirm the rows match their type.
 3. Export to AnkiDroid and accept the permission prompt.
-4. Open AnkiDroid, open the Question Practice deck and confirm:
+4. In AnkiDroid, open the Question Practice deck and confirm:
    - concept notes render as cloze cards with no topic prefix in the text;
    - contrast and heuristic notes use the `Basic` note type;
    - `question-practice`, `topic::` and `subtopic::` tags are present.
 5. Set the Cloud topic to a separate deck with **Edit topic → AnkiDroid deck** (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck. Open **Edit practice** and confirm it has no deck row; deck selection is topic-level only.
-6. Import a multi-answer question, answer it wrong, open the review and confirm **Create cards** adds two cards manually without AI, while **AI suggestions** proposes contrast and heuristic ideas with variants and advisory quality badges. Retry with the refresh icon and confirm drafts stay.
+6. Import a multi-answer question, answer it wrong, open the review and confirm **Create cards** adds two cards manually without AI, while **AI suggestions** proposes contrast and heuristic ideas with variants, advisory quality badges and reading times. Retry with the refresh icon and confirm drafts stay.
 7. Confirm no `Question Practice: Error v2` model is created in AnkiDroid.
 8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
 9. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.

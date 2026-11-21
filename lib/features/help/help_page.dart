@@ -106,7 +106,7 @@ class HelpPage extends StatelessWidget {
             'Unsaved drafts ask before Previous, Skip, Continue or closing the review.',
             'Five templates write the front and back: Definition / term, Contrast / difference, Mechanism / cause-effect, Exam heuristic and Phase transition / procedure.',
             'AI suggestions are optional. Each idea offers up to three variants; keep the ones that help and add them to your list.',
-            'Card quality flags yes/no questions, long fronts, long cards, answer clues, template mismatches and missing fields. It never blocks saving.',
+            'Card quality shows the estimated reading time and flags yes/no questions, long fronts, long cards, answer clues, template mismatches and missing fields. It never blocks saving.',
             'A concept card needs only a term. Its meaning comes from your saved cards or AI and is never typed in the creator.',
             'Topic and subtopic are saved as Anki tags, never inside the card text.',
             'Review opens fullscreen. Missing details can be completed later from Cards.',

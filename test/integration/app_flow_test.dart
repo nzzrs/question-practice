@@ -113,9 +113,12 @@ void main() {
     expect(gateway.importedNotes, hasLength(1));
     expect(
       gateway.importedNotes.first.fields.first,
-      '[Cloud fundamentals] '
       'Definition of {{c1::GCP}}: {{c2::Google Cloud Platform}}',
     );
+    expect(gateway.importedNotes.first.tags, [
+      'question-practice',
+      'topic::cloud-fundamentals',
+    ]);
     expect(await harness.cards.watchConcepts().first, isEmpty);
     expect(await harness.cards.watchErrorCards().first, isNotEmpty);
   });

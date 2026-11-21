@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/platform/anki_gateway.dart';
@@ -10,20 +12,26 @@ void main() {
   late TestHarness harness;
   late FakeAnkiGateway gateway;
   late ExportService service;
+  late Directory tempDir;
 
-  setUp(() {
+  setUp(() async {
     gateway = FakeAnkiGateway();
     harness = TestHarness(anki: gateway);
+    tempDir = await Directory.systemTemp.createTemp('qp-export-test-');
     service = ExportService(
       gateway: gateway,
       cards: harness.cards,
       practices: harness.practices,
       clock: harness.clock,
+      temporaryDirectory: () async => tempDir,
     );
   });
 
   tearDown(() async {
     await harness.close();
+    if (tempDir.existsSync()) {
+      tempDir.deleteSync(recursive: true);
+    }
   });
 
   Future<ExportSelection> selection() async {
@@ -42,6 +50,7 @@ void main() {
       definition: 'Google Cloud Platform',
       context: 'Question',
       topicName: 'Cloud',
+      subtopic: 'Layer 4',
       source: ConceptSource.ai,
       createdAt: harness.clock.now().toUtc(),
     );
@@ -71,6 +80,7 @@ void main() {
       question: 'Manual question',
       answer: 'Manual answer',
       topicName: 'Cloud',
+      subtopic: 'Layer 4',
       createdAt: harness.clock.now().toUtc(),
     );
     final concepts = await harness.cards.watchConcepts().first;
@@ -95,6 +105,16 @@ void main() {
       AnkiModel.concept,
       AnkiModel.basic,
     ]);
+    expect(gateway.importedNotes.first.tags, [
+      'question-practice',
+      'topic::cloud',
+      'subtopic::layer-4',
+    ]);
+    expect(gateway.importedNotes.last.tags, [
+      'question-practice',
+      'topic::cloud',
+      'subtopic::layer-4',
+    ]);
     expect(gateway.importedNotes.map((note) => note.deckName).toSet(), {
       'Cloud deck',
     });
@@ -103,6 +123,34 @@ void main() {
     expect(await harness.cards.watchManualCards().first, isEmpty);
     // Errors are reviewed into atomic cards, never exported directly.
     expect(await harness.cards.watchErrorCards().first, isNotEmpty);
+  });
+
+  test(
+    'writeFiles writes the header block for concepts and basic files',
+    () async {
+      final items = await selection();
+      final files = await service.writeFiles(items);
+
+      expect(files, hasLength(2));
+      final concept = await files[0].readAsString();
+      final basic = await files[1].readAsString();
+      expect(concept, startsWith('#separator:Tab'));
+      expect(concept, contains('#columns:Front\tExtra\tTags'));
+      expect(concept, contains('#tags column:3'));
+      expect(basic, startsWith('#separator:Tab'));
+      expect(basic, contains('#columns:Front\tBack\tTags'));
+      expect(basic, contains('#tags column:3'));
+    },
+  );
+
+  test('writeFiles preserves the existing file names and extensions', () async {
+    final items = await selection();
+    final files = await service.writeFiles(items);
+
+    expect(files[0].path, contains('question-practice-concepts-'));
+    expect(files[0].path, endsWith('.txt'));
+    expect(files[1].path, contains('question-practice-basic-'));
+    expect(files[1].path, endsWith('.tsv'));
   });
 
   test('does not export when permission is missing', () async {

@@ -12,19 +12,28 @@ import 'package:question_practice/features/review/review_page.dart';
 
 import '../../helpers/test_harness.dart';
 
-http.Response _aiResponse(List<Map<String, String>> cards) {
+http.Response _aiResponse(List<Map<String, dynamic>> ideas) {
   return http.Response(
     jsonEncode({
       'choices': [
         {
           'message': {
-            'content': jsonEncode({'cards': cards}),
+            'content': jsonEncode({'ideas': ideas}),
           },
         },
       ],
     }),
     200,
   );
+}
+
+Map<String, dynamic> _idea(String template, String front, String back) {
+  return {
+    'template': template,
+    'variants': [
+      {'front': front, 'back': back},
+    ],
+  };
 }
 
 void main() {
@@ -251,16 +260,17 @@ void main() {
   ) async {
     final client = MockClient(
       (_) async => _aiResponse([
-        {
-          'type': 'contrast',
-          'front': 'Which layer owns IP addresses?',
-          'back': 'The network layer owns addressing.',
-        },
-        {
-          'type': 'heuristic',
-          'front': 'Given requirement X with restriction Y, what rule applies?',
-          'back': 'Match the layer to its addressing job.',
-        },
+        _idea(
+          'contrast',
+          'Which layer owns IP addresses?',
+          'The network layer owns addressing.',
+        ),
+        _idea(
+          'heuristic',
+          'If a scenario asks for addressing but restricts with layer, which '
+              'option is always discarded?',
+          'Discard the physical layer because it has no addressing.',
+        ),
       ]),
     );
     final harness = TestHarness(httpClient: client);

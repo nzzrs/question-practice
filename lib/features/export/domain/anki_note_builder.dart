@@ -36,27 +36,17 @@ class AnkiNoteBuilder {
 
   static const _html = HtmlEscape(HtmlEscapeMode.element);
 
-  /// Builds a cloze card whose front names the topic and subtopic.
-  String conceptCloze(
-    String term,
-    String definition, {
-    String topicName = '',
-    String subtopic = '',
-  }) {
+  /// Builds a cloze card. Topic and subtopic travel in tags only, never in the
+  /// card text.
+  String conceptCloze(String term, String definition) {
     final safeTerm = _escapeCloze(term);
     final safeDefinition = _escapeCloze(definition);
-    final context = _contextPrefix(topicName, subtopic);
-    return '${context}Definition of {{c1::$safeTerm}}: {{c2::$safeDefinition}}';
+    return 'Definition of {{c1::$safeTerm}}: {{c2::$safeDefinition}}';
   }
 
   List<String> conceptFields(Concept concept) {
     return [
-      conceptCloze(
-        concept.term,
-        concept.definition,
-        topicName: concept.topicName,
-        subtopic: concept.subtopic,
-      ),
+      conceptCloze(concept.term, concept.definition),
       html(concept.extra),
     ];
   }
@@ -88,37 +78,56 @@ class AnkiNoteBuilder {
           model: AnkiModel.concept,
           deckName: deckFor(concept.topicName),
           fields: conceptFields(concept),
-          tags: _tags(concept.topicName, concept.subtopic),
+          tags: tagsFor(concept.topicName, concept.subtopic),
         ),
       for (final card in selection.manualCards)
         AnkiNote(
           model: AnkiModel.basic,
           deckName: deckFor(card.topicName),
           fields: [html(card.question), html(card.answer)],
-          tags: _tags(card.topicName, card.subtopic),
+          tags: tagsFor(card.topicName, card.subtopic),
         ),
     ];
   }
 
   ExportFiles files(ExportSelection selection) {
     return ExportFiles(
-      concepts: [
-        for (final concept in selection.concepts)
-          conceptFields(concept).join('\t'),
-      ].join('\n'),
-      basic: [
-        for (final card in selection.manualCards)
-          [html(card.question), html(card.answer)].join('\t'),
-      ].join('\n'),
+      concepts: _conceptFile(selection.concepts),
+      basic: _basicFile(selection.manualCards),
     );
   }
 
-  String _contextPrefix(String topicName, String subtopic) {
-    final topic = topicName.trim();
-    final sub = subtopic.trim();
-    if (topic.isEmpty && sub.isEmpty) return '';
-    if (topic.isNotEmpty && sub.isNotEmpty) return '[$topic / $sub] ';
-    return '[${topic.isEmpty ? sub : topic}] ';
+  String _conceptFile(List<Concept> concepts) {
+    if (concepts.isEmpty) return '';
+    return [
+      '#separator:Tab',
+      '#html:true',
+      '#notetype:Cloze',
+      '#columns:Front\tExtra\tTags',
+      '#tags column:3',
+      for (final concept in concepts)
+        [
+          ...conceptFields(concept),
+          tagsFor(concept.topicName, concept.subtopic).join(' '),
+        ].join('\t'),
+    ].join('\n');
+  }
+
+  String _basicFile(List<ManualCard> cards) {
+    if (cards.isEmpty) return '';
+    return [
+      '#separator:Tab',
+      '#html:true',
+      '#notetype:Basic',
+      '#columns:Front\tBack\tTags',
+      '#tags column:3',
+      for (final card in cards)
+        [
+          html(card.question),
+          html(card.answer),
+          tagsFor(card.topicName, card.subtopic).join(' '),
+        ].join('\t'),
+    ].join('\n');
   }
 
   String _escapeCloze(String value) {
@@ -129,15 +138,16 @@ class AnkiNoteBuilder {
   }
 
   /// Hierarchical Anki tags derived from the simulator structure.
-  List<String> _tags(String topicName, String subtopic) {
+  static List<String> tagsFor(String topicName, String subtopic) {
     return [
       'question-practice',
-      if (_slug(topicName).isNotEmpty) 'topic::${_slug(topicName)}',
-      if (_slug(subtopic).isNotEmpty) 'subtopic::${_slug(subtopic)}',
+      if (slug(topicName).isNotEmpty) 'topic::${slug(topicName)}',
+      if (slug(subtopic).isNotEmpty) 'subtopic::${slug(subtopic)}',
     ];
   }
 
-  String _slug(String value) {
+  /// Stable slug used inside Anki tags.
+  static String slug(String value) {
     return value
         .trim()
         .toLowerCase()

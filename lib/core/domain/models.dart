@@ -35,6 +35,34 @@ enum CognitiveType {
   }
 }
 
+/// The authoring shape a card is written in inside the card creator.
+///
+/// A template codes how the front and back are phrased. The exact template is
+/// not stored: after saving, [cognitiveType] carries the pedagogical shape and
+/// the Definition template becomes a [Concept].
+enum CardTemplate {
+  definition('Definition', 'Definition / term', CognitiveType.concept),
+  contrast('Contrast', 'Contrast / difference', CognitiveType.contrast),
+  mechanism('Mechanism', 'Mechanism / cause-effect', CognitiveType.fact),
+  heuristic('Exam heuristic', 'Exam heuristic', CognitiveType.heuristic),
+  procedure(
+    'Procedure',
+    'Phase transition / procedure',
+    CognitiveType.heuristic,
+  );
+
+  const CardTemplate(this.label, this.chipLabel, this.cognitiveType);
+
+  /// Short name for quality rows and group headers.
+  final String label;
+
+  /// Full pedagogical name shown on the template chips.
+  final String chipLabel;
+
+  /// The stored shape after the card is saved.
+  final CognitiveType cognitiveType;
+}
+
 /// A one-tap classification of why an answer was wrong.
 ///
 /// Legacy data only: practice now keeps free-form wrong-answer bullets. The
@@ -744,18 +772,33 @@ class Note {
   bool get needsReview => !isKept && !hasCard;
 }
 
-/// One atomic front/back card proposed by the AI for a saved note.
+/// One atomic front/back variant proposed by the AI.
 @immutable
 class SuggestedCard {
   const SuggestedCard({
     required this.front,
     required this.back,
-    this.cognitiveType = CognitiveType.fact,
+    required this.template,
+    this.variantIndex = 0,
   });
 
   final String front;
   final String back;
-  final CognitiveType cognitiveType;
+  final CardTemplate template;
+
+  /// Zero-based position of this variant inside its idea.
+  final int variantIndex;
+
+  CognitiveType get cognitiveType => template.cognitiveType;
+}
+
+/// One AI idea with one to three wording variants of the same fact.
+@immutable
+class SuggestedCardIdea {
+  const SuggestedCardIdea({required this.template, required this.variants});
+
+  final CardTemplate template;
+  final List<SuggestedCard> variants;
 }
 
 @immutable

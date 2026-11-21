@@ -274,21 +274,35 @@ void main() {
             {
               'message': {
                 'content': jsonEncode({
-                  'cards': [
+                  'ideas': [
                     {
-                      'type': 'heuristic',
-                      'front': 'Given a VPC with a private subnet, what rule applies?',
-                      'back': 'Traffic stays inside the VPC.',
+                      'template': 'contrast',
+                      'variants': [
+                        {
+                          'front':
+                              'How does a VPC differ from a public subnet?',
+                          'back': 'A VPC stays private while a public subnet routes out.',
+                        },
+                      ],
                     },
                     {
-                      'type': 'fact',
-                      'front': 'What is a VPC?',
-                      'back': 'A private network',
+                      'template': 'mechanism',
+                      'variants': [
+                        {
+                          'front':
+                              'Why does a private subnet need a NAT gateway?',
+                          'back': 'Because it has no direct route out.',
+                        },
+                      ],
                     },
                     {
-                      'type': 'fact',
-                      'front': 'Is a VPC public?',
-                      'back': 'No, it is private.',
+                      'template': 'mechanism',
+                      'variants': [
+                        {
+                          'front': 'Is a VPC public?',
+                          'back': 'No, it is private.',
+                        },
+                      ],
                     },
                   ],
                 }),
@@ -337,10 +351,11 @@ void main() {
     await tester.tap(suggest);
     await pumpFrames(tester, frames: 24);
 
-    expect(find.text('Suggest with AI'), findsWidgets);
-    expect(find.text('Heuristic'), findsOneWidget);
-    expect(find.text('Fact'), findsNWidgets(2));
-    expect(find.text('Ready'), findsNWidgets(3));
+    expect(find.text('AI suggestions'), findsOneWidget);
+    expect(find.text('3 ideas · 3 variants'), findsOneWidget);
+    expect(find.text('Contrast'), findsOneWidget);
+    expect(find.text('Mechanism'), findsNWidgets(2));
+    expect(find.text('Ready'), findsNWidgets(2));
     expect(
       find.textContaining('Can be answered with yes or no'),
       findsOneWidget,
@@ -362,18 +377,18 @@ void main() {
     expect(
       manuals!.map((card) => card.question),
       containsAll([
-        'Given a VPC with a private subnet, what rule applies?',
-        'What is a VPC?',
+        'How does a VPC differ from a public subnet?',
+        'Why does a private subnet need a NAT gateway?',
         'Is a VPC public?',
       ]),
     );
     expect(
       manuals.map((card) => card.cognitiveType),
-      containsAll([CognitiveType.heuristic, CognitiveType.fact]),
+      containsAll([CognitiveType.contrast, CognitiveType.fact]),
     );
     expect(
       manuals.where((card) => card.cognitiveType == CognitiveType.heuristic),
-      hasLength(1),
+      isEmpty,
     );
     expect(manuals.every((card) => card.subtopic == 'Networking'), isTrue);
     expect(manuals.first.context, question.prompt);
@@ -438,16 +453,19 @@ void main() {
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 
-    expect(find.byKey(const ValueKey('creator-definition')), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-term')), findsOneWidget);
     expect(find.byKey(const ValueKey('creator-front')), findsNothing);
-    expect(find.text('Basic'), findsOneWidget);
-    expect(find.text('Concept'), findsOneWidget);
-
-    await tester.enterText(
-      find.byKey(const ValueKey('creator-definition')),
-      'A private network.',
+    expect(find.text('Basic'), findsNothing);
+    expect(find.text('Concept'), findsNothing);
+    expect(find.text('Definition / term'), findsOneWidget);
+    expect(
+      tester
+          .widget<M3ETextField>(find.byKey(const ValueKey('creator-term')))
+          .controller!
+          .text,
+      'managed service',
     );
-    await pumpFrames(tester);
+
     await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));

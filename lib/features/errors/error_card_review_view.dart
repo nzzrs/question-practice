@@ -122,7 +122,7 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
         questionContext: card.question,
         topicName: card.topicName,
         subtopic: card.subtopic,
-        initialKind: CardCreatorKind.concept,
+        initialTemplate: CardTemplate.definition,
         initialTerm: note.text,
         note: note,
       ),

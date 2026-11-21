@@ -42,12 +42,13 @@ Basic cards use the note type named exactly **`Basic`**, with the two fields `Fr
 Concept note text is:
 
 ```
-[Topic / Subtopic] Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}
+Definition of {{c1::GCP}}: {{c2::A managed cloud computing platform.}}
 ```
 
-The topic and subtopic context is added automatically when the term is defined
-inside a question. If only one of them exists, only that one is shown; with
-neither, the card starts directly with `Definition of`.
+The topic and subtopic are never written into the note text, even when the term
+is defined inside a question. They travel as tags (`question-practice`,
+`topic::<topic>`, `subtopic::<subtopic>`) and, in file exports, in the third
+`Tags` column.
 
 When the selected term is an acronym, the AI returns a dictionary-style meaning
 for the cloze and puts only the full form in the note's `Back Extra` field:
@@ -61,19 +62,23 @@ the definition bubble in the app.
 
 ### Atomic error cards
 
-The end-of-session review and the Cards screen show the same feedback as practice: the question, every alternative with its correct/wrong state and explanation, the status, and your read-only wrong-answer bullets. Notes saved for the question can be copied or used with **Create card with AI**. A distracted re-test keeps the card due and adds a warning. The review no longer edits the question or options. There are no free-text bias or vaccine fields and no "Check with AI" button.
+The end-of-session review and the Cards screen show the same feedback as practice: the question, every alternative with its correct/wrong state and explanation, the status, and your read-only wrong-answer bullets. Notes saved for the question can be copied or used with **Create cards**. A distracted re-test keeps the card due and adds a warning. The review no longer edits the question or options. There are no free-text bias or vaccine fields and no "Check with AI" button.
 
-**Create cards** sits inside the error review and opens the card creator as a draggable half-height sheet, keeping the error visible. Manual entry adds cards one at a time and works offline without AI, so error review no longer depends on an AI provider. **Suggest with AI** is optional and proposes at most two Basic cards:
+**Create cards** sits inside the error review and opens the card creator as a draggable half-height sheet, keeping the error visible. Manual entry adds cards one at a time and works offline without AI, so error review no longer depends on an AI provider. Five templates write the front and back: Definition / term, Contrast / difference, Mechanism / cause-effect, Exam heuristic and Phase transition / procedure. A Definition card becomes a Cloze concept; the other four become Basic cards.
 
-- a **contrast** card that asks you to distinguish the chosen wrong option from the correct one;
-- a **heuristic** card whose front follows the mandatory template
-  `Given requirement X with restriction Y, what rule applies?` and whose back is the atomic rule.
+AI suggestions are optional and sit below manual entry. Each idea offers up to
+three wording variants, and an error breakdown proposes at most two ideas:
 
-Every suggestion carries a live quality badge. The Litmus check flags a binary
-front (one answerable with yes/no), a front longer than 30 words, syntactic
-clues that give the answer away, and a heuristic front that does not use the
-rule template. You choose which cards to save; they become Basic cards and the
-error is marked reviewed. Errors are never sent to Anki directly.
+- a **contrast** idea that asks you to distinguish the chosen wrong option from the correct one;
+- a **heuristic** idea whose front follows the mandatory template
+  `If a scenario asks X but restricts with Y, which option is always discarded?` and whose back starts with `Discard Z because ...`.
+
+Every builder card, draft and AI variant carries an advisory quality badge. It
+flags a binary front (one answerable with yes/no), a front longer than 30 words,
+a card over 15 seconds to read, syntactic clues that give the answer away,
+template mismatches, missing fronts or backs, and a missing or term-repeating
+definition. It never blocks saving. You choose which cards to save; the error is
+marked reviewed. Errors are never sent to Anki directly.
 
 ## Tags
 
@@ -87,7 +92,9 @@ subtopic::layer-4
 ```
 
 Topic and subtopic names are lower-cased and slugged (non-alphanumeric runs
-become `-`). The `subtopic::` tag is omitted when the card has no subtopic.
+become `-`). The `subtopic::` tag is omitted when the card has no subtopic. Tags
+are the only carrier of topic and subtopic: no front or back ever contains a
+bracketed `[Topic / Subtopic]` prefix.
 
 ## What is sent
 
@@ -111,10 +118,14 @@ After a successful import the app broadcasts `com.ichi2.anki.DO_SYNC` so AnkiDro
 
 **Share files** creates UTF-8, Anki-compatible files:
 
-- `question-practice-concepts-YYYYMMDD-HHmm.txt` — one cloze note per line;
-- `question-practice-basic-YYYYMMDD-HHmm.tsv` — two tab-separated fields.
+- `question-practice-concepts-YYYYMMDD-HHmm.txt` — a Cloze file with `#separator`, `#html`, `#notetype`, `#columns` and `#tags column:3` headers, then three tab-separated fields: front, extra, tags;
+- `question-practice-basic-YYYYMMDD-HHmm.tsv` — the same header block for the Basic note type, then front, back, tags.
 
-Import them into Anki desktop or AnkiDroid with the matching note types. Tabs become spaces and newlines become `<br>`; user content is HTML-escaped. File exports carry no tags or deck, so choose them when importing.
+Import them into Anki desktop or AnkiDroid with the matching note types and map
+the third column to Tags. Tabs become spaces and newlines become `<br>`; user
+content is HTML-escaped. If an app ignores the header or cannot map a tags
+column, the tags are dropped there; they are never moved into the card text.
+File exports carry no deck, so choose one when importing.
 
 ## Manual verification
 
@@ -124,11 +135,11 @@ On a connected Android device with AnkiDroid installed:
 2. In Cards, filter by Facts, Heuristics, Contrasts and Concepts and confirm the rows match their type.
 3. Export to AnkiDroid and accept the permission prompt.
 4. Open AnkiDroid, open the Question Practice deck and confirm:
-   - concept notes render as cloze cards with the topic/subtopic prefix;
+   - concept notes render as cloze cards with no topic prefix in the text;
    - contrast and heuristic notes use the `Basic` note type;
-   - the `topic::` and `subtopic::` tags are present.
+   - `question-practice`, `topic::` and `subtopic::` tags are present.
 5. Set the Cloud topic to a separate deck with **Edit topic → AnkiDroid deck** (for example `QP Cloud`) and export again. Confirm the cards land in `QP Cloud`, not the default deck. Open **Edit practice** and confirm it has no deck row; deck selection is topic-level only.
-6. Import a multi-answer question, answer it wrong, open the review and confirm **Create cards** adds a card manually without AI, while **Suggest with AI** proposes a contrast and/or heuristic with Litmus badges.
+6. Import a multi-answer question, answer it wrong, open the review and confirm **Create cards** adds two cards manually without AI, while **AI suggestions** proposes contrast and heuristic ideas with variants and advisory quality badges. Retry with the refresh icon and confirm drafts stay.
 7. Confirm no `Question Practice: Error v2` model is created in AnkiDroid.
 8. Rename the topic and confirm old cards still use their captured topic name (and therefore the default deck), while new cards use the renamed topic.
 9. Trigger AnkiDroid sync and confirm the DO_SYNC broadcast does not crash.

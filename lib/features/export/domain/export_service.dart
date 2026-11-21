@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/data/card_repository.dart';
 import '../../../core/data/practice_repository.dart';
 import '../../../core/domain/models.dart';
+import '../../../core/domain/plural.dart';
 import '../../../core/platform/anki_gateway.dart';
 import 'anki_note_builder.dart';
 
@@ -126,7 +127,7 @@ class ExportService {
       failed: result.failed,
       message: result.message.isEmpty
           ? success
-                ? '${result.added} cards sent to AnkiDroid.'
+                ? '${formatCount(result.added, 'card')} sent to AnkiDroid.'
                 : 'AnkiDroid rejected some cards.'
           : result.message,
     );

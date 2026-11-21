@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/plural.dart';
 import '../../core/ui/widgets.dart';
 import '../import/domain/import_models.dart';
 import '../practice_edit/domain/practice_edit_service.dart';
@@ -285,7 +286,7 @@ class _PracticeOptionsSheet extends StatelessWidget {
             _SheetHeader(
               title: practice.name,
               subtitle:
-                  '${summary.questionCount} questions · '
+                  '${formatCount(summary.questionCount, 'question')} · '
                   '${practice.isDone ? 'Marked as done' : 'Active'}',
             ),
             OptionTile(

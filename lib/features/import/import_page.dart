@@ -5,6 +5,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
+import '../../core/domain/plural.dart';
 import '../../core/ui/widgets.dart';
 import 'domain/import_models.dart';
 
@@ -147,11 +148,12 @@ class _ImportPageState extends ConsumerState<ImportPage> {
       ref.invalidate(homeStatsProvider);
       final duplicates = result.practicesSkipped == 0
           ? ''
-          : ', ${result.practicesSkipped} duplicates skipped';
+          : ', ${formatCount(result.practicesSkipped, 'duplicate')} skipped';
       await showSnack(
         context,
-        'Practice imported: ${result.practicesImported} practices, '
-        '${result.questionsImported} questions$duplicates.',
+        'Practice imported: '
+        '${formatCount(result.practicesImported, 'practice')}, '
+        '${formatCount(result.questionsImported, 'question')}$duplicates.',
       );
       if (mounted) Navigator.of(context).pop(true);
     } on ImportException catch (error) {
@@ -409,7 +411,9 @@ class _Preview extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                '${preview.topicCount} topics · ${preview.practiceCount} practices · ${preview.questionCount} questions',
+                '${formatCount(preview.topicCount, 'topic')} · '
+                '${formatCount(preview.practiceCount, 'practice')} · '
+                '${formatCount(preview.questionCount, 'question')}',
                 style: theme.typography.baseline.bodySmall.copyWith(
                   color: theme.colorScheme.onPrimaryContainer.withValues(
                     alpha: 0.85,
@@ -466,7 +470,8 @@ class _Preview extends StatelessWidget {
                     const SizedBox(height: 2),
                     for (final practice in topic.practices)
                       Text(
-                        '${practice.name} · ${practice.questions.length} questions',
+                        '${practice.name} · '
+                        '${formatCount(practice.questions.length, 'question')}',
                         style: theme.typography.baseline.bodySmall.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
@@ -479,7 +484,7 @@ class _Preview extends StatelessWidget {
         if (preview.topics.length > 5) ...[
           const SizedBox(height: 8),
           Text(
-            '…and ${preview.topics.length - 5} more topics.',
+            '…and ${formatCount(preview.topics.length - 5, 'more topic', plural: 'more topics')}.',
             style: theme.typography.baseline.bodySmall.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),

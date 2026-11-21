@@ -8,6 +8,7 @@ import '../../app/providers.dart';
 import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
+import '../../core/domain/plural.dart';
 import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/past_errors_page.dart';
@@ -181,8 +182,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  String _pausedLabel(int count) =>
-      count == 1 ? '1 session paused' : '$count sessions paused';
+  String _pausedLabel(int count) => '${formatCount(count, 'session')} paused';
 
   Future<void> _push(Widget page) async {
     await Navigator.of(context)
@@ -318,10 +318,11 @@ class _QuickActions extends StatelessWidget {
           : cards == 0 && pending == 0
           ? 'Nothing waiting to export'
           : cards == 0
-          ? '$pending error${pending == 1 ? '' : 's'} to review'
+          ? '${formatCount(pending, 'error')} to review'
           : pending == 0
-          ? '$cards cards ready to export'
-          : '$cards cards ready · $pending errors to review',
+          ? '${formatCount(cards!, 'card')} ready to export'
+          : '${formatCount(cards!, 'card')} ready · '
+                '${formatCount(pending, 'error')} to review',
       badge: pending > 0 ? '$pending pending' : null,
       tone: cards != null && cards > 0 ? PillTone.secondary : PillTone.neutral,
       onPressed: () => Navigator.of(
@@ -736,7 +737,8 @@ class _TopicRow extends StatelessWidget {
                   ],
                   Expanded(
                     child: Text(
-                      '${summary.practiceCount} practices · ${summary.relevantQuestionCount} questions',
+                      '${formatCount(summary.practiceCount, 'practice')} · '
+                      '${formatCount(summary.relevantQuestionCount, 'question')}',
                       style: theme.typography.baseline.labelSmall.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),

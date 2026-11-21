@@ -28,6 +28,7 @@ Future<({ErrorCard card, Question question})> _seedCard(
       'I confused the network and transport layers.\n'
       'I read reliable as secure.',
   bool distracted = false,
+  bool complete = true,
 }) async {
   final seeded = await harness.seedPractice(count: 1);
   final question = (await harness.practices.questionsForPractice(
@@ -50,7 +51,12 @@ Future<({ErrorCard card, Question question})> _seedCard(
     lastWrongAt: harness.clock.now().toUtc(),
     dueAfter: const Duration(hours: 48),
   );
-  await harness.cards.completeErrorCardDetails(id, harness.clock.now().toUtc());
+  if (complete) {
+    await harness.cards.completeErrorCardDetails(
+      id,
+      harness.clock.now().toUtc(),
+    );
+  }
   return (card: (await harness.cards.errorCardById(id))!, question: question);
 }
 
@@ -874,6 +880,168 @@ void main() {
     expect(find.text('Cards to save · 1'), findsOneWidget);
   });
 
+  testWidgets(
+    'a dock save that completes cards but not details retries without duplicates',
+    (tester) async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await _seedCard(harness, complete: false);
+      final service = _ControlledReviewService(harness)..failCompleteOnCall = 1;
+
+      await pumpTestApp(
+        tester,
+        home: ErrorCardsReviewPage(cards: [seeded.card]),
+        harness: harness,
+        overrides: [reviewServiceProvider.overrideWithValue(service)],
+      );
+
+      await _openCreator(tester);
+      await _enterDraft(tester);
+      await _closeCreator(tester);
+
+      await tester.tap(find.byKey(const ValueKey('review-dock-save')));
+      await pumpFrames(tester, frames: 24);
+
+      expect(find.text('Complete the error card'), findsOneWidget);
+      expect(
+        find.textContaining(
+          '1 card saved, but this item could not be completed',
+        ),
+        findsOneWidget,
+      );
+      expect(service.completeCalls, 1);
+
+      // Let the failure snackbar clear so it no longer covers the dock.
+      await tester.pump(const Duration(seconds: 5));
+      await pumpFrames(tester, frames: 4);
+      await tester.tap(find.byKey(const ValueKey('review-dock-save')));
+      await pumpFrames(tester, frames: 24);
+
+      expect(service.completeCalls, 2);
+      expect(find.text('Review complete'), findsWidgets);
+      final manuals = await tester.runAsync(
+        () => harness.cards.watchManualCards().first,
+      );
+      expect(manuals, hasLength(1));
+      final completed = await tester.runAsync(
+        () => harness.cards.errorCardById(seeded.card.id),
+      );
+      expect(completed!.needsDetails, isFalse);
+    },
+  );
+
+  testWidgets('a deleted note no longer seeds the creator from its text', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: null,
+      questionId: seeded.question.id,
+      text: 'managed service',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final noteCard = find.byKey(ValueKey('feedback-note-card-$noteId'));
+    await tester.ensureVisible(noteCard);
+    await pumpFrames(tester);
+    await tester.tap(noteCard);
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
+    expect(find.byKey(const ValueKey('creator-seed-composer')), findsOneWidget);
+    await _closeCreator(tester);
+
+    final more = find.byKey(ValueKey('feedback-note-more-$noteId'));
+    await tester.ensureVisible(more);
+    await pumpFrames(tester);
+    await tester.tap(more);
+    await pumpFrames(tester);
+    await tester.tap(find.text('Delete').last);
+    await pumpFrames(tester);
+    await tester.tap(find.text('Delete').last);
+    await pumpFrames(tester, frames: 24);
+
+    expect(
+      await tester.runAsync(() => harness.cards.watchNotes().first),
+      isEmpty,
+    );
+
+    await _openCreator(tester);
+    expect(find.byKey(const ValueKey('creator-seed-composer')), findsNothing);
+  });
+
+  testWidgets('a bullet that replaces a note seed does not convert the note', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: null,
+      questionId: seeded.question.id,
+      text: 'managed service',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final noteCard = find.byKey(ValueKey('feedback-note-card-$noteId'));
+    await tester.ensureVisible(noteCard);
+    await pumpFrames(tester);
+    await tester.tap(noteCard);
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
+    await _closeCreator(tester);
+
+    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
+    await tester.ensureVisible(bullet);
+    await pumpFrames(tester);
+    await tester.tap(bullet);
+    await pumpFrames(tester, frames: 24);
+    expect(find.text('Replace the draft you started?'), findsOneWidget);
+    await tester.tap(find.text('Replace'));
+    await pumpFrames(tester, frames: 24);
+    await expandCardCreatorSheet(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-back')));
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-back')),
+      'They are different layers.',
+    );
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await _closeCreator(tester);
+
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
+    await pumpFrames(tester, frames: 24);
+
+    final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
+    expect(notes!.single.hasCard, isFalse);
+    final manuals = await tester.runAsync(
+      () => harness.cards.watchManualCards().first,
+    );
+    expect(manuals, hasLength(1));
+  });
+
   testWidgets('AI results stay with their item across steps', (tester) async {
     final harness = TestHarness(
       httpClient: MockClient((_) async => _ideaResponse()),
@@ -1005,6 +1173,17 @@ class _ControlledReviewService extends ReviewService {
 
   int calls = 0;
   int failOnCall = 0;
+  int completeCalls = 0;
+  int failCompleteOnCall = 0;
+
+  @override
+  Future<void> completeErrorDetails(int cardId) async {
+    completeCalls++;
+    if (completeCalls == failCompleteOnCall) {
+      throw StateError('could not complete details');
+    }
+    return super.completeErrorDetails(cardId);
+  }
 
   @override
   Future<int> createBasicCard({

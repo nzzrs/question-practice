@@ -13,7 +13,7 @@ import '../lookup/lookup_actions.dart';
 /// Shared reading surface for one saved note.
 ///
 /// The end-of-session review and the Cards note review render the same
-/// content: the highlighted note, its topic and practice, and a read-only
+/// content: the saved note, its topic and practice, and a read-only
 /// context action. Navigation, delete and card creation live in the shared
 /// review dock, not in this view.
 class NoteReviewView extends ConsumerStatefulWidget {

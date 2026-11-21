@@ -1164,7 +1164,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const _PreviewLabel('Highlight'),
+            const _PreviewLabel('Saved note'),
             const SizedBox(height: 4),
             SelectableText(
               note.text,

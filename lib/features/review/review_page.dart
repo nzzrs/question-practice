@@ -39,6 +39,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   final _creator = CardCreatorController();
   final _conceptDrafts = <int, String>{};
   final _savedConceptIds = <int>{};
+  final _completionPending = <String>{};
 
   @override
   void initState() {
@@ -207,8 +208,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       await _openCreator(step);
       return false;
     }
-    if (!snapshot.hasDrafts) return true;
     final key = _itemKey(step);
+    final retryCompletion =
+        !snapshot.hasDrafts && _completionPending.contains(key);
+    if (!snapshot.hasDrafts && !retryCompletion) return true;
     setState(() => _busy = true);
     try {
       final result = await saveCardCreatorDrafts(
@@ -216,20 +219,21 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         drafts: snapshot.drafts,
         service: ref.read(reviewServiceProvider),
         noteToConvertId: snapshot.noteToConvert?.id,
+        retryCompletion: retryCompletion,
       );
       if (!mounted) return false;
       if (result.failure != null) {
         _creator.storeSnapshot(key, snapshot.withDrafts(result.remaining));
+        if (result.completionPending) {
+          _completionPending.add(key);
+        } else {
+          _completionPending.remove(key);
+        }
         _created += result.created;
-        await showSnack(
-          context,
-          result.created > 0
-              ? '${result.created} card${result.created == 1 ? '' : 's'} '
-                    'saved, but the rest could not be saved: ${result.failure}'
-              : 'Could not create the cards: ${result.failure}',
-        );
+        await showSnack(context, cardCreatorSaveFailureMessage(result));
         return false;
       }
+      _completionPending.remove(key);
       _creator.clearSnapshot(key);
       _creator.clearSeed();
       _created += result.created;
@@ -315,7 +319,9 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     try {
       await ref.read(cardRepositoryProvider).deleteNote(note.id);
       if (!mounted) return;
+      _creator.forgetNote(note.id);
       _creator.clearSnapshot(_itemKey(step));
+      _completionPending.remove(_itemKey(step));
       final data = _data;
       if (data == null) return;
       data.steps.remove(step);
@@ -358,6 +364,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       );
       if (!leave || !mounted) return;
       _creator.clearSnapshots();
+      _completionPending.clear();
     }
     _advance();
   }
@@ -376,6 +383,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       if (!leave || !mounted) return;
     }
     _creator.clearSnapshots();
+    _completionPending.clear();
     // Pop directly: the focus shell's PopScope delegates back here, so
     // maybePop would re-enter this guard.
     Navigator.of(context).pop();

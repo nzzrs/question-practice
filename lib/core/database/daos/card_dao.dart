@@ -423,7 +423,11 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     return (update(notes)..where((n) => n.id.equals(id))).write(
       NotesCompanion(
         cardCreatedAt: Value(cardCreatedAt),
-        manualCardId: Value(manualCardId),
+        // A retry after a concept-only save has no manual card to link, so it
+        // must not clear the link an earlier basic card already set.
+        manualCardId: manualCardId == null
+            ? const Value.absent()
+            : Value(manualCardId),
       ),
     );
   }

@@ -53,6 +53,8 @@ void main() {
     expect(find.text('Close'), findsOneWidget);
     expect(find.text('Review'), findsOneWidget);
     expect(find.text('FROM THE QUESTION'), findsOneWidget);
+    expect(find.text('SAVED NOTE'), findsOneWidget);
+    expect(find.text('HIGHLIGHT'), findsNothing);
 
     final highlighted = tester.widget<SelectableText>(
       find.byKey(const ValueKey('note-preview-text')),

@@ -403,31 +403,64 @@ class CardCreatorSaveResult {
     required this.created,
     required this.remaining,
     this.failure,
+    this.completionPending = false,
   });
 
   final int created;
   final List<CardCreatorDraft> remaining;
   final Object? failure;
 
+  /// Whether writing cards worked but marking the item complete did not.
+  ///
+  /// Review hosts keep the item open and retry with [saveCardCreatorDrafts]
+  /// and `retryCompletion: true` so saved cards are never created twice.
+  final bool completionPending;
+
   bool get succeeded => failure == null;
   bool get hasRemaining => remaining.isNotEmpty;
+}
+
+/// The snack shown after [saveCardCreatorDrafts] reports a failure.
+String cardCreatorSaveFailureMessage(CardCreatorSaveResult result) {
+  final failure = result.failure;
+  if (result.completionPending && !result.hasRemaining) {
+    return result.created > 0
+        ? '${result.created} card${result.created == 1 ? '' : 's'} saved, '
+              'but this item could not be completed: $failure'
+        : 'The cards are saved, but this item could not be completed: '
+              '$failure';
+  }
+  return result.created > 0
+      ? '${result.created} card${result.created == 1 ? '' : 's'} saved, '
+            'but the rest could not be saved: $failure'
+      : 'Could not create the cards: $failure';
 }
 
 /// Saves [drafts] with the same rules as the creator's own save action.
 ///
 /// Review docks call this after the sheet has closed, so a review host can own
 /// the only Save action while every draft still reaches the database.
+///
+/// Set [retryCompletion] after a previous call created cards but could not
+/// mark the note converted or complete the error details. No draft is created
+/// again; only the missing completion is retried.
 Future<CardCreatorSaveResult> saveCardCreatorDrafts({
   required CardCreatorRequest request,
   required Iterable<CardCreatorDraft> drafts,
   required ReviewService service,
   int? noteToConvertId,
+  bool retryCompletion = false,
 }) async {
-  final pending = List<CardCreatorDraft>.of(drafts);
-  final remaining = List<CardCreatorDraft>.of(pending);
+  final pending = retryCompletion
+      ? const <CardCreatorDraft>[]
+      : List<CardCreatorDraft>.of(drafts);
+  final remaining = retryCompletion
+      ? const <CardCreatorDraft>[]
+      : List<CardCreatorDraft>.of(pending);
   var created = 0;
   int? manualCardId;
   Object? failure;
+  var completionPending = false;
   for (final draft in pending) {
     try {
       switch (draft) {
@@ -466,7 +499,7 @@ Future<CardCreatorSaveResult> saveCardCreatorDrafts({
     }
   }
 
-  if (created > 0) {
+  if (created > 0 || retryCompletion) {
     try {
       final noteIds = <int>{
         if (request.note != null) request.note!.id,
@@ -481,6 +514,7 @@ Future<CardCreatorSaveResult> saveCardCreatorDrafts({
       }
     } on Object catch (error) {
       failure ??= error;
+      completionPending = true;
     }
   }
 
@@ -488,6 +522,7 @@ Future<CardCreatorSaveResult> saveCardCreatorDrafts({
     created: created,
     remaining: remaining,
     failure: failure,
+    completionPending: completionPending,
   );
 }
 
@@ -739,6 +774,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         case BulletCardSeed(:final bulletId, :final bullet):
           _seedBulletId = bulletId;
           _seedNote = null;
+          _noteToConvert = null;
           _template = null;
           _front.text = bullet;
           _back.clear();
@@ -1309,13 +1345,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     });
     _reportDraftCount();
     if (result.failure != null) {
-      await showSnack(
-        context,
-        result.created > 0
-            ? '${result.created} card${result.created == 1 ? '' : 's'} saved, '
-                  'but the rest could not be saved: ${result.failure}'
-            : 'Could not create the cards: ${result.failure}',
-      );
+      await showSnack(context, cardCreatorSaveFailureMessage(result));
       return result.created;
     }
     widget.onSaved?.call(result.created);

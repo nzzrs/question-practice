@@ -9,6 +9,7 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../lookup/domain/lookup_service.dart';
 import '../review/domain/card_litmus.dart';
+import 'card_creator_controller.dart';
 import 'domain/anki_note_builder.dart';
 import 'domain/card_templates.dart';
 
@@ -21,6 +22,7 @@ class CardCreatorErrorSource {
     required this.correctAnswer,
     this.reasoning = '',
     this.explanation = '',
+    this.wrongNotes = const [],
   });
 
   final ErrorCard card;
@@ -29,6 +31,9 @@ class CardCreatorErrorSource {
   final String correctAnswer;
   final String reasoning;
   final String explanation;
+
+  /// The learner's read-only bullets, sent separately to the AI breakdown.
+  final List<String> wrongNotes;
 }
 
 /// Everything one card-creation flow needs from its review surface.
@@ -119,17 +124,57 @@ class CardCreatorSheet extends StatelessWidget {
 
 /// An embedded creator with no modal, close button or context recap.
 ///
-/// It keeps its own scroll view and reports saved cards through [onSaved], so
-/// a review surface can place it in a split view.
-class CardCreatorPane extends StatelessWidget {
-  const CardCreatorPane({required this.request, this.onSaved, super.key});
+/// The pane owns its scroll position and its sticky save footer. The body never
+/// renders a second save action, and [onDraftCountChanged] lets the review page
+/// guard navigation while drafts are unsaved.
+class CardCreatorPane extends StatefulWidget {
+  const CardCreatorPane({
+    required this.request,
+    required this.controller,
+    this.onSaved,
+    this.onDraftCountChanged,
+    super.key,
+  });
 
   final CardCreatorRequest request;
+  final CardCreatorController controller;
   final ValueChanged<int>? onSaved;
+  final ValueChanged<int>? onDraftCountChanged;
+
+  @override
+  State<CardCreatorPane> createState() => _CardCreatorPaneState();
+}
+
+class _CardCreatorPaneState extends State<CardCreatorPane> {
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return CardCreatorBody(request: request, embedded: true, onSaved: onSaved);
+    final theme = M3ETheme.of(context);
+    return Semantics(
+      container: true,
+      label: 'Card creator',
+      child: ColoredBox(
+        color: theme.colorScheme.surfaceContainerLow,
+        child: CardCreatorBody(
+          request: widget.request,
+          embedded: true,
+          controller: widget.controller,
+          scrollController: _scroll,
+          scrollStorageKey: PageStorageKey<String>(
+            'creator-scroll-${widget.request.questionId ?? widget.request.title}',
+          ),
+          onSaved: widget.onSaved,
+          onDraftCountChanged: widget.onDraftCountChanged,
+        ),
+      ),
+    );
   }
 }
 
@@ -140,6 +185,11 @@ class CardCreatorBody extends ConsumerStatefulWidget {
     this.onSaved,
     this.onClose,
     this.embedded = false,
+    this.controller,
+    this.onDraftCountChanged,
+    this.scrollController,
+    this.scrollStorageKey,
+    this.showSaveButton = true,
     super.key,
   });
 
@@ -147,6 +197,24 @@ class CardCreatorBody extends ConsumerStatefulWidget {
   final ValueChanged<int>? onSaved;
   final VoidCallback? onClose;
   final bool embedded;
+
+  /// Whether the scrolling body renders its own save action.
+  ///
+  /// The sheet keeps it in the scroll; the embedded pane moves it to a sticky
+  /// footer so it is always reachable.
+  final bool showSaveButton;
+
+  /// The page's seed bridge, used by the embedded pane only.
+  final CardCreatorController? controller;
+
+  /// Reports how many drafts are waiting to be saved.
+  final ValueChanged<int>? onDraftCountChanged;
+
+  /// Lets the host own the creator scroll position.
+  final ScrollController? scrollController;
+
+  /// Keeps the creator scroll position per reviewed card.
+  final PageStorageKey<String>? scrollStorageKey;
 
   @override
   ConsumerState<CardCreatorBody> createState() => _CardCreatorBodyState();
@@ -156,6 +224,8 @@ sealed class _CardDraft {
   const _CardDraft();
 
   CardTemplate get template;
+
+  String? get sourceBulletId;
 }
 
 class _BasicDraft extends _CardDraft {
@@ -163,10 +233,14 @@ class _BasicDraft extends _CardDraft {
     required this.front,
     required this.back,
     required this.template,
+    this.sourceBulletId,
   });
 
   final String front;
   final String back;
+
+  @override
+  final String? sourceBulletId;
 
   @override
   final CardTemplate template;
@@ -178,12 +252,16 @@ class _ConceptDraft extends _CardDraft {
     required this.definition,
     required this.extra,
     required this.source,
+    this.sourceBulletId,
   });
 
   final String term;
   final String definition;
   final String extra;
   final ConceptSource source;
+
+  @override
+  final String? sourceBulletId;
 
   @override
   CardTemplate get template => CardTemplate.definition;
@@ -294,9 +372,25 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   bool _aiLoading = false;
   bool _saving = false;
 
+  int _appliedSeedRevision = -1;
+  String? _seedBulletId;
+  Note? _seedNote;
+  Note? _noteToConvert;
+  String _seedInitialFront = '';
+  String _seedInitialBack = '';
+  SuggestedCard? _seedSuggestion;
+  bool _seedTouched = false;
+  bool _seedLoading = false;
+  bool _applyingSeed = false;
+  bool _seedHint = false;
+  String? _seedError;
+  int _seedRequest = 0;
+  int _reportedDraftCount = 0;
+
   @override
   void initState() {
     super.initState();
+    widget.controller?.addListener(_onControllerChanged);
     final request = widget.request;
     _front = TextEditingController(text: request.initialFront);
     _back = TextEditingController(text: request.initialBack);
@@ -314,6 +408,193 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         });
       }
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _reportDraftCount(force: true);
+      _onControllerChanged();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant CardCreatorBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_onControllerChanged);
+      widget.controller?.addListener(_onControllerChanged);
+      _appliedSeedRevision = -1;
+      _onControllerChanged();
+    }
+  }
+
+  void _onControllerChanged() {
+    final controller = widget.controller;
+    if (!mounted || controller == null) return;
+    if (controller.seedRevision != _appliedSeedRevision) {
+      _applySeed();
+    }
+  }
+
+  void _reportDraftCount({bool force = false}) {
+    final count = _drafts.length;
+    if (!force && count == _reportedDraftCount) return;
+    _reportedDraftCount = count;
+    final report = widget.onDraftCountChanged;
+    if (report == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) report(count);
+    });
+  }
+
+  Future<void> _applySeed() async {
+    final controller = widget.controller;
+    if (controller == null) return;
+    final seed = controller.seed;
+    if (seed == null) {
+      _appliedSeedRevision = controller.seedRevision;
+      if (_hasSeedComposer) setState(_clearSeedComposer);
+      return;
+    }
+    if (controller.seedRevision == _appliedSeedRevision) return;
+    _appliedSeedRevision = controller.seedRevision;
+    _definitionDebounce?.cancel();
+    _definitionRequest++;
+    final requestId = ++_seedRequest;
+
+    _applyingSeed = true;
+    setState(() {
+      _seedSuggestion = null;
+      _seedTouched = false;
+      _seedLoading = false;
+      _seedHint = false;
+      _seedError = null;
+      switch (seed) {
+        case BulletCardSeed(:final bulletId, :final bullet):
+          _seedBulletId = bulletId;
+          _seedNote = null;
+          _template = null;
+          _front.text = bullet;
+          _back.clear();
+          _appliedScaffoldFront = '';
+          _appliedScaffoldBack = '';
+          _seedInitialFront = bullet;
+          _seedInitialBack = '';
+          _clearMeaningFields();
+        case NoteCardSeed(:final note):
+          _seedBulletId = null;
+          _seedNote = note;
+          _noteToConvert = note;
+          _template = CardTemplate.definition;
+          _term.text = note.text;
+          _front.clear();
+          _back.clear();
+          _appliedScaffoldFront = '';
+          _appliedScaffoldBack = '';
+          _seedInitialFront = note.text;
+          _seedInitialBack = '';
+          _clearMeaningFields();
+      }
+    });
+    _applyingSeed = false;
+    _seedScrollToTop();
+    await _runSeedRequest(seed, requestId);
+  }
+
+  void _seedScrollToTop() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final scroll = widget.scrollController;
+      if (!mounted || scroll == null || !scroll.hasClients) return;
+      scroll.jumpTo(0);
+    });
+  }
+
+  Future<bool> _hasApiKey() async {
+    try {
+      return await ref.read(hasApiKeyProvider.future);
+    } on Object {
+      return false;
+    }
+  }
+
+  Future<void> _runSeedRequest(CardCreatorSeed seed, int requestId) async {
+    final hasKey = await _hasApiKey();
+    if (!mounted || requestId != _seedRequest) return;
+    if (!hasKey) {
+      setState(() {
+        _seedHint = true;
+        _seedLoading = false;
+      });
+      widget.controller?.markSeedSettled();
+      return;
+    }
+    setState(() => _seedLoading = true);
+    final lookup = ref.read(lookupServiceProvider);
+    final request = widget.request;
+    try {
+      switch (seed) {
+        case BulletCardSeed(:final bullet):
+          final error = request.error;
+          final suggestion = await lookup.suggestCardFromWrongNote(
+            note: bullet,
+            question: error?.question ?? request.questionContext,
+            wrongAnswer: error?.wrongAnswer ?? '',
+            correctAnswer: error?.correctAnswer ?? '',
+            explanation: error?.explanation ?? '',
+            topicName: request.topicName,
+            subtopic: request.subtopic,
+            otherNotes: error?.wrongNotes ?? const [],
+          );
+          if (!mounted || requestId != _seedRequest) return;
+          setState(() {
+            _seedLoading = false;
+            if (suggestion == null) {
+              _seedError =
+                  'The AI found nothing to draft. Write the card yourself.';
+            } else if (_seedTouched ||
+                _front.text.trim() != _seedInitialFront.trim() ||
+                _back.text.trim().isNotEmpty) {
+              _seedSuggestion = suggestion;
+            } else {
+              _template = suggestion.template;
+              _front.text = suggestion.front;
+              _back.text = suggestion.back;
+              _seedInitialFront = suggestion.front;
+              _seedInitialBack = suggestion.back;
+            }
+          });
+        case NoteCardSeed(:final note):
+          final ideas = await lookup.suggestArchetypeCards(
+            note: note.text,
+            questionContext: request.questionContext,
+            topicName: request.topicName,
+            subtopic: request.subtopic,
+          );
+          if (!mounted || requestId != _seedRequest) return;
+          setState(() {
+            _seedLoading = false;
+            _retiredIdeas.addAll(_ideas ?? const []);
+            _ideas = [for (final idea in ideas) _SuggestedIdea(idea)];
+            if (ideas.isEmpty) {
+              _seedError =
+                  'The AI found nothing to draft. Write the card yourself.';
+            }
+          });
+      }
+      widget.controller?.markSeedSettled();
+    } on LookupException catch (error) {
+      if (!mounted || requestId != _seedRequest) return;
+      setState(() {
+        _seedLoading = false;
+        _seedError = error.message;
+      });
+      widget.controller?.markSeedSettled();
+    } on Object catch (error) {
+      if (!mounted || requestId != _seedRequest) return;
+      setState(() {
+        _seedLoading = false;
+        _seedError = 'Could not draft a card: $error';
+      });
+      widget.controller?.markSeedSettled();
+    }
   }
 
   CardTemplate? _initialTemplate() {
@@ -330,6 +611,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
 
   @override
   void dispose() {
+    widget.controller?.removeListener(_onControllerChanged);
     _definitionDebounce?.cancel();
     _front.dispose();
     _back.dispose();
@@ -453,12 +735,29 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     controller.selection = TextSelection.collapsed(offset: index);
   }
 
+  void _markSeedEdited() {
+    if (_applyingSeed) return;
+    if (_seedBulletId == null && _seedNote == null) return;
+    final changed =
+        _front.text != _seedInitialFront ||
+        _back.text != _seedInitialBack ||
+        (_seedNote != null && _term.text != _seedInitialFront);
+    if (!changed) return;
+    _seedTouched = true;
+    widget.controller?.markSeedDirty();
+  }
+
   void _onTermChanged(String value) {
     if (_template != CardTemplate.definition) {
-      setState(() {});
+      setState(_markSeedEdited);
       return;
     }
+    setState(_markSeedEdited);
     _scheduleDefinitionLookup();
+  }
+
+  void _onFrontBackChanged(String value) {
+    setState(_markSeedEdited);
   }
 
   void _scheduleDefinitionLookup({bool immediate = false}) {
@@ -594,6 +893,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
 
   void _addDraft() {
     if (!_canAdd || _saving) return;
+    final bulletId = _seedBulletId;
     if (_template == CardTemplate.definition) {
       final term = _term.text.trim();
       final source = _meaningSource == _DefinitionSource.ai
@@ -608,11 +908,14 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             definition: _meaning.trim(),
             extra: _meaningExtra,
             source: source,
+            sourceBulletId: bulletId,
           ),
         );
         _term.clear();
         _clearMeaningFields();
+        _clearSeedComposer();
       });
+      _afterDraftAdded(bulletId);
       return;
     }
     final template = _template ?? CardTemplate.mechanism;
@@ -622,18 +925,49 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
           front: _front.text.trim(),
           back: _back.text.trim(),
           template: template,
+          sourceBulletId: bulletId,
         ),
       );
       _front.clear();
       _back.clear();
       _appliedScaffoldFront = '';
       _appliedScaffoldBack = '';
+      _clearSeedComposer();
     });
+    _afterDraftAdded(bulletId);
+  }
+
+  void _afterDraftAdded(String? bulletId) {
+    _reportDraftCount();
+    if (bulletId == null) return;
+    widget.controller?.markDraftAdded(bulletId);
+    widget.controller?.markSeedSettled();
+  }
+
+  void _clearSeedComposer() {
+    _seedBulletId = null;
+    _seedNote = null;
+    _seedSuggestion = null;
+    _seedTouched = false;
+    _seedHint = false;
+    _seedError = null;
+    _seedLoading = false;
+    _seedInitialFront = '';
+    _seedInitialBack = '';
   }
 
   void _removeDraft(int index) {
     if (_saving || index < 0 || index >= _drafts.length) return;
+    final removed = _drafts[index];
     setState(() => _drafts.removeAt(index));
+    _reportDraftCount();
+    final bulletId = removed.sourceBulletId;
+    if (bulletId != null) {
+      final stillPresent = _drafts.any(
+        (draft) => draft.sourceBulletId == bulletId,
+      );
+      if (!stillPresent) widget.controller?.markDraftRemoved(bulletId);
+    }
   }
 
   Future<void> _loadAiSuggestions() async {
@@ -659,6 +993,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
           topicName: widget.request.topicName,
           subtopic: widget.request.subtopic,
           mistakeKinds: error.card.mistakeKinds,
+          wrongNotes: error.wrongNotes,
         );
       } else if (note != null) {
         ideas = await lookup.suggestArchetypeCards(
@@ -722,6 +1057,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       _ideas = remainingIdeas;
       _retiredVariants.addAll(accepted);
     });
+    _reportDraftCount();
   }
 
   Future<void> _save() async {
@@ -774,8 +1110,13 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     if (created > 0) {
       try {
         final note = request.note;
-        if (note != null) {
-          await service.markNoteConverted(note.id, manualCardId: manualCardId);
+        final seededNote = _noteToConvert;
+        final noteIds = <int>{
+          if (note != null) note.id,
+          if (seededNote != null) seededNote.id,
+        };
+        for (final noteId in noteIds) {
+          await service.markNoteConverted(noteId, manualCardId: manualCardId);
         }
         final error = request.error;
         if (error != null && request.completeErrorOnSave) {
@@ -787,7 +1128,14 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     }
 
     if (!mounted) return;
-    setState(() => _saving = false);
+    setState(() {
+      _saving = false;
+      if (created > 0) {
+        _clearSeedComposer();
+        _noteToConvert = null;
+      }
+    });
+    _reportDraftCount();
     if (failure != null) {
       await showSnack(
         context,
@@ -819,35 +1167,57 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  request.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+        if (widget.embedded)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Card creator',
                   style: theme.typography.emphasized.titleLarge,
                 ),
-              ),
+                const SizedBox(height: 2),
+                Text(
+                  'One idea per card.',
+                  style: theme.typography.baseline.labelSmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            if (!widget.embedded && widget.onClose != null)
-              M3EIconButton(
-                key: const ValueKey('creator-close'),
-                variant: M3EIconButtonVariant.standard,
-                icon: const Icon(Icons.close),
-                tooltip: 'Close card creator',
-                onPressed: _saving ? null : widget.onClose,
+          )
+        else
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    request.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.typography.emphasized.titleLarge,
+                  ),
+                ),
               ),
-          ],
-        ),
-        const SizedBox(height: 8),
+              if (widget.onClose != null)
+                M3EIconButton(
+                  key: const ValueKey('creator-close'),
+                  variant: M3EIconButtonVariant.standard,
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close card creator',
+                  onPressed: _saving ? null : widget.onClose,
+                ),
+            ],
+          ),
+        if (!widget.embedded) const SizedBox(height: 8),
         if (!widget.embedded && hasContext) ...[
           _CreatorContextRecap(request: request),
           const SizedBox(height: 20),
         ],
+        if (_hasSeedComposer) _buildSeedComposer(theme),
         _buildTemplateSection(theme),
         const SizedBox(height: 16),
         if (_template == CardTemplate.definition)
@@ -890,39 +1260,266 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             ],
           ),
         ],
-        const SizedBox(height: 20),
-        AppPrimaryButton(
-          key: const ValueKey('creator-save'),
-          onPressed: count == 0 || _saving ? null : _save,
-          label: _saving
-              ? 'Saving…'
-              : 'Save $count card${count == 1 ? '' : 's'}',
-          icon: Icons.check,
-        ),
-        const SizedBox(height: 8),
+        if (widget.showSaveButton && !widget.embedded) ...[
+          const SizedBox(height: 20),
+          _saveButton(count),
+          const SizedBox(height: 8),
+        ] else
+          const SizedBox(height: 12),
       ],
     );
+
+    final scroll = SingleChildScrollView(
+      key: widget.scrollStorageKey ?? const ValueKey('creator-scroll'),
+      controller: widget.scrollController,
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+      padding: EdgeInsets.fromLTRB(
+        wide ? 24 : 16,
+        0,
+        wide ? 24 : 16,
+        wide ? 20 : 16,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 640),
+          child: content,
+        ),
+      ),
+    );
+
+    if (widget.embedded) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(child: scroll),
+              _buildStickyFooter(
+                theme,
+                count,
+                showEmptyHint: constraints.maxHeight >= 320,
+                compact: constraints.maxHeight < 220,
+              ),
+            ],
+          );
+        },
+      );
+    }
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SingleChildScrollView(
-        key: const ValueKey('creator-scroll'),
-        padding: EdgeInsets.fromLTRB(
-          wide ? 24 : 16,
-          0,
-          wide ? 24 : 16,
-          wide ? 24 : 16,
+      child: scroll,
+    );
+  }
+
+  Widget _saveButton(int count) {
+    return AppPrimaryButton(
+      key: const ValueKey('creator-save'),
+      onPressed: count == 0 || _saving ? null : _save,
+      label: _saving ? 'Saving…' : 'Save $count card${count == 1 ? '' : 's'}',
+      icon: Icons.check,
+    );
+  }
+
+  Widget _buildStickyFooter(
+    M3EThemeData theme,
+    int count, {
+    required bool showEmptyHint,
+    required bool compact,
+  }) {
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(
+            top: BorderSide(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.55),
+            ),
+          ),
         ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: content,
+        padding: EdgeInsets.fromLTRB(
+          16,
+          compact ? 4 : 10,
+          16,
+          compact ? 4 : 10,
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (count == 0 && showEmptyHint)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    'Nothing to save yet.',
+                    textAlign: TextAlign.center,
+                    style: theme.typography.baseline.labelSmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              _saveButton(count),
+            ],
           ),
         ),
       ),
     );
+  }
+
+  bool get _hasSeedComposer =>
+      _seedBulletId != null ||
+      _seedNote != null ||
+      _seedLoading ||
+      _seedHint ||
+      _seedError != null ||
+      _seedSuggestion != null;
+
+  Widget _buildSeedComposer(M3EThemeData theme) {
+    final seed = widget.controller?.seed;
+    final sourceText = switch (seed) {
+      BulletCardSeed(:final bullet) => bullet,
+      NoteCardSeed(:final note) => note.text,
+      null => _seedInitialFront,
+    };
+    final fromBullet = _seedBulletId != null || seed is BulletCardSeed;
+    final suggestion = _seedSuggestion;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TonalBox(
+        key: const ValueKey('creator-seed-composer'),
+        color: theme.colorScheme.surfaceContainerHigh,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              fromBullet ? 'From this bullet' : 'From this note',
+              style: theme.typography.emphasized.titleSmall,
+            ),
+            if (sourceText.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                '“${sourceText.trim()}”',
+                key: const ValueKey('creator-seed-quote'),
+                style: theme.typography.baseline.bodySmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ],
+            if (_seedLoading) ...[
+              const SizedBox(height: 10),
+              Row(
+                key: const ValueKey('creator-seed-loading'),
+                children: [
+                  const M3ELoadingIndicator(),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Drafting a card…',
+                      style: theme.typography.baseline.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (_seedHint) ...[
+              const SizedBox(height: 10),
+              Text(
+                'AI is optional. Add an API key in Settings to draft the back '
+                'automatically.',
+                key: const ValueKey('creator-seed-hint'),
+                style: theme.typography.baseline.bodySmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ],
+            if (_seedError != null) ...[
+              const SizedBox(height: 10),
+              Semantics(
+                liveRegion: true,
+                child: TonalBox(
+                  key: const ValueKey('creator-seed-error'),
+                  color: theme.colorScheme.errorContainer,
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _seedError!,
+                        style: theme.typography.baseline.bodySmall.copyWith(
+                          color: theme.colorScheme.onErrorContainer,
+                          height: 1.4,
+                        ),
+                      ),
+                      Wrap(
+                        spacing: 4,
+                        children: [
+                          M3EButton.text(
+                            key: const ValueKey('creator-seed-retry'),
+                            onPressed: _seedLoading ? null : _retrySeed,
+                            child: const Text('Try again'),
+                          ),
+                          M3EButton.text(
+                            key: const ValueKey('creator-seed-write'),
+                            onPressed: () => setState(() {
+                              _seedError = null;
+                            }),
+                            child: const Text('Write it myself'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            if (suggestion != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                '${suggestion.front} → ${suggestion.back}',
+                key: const ValueKey('creator-seed-suggestion'),
+                style: theme.typography.baseline.bodySmall.copyWith(
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 4),
+              M3EButton.text(
+                key: const ValueKey('creator-seed-use-ai'),
+                onPressed: () {
+                  setState(() {
+                    _template = suggestion.template;
+                    _front.text = suggestion.front;
+                    _back.text = suggestion.back;
+                    _seedInitialFront = suggestion.front;
+                    _seedInitialBack = suggestion.back;
+                    _seedSuggestion = null;
+                    _seedTouched = false;
+                  });
+                },
+                child: const Text('Use AI draft'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _retrySeed() {
+    final seed = widget.controller?.seed;
+    if (seed == null) return;
+    final requestId = ++_seedRequest;
+    setState(() {
+      _seedError = null;
+      _seedSuggestion = null;
+      _seedHint = false;
+    });
+    _runSeedRequest(seed, requestId);
   }
 
   Widget _buildTemplateSection(M3EThemeData theme) {
@@ -986,7 +1583,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
           maxLines: 4,
           isRequired: true,
           enabled: !_saving,
-          onChanged: (_) => setState(() {}),
+          onChanged: _onFrontBackChanged,
         ),
         const SizedBox(height: 12),
         M3ETextField(
@@ -998,7 +1595,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
           maxLines: 4,
           isRequired: true,
           enabled: !_saving,
-          onChanged: (_) => setState(() {}),
+          onChanged: _onFrontBackChanged,
         ),
       ],
     );

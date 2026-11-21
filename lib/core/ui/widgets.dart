@@ -159,6 +159,7 @@ Future<bool> confirmDialog(
   required String title,
   required String message,
   String confirmLabel = 'Confirm',
+  String cancelLabel = 'Cancel',
   bool destructive = false,
 }) async {
   final result = await M3EDialog.show<bool>(
@@ -169,7 +170,7 @@ Future<bool> confirmDialog(
       actions: [
         M3EButton.text(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('Cancel'),
+          child: Text(cancelLabel),
         ),
         M3EButton.filled(
           onPressed: () => Navigator.of(context).pop(true),

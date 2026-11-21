@@ -20,6 +20,7 @@ class AppPage extends StatelessWidget {
     this.maxWidth = 720,
     this.focus = false,
     this.scrollController,
+    this.body,
     super.key,
   });
 
@@ -47,6 +48,12 @@ class AppPage extends StatelessWidget {
   /// return to the top when the learner moves to another card.
   final ScrollController? scrollController;
 
+  /// Replaces the scrolling [children] in focus mode.
+  ///
+  /// Review steps with their own split panes use this instead of a page scroll
+  /// view. The widget is given the full body height above the bottom bar.
+  final Widget? body;
+
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
@@ -69,15 +76,17 @@ class AppPage extends StatelessWidget {
             tablet ? 24 : 12,
             bottomInset,
           );
-      final content = CustomScrollView(
-        controller: scrollController,
-        slivers: [
-          SliverPadding(
-            padding: focusPadding,
-            sliver: SliverList.list(children: children),
-          ),
-        ],
-      );
+      final content = body == null
+          ? CustomScrollView(
+              controller: scrollController,
+              slivers: [
+                SliverPadding(
+                  padding: focusPadding,
+                  sliver: SliverList.list(children: children),
+                ),
+              ],
+            )
+          : Padding(padding: focusPadding, child: body);
       return PopScope(
         // Keep the system back gesture aligned with the visible close control,
         // including on the completion screen where closing reports success.

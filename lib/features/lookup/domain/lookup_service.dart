@@ -419,6 +419,97 @@ class LookupService {
     );
   }
 
+  /// Drafts one atomic card from a read-only wrong-answer bullet.
+  ///
+  /// The bullet is the starting point, not the final wording. Returns null
+  /// when the provider answers without a usable card, so the creator can tell
+  /// the learner to write the card instead.
+  Future<SuggestedCard?> suggestCardFromWrongNote({
+    required String note,
+    required String question,
+    required String wrongAnswer,
+    required String correctAnswer,
+    required String explanation,
+    required String topicName,
+    String subtopic = '',
+    List<String> otherNotes = const [],
+  }) async {
+    final bullet = note.trim();
+    if (bullet.isEmpty) {
+      throw const LookupException('Write the bullet first.');
+    }
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'Drafting a card needs an AI provider. Add an API key in Settings.',
+        failure: LookupFailure.noProvider,
+      );
+    }
+    const systemPrompt =
+        'You turn one learner-written wrong-answer note into one atomic study '
+        'card. Return exactly one JSON object: '
+        '{"cards":[{"type":"contrast|heuristic|fact","front":"...",'
+        '"back":"..."}]}. Rules: '
+        '- Give 1-3 candidate cards, but each card tests exactly one idea. '
+        '- Use the note as the basis; fix the wording instead of copying it. '
+        '- contrast when the note names a confusion; heuristic when it names '
+        'a rule or condition; fact otherwise. '
+        '- Front <= 30 words. Back <= 20 words. No yes/no fronts. '
+        '- No answer clues, option letters, markdown or code fences. '
+        '- Never put the topic or subtopic inside the front or back.';
+    final other = otherNotes
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty && item != bullet)
+        .toList();
+    final userPrompt = [
+      if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
+      if (subtopic.trim().isNotEmpty) 'Subtopic: ${subtopic.trim()}',
+      'Question: $question',
+      'Chosen wrong answer: $wrongAnswer',
+      'Correct answer: $correctAnswer',
+      'Explanation: $explanation',
+      if (other.isNotEmpty)
+        'Other notes from this attempt:\n- ${other.join('\n- ')}',
+      'Learner note to turn into a card: $bullet',
+    ].join('\n');
+
+    final content = await _requestAi(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+    );
+    try {
+      final payload = _decodeObject(content);
+      final rawCards = payload['cards'];
+      if (rawCards is! List) {
+        throw const FormatException('Missing cards list');
+      }
+      for (final item in rawCards) {
+        if (item is! Map<String, dynamic>) continue;
+        final rawFront = item['front'];
+        final rawBack = item['back'];
+        final front = rawFront is String ? rawFront.trim() : '';
+        final back = rawBack is String ? rawBack.trim() : '';
+        if (front.isEmpty || back.isEmpty) continue;
+        final rawType = item['type'];
+        final template = templateFromLegacyType(
+          rawType is String ? rawType : null,
+        );
+        if (template == null || template == CardTemplate.definition) continue;
+        return SuggestedCard(front: front, back: back, template: template);
+      }
+      return null;
+    } on LookupException {
+      rethrow;
+    } on Object {
+      throw const LookupException(
+        'The AI returned invalid card drafts. Try again.',
+      );
+    }
+  }
+
   /// Breaks one error into contrast and heuristic ideas.
   ///
   /// At most two ideas are returned: a contrast between the chosen wrong
@@ -433,6 +524,7 @@ class LookupService {
     required String topicName,
     String subtopic = '',
     List<MistakeKind> mistakeKinds = const [],
+    List<String> wrongNotes = const [],
   }) async {
     final settings = await _settings.load();
     final apiKey = await _keyStore.readApiKey();
@@ -464,6 +556,10 @@ class LookupService {
         '- Only use ideas supported by the error context. Skip trivial or '
         'duplicate ideas.';
     final mistakes = mistakeKinds.map((kind) => kind.label).join(', ');
+    final notes = wrongNotes
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
     final userPrompt = [
       if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
       if (subtopic.trim().isNotEmpty) 'Subtopic: ${subtopic.trim()}',
@@ -471,6 +567,9 @@ class LookupService {
       'Chosen wrong answer: $wrongAnswer',
       'Correct answer: $correctAnswer',
       'Mistake classifications: ${mistakes.isEmpty ? '(none)' : mistakes}',
+      if (notes.isNotEmpty)
+        'What went wrong (learner\'s own notes, one per line):\n'
+            '- ${notes.join('\n- ')}',
       'Learner reasoning: ${reasoning.trim().isEmpty ? '(not written)' : reasoning.trim()}',
       'Explanation: $explanation',
     ].join('\n');

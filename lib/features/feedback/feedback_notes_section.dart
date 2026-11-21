@@ -54,44 +54,53 @@ class FeedbackNotesSection extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      M3EChip(
-                        key: ValueKey('feedback-note-copy-${notes[index].id}'),
-                        type: M3EChipType.assist,
-                        leading: const Icon(Icons.copy_all_outlined),
-                        label: 'Copy',
-                        onPressed: () => onCopy(notes[index]),
-                      ),
-                      M3EChip(
-                        key: ValueKey('feedback-note-card-${notes[index].id}'),
-                        type: M3EChipType.assist,
-                        leading: Icon(
-                          notes[index].hasCard
-                              ? Icons.check
-                              : Icons.auto_awesome_outlined,
-                        ),
-                        label: notes[index].hasCard
-                            ? 'Card created'
-                            : 'Create card with AI',
-                        onPressed: notes[index].hasCard
-                            ? null
-                            : () => onCreateCard(notes[index]),
-                      ),
-                      if (onOverflow != null)
-                        M3EIconButton(
+                  M3ETheme(
+                    data: theme.copyWith(
+                      chipTheme: theme.chipTheme.copyWith(height: 48),
+                    ),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        M3EChip(
                           key: ValueKey(
-                            'feedback-note-more-${notes[index].id}',
+                            'feedback-note-copy-${notes[index].id}',
                           ),
-                          variant: M3EIconButtonVariant.standard,
-                          icon: const Icon(Icons.more_vert),
-                          tooltip: 'Note actions',
-                          onPressed: () => onOverflow!(notes[index]),
+                          type: M3EChipType.assist,
+                          leading: const Icon(Icons.copy_all_outlined),
+                          label: 'Copy',
+                          onPressed: () => onCopy(notes[index]),
                         ),
-                    ],
+                        M3EChip(
+                          key: ValueKey(
+                            'feedback-note-card-${notes[index].id}',
+                          ),
+                          type: M3EChipType.assist,
+                          leading: Icon(
+                            notes[index].hasCard
+                                ? Icons.check
+                                : Icons.auto_awesome_outlined,
+                          ),
+                          label: notes[index].hasCard
+                              ? 'Card created'
+                              : 'Create card with AI',
+                          onPressed: notes[index].hasCard
+                              ? null
+                              : () => onCreateCard(notes[index]),
+                        ),
+                        if (onOverflow != null)
+                          M3EIconButton(
+                            key: ValueKey(
+                              'feedback-note-more-${notes[index].id}',
+                            ),
+                            variant: M3EIconButtonVariant.standard,
+                            icon: const Icon(Icons.more_vert),
+                            tooltip: 'Note actions',
+                            onPressed: () => onOverflow!(notes[index]),
+                          ),
+                      ],
+                    ),
                   ),
                 ],
               ),

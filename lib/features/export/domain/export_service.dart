@@ -163,24 +163,22 @@ class ExportService {
     );
   }
 
-  /// Serializes saved highlights as human-readable plain text.
-  String highlightsText(List<StudyHighlight> highlights) {
+  /// Serializes saved notes as human-readable plain text.
+  String notesText(List<Note> notes) {
     final buffer = StringBuffer('Question Practice notes\n');
-    buffer.writeln(
-      '${highlights.length} note${highlights.length == 1 ? '' : 's'}',
-    );
-    for (final highlight in highlights) {
+    buffer.writeln('${notes.length} note${notes.length == 1 ? '' : 's'}');
+    for (final note in notes) {
       buffer.writeln();
       buffer.writeln('---');
-      final topic = highlight.topicName.trim();
+      final topic = note.topicName.trim();
       if (topic.isNotEmpty) buffer.writeln('# $topic');
-      buffer.writeln(highlight.text.trim());
-      if (highlight.context.trim().isNotEmpty) {
-        buffer.writeln('Context: ${highlight.context.trim()}');
+      buffer.writeln(note.text.trim());
+      if (note.context.trim().isNotEmpty) {
+        buffer.writeln('Context: ${note.context.trim()}');
       }
-      final status = highlight.hasCard
+      final status = note.hasCard
           ? 'Card made'
-          : highlight.isKept
+          : note.isKept
           ? 'Kept'
           : 'In review';
       buffer.writeln('Status: $status');
@@ -188,15 +186,15 @@ class ExportService {
     return buffer.toString();
   }
 
-  /// Writes all highlights to a text file and opens the share sheet.
-  Future<void> shareHighlights(List<StudyHighlight> highlights) async {
-    if (highlights.isEmpty) return;
+  /// Writes all notes to a text file and opens the share sheet.
+  Future<void> shareNotes(List<Note> notes) async {
+    if (notes.isEmpty) return;
     final directory = await getTemporaryDirectory();
     final stamp = DateFormat('yyyyMMdd-HHmm').format(_clock.now());
     final file = File(
       p.join(directory.path, 'question-practice-notes-$stamp.txt'),
     );
-    await file.writeAsString(highlightsText(highlights));
+    await file.writeAsString(notesText(notes));
     await SharePlus.instance.share(
       ShareParams(
         subject: 'Question Practice notes',

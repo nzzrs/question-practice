@@ -8,33 +8,32 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../export/card_creator_sheet.dart';
-import 'highlight_review_view.dart';
+import 'note_review_view.dart';
 
-/// Reviews saved highlights one at a time.
+/// Reviews saved notes one at a time.
 ///
-/// Opened from Cards with every visible highlight, or with a single highlight
-/// when its row is tapped. Highlights are read live from the database, so a
-/// card made or a highlight deleted here is reflected without closing the
+/// Opened from Cards with every visible note, or with a single note
+/// when its row is tapped. Notes are read live from the database, so a
+/// card made or a note deleted here is reflected without closing the
 /// review. The card-making actions live inside the shared
-/// [HighlightReviewView] and disappear once a highlight has a card.
-class HighlightReviewPage extends ConsumerStatefulWidget {
-  const HighlightReviewPage({
-    required this.highlights,
-    this.initialHighlightId,
+/// [NoteReviewView] and disappear once a note has a card.
+class NoteReviewPage extends ConsumerStatefulWidget {
+  const NoteReviewPage({
+    required this.notes,
+    this.initialNoteId,
     this.title = 'Review notes',
     super.key,
   });
 
-  final List<StudyHighlight> highlights;
-  final int? initialHighlightId;
+  final List<Note> notes;
+  final int? initialNoteId;
   final String title;
 
   @override
-  ConsumerState<HighlightReviewPage> createState() =>
-      _HighlightReviewPageState();
+  ConsumerState<NoteReviewPage> createState() => _NoteReviewPageState();
 }
 
-class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
+class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
   final _scroll = ScrollController();
   late final Set<int> _ids;
   late int _index;
@@ -46,13 +45,11 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
   @override
   void initState() {
     super.initState();
-    _ids = {for (final highlight in widget.highlights) highlight.id};
-    final initialId = widget.initialHighlightId;
+    _ids = {for (final note in widget.notes) note.id};
+    final initialId = widget.initialNoteId;
     final found = initialId == null
         ? -1
-        : widget.highlights.indexWhere(
-            (highlight) => highlight.id == initialId,
-          );
+        : widget.notes.indexWhere((note) => note.id == initialId);
     _index = found < 0 ? 0 : found;
   }
 
@@ -81,11 +78,11 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     if (_scroll.hasClients) _scroll.jumpTo(0);
   }
 
-  Future<void> _keep(StudyHighlight highlight, int index, int length) async {
+  Future<void> _keep(Note note, int index, int length) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      await ref.read(reviewServiceProvider).keepHighlight(highlight.id);
+      await ref.read(reviewServiceProvider).keepNote(note.id);
       _kept++;
       if (!mounted) return;
       _advanceFrom(index, length);
@@ -94,24 +91,20 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     }
   }
 
-  Future<void> _createCards(
-    StudyHighlight highlight,
-    int index,
-    int length,
-  ) async {
+  Future<void> _createCards(Note note, int index, int length) async {
     if (_busy) return;
     final created = await showCardCreator(
       context,
       request: CardCreatorRequest(
         title: 'Create cards',
-        sessionId: highlight.sessionId,
-        questionId: highlight.questionId,
-        questionContext: highlight.context,
-        topicName: highlight.topicName,
-        subtopic: highlight.subtopic,
+        sessionId: note.sessionId,
+        questionId: note.questionId,
+        questionContext: note.context,
+        topicName: note.topicName,
+        subtopic: note.subtopic,
         initialKind: CardCreatorKind.concept,
-        initialTerm: highlight.text,
-        note: highlight,
+        initialTerm: note.text,
+        note: note,
       ),
     );
     if (!mounted || created == 0) return;
@@ -119,13 +112,13 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     _advanceFrom(index, length);
   }
 
-  Future<void> _deleteHighlight(StudyHighlight highlight, int length) async {
+  Future<void> _deleteNote(Note note, int length) async {
     if (_busy) return;
     final confirmed = await confirmDialog(
       context,
       title: 'Delete note?',
       message:
-          'The saved note "${highlight.text}" is removed from Cards. '
+          'The saved note "${note.text}" is removed from Cards. '
           'Cards already made from it stay.',
       confirmLabel: 'Delete',
       destructive: true,
@@ -133,11 +126,11 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
     if (!confirmed || !mounted) return;
     setState(() => _busy = true);
     try {
-      await ref.read(cardRepositoryProvider).deleteHighlight(highlight.id);
+      await ref.read(cardRepositoryProvider).deleteNote(note.id);
       if (!mounted) return;
       final remaining = math.max(0, length - 1);
       setState(() {
-        _ids.remove(highlight.id);
+        _ids.remove(note.id);
         if (remaining == 0) {
           _finished = true;
         } else if (_index >= remaining) {
@@ -157,13 +150,13 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
 
   Widget _buildPage(BuildContext context) {
     final theme = M3ETheme.of(context);
-    final live = ref.watch(highlightsProvider).value ?? widget.highlights;
-    final highlights = [
-      for (final highlight in live)
-        if (_ids.contains(highlight.id)) highlight,
+    final live = ref.watch(notesProvider).value ?? widget.notes;
+    final notes = [
+      for (final note in live)
+        if (_ids.contains(note.id)) note,
     ];
 
-    if (_finished || highlights.isEmpty) {
+    if (_finished || notes.isEmpty) {
       final changed = _kept > 0 || _cards > 0;
       return AppPage(
         title: 'Notes reviewed',
@@ -176,7 +169,7 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
           Center(child: IconBadge(Icons.check_circle_outline, size: 72)),
           const SizedBox(height: 16),
           Text(
-            highlights.isEmpty && !changed
+            notes.isEmpty && !changed
                 ? 'No notes to review'
                 : 'Note review complete',
             textAlign: TextAlign.center,
@@ -206,9 +199,9 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
       );
     }
 
-    final index = _index >= highlights.length ? highlights.length - 1 : _index;
-    final highlight = highlights[index];
-    final last = index == highlights.length - 1;
+    final index = _index >= notes.length ? notes.length - 1 : _index;
+    final note = notes[index];
+    final last = index == notes.length - 1;
     return AppPage(
       title: widget.title,
       showBack: true,
@@ -230,30 +223,30 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
                 onPressed: _busy
                     ? null
                     : () {
-                        if (!highlight.isKept) {
-                          _keep(highlight, index, highlights.length);
+                        if (!note.isKept) {
+                          _keep(note, index, notes.length);
                         } else {
-                          _advanceFrom(index, highlights.length);
+                          _advanceFrom(index, notes.length);
                         }
                       },
                 label: _busy
                     ? 'Saving…'
-                    : !highlight.isKept
+                    : !note.isKept
                     ? last
                           ? 'Keep & done'
                           : 'Keep & next'
                     : last
                     ? 'Done'
                     : 'Next',
-                icon: !highlight.isKept ? Icons.check : Icons.arrow_forward,
+                icon: !note.isKept ? Icons.check : Icons.arrow_forward,
               ),
             ),
-            if (!highlight.isKept) ...[
+            if (!note.isKept) ...[
               const SizedBox(width: 4),
               M3EButton.text(
                 onPressed: _busy
                     ? null
-                    : () => _advanceFrom(index, highlights.length),
+                    : () => _advanceFrom(index, notes.length),
                 child: const Text('Skip'),
               ),
             ],
@@ -262,28 +255,25 @@ class _HighlightReviewPageState extends ConsumerState<HighlightReviewPage> {
       ),
       children: [
         Text(
-          'Item ${index + 1} of ${highlights.length}',
+          'Item ${index + 1} of ${notes.length}',
           style: theme.typography.baseline.labelMedium.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 8),
-        LinearScore(value: (index + 1) / highlights.length),
+        LinearScore(value: (index + 1) / notes.length),
         const SizedBox(height: 22),
         Text(
           'Review the note',
           style: theme.typography.emphasized.headlineSmall,
         ),
         const SizedBox(height: 16),
-        HighlightReviewView(
-          key: ValueKey('highlight-review-${highlight.id}'),
-          highlight: highlight,
-          onCreateCards: () =>
-              _createCards(highlight, index, highlights.length),
-          onKeep: highlight.isKept
-              ? null
-              : () => _keep(highlight, index, highlights.length),
-          onDelete: () => _deleteHighlight(highlight, highlights.length),
+        NoteReviewView(
+          key: ValueKey('note-review-${note.id}'),
+          note: note,
+          onCreateCards: () => _createCards(note, index, notes.length),
+          onKeep: note.isKept ? null : () => _keep(note, index, notes.length),
+          onDelete: () => _deleteNote(note, notes.length),
         ),
       ],
     );

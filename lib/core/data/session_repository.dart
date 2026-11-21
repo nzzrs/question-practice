@@ -160,7 +160,7 @@ class SessionRepository {
   /// Deletes the given completed sessions in one transaction.
   ///
   /// Attempts, session questions, error cards, skipped records, concepts,
-  /// highlights and basic cards linked to those sessions cascade with them.
+  /// notes and basic cards linked to those sessions cascade with them.
   /// Rows belonging to in-progress or abandoned sessions are kept.
   Future<int> deleteSessions(Iterable<int> ids) {
     final values = ids.toSet();

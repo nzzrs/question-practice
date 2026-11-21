@@ -6705,12 +6705,11 @@ class SkippedQuestionsCompanion extends UpdateCompanion<SkippedQuestionRow> {
   }
 }
 
-class $HighlightsTable extends Highlights
-    with TableInfo<$HighlightsTable, HighlightRow> {
+class $NotesTable extends Notes with TableInfo<$NotesTable, NoteRow> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $HighlightsTable(this.attachedDatabase, [this._alias]);
+  $NotesTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
@@ -6752,10 +6751,12 @@ class $HighlightsTable extends Highlights
       'REFERENCES questions (id) ON DELETE SET NULL',
     ),
   );
-  static const VerificationMeta _phraseMeta = const VerificationMeta('phrase');
+  static const VerificationMeta _noteTextMeta = const VerificationMeta(
+    'noteText',
+  );
   @override
-  late final GeneratedColumn<String> phrase = GeneratedColumn<String>(
-    'phrase',
+  late final GeneratedColumn<String> noteText = GeneratedColumn<String>(
+    'text',
     aliasedName,
     false,
     type: DriftSqlType.string,
@@ -6860,7 +6861,7 @@ class $HighlightsTable extends Highlights
     id,
     sessionId,
     questionId,
-    phrase,
+    noteText,
     context,
     topicName,
     subtopic,
@@ -6874,10 +6875,10 @@ class $HighlightsTable extends Highlights
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'highlights';
+  static const String $name = 'notes';
   @override
   VerificationContext validateIntegrity(
-    Insertable<HighlightRow> instance, {
+    Insertable<NoteRow> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -6897,13 +6898,13 @@ class $HighlightsTable extends Highlights
         questionId.isAcceptableOrUnknown(data['question_id']!, _questionIdMeta),
       );
     }
-    if (data.containsKey('phrase')) {
+    if (data.containsKey('text')) {
       context.handle(
-        _phraseMeta,
-        phrase.isAcceptableOrUnknown(data['phrase']!, _phraseMeta),
+        _noteTextMeta,
+        noteText.isAcceptableOrUnknown(data['text']!, _noteTextMeta),
       );
     } else if (isInserting) {
-      context.missing(_phraseMeta);
+      context.missing(_noteTextMeta);
     }
     if (data.containsKey('context')) {
       context.handle(
@@ -6970,9 +6971,9 @@ class $HighlightsTable extends Highlights
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  HighlightRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+  NoteRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return HighlightRow(
+    return NoteRow(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}id'],
@@ -6985,9 +6986,9 @@ class $HighlightsTable extends Highlights
         DriftSqlType.int,
         data['${effectivePrefix}question_id'],
       ),
-      phrase: attachedDatabase.typeMapping.read(
+      noteText: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
-        data['${effectivePrefix}phrase'],
+        data['${effectivePrefix}text'],
       )!,
       context: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -7025,16 +7026,18 @@ class $HighlightsTable extends Highlights
   }
 
   @override
-  $HighlightsTable createAlias(String alias) {
-    return $HighlightsTable(attachedDatabase, alias);
+  $NotesTable createAlias(String alias) {
+    return $NotesTable(attachedDatabase, alias);
   }
 }
 
-class HighlightRow extends DataClass implements Insertable<HighlightRow> {
+class NoteRow extends DataClass implements Insertable<NoteRow> {
   final int id;
   final int? sessionId;
   final int? questionId;
-  final String phrase;
+
+  /// The passage itself. Stored and exported as `text`.
+  final String noteText;
   final String context;
   final String topicName;
   final String subtopic;
@@ -7043,11 +7046,11 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
   final DateTime? keptAt;
   final DateTime? cardCreatedAt;
   final int? manualCardId;
-  const HighlightRow({
+  const NoteRow({
     required this.id,
     this.sessionId,
     this.questionId,
-    required this.phrase,
+    required this.noteText,
     required this.context,
     required this.topicName,
     required this.subtopic,
@@ -7067,7 +7070,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     if (!nullToAbsent || questionId != null) {
       map['question_id'] = Variable<int>(questionId);
     }
-    map['phrase'] = Variable<String>(phrase);
+    map['text'] = Variable<String>(noteText);
     map['context'] = Variable<String>(context);
     map['topic_name'] = Variable<String>(topicName);
     map['subtopic'] = Variable<String>(subtopic);
@@ -7085,8 +7088,8 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     return map;
   }
 
-  HighlightsCompanion toCompanion(bool nullToAbsent) {
-    return HighlightsCompanion(
+  NotesCompanion toCompanion(bool nullToAbsent) {
+    return NotesCompanion(
       id: Value(id),
       sessionId: sessionId == null && nullToAbsent
           ? const Value.absent()
@@ -7094,7 +7097,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
       questionId: questionId == null && nullToAbsent
           ? const Value.absent()
           : Value(questionId),
-      phrase: Value(phrase),
+      noteText: Value(noteText),
       context: Value(context),
       topicName: Value(topicName),
       subtopic: Value(subtopic),
@@ -7112,16 +7115,16 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     );
   }
 
-  factory HighlightRow.fromJson(
+  factory NoteRow.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return HighlightRow(
+    return NoteRow(
       id: serializer.fromJson<int>(json['id']),
       sessionId: serializer.fromJson<int?>(json['sessionId']),
       questionId: serializer.fromJson<int?>(json['questionId']),
-      phrase: serializer.fromJson<String>(json['phrase']),
+      noteText: serializer.fromJson<String>(json['text']),
       context: serializer.fromJson<String>(json['context']),
       topicName: serializer.fromJson<String>(json['topicName']),
       subtopic: serializer.fromJson<String>(json['subtopic']),
@@ -7139,7 +7142,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
       'id': serializer.toJson<int>(id),
       'sessionId': serializer.toJson<int?>(sessionId),
       'questionId': serializer.toJson<int?>(questionId),
-      'phrase': serializer.toJson<String>(phrase),
+      'text': serializer.toJson<String>(noteText),
       'context': serializer.toJson<String>(context),
       'topicName': serializer.toJson<String>(topicName),
       'subtopic': serializer.toJson<String>(subtopic),
@@ -7151,11 +7154,11 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     };
   }
 
-  HighlightRow copyWith({
+  NoteRow copyWith({
     int? id,
     Value<int?> sessionId = const Value.absent(),
     Value<int?> questionId = const Value.absent(),
-    String? phrase,
+    String? noteText,
     String? context,
     String? topicName,
     String? subtopic,
@@ -7164,11 +7167,11 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     Value<DateTime?> keptAt = const Value.absent(),
     Value<DateTime?> cardCreatedAt = const Value.absent(),
     Value<int?> manualCardId = const Value.absent(),
-  }) => HighlightRow(
+  }) => NoteRow(
     id: id ?? this.id,
     sessionId: sessionId.present ? sessionId.value : this.sessionId,
     questionId: questionId.present ? questionId.value : this.questionId,
-    phrase: phrase ?? this.phrase,
+    noteText: noteText ?? this.noteText,
     context: context ?? this.context,
     topicName: topicName ?? this.topicName,
     subtopic: subtopic ?? this.subtopic,
@@ -7180,14 +7183,14 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
         : this.cardCreatedAt,
     manualCardId: manualCardId.present ? manualCardId.value : this.manualCardId,
   );
-  HighlightRow copyWithCompanion(HighlightsCompanion data) {
-    return HighlightRow(
+  NoteRow copyWithCompanion(NotesCompanion data) {
+    return NoteRow(
       id: data.id.present ? data.id.value : this.id,
       sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
       questionId: data.questionId.present
           ? data.questionId.value
           : this.questionId,
-      phrase: data.phrase.present ? data.phrase.value : this.phrase,
+      noteText: data.noteText.present ? data.noteText.value : this.noteText,
       context: data.context.present ? data.context.value : this.context,
       topicName: data.topicName.present ? data.topicName.value : this.topicName,
       subtopic: data.subtopic.present ? data.subtopic.value : this.subtopic,
@@ -7207,11 +7210,11 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
 
   @override
   String toString() {
-    return (StringBuffer('HighlightRow(')
+    return (StringBuffer('NoteRow(')
           ..write('id: $id, ')
           ..write('sessionId: $sessionId, ')
           ..write('questionId: $questionId, ')
-          ..write('phrase: $phrase, ')
+          ..write('noteText: $noteText, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
           ..write('subtopic: $subtopic, ')
@@ -7229,7 +7232,7 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
     id,
     sessionId,
     questionId,
-    phrase,
+    noteText,
     context,
     topicName,
     subtopic,
@@ -7242,11 +7245,11 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is HighlightRow &&
+      (other is NoteRow &&
           other.id == this.id &&
           other.sessionId == this.sessionId &&
           other.questionId == this.questionId &&
-          other.phrase == this.phrase &&
+          other.noteText == this.noteText &&
           other.context == this.context &&
           other.topicName == this.topicName &&
           other.subtopic == this.subtopic &&
@@ -7257,11 +7260,11 @@ class HighlightRow extends DataClass implements Insertable<HighlightRow> {
           other.manualCardId == this.manualCardId);
 }
 
-class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
+class NotesCompanion extends UpdateCompanion<NoteRow> {
   final Value<int> id;
   final Value<int?> sessionId;
   final Value<int?> questionId;
-  final Value<String> phrase;
+  final Value<String> noteText;
   final Value<String> context;
   final Value<String> topicName;
   final Value<String> subtopic;
@@ -7270,11 +7273,11 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
   final Value<DateTime?> keptAt;
   final Value<DateTime?> cardCreatedAt;
   final Value<int?> manualCardId;
-  const HighlightsCompanion({
+  const NotesCompanion({
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
     this.questionId = const Value.absent(),
-    this.phrase = const Value.absent(),
+    this.noteText = const Value.absent(),
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
     this.subtopic = const Value.absent(),
@@ -7284,11 +7287,11 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     this.cardCreatedAt = const Value.absent(),
     this.manualCardId = const Value.absent(),
   });
-  HighlightsCompanion.insert({
+  NotesCompanion.insert({
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
     this.questionId = const Value.absent(),
-    required String phrase,
+    required String noteText,
     this.context = const Value.absent(),
     this.topicName = const Value.absent(),
     this.subtopic = const Value.absent(),
@@ -7297,13 +7300,13 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     this.keptAt = const Value.absent(),
     this.cardCreatedAt = const Value.absent(),
     this.manualCardId = const Value.absent(),
-  }) : phrase = Value(phrase),
+  }) : noteText = Value(noteText),
        createdAt = Value(createdAt);
-  static Insertable<HighlightRow> custom({
+  static Insertable<NoteRow> custom({
     Expression<int>? id,
     Expression<int>? sessionId,
     Expression<int>? questionId,
-    Expression<String>? phrase,
+    Expression<String>? noteText,
     Expression<String>? context,
     Expression<String>? topicName,
     Expression<String>? subtopic,
@@ -7317,7 +7320,7 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
       if (id != null) 'id': id,
       if (sessionId != null) 'session_id': sessionId,
       if (questionId != null) 'question_id': questionId,
-      if (phrase != null) 'phrase': phrase,
+      if (noteText != null) 'text': noteText,
       if (context != null) 'context': context,
       if (topicName != null) 'topic_name': topicName,
       if (subtopic != null) 'subtopic': subtopic,
@@ -7329,11 +7332,11 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     });
   }
 
-  HighlightsCompanion copyWith({
+  NotesCompanion copyWith({
     Value<int>? id,
     Value<int?>? sessionId,
     Value<int?>? questionId,
-    Value<String>? phrase,
+    Value<String>? noteText,
     Value<String>? context,
     Value<String>? topicName,
     Value<String>? subtopic,
@@ -7343,11 +7346,11 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     Value<DateTime?>? cardCreatedAt,
     Value<int?>? manualCardId,
   }) {
-    return HighlightsCompanion(
+    return NotesCompanion(
       id: id ?? this.id,
       sessionId: sessionId ?? this.sessionId,
       questionId: questionId ?? this.questionId,
-      phrase: phrase ?? this.phrase,
+      noteText: noteText ?? this.noteText,
       context: context ?? this.context,
       topicName: topicName ?? this.topicName,
       subtopic: subtopic ?? this.subtopic,
@@ -7371,8 +7374,8 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
     if (questionId.present) {
       map['question_id'] = Variable<int>(questionId.value);
     }
-    if (phrase.present) {
-      map['phrase'] = Variable<String>(phrase.value);
+    if (noteText.present) {
+      map['text'] = Variable<String>(noteText.value);
     }
     if (context.present) {
       map['context'] = Variable<String>(context.value);
@@ -7403,11 +7406,11 @@ class HighlightsCompanion extends UpdateCompanion<HighlightRow> {
 
   @override
   String toString() {
-    return (StringBuffer('HighlightsCompanion(')
+    return (StringBuffer('NotesCompanion(')
           ..write('id: $id, ')
           ..write('sessionId: $sessionId, ')
           ..write('questionId: $questionId, ')
-          ..write('phrase: $phrase, ')
+          ..write('noteText: $noteText, ')
           ..write('context: $context, ')
           ..write('topicName: $topicName, ')
           ..write('subtopic: $subtopic, ')
@@ -7646,7 +7649,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $SkippedQuestionsTable skippedQuestions = $SkippedQuestionsTable(
     this,
   );
-  late final $HighlightsTable highlights = $HighlightsTable(this);
+  late final $NotesTable notes = $NotesTable(this);
   late final $SettingsTable settings = $SettingsTable(this);
   late final Index practicesTopic = Index(
     'practices_topic',
@@ -7704,13 +7707,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'skipped_questions_session',
     'CREATE INDEX skipped_questions_session ON skipped_questions (session_id)',
   );
-  late final Index highlightsSession = Index(
-    'highlights_session',
-    'CREATE INDEX highlights_session ON highlights (session_id)',
+  late final Index notesSession = Index(
+    'notes_session',
+    'CREATE INDEX notes_session ON notes (session_id)',
   );
-  late final Index highlightsQuestion = Index(
-    'highlights_question',
-    'CREATE INDEX highlights_question ON highlights (question_id)',
+  late final Index notesQuestion = Index(
+    'notes_question',
+    'CREATE INDEX notes_question ON notes (question_id)',
   );
   late final TopicDao topicDao = TopicDao(this as AppDatabase);
   late final SessionDao sessionDao = SessionDao(this as AppDatabase);
@@ -7732,7 +7735,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     errorCards,
     manualCards,
     skippedQuestions,
-    highlights,
+    notes,
     settings,
     practicesTopic,
     questionsPractice,
@@ -7748,8 +7751,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     manualCardsExported,
     skippedQuestionsHandled,
     skippedQuestionsSession,
-    highlightsSession,
-    highlightsQuestion,
+    notesSession,
+    notesQuestion,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
@@ -7863,21 +7866,21 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         'sessions',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('highlights', kind: UpdateKind.delete)],
+      result: [TableUpdate('notes', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'questions',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('highlights', kind: UpdateKind.update)],
+      result: [TableUpdate('notes', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'manual_cards',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('highlights', kind: UpdateKind.update)],
+      result: [TableUpdate('notes', kind: UpdateKind.update)],
     ),
   ]);
 }
@@ -8950,19 +8953,20 @@ final class $$QuestionsTableReferences
     );
   }
 
-  static MultiTypedResultKey<$HighlightsTable, List<HighlightRow>>
-  _highlightsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.highlights,
-    aliasName: 'questions__id__highlights__question_id',
+  static MultiTypedResultKey<$NotesTable, List<NoteRow>> _notesRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.notes,
+    aliasName: 'questions__id__notes__question_id',
   );
 
-  $$HighlightsTableProcessedTableManager get highlightsRefs {
-    final manager = $$HighlightsTableTableManager(
+  $$NotesTableProcessedTableManager get notesRefs {
+    final manager = $$NotesTableTableManager(
       $_db,
-      $_db.highlights,
+      $_db.notes,
     ).filter((f) => f.questionId.id.sqlEquals($_itemColumn<int>('id')!));
 
-    final cache = $_typedResult.readTableOrNull(_highlightsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(_notesRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -9191,22 +9195,22 @@ class $$QuestionsTableFilterComposer
     return f(composer);
   }
 
-  Expression<bool> highlightsRefs(
-    Expression<bool> Function($$HighlightsTableFilterComposer f) f,
+  Expression<bool> notesRefs(
+    Expression<bool> Function($$NotesTableFilterComposer f) f,
   ) {
-    final $$HighlightsTableFilterComposer composer = $composerBuilder(
+    final $$NotesTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.highlights,
+      referencedTable: $db.notes,
       getReferencedColumn: (t) => t.questionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$HighlightsTableFilterComposer(
+          }) => $$NotesTableFilterComposer(
             $db: $db,
-            $table: $db.highlights,
+            $table: $db.notes,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9504,22 +9508,22 @@ class $$QuestionsTableAnnotationComposer
     return f(composer);
   }
 
-  Expression<T> highlightsRefs<T extends Object>(
-    Expression<T> Function($$HighlightsTableAnnotationComposer a) f,
+  Expression<T> notesRefs<T extends Object>(
+    Expression<T> Function($$NotesTableAnnotationComposer a) f,
   ) {
-    final $$HighlightsTableAnnotationComposer composer = $composerBuilder(
+    final $$NotesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.highlights,
+      referencedTable: $db.notes,
       getReferencedColumn: (t) => t.questionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$HighlightsTableAnnotationComposer(
+          }) => $$NotesTableAnnotationComposer(
             $db: $db,
-            $table: $db.highlights,
+            $table: $db.notes,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9551,7 +9555,7 @@ class $$QuestionsTableTableManager
             bool errorCardsRefs,
             bool manualCardsRefs,
             bool skippedQuestionsRefs,
-            bool highlightsRefs,
+            bool notesRefs,
           })
         > {
   $$QuestionsTableTableManager(_$AppDatabase db, $QuestionsTable table)
@@ -9627,7 +9631,7 @@ class $$QuestionsTableTableManager
                 errorCardsRefs = false,
                 manualCardsRefs = false,
                 skippedQuestionsRefs = false,
-                highlightsRefs = false,
+                notesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -9638,7 +9642,7 @@ class $$QuestionsTableTableManager
                     if (errorCardsRefs) db.errorCards,
                     if (manualCardsRefs) db.manualCards,
                     if (skippedQuestionsRefs) db.skippedQuestions,
-                    if (highlightsRefs) db.highlights,
+                    if (notesRefs) db.notes,
                   ],
                   addJoins:
                       <
@@ -9792,22 +9796,22 @@ class $$QuestionsTableTableManager
                           referencedColumn: 'question_id',
                           typedResults: items,
                         ),
-                      if (highlightsRefs)
+                      if (notesRefs)
                         await $_getPrefetchedDataByColumns<
                           QuestionRow,
                           $QuestionsTable,
-                          HighlightRow,
-                          $HighlightsTable
+                          NoteRow,
+                          $NotesTable
                         >(
                           currentTable: table,
                           referencedTable: $$QuestionsTableReferences
-                              ._highlightsRefsTable(db),
+                              ._notesRefsTable(db),
                           managerFromTypedResult: (p0) =>
                               $$QuestionsTableReferences(
                                 db,
                                 table,
                                 p0,
-                              ).highlightsRefs,
+                              ).notesRefs,
                           currentColumn: 'id',
                           referencedColumn: 'question_id',
                           typedResults: items,
@@ -9840,7 +9844,7 @@ typedef $$QuestionsTableProcessedTableManager =
         bool errorCardsRefs,
         bool manualCardsRefs,
         bool skippedQuestionsRefs,
-        bool highlightsRefs,
+        bool notesRefs,
       })
     >;
 typedef $$SessionsTableCreateCompanionBuilder = SessionsCompanion Function({
@@ -10001,19 +10005,20 @@ final class $$SessionsTableReferences
     );
   }
 
-  static MultiTypedResultKey<$HighlightsTable, List<HighlightRow>>
-  _highlightsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.highlights,
-    aliasName: 'sessions__id__highlights__session_id',
+  static MultiTypedResultKey<$NotesTable, List<NoteRow>> _notesRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.notes,
+    aliasName: 'sessions__id__notes__session_id',
   );
 
-  $$HighlightsTableProcessedTableManager get highlightsRefs {
-    final manager = $$HighlightsTableTableManager(
+  $$NotesTableProcessedTableManager get notesRefs {
+    final manager = $$NotesTableTableManager(
       $_db,
-      $_db.highlights,
+      $_db.notes,
     ).filter((f) => f.sessionId.id.sqlEquals($_itemColumn<int>('id')!));
 
-    final cache = $_typedResult.readTableOrNull(_highlightsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(_notesRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -10247,22 +10252,22 @@ class $$SessionsTableFilterComposer
     return f(composer);
   }
 
-  Expression<bool> highlightsRefs(
-    Expression<bool> Function($$HighlightsTableFilterComposer f) f,
+  Expression<bool> notesRefs(
+    Expression<bool> Function($$NotesTableFilterComposer f) f,
   ) {
-    final $$HighlightsTableFilterComposer composer = $composerBuilder(
+    final $$NotesTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.highlights,
+      referencedTable: $db.notes,
       getReferencedColumn: (t) => t.sessionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$HighlightsTableFilterComposer(
+          }) => $$NotesTableFilterComposer(
             $db: $db,
-            $table: $db.highlights,
+            $table: $db.notes,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10564,22 +10569,22 @@ class $$SessionsTableAnnotationComposer
     return f(composer);
   }
 
-  Expression<T> highlightsRefs<T extends Object>(
-    Expression<T> Function($$HighlightsTableAnnotationComposer a) f,
+  Expression<T> notesRefs<T extends Object>(
+    Expression<T> Function($$NotesTableAnnotationComposer a) f,
   ) {
-    final $$HighlightsTableAnnotationComposer composer = $composerBuilder(
+    final $$NotesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.highlights,
+      referencedTable: $db.notes,
       getReferencedColumn: (t) => t.sessionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$HighlightsTableAnnotationComposer(
+          }) => $$NotesTableAnnotationComposer(
             $db: $db,
-            $table: $db.highlights,
+            $table: $db.notes,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10611,7 +10616,7 @@ class $$SessionsTableTableManager
             bool errorCardsRefs,
             bool manualCardsRefs,
             bool skippedQuestionsRefs,
-            bool highlightsRefs,
+            bool notesRefs,
           })
         > {
   $$SessionsTableTableManager(_$AppDatabase db, $SessionsTable table)
@@ -10690,7 +10695,7 @@ class $$SessionsTableTableManager
                 errorCardsRefs = false,
                 manualCardsRefs = false,
                 skippedQuestionsRefs = false,
-                highlightsRefs = false,
+                notesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
@@ -10701,7 +10706,7 @@ class $$SessionsTableTableManager
                     if (errorCardsRefs) db.errorCards,
                     if (manualCardsRefs) db.manualCards,
                     if (skippedQuestionsRefs) db.skippedQuestions,
-                    if (highlightsRefs) db.highlights,
+                    if (notesRefs) db.notes,
                   ],
                   addJoins:
                       <
@@ -10855,22 +10860,22 @@ class $$SessionsTableTableManager
                           referencedColumn: 'session_id',
                           typedResults: items,
                         ),
-                      if (highlightsRefs)
+                      if (notesRefs)
                         await $_getPrefetchedDataByColumns<
                           SessionRow,
                           $SessionsTable,
-                          HighlightRow,
-                          $HighlightsTable
+                          NoteRow,
+                          $NotesTable
                         >(
                           currentTable: table,
                           referencedTable: $$SessionsTableReferences
-                              ._highlightsRefsTable(db),
+                              ._notesRefsTable(db),
                           managerFromTypedResult: (p0) =>
                               $$SessionsTableReferences(
                                 db,
                                 table,
                                 p0,
-                              ).highlightsRefs,
+                              ).notesRefs,
                           currentColumn: 'id',
                           referencedColumn: 'session_id',
                           typedResults: items,
@@ -10903,7 +10908,7 @@ typedef $$SessionsTableProcessedTableManager =
         bool errorCardsRefs,
         bool manualCardsRefs,
         bool skippedQuestionsRefs,
-        bool highlightsRefs,
+        bool notesRefs,
       })
     >;
 typedef $$SessionQuestionsTableCreateCompanionBuilder =
@@ -13147,19 +13152,20 @@ final class $$ManualCardsTableReferences
     );
   }
 
-  static MultiTypedResultKey<$HighlightsTable, List<HighlightRow>>
-  _highlightsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.highlights,
-    aliasName: 'manual_cards__id__highlights__manual_card_id',
+  static MultiTypedResultKey<$NotesTable, List<NoteRow>> _notesRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.notes,
+    aliasName: 'manual_cards__id__notes__manual_card_id',
   );
 
-  $$HighlightsTableProcessedTableManager get highlightsRefs {
-    final manager = $$HighlightsTableTableManager(
+  $$NotesTableProcessedTableManager get notesRefs {
+    final manager = $$NotesTableTableManager(
       $_db,
-      $_db.highlights,
+      $_db.notes,
     ).filter((f) => f.manualCardId.id.sqlEquals($_itemColumn<int>('id')!));
 
-    final cache = $_typedResult.readTableOrNull(_highlightsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(_notesRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -13266,22 +13272,22 @@ class $$ManualCardsTableFilterComposer
     return composer;
   }
 
-  Expression<bool> highlightsRefs(
-    Expression<bool> Function($$HighlightsTableFilterComposer f) f,
+  Expression<bool> notesRefs(
+    Expression<bool> Function($$NotesTableFilterComposer f) f,
   ) {
-    final $$HighlightsTableFilterComposer composer = $composerBuilder(
+    final $$NotesTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.highlights,
+      referencedTable: $db.notes,
       getReferencedColumn: (t) => t.manualCardId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$HighlightsTableFilterComposer(
+          }) => $$NotesTableFilterComposer(
             $db: $db,
-            $table: $db.highlights,
+            $table: $db.notes,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -13479,22 +13485,22 @@ class $$ManualCardsTableAnnotationComposer
     return composer;
   }
 
-  Expression<T> highlightsRefs<T extends Object>(
-    Expression<T> Function($$HighlightsTableAnnotationComposer a) f,
+  Expression<T> notesRefs<T extends Object>(
+    Expression<T> Function($$NotesTableAnnotationComposer a) f,
   ) {
-    final $$HighlightsTableAnnotationComposer composer = $composerBuilder(
+    final $$NotesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.highlights,
+      referencedTable: $db.notes,
       getReferencedColumn: (t) => t.manualCardId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$HighlightsTableAnnotationComposer(
+          }) => $$NotesTableAnnotationComposer(
             $db: $db,
-            $table: $db.highlights,
+            $table: $db.notes,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -13521,7 +13527,7 @@ class $$ManualCardsTableTableManager
           PrefetchHooks Function({
             bool sessionId,
             bool questionId,
-            bool highlightsRefs,
+            bool notesRefs,
           })
         > {
   $$ManualCardsTableTableManager(_$AppDatabase db, $ManualCardsTable table)
@@ -13596,14 +13602,10 @@ class $$ManualCardsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({
-                sessionId = false,
-                questionId = false,
-                highlightsRefs = false,
-              }) {
+              ({sessionId = false, questionId = false, notesRefs = false}) {
                 return PrefetchHooks(
                   db: db,
-                  explicitlyWatchedTables: [if (highlightsRefs) db.highlights],
+                  explicitlyWatchedTables: [if (notesRefs) db.notes],
                   addJoins:
                       <
                         T extends TableManagerState<
@@ -13647,22 +13649,22 @@ class $$ManualCardsTableTableManager
                       },
                   getPrefetchedDataCallback: (items) async {
                     return [
-                      if (highlightsRefs)
+                      if (notesRefs)
                         await $_getPrefetchedDataByColumns<
                           ManualCardRow,
                           $ManualCardsTable,
-                          HighlightRow,
-                          $HighlightsTable
+                          NoteRow,
+                          $NotesTable
                         >(
                           currentTable: table,
                           referencedTable: $$ManualCardsTableReferences
-                              ._highlightsRefsTable(db),
+                              ._notesRefsTable(db),
                           managerFromTypedResult: (p0) =>
                               $$ManualCardsTableReferences(
                                 db,
                                 table,
                                 p0,
-                              ).highlightsRefs,
+                              ).notesRefs,
                           currentColumn: 'id',
                           referencedColumn: 'manual_card_id',
                           typedResults: items,
@@ -13687,11 +13689,7 @@ typedef $$ManualCardsTableProcessedTableManager =
       $$ManualCardsTableUpdateCompanionBuilder,
       (ManualCardRow, $$ManualCardsTableReferences),
       ManualCardRow,
-      PrefetchHooks Function({
-        bool sessionId,
-        bool questionId,
-        bool highlightsRefs,
-      })
+      PrefetchHooks Function({bool sessionId, bool questionId, bool notesRefs})
     >;
 typedef $$SkippedQuestionsTableCreateCompanionBuilder =
     SkippedQuestionsCompanion Function({
@@ -14303,11 +14301,11 @@ typedef $$SkippedQuestionsTableProcessedTableManager =
       SkippedQuestionRow,
       PrefetchHooks Function({bool sessionId, bool questionId})
     >;
-typedef $$HighlightsTableCreateCompanionBuilder = HighlightsCompanion Function({
+typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
   Value<int> id,
   Value<int?> sessionId,
   Value<int?> questionId,
-  required String phrase,
+  required String noteText,
   Value<String> context,
   Value<String> topicName,
   Value<String> subtopic,
@@ -14317,11 +14315,11 @@ typedef $$HighlightsTableCreateCompanionBuilder = HighlightsCompanion Function({
   Value<DateTime?> cardCreatedAt,
   Value<int?> manualCardId,
 });
-typedef $$HighlightsTableUpdateCompanionBuilder = HighlightsCompanion Function({
+typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
   Value<int> id,
   Value<int?> sessionId,
   Value<int?> questionId,
-  Value<String> phrase,
+  Value<String> noteText,
   Value<String> context,
   Value<String> topicName,
   Value<String> subtopic,
@@ -14332,12 +14330,12 @@ typedef $$HighlightsTableUpdateCompanionBuilder = HighlightsCompanion Function({
   Value<int?> manualCardId,
 });
 
-final class $$HighlightsTableReferences
-    extends BaseReferences<_$AppDatabase, $HighlightsTable, HighlightRow> {
-  $$HighlightsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+final class $$NotesTableReferences
+    extends BaseReferences<_$AppDatabase, $NotesTable, NoteRow> {
+  $$NotesTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $SessionsTable _sessionIdTable(_$AppDatabase db) =>
-      db.sessions.createAlias('highlights__session_id__sessions__id');
+      db.sessions.createAlias('notes__session_id__sessions__id');
 
   $$SessionsTableProcessedTableManager? get sessionId {
     final $_column = $_itemColumn<int>('session_id');
@@ -14354,7 +14352,7 @@ final class $$HighlightsTableReferences
   }
 
   static $QuestionsTable _questionIdTable(_$AppDatabase db) =>
-      db.questions.createAlias('highlights__question_id__questions__id');
+      db.questions.createAlias('notes__question_id__questions__id');
 
   $$QuestionsTableProcessedTableManager? get questionId {
     final $_column = $_itemColumn<int>('question_id');
@@ -14370,9 +14368,8 @@ final class $$HighlightsTableReferences
     );
   }
 
-  static $ManualCardsTable _manualCardIdTable(_$AppDatabase db) => db
-      .manualCards
-      .createAlias('highlights__manual_card_id__manual_cards__id');
+  static $ManualCardsTable _manualCardIdTable(_$AppDatabase db) =>
+      db.manualCards.createAlias('notes__manual_card_id__manual_cards__id');
 
   $$ManualCardsTableProcessedTableManager? get manualCardId {
     final $_column = $_itemColumn<int>('manual_card_id');
@@ -14389,9 +14386,8 @@ final class $$HighlightsTableReferences
   }
 }
 
-class $$HighlightsTableFilterComposer
-    extends Composer<_$AppDatabase, $HighlightsTable> {
-  $$HighlightsTableFilterComposer({
+class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
+  $$NotesTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -14403,8 +14399,8 @@ class $$HighlightsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get phrase => $composableBuilder(
-    column: $table.phrase,
+  ColumnFilters<String> get noteText => $composableBuilder(
+    column: $table.noteText,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14513,9 +14509,9 @@ class $$HighlightsTableFilterComposer
   }
 }
 
-class $$HighlightsTableOrderingComposer
-    extends Composer<_$AppDatabase, $HighlightsTable> {
-  $$HighlightsTableOrderingComposer({
+class $$NotesTableOrderingComposer
+    extends Composer<_$AppDatabase, $NotesTable> {
+  $$NotesTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -14527,8 +14523,8 @@ class $$HighlightsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get phrase => $composableBuilder(
-    column: $table.phrase,
+  ColumnOrderings<String> get noteText => $composableBuilder(
+    column: $table.noteText,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -14637,9 +14633,9 @@ class $$HighlightsTableOrderingComposer
   }
 }
 
-class $$HighlightsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $HighlightsTable> {
-  $$HighlightsTableAnnotationComposer({
+class $$NotesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $NotesTable> {
+  $$NotesTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -14649,8 +14645,8 @@ class $$HighlightsTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get phrase =>
-      $composableBuilder(column: $table.phrase, builder: (column) => column);
+  GeneratedColumn<String> get noteText =>
+      $composableBuilder(column: $table.noteText, builder: (column) => column);
 
   GeneratedColumn<String> get context =>
       $composableBuilder(column: $table.context, builder: (column) => column);
@@ -14747,42 +14743,42 @@ class $$HighlightsTableAnnotationComposer
   }
 }
 
-class $$HighlightsTableTableManager
+class $$NotesTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $HighlightsTable,
-          HighlightRow,
-          $$HighlightsTableFilterComposer,
-          $$HighlightsTableOrderingComposer,
-          $$HighlightsTableAnnotationComposer,
-          $$HighlightsTableCreateCompanionBuilder,
-          $$HighlightsTableUpdateCompanionBuilder,
-          (HighlightRow, $$HighlightsTableReferences),
-          HighlightRow,
+          $NotesTable,
+          NoteRow,
+          $$NotesTableFilterComposer,
+          $$NotesTableOrderingComposer,
+          $$NotesTableAnnotationComposer,
+          $$NotesTableCreateCompanionBuilder,
+          $$NotesTableUpdateCompanionBuilder,
+          (NoteRow, $$NotesTableReferences),
+          NoteRow,
           PrefetchHooks Function({
             bool sessionId,
             bool questionId,
             bool manualCardId,
           })
         > {
-  $$HighlightsTableTableManager(_$AppDatabase db, $HighlightsTable table)
+  $$NotesTableTableManager(_$AppDatabase db, $NotesTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$HighlightsTableFilterComposer($db: db, $table: table),
+              $$NotesTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$HighlightsTableOrderingComposer($db: db, $table: table),
+              $$NotesTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$HighlightsTableAnnotationComposer($db: db, $table: table),
+              $$NotesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 Value<int?> sessionId = const Value.absent(),
                 Value<int?> questionId = const Value.absent(),
-                Value<String> phrase = const Value.absent(),
+                Value<String> noteText = const Value.absent(),
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
                 Value<String> subtopic = const Value.absent(),
@@ -14791,11 +14787,11 @@ class $$HighlightsTableTableManager
                 Value<DateTime?> keptAt = const Value.absent(),
                 Value<DateTime?> cardCreatedAt = const Value.absent(),
                 Value<int?> manualCardId = const Value.absent(),
-              }) => HighlightsCompanion(
+              }) => NotesCompanion(
                 id: id,
                 sessionId: sessionId,
                 questionId: questionId,
-                phrase: phrase,
+                noteText: noteText,
                 context: context,
                 topicName: topicName,
                 subtopic: subtopic,
@@ -14810,7 +14806,7 @@ class $$HighlightsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int?> sessionId = const Value.absent(),
                 Value<int?> questionId = const Value.absent(),
-                required String phrase,
+                required String noteText,
                 Value<String> context = const Value.absent(),
                 Value<String> topicName = const Value.absent(),
                 Value<String> subtopic = const Value.absent(),
@@ -14819,11 +14815,11 @@ class $$HighlightsTableTableManager
                 Value<DateTime?> keptAt = const Value.absent(),
                 Value<DateTime?> cardCreatedAt = const Value.absent(),
                 Value<int?> manualCardId = const Value.absent(),
-              }) => HighlightsCompanion.insert(
+              }) => NotesCompanion.insert(
                 id: id,
                 sessionId: sessionId,
                 questionId: questionId,
-                phrase: phrase,
+                noteText: noteText,
                 context: context,
                 topicName: topicName,
                 subtopic: subtopic,
@@ -14836,8 +14832,8 @@ class $$HighlightsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable<$HighlightsTable, HighlightRow>(table),
-                  $$HighlightsTableReferences(db, table, e),
+                  e.readTable<$NotesTable, NoteRow>(table),
+                  $$NotesTableReferences(db, table, e),
                 ),
               )
               .toList(),
@@ -14866,9 +14862,9 @@ class $$HighlightsTableTableManager
                           state = state.withJoin(
                             currentTable: table,
                             currentColumn: table.sessionId,
-                            referencedTable: $$HighlightsTableReferences
+                            referencedTable: $$NotesTableReferences
                                 ._sessionIdTable(db),
-                            referencedColumn: $$HighlightsTableReferences
+                            referencedColumn: $$NotesTableReferences
                                 ._sessionIdTable(db)
                                 .id,
                           ) as T;
@@ -14877,9 +14873,9 @@ class $$HighlightsTableTableManager
                           state = state.withJoin(
                             currentTable: table,
                             currentColumn: table.questionId,
-                            referencedTable: $$HighlightsTableReferences
+                            referencedTable: $$NotesTableReferences
                                 ._questionIdTable(db),
-                            referencedColumn: $$HighlightsTableReferences
+                            referencedColumn: $$NotesTableReferences
                                 ._questionIdTable(db)
                                 .id,
                           ) as T;
@@ -14888,9 +14884,9 @@ class $$HighlightsTableTableManager
                           state = state.withJoin(
                             currentTable: table,
                             currentColumn: table.manualCardId,
-                            referencedTable: $$HighlightsTableReferences
+                            referencedTable: $$NotesTableReferences
                                 ._manualCardIdTable(db),
-                            referencedColumn: $$HighlightsTableReferences
+                            referencedColumn: $$NotesTableReferences
                                 ._manualCardIdTable(db)
                                 .id,
                           ) as T;
@@ -14907,18 +14903,18 @@ class $$HighlightsTableTableManager
       );
 }
 
-typedef $$HighlightsTableProcessedTableManager =
+typedef $$NotesTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $HighlightsTable,
-      HighlightRow,
-      $$HighlightsTableFilterComposer,
-      $$HighlightsTableOrderingComposer,
-      $$HighlightsTableAnnotationComposer,
-      $$HighlightsTableCreateCompanionBuilder,
-      $$HighlightsTableUpdateCompanionBuilder,
-      (HighlightRow, $$HighlightsTableReferences),
-      HighlightRow,
+      $NotesTable,
+      NoteRow,
+      $$NotesTableFilterComposer,
+      $$NotesTableOrderingComposer,
+      $$NotesTableAnnotationComposer,
+      $$NotesTableCreateCompanionBuilder,
+      $$NotesTableUpdateCompanionBuilder,
+      (NoteRow, $$NotesTableReferences),
+      NoteRow,
       PrefetchHooks Function({
         bool sessionId,
         bool questionId,
@@ -15086,8 +15082,8 @@ class $AppDatabaseManager {
       $$ManualCardsTableTableManager(_db, _db.manualCards);
   $$SkippedQuestionsTableTableManager get skippedQuestions =>
       $$SkippedQuestionsTableTableManager(_db, _db.skippedQuestions);
-  $$HighlightsTableTableManager get highlights =>
-      $$HighlightsTableTableManager(_db, _db.highlights);
+  $$NotesTableTableManager get notes =>
+      $$NotesTableTableManager(_db, _db.notes);
   $$SettingsTableTableManager get settings =>
       $$SettingsTableTableManager(_db, _db.settings);
 }

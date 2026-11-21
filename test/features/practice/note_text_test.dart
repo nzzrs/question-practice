@@ -12,16 +12,14 @@ final _richTextFinder = find.descendant(
 );
 
 void main() {
-  testWidgets('a saved phrase is painted with a highlight background', (
-    tester,
-  ) async {
+  testWidgets('a saved phrase is shown with a note tint', (tester) async {
     await pumpTestApp(
       tester,
       home: Scaffold(
         body: SelectableLinkifiedText(
           text: 'This is a managed service for containers.',
           style: const TextStyle(fontSize: 16),
-          highlights: const ['managed service'],
+          notes: const ['managed service'],
           onDefine: (_, _) {},
           onOpenUrl: (_) {},
         ),
@@ -34,10 +32,10 @@ void main() {
         matching: find.byType(RichText),
       ),
     );
-    expect(_hasHighlight(richText.text), isTrue);
+    expect(_hasNote(richText.text), isTrue);
   });
 
-  testWidgets('tapping a saved phrase reports it through onHighlightTap', (
+  testWidgets('tapping a saved phrase reports it through onNoteTap', (
     tester,
   ) async {
     String? tapped;
@@ -47,8 +45,8 @@ void main() {
         body: SelectableLinkifiedText(
           text: 'This is a managed service for containers.',
           style: const TextStyle(fontSize: 16),
-          highlights: const ['managed service'],
-          onHighlightTap: (value) => tapped = value,
+          notes: const ['managed service'],
+          onNoteTap: (value) => tapped = value,
           onDefine: (_, _) {},
           onOpenUrl: (_) {},
         ),
@@ -64,7 +62,7 @@ void main() {
     expect(tapped, 'managed service');
   });
 
-  testWidgets('a link inside a highlight keeps its URL action', (tester) async {
+  testWidgets('a link inside a note keeps its URL action', (tester) async {
     String? opened;
     String? tapped;
     await pumpTestApp(
@@ -73,15 +71,15 @@ void main() {
         body: SelectableLinkifiedText(
           text: 'See https://example.com for a managed service.',
           style: const TextStyle(fontSize: 16),
-          highlights: const ['https://example.com'],
-          onHighlightTap: (value) => tapped = value,
+          notes: const ['https://example.com'],
+          onNoteTap: (value) => tapped = value,
           onDefine: (_, _) {},
           onOpenUrl: (value) => opened = value,
         ),
       ),
     );
 
-    final span = _highlightedSpan(_richText(tester).text)!;
+    final span = _noteSpan(_richText(tester).text)!;
     expect(span.recognizer, isA<TapGestureRecognizer>());
     (span.recognizer! as TapGestureRecognizer).onTap!();
     expect(opened, 'https://example.com');
@@ -96,18 +94,18 @@ RichText _richText(WidgetTester tester) => tester.widget<RichText>(
   ),
 );
 
-TextSpan? _highlightedSpan(InlineSpan span) {
+TextSpan? _noteSpan(InlineSpan span) {
   if (span is! TextSpan) return null;
   if (span.style?.backgroundColor != null && span.text != null) return span;
   for (final child in span.children ?? const <InlineSpan>[]) {
-    final found = _highlightedSpan(child);
+    final found = _noteSpan(child);
     if (found != null) return found;
   }
   return null;
 }
 
-bool _hasHighlight(InlineSpan span) {
+bool _hasNote(InlineSpan span) {
   if (span is! TextSpan) return false;
   if (span.style?.backgroundColor != null) return true;
-  return span.children?.any(_hasHighlight) ?? false;
+  return span.children?.any(_hasNote) ?? false;
 }

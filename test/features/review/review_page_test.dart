@@ -161,7 +161,7 @@ void main() {
     expect(recorder.modes.last, 'SystemUiMode.edgeToEdge');
   });
 
-  testWidgets('the end-of-session highlight step uses the shared view', (
+  testWidgets('the end-of-session note step uses the shared view', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -182,7 +182,7 @@ void main() {
       reasoning: '',
       distracted: false,
     );
-    await harness.cards.createHighlight(
+    await harness.cards.createNote(
       sessionId: start.session.id,
       questionId: item.question.id,
       text: 'managed service',

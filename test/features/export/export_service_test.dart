@@ -172,9 +172,9 @@ void main() {
     expect(gateway.importedNotes, isEmpty);
   });
 
-  test('highlights serialize as plain text outside the Anki selection', () {
-    final text = service.highlightsText([
-      StudyHighlight(
+  test('notes serialize as plain text outside the Anki selection', () {
+    final text = service.notesText([
+      Note(
         id: 1,
         sessionId: 1,
         questionId: 1,
@@ -187,7 +187,7 @@ void main() {
         cardCreatedAt: null,
         manualCardId: null,
       ),
-      StudyHighlight(
+      Note(
         id: 2,
         sessionId: 1,
         questionId: 2,

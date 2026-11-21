@@ -196,12 +196,12 @@ SkippedQuestion skippedQuestionFromRow(SkippedQuestionRow row) {
   );
 }
 
-StudyHighlight highlightFromRow(HighlightRow row) {
-  return StudyHighlight(
+Note noteFromRow(NoteRow row) {
+  return Note(
     id: row.id,
     sessionId: row.sessionId,
     questionId: row.questionId,
-    text: row.phrase,
+    text: row.noteText,
     context: row.context,
     topicName: row.topicName,
     practiceName: row.practiceName,

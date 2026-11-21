@@ -351,7 +351,7 @@ class CardRepository {
     await _db.cardDao.deleteSkippedQuestion(existing.id);
   }
 
-  Future<int> createHighlight({
+  Future<int> createNote({
     required int? sessionId,
     required int? questionId,
     required String text,
@@ -361,11 +361,11 @@ class CardRepository {
     required DateTime createdAt,
     String subtopic = '',
   }) {
-    return _db.cardDao.insertHighlight(
-      HighlightsCompanion.insert(
+    return _db.cardDao.insertNote(
+      NotesCompanion.insert(
         sessionId: Value(sessionId),
         questionId: Value(questionId),
-        phrase: text,
+        noteText: text,
         context: Value(context),
         topicName: Value(topicName),
         subtopic: Value(subtopic),
@@ -375,45 +375,45 @@ class CardRepository {
     );
   }
 
-  Stream<List<StudyHighlight>> watchHighlights() {
-    return _db.cardDao.watchHighlights().map(
-      (rows) => rows.map(highlightFromRow).toList(),
+  Stream<List<Note>> watchNotes() {
+    return _db.cardDao.watchNotes().map(
+      (rows) => rows.map(noteFromRow).toList(),
     );
   }
 
-  Future<List<StudyHighlight>> highlightsForSession(int sessionId) async {
-    final rows = await _db.cardDao.highlightsForSession(sessionId);
-    return rows.map(highlightFromRow).toList();
+  Future<List<Note>> notesForSession(int sessionId) async {
+    final rows = await _db.cardDao.notesForSession(sessionId);
+    return rows.map(noteFromRow).toList();
   }
 
-  /// Highlights saved for a question in any session.
-  Future<List<StudyHighlight>> highlightsForQuestion(int questionId) async {
-    final rows = await _db.cardDao.highlightsForQuestion(questionId);
-    return rows.map(highlightFromRow).toList();
+  /// Notes saved for a question in any session.
+  Future<List<Note>> notesForQuestion(int questionId) async {
+    final rows = await _db.cardDao.notesForQuestion(questionId);
+    return rows.map(noteFromRow).toList();
   }
 
-  Future<void> keepHighlight(int id, DateTime keptAt) {
-    return _db.cardDao.markHighlightKept(id, keptAt);
+  Future<void> keepNote(int id, DateTime keptAt) {
+    return _db.cardDao.markNoteKept(id, keptAt);
   }
 
-  Future<void> markHighlightConverted(
+  Future<void> markNoteConverted(
     int id, {
     required DateTime cardCreatedAt,
     int? manualCardId,
   }) {
-    return _db.cardDao.markHighlightConverted(
+    return _db.cardDao.markNoteConverted(
       id,
       cardCreatedAt: cardCreatedAt,
       manualCardId: manualCardId,
     );
   }
 
-  Future<void> deleteHighlight(int id) {
-    return _db.cardDao.deleteHighlight(id);
+  Future<void> deleteNote(int id) {
+    return _db.cardDao.deleteNote(id);
   }
 
-  Future<void> deleteHighlights(List<int> ids) {
-    return _db.cardDao.deleteHighlights(ids);
+  Future<void> deleteNotes(List<int> ids) {
+    return _db.cardDao.deleteNotes(ids);
   }
 
   Future<void> markExported({
@@ -432,14 +432,14 @@ class CardRepository {
     required List<int> errorCardIds,
     required List<int> manualCardIds,
     List<int> skippedQuestionIds = const [],
-    List<int> highlightIds = const [],
+    List<int> noteIds = const [],
   }) {
     return _db.transaction(() async {
       await _db.cardDao.deleteConcepts(conceptIds);
       await _db.cardDao.deleteErrorCards(errorCardIds);
       await _db.cardDao.deleteManualCards(manualCardIds);
       await _db.cardDao.deleteSkippedQuestions(skippedQuestionIds);
-      await _db.cardDao.deleteHighlights(highlightIds);
+      await _db.cardDao.deleteNotes(noteIds);
     });
   }
 }

@@ -61,7 +61,7 @@ class CardCreatorRequest {
   final String initialDefinition;
 
   /// Note context: enables AI suggestions and marks the note converted on save.
-  final StudyHighlight? note;
+  final Note? note;
 
   /// Error context: enables AI breakdown and completes details on save.
   final CardCreatorErrorSource? error;
@@ -256,7 +256,7 @@ class _CardCreatorSheetState extends ConsumerState<CardCreatorSheet> {
         );
       } else if (note != null) {
         cards = await lookup.suggestArchetypeCards(
-          highlight: note.text,
+          note: note.text,
           questionContext: widget.request.questionContext,
           topicName: widget.request.topicName,
           subtopic: widget.request.subtopic,
@@ -314,7 +314,7 @@ class _CardCreatorSheetState extends ConsumerState<CardCreatorSheet> {
     final service = ref.read(reviewServiceProvider);
     final note = widget.request.note;
     if (note != null) {
-      await service.markHighlightConverted(note.id, manualCardId: manualCardId);
+      await service.markNoteConverted(note.id, manualCardId: manualCardId);
     }
     final error = widget.request.error;
     if (error != null) {

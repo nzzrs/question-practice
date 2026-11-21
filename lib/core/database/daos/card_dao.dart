@@ -8,7 +8,7 @@ import '../tables.dart';
 part 'card_dao.g.dart';
 
 @DriftAccessor(
-  tables: [Concepts, ErrorCards, ManualCards, SkippedQuestions, Highlights],
+  tables: [Concepts, ErrorCards, ManualCards, SkippedQuestions, Notes],
 )
 class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   CardDao(super.db);
@@ -314,60 +314,60 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     await (delete(skippedQuestions)..where((s) => s.id.isIn(ids))).go();
   }
 
-  Future<int> insertHighlight(HighlightsCompanion highlight) {
-    return into(highlights).insert(highlight);
+  Future<int> insertNote(NotesCompanion note) {
+    return into(notes).insert(note);
   }
 
-  Stream<List<HighlightRow>> watchHighlights() {
+  Stream<List<NoteRow>> watchNotes() {
     return (select(
-      highlights,
-    )..orderBy([(h) => OrderingTerm.desc(h.createdAt)])).watch();
+      notes,
+    )..orderBy([(n) => OrderingTerm.desc(n.createdAt)])).watch();
   }
 
-  Future<List<HighlightRow>> highlightsForSession(int sessionId) {
-    return (select(highlights)
-          ..where((h) => h.sessionId.equals(sessionId))
-          ..orderBy([(h) => OrderingTerm.asc(h.id)]))
+  Future<List<NoteRow>> notesForSession(int sessionId) {
+    return (select(notes)
+          ..where((n) => n.sessionId.equals(sessionId))
+          ..orderBy([(n) => OrderingTerm.asc(n.id)]))
         .get();
   }
 
-  /// Highlights saved for a question in any session.
+  /// Notes saved for a question in any session.
   ///
-  /// A highlight belongs to the question, so it keeps showing whenever that
+  /// A note belongs to the question, so it keeps showing whenever that
   /// question is practised again, not only in the session that saved it.
-  Future<List<HighlightRow>> highlightsForQuestion(int questionId) {
-    return (select(highlights)
-          ..where((h) => h.questionId.equals(questionId))
-          ..orderBy([(h) => OrderingTerm.asc(h.id)]))
+  Future<List<NoteRow>> notesForQuestion(int questionId) {
+    return (select(notes)
+          ..where((n) => n.questionId.equals(questionId))
+          ..orderBy([(n) => OrderingTerm.asc(n.id)]))
         .get();
   }
 
-  Future<void> markHighlightKept(int id, DateTime keptAt) {
-    return (update(highlights)..where((h) => h.id.equals(id))).write(
-      HighlightsCompanion(keptAt: Value(keptAt)),
+  Future<void> markNoteKept(int id, DateTime keptAt) {
+    return (update(notes)..where((n) => n.id.equals(id))).write(
+      NotesCompanion(keptAt: Value(keptAt)),
     );
   }
 
-  Future<void> markHighlightConverted(
+  Future<void> markNoteConverted(
     int id, {
     required DateTime cardCreatedAt,
     int? manualCardId,
   }) {
-    return (update(highlights)..where((h) => h.id.equals(id))).write(
-      HighlightsCompanion(
+    return (update(notes)..where((n) => n.id.equals(id))).write(
+      NotesCompanion(
         cardCreatedAt: Value(cardCreatedAt),
         manualCardId: Value(manualCardId),
       ),
     );
   }
 
-  Future<void> deleteHighlight(int id) {
-    return deleteHighlights([id]);
+  Future<void> deleteNote(int id) {
+    return deleteNotes([id]);
   }
 
-  Future<void> deleteHighlights(List<int> ids) async {
+  Future<void> deleteNotes(List<int> ids) async {
     if (ids.isEmpty) return;
-    await (delete(highlights)..where((h) => h.id.isIn(ids))).go();
+    await (delete(notes)..where((n) => n.id.isIn(ids))).go();
   }
 
   Future<void> markManualCardsExported(

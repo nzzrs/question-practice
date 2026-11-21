@@ -699,9 +699,10 @@ class SkippedQuestion {
   String get correctAnswer => correctAnswers.join('; ');
 }
 
+/// A passage the learner saved from a question.
 @immutable
-class StudyHighlight {
-  const StudyHighlight({
+class Note {
+  const Note({
     required this.id,
     required this.sessionId,
     required this.questionId,
@@ -736,7 +737,7 @@ class StudyHighlight {
   bool get needsReview => !isKept && !hasCard;
 }
 
-/// One atomic front/back card proposed by the AI for a saved highlight.
+/// One atomic front/back card proposed by the AI for a saved note.
 @immutable
 class SuggestedCard {
   const SuggestedCard({

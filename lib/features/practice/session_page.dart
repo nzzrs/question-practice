@@ -19,7 +19,7 @@ enum _ExitChoice { save, discard }
 
 enum _FinishChoice { leaveUnanswered, markSkipped }
 
-enum _HighlightAction { define, ask, delete }
+enum _NoteAction { define, ask, delete }
 
 class SessionPage extends ConsumerStatefulWidget {
   const SessionPage({required this.start, super.key});
@@ -36,7 +36,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   SessionQuestionItem? _item;
   int _index = 0;
   final _selectedIndexes = <int>{};
-  final _highlights = <int, List<StudyHighlight>>{};
+  final _notes = <int, List<Note>>{};
   final _mistakeKinds = <MistakeKind>{};
   bool _submitted = false;
   bool _submitting = false;
@@ -63,26 +63,26 @@ class _SessionPageState extends ConsumerState<SessionPage>
         : _start.currentIndex.clamp(0, _start.items.length - 1).toInt();
     _item = _start.items.isEmpty ? null : _start.items[_index];
     _loadQuestionState();
-    unawaited(_loadHighlights());
+    unawaited(_loadNotes());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_item == null) _finishExisting();
     });
   }
 
-  Future<void> _loadHighlights() async {
+  Future<void> _loadNotes() async {
     try {
       final repository = ref.read(cardRepositoryProvider);
-      final byQuestion = <int, List<StudyHighlight>>{};
+      final byQuestion = <int, List<Note>>{};
       final loaded = <int>{};
       for (final item in _start.items) {
         final questionId = item.question.id;
         if (!loaded.add(questionId)) continue;
-        final highlights = await repository.highlightsForQuestion(questionId);
-        if (highlights.isNotEmpty) byQuestion[questionId] = highlights;
+        final notes = await repository.notesForQuestion(questionId);
+        if (notes.isNotEmpty) byQuestion[questionId] = notes;
       }
       if (!mounted) return;
       setState(() {
-        _highlights
+        _notes
           ..clear()
           ..addAll(byQuestion);
       });
@@ -93,42 +93,39 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
   }
 
-  List<String> _highlightTexts(int questionId) => [
-    for (final highlight in _highlights[questionId] ?? const <StudyHighlight>[])
-      highlight.text,
+  List<String> _noteTexts(int questionId) => [
+    for (final note in _notes[questionId] ?? const <Note>[]) note.text,
   ];
 
-  Future<void> _reloadHighlights(int questionId) async {
-    final highlights = await ref
+  Future<void> _reloadNotes(int questionId) async {
+    final notes = await ref
         .read(cardRepositoryProvider)
-        .highlightsForQuestion(questionId);
+        .notesForQuestion(questionId);
     if (!mounted) return;
     setState(() {
-      if (highlights.isEmpty) {
-        _highlights.remove(questionId);
+      if (notes.isEmpty) {
+        _notes.remove(questionId);
       } else {
-        _highlights[questionId] = highlights;
+        _notes[questionId] = notes;
       }
     });
   }
 
-  Future<void> _addHighlight(String selection, Rect? anchor) async {
+  Future<void> _addNote(String selection, Rect? anchor) async {
     final item = _item;
     if (item == null) return;
     final text = selection.trim();
     if (text.isEmpty) return;
     final lowered = text.toLowerCase();
-    final existing = _highlights[item.question.id] ?? const <StudyHighlight>[];
-    if (existing.any(
-      (highlight) => highlight.text.trim().toLowerCase() == lowered,
-    )) {
+    final existing = _notes[item.question.id] ?? const <Note>[];
+    if (existing.any((note) => note.text.trim().toLowerCase() == lowered)) {
       await showSnack(context, 'That phrase is already saved as a note.');
       return;
     }
     try {
       await ref
           .read(cardRepositoryProvider)
-          .createHighlight(
+          .createNote(
             sessionId: _start.session.id,
             questionId: item.question.id,
             text: text,
@@ -139,7 +136,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
             createdAt: ref.read(clockProvider).now().toUtc(),
           );
       if (!mounted) return;
-      await _reloadHighlights(item.question.id);
+      await _reloadNotes(item.question.id);
       if (!mounted) return;
       await showSnack(context, 'Note saved. It is ready in the review.');
     } on Object catch (error) {
@@ -149,30 +146,28 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
   }
 
-  Future<void> _deleteHighlight(int questionId, String phrase) async {
+  Future<void> _deleteNote(int questionId, String phrase) async {
     final lowered = phrase.trim().toLowerCase();
     final matches = [
-      for (final highlight
-          in _highlights[questionId] ?? const <StudyHighlight>[])
-        if (highlight.text.trim().toLowerCase() == lowered) highlight,
+      for (final note in _notes[questionId] ?? const <Note>[])
+        if (note.text.trim().toLowerCase() == lowered) note,
     ];
     if (matches.isEmpty) return;
     try {
-      await ref.read(cardRepositoryProvider).deleteHighlights([
-        for (final highlight in matches) highlight.id,
+      await ref.read(cardRepositoryProvider).deleteNotes([
+        for (final note in matches) note.id,
       ]);
       if (!mounted) return;
-      final removed = {for (final highlight in matches) highlight.id};
+      final removed = {for (final note in matches) note.id};
       setState(() {
         final remaining = [
-          for (final highlight
-              in _highlights[questionId] ?? const <StudyHighlight>[])
-            if (!removed.contains(highlight.id)) highlight,
+          for (final note in _notes[questionId] ?? const <Note>[])
+            if (!removed.contains(note.id)) note,
         ];
         if (remaining.isEmpty) {
-          _highlights.remove(questionId);
+          _notes.remove(questionId);
         } else {
-          _highlights[questionId] = remaining;
+          _notes[questionId] = remaining;
         }
       });
       await showSnack(context, 'Note deleted.');
@@ -183,7 +178,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     }
   }
 
-  Future<void> _openHighlightActions(String phrase) async {
+  Future<void> _openNoteActions(String phrase) async {
     final item = _item;
     if (item == null) return;
     var aiAvailable = ref.read(hasApiKeyProvider).value;
@@ -195,20 +190,20 @@ class _SessionPageState extends ConsumerState<SessionPage>
       }
     }
     if (!mounted) return;
-    final action = await M3EBottomSheet.show<_HighlightAction>(
+    final action = await M3EBottomSheet.show<_NoteAction>(
       context,
       initialValue: M3EBottomSheetValue.expanded,
       builder: (context) =>
-          _HighlightActionsSheet(phrase: phrase, showAsk: aiAvailable ?? false),
+          _NoteActionsSheet(phrase: phrase, showAsk: aiAvailable ?? false),
     );
     if (action == null || !mounted) return;
     switch (action) {
-      case _HighlightAction.define:
+      case _NoteAction.define:
         await _openLookup(phrase, null);
-      case _HighlightAction.ask:
+      case _NoteAction.ask:
         await _openAsk(phrase, null);
-      case _HighlightAction.delete:
-        await _deleteHighlight(item.question.id, phrase);
+      case _NoteAction.delete:
+        await _deleteNote(item.question.id, phrase);
     }
   }
 
@@ -733,10 +728,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
                   ),
                   onDefine: _openLookup,
                   onOpenUrl: _openUrl,
-                  onHighlight: _addHighlight,
+                  onNote: _addNote,
                   onAsk: _openAsk,
-                  onHighlightTap: _openHighlightActions,
-                  highlights: _highlightTexts(item.question.id),
+                  onNoteTap: _openNoteActions,
+                  notes: _noteTexts(item.question.id),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -780,10 +775,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
                           : '',
                       onDefine: _openLookup,
                       onOpenUrl: _openUrl,
-                      onHighlight: _addHighlight,
+                      onNote: _addNote,
                       onAsk: _openAsk,
-                      onHighlightTap: _openHighlightActions,
-                      highlights: _highlightTexts(item.question.id),
+                      onNoteTap: _openNoteActions,
+                      notes: _noteTexts(item.question.id),
                       onPressed: _submitted
                           ? null
                           : () => setState(() {
@@ -822,10 +817,10 @@ class _SessionPageState extends ConsumerState<SessionPage>
                           ),
                           onDefine: _openLookup,
                           onOpenUrl: _openUrl,
-                          onHighlight: _addHighlight,
+                          onNote: _addNote,
                           onAsk: _openAsk,
-                          onHighlightTap: _openHighlightActions,
-                          highlights: _highlightTexts(item.question.id),
+                          onNoteTap: _openNoteActions,
+                          notes: _noteTexts(item.question.id),
                         ),
                       ],
                     ),
@@ -1126,8 +1121,8 @@ class _MistakeChips extends StatelessWidget {
   }
 }
 
-class _HighlightActionsSheet extends StatelessWidget {
-  const _HighlightActionsSheet({required this.phrase, required this.showAsk});
+class _NoteActionsSheet extends StatelessWidget {
+  const _NoteActionsSheet({required this.phrase, required this.showAsk});
 
   final String phrase;
   final bool showAsk;
@@ -1167,21 +1162,21 @@ class _HighlightActionsSheet extends StatelessWidget {
               icon: Icons.menu_book_outlined,
               title: 'Define',
               subtitle: 'Look up this phrase',
-              onTap: () => Navigator.of(context).pop(_HighlightAction.define),
+              onTap: () => Navigator.of(context).pop(_NoteAction.define),
             ),
             if (showAsk)
               OptionTile(
                 icon: Icons.auto_awesome_outlined,
                 title: 'Ask',
                 subtitle: 'Ask the configured AI about this passage',
-                onTap: () => Navigator.of(context).pop(_HighlightAction.ask),
+                onTap: () => Navigator.of(context).pop(_NoteAction.ask),
               ),
             OptionTile(
               icon: Icons.delete_outline,
               title: 'Delete note',
               subtitle: 'Remove it everywhere for this question',
               destructive: true,
-              onTap: () => Navigator.of(context).pop(_HighlightAction.delete),
+              onTap: () => Navigator.of(context).pop(_NoteAction.delete),
             ),
           ],
         ),
@@ -1374,10 +1369,10 @@ class _OptionCard extends StatefulWidget {
     required this.explanation,
     required this.onDefine,
     required this.onOpenUrl,
-    required this.onHighlight,
+    required this.onNote,
     required this.onAsk,
-    required this.onHighlightTap,
-    required this.highlights,
+    required this.onNoteTap,
+    required this.notes,
     required this.onPressed,
     super.key,
   });
@@ -1392,10 +1387,10 @@ class _OptionCard extends StatefulWidget {
   final String explanation;
   final void Function(String selection, Rect? anchor) onDefine;
   final ValueChanged<String> onOpenUrl;
-  final Future<void> Function(String selection, Rect? anchor) onHighlight;
+  final Future<void> Function(String selection, Rect? anchor) onNote;
   final Future<void> Function(String selection, Rect? anchor) onAsk;
-  final ValueChanged<String> onHighlightTap;
-  final List<String> highlights;
+  final ValueChanged<String> onNoteTap;
+  final List<String> notes;
   final VoidCallback? onPressed;
 
   @override
@@ -1562,10 +1557,10 @@ class _OptionCardState extends State<_OptionCard> {
                           ),
                           onDefine: widget.onDefine,
                           onOpenUrl: widget.onOpenUrl,
-                          onHighlight: widget.onHighlight,
+                          onNote: widget.onNote,
                           onAsk: widget.onAsk,
-                          onHighlightTap: widget.onHighlightTap,
-                          highlights: widget.highlights,
+                          onNoteTap: widget.onNoteTap,
+                          notes: widget.notes,
                         ),
                         if (widget.submitted &&
                             widget.explanation.isNotEmpty &&
@@ -1579,10 +1574,10 @@ class _OptionCardState extends State<_OptionCard> {
                             ),
                             onDefine: widget.onDefine,
                             onOpenUrl: widget.onOpenUrl,
-                            onHighlight: widget.onHighlight,
+                            onNote: widget.onNote,
                             onAsk: widget.onAsk,
-                            onHighlightTap: widget.onHighlightTap,
-                            highlights: widget.highlights,
+                            onNoteTap: widget.onNoteTap,
+                            notes: widget.notes,
                           ),
                         ],
                       ],

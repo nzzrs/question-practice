@@ -4,17 +4,17 @@ import 'package:flutter/gestures.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Selectable text with Define and Highlight actions, plus tappable links.
+/// Selectable text with Define and Save as note actions, plus tappable links.
 class SelectableLinkifiedText extends StatefulWidget {
   const SelectableLinkifiedText({
     required this.text,
     required this.style,
     required this.onDefine,
     required this.onOpenUrl,
-    this.onHighlight,
+    this.onNote,
     this.onAsk,
-    this.onHighlightTap,
-    this.highlights = const [],
+    this.onNoteTap,
+    this.notes = const [],
     this.selectable = true,
     super.key,
   });
@@ -24,17 +24,17 @@ class SelectableLinkifiedText extends StatefulWidget {
   final void Function(String selection, Rect? anchor) onDefine;
   final ValueChanged<String> onOpenUrl;
 
-  /// Saves the selected phrase as a highlight.
-  final Future<void> Function(String selection, Rect? anchor)? onHighlight;
+  /// Saves the selected phrase as a note.
+  final Future<void> Function(String selection, Rect? anchor)? onNote;
 
   /// Asks the configured AI about the selected phrase.
   final Future<void> Function(String selection, Rect? anchor)? onAsk;
 
-  /// Called with the saved phrase when a painted highlight is tapped.
-  final ValueChanged<String>? onHighlightTap;
+  /// Called with the saved phrase when a note is tapped.
+  final ValueChanged<String>? onNoteTap;
 
-  /// Phrases painted with a highlight background inside [text].
-  final List<String> highlights;
+  /// Phrases shown with a note tint inside [text].
+  final List<String> notes;
   final bool selectable;
 
   @override
@@ -45,7 +45,7 @@ class SelectableLinkifiedText extends StatefulWidget {
 class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   static final _urlPattern = RegExp(r'https?://[^\s<>"`]+');
   final _urlRecognizers = <TapGestureRecognizer>[];
-  final _highlightHits = <_HighlightHit>[];
+  final _noteHits = <_NoteHit>[];
   String _selectedText = '';
 
   @override
@@ -58,8 +58,8 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   void didUpdateWidget(SelectableLinkifiedText oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.text != widget.text ||
-        !_sameHighlights(oldWidget.highlights, widget.highlights) ||
-        oldWidget.onHighlightTap != widget.onHighlightTap) {
+        !_sameNotes(oldWidget.notes, widget.notes) ||
+        oldWidget.onNoteTap != widget.onNoteTap) {
       _syncRecognizers();
     }
   }
@@ -75,10 +75,10 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
       recognizer.dispose();
     }
     _urlRecognizers.clear();
-    for (final hit in _highlightHits) {
+    for (final hit in _noteHits) {
       hit.recognizer?.dispose();
     }
-    _highlightHits.clear();
+    _noteHits.clear();
   }
 
   void _syncRecognizers() {
@@ -89,10 +89,10 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
         ..onTap = () => widget.onOpenUrl(url);
       _urlRecognizers.add(recognizer);
     }
-    final onTap = widget.onHighlightTap;
+    final onTap = widget.onNoteTap;
     final haystack = widget.text.toLowerCase();
-    for (final highlight in widget.highlights) {
-      final needle = highlight.trim().toLowerCase();
+    for (final note in widget.notes) {
+      final needle = note.trim().toLowerCase();
       if (needle.isEmpty) continue;
       var from = 0;
       while (from < haystack.length) {
@@ -104,13 +104,13 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
           final phrase = widget.text.substring(index, end);
           recognizer = TapGestureRecognizer()..onTap = () => onTap(phrase);
         }
-        _highlightHits.add(_HighlightHit(index, end, recognizer));
+        _noteHits.add(_NoteHit(index, end, recognizer));
         from = end;
       }
     }
   }
 
-  static bool _sameHighlights(List<String> a, List<String> b) {
+  static bool _sameNotes(List<String> a, List<String> b) {
     if (identical(a, b)) return true;
     if (a.length != b.length) return false;
     for (var index = 0; index < a.length; index++) {
@@ -124,13 +124,13 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
     final theme = M3ETheme.of(context);
     final text = widget.text;
     final urlMatches = _urlPattern.allMatches(text).toList();
-    final highlightRanges = _highlightRanges();
+    final noteRanges = _noteRanges();
     final urlRanges = [
       for (final match in urlMatches) (match.start, match.end),
     ];
 
     final cuts = <int>{0, text.length};
-    for (final (start, end) in [...urlRanges, ...highlightRanges]) {
+    for (final (start, end) in [...urlRanges, ...noteRanges]) {
       if (start > 0 && start < text.length) cuts.add(start);
       if (end > 0 && end < text.length) cuts.add(end);
     }
@@ -145,10 +145,10 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
       final urlIndex = urlRanges.indexWhere(
         (range) => range.$1 <= start && end <= range.$2,
       );
-      final highlightIndex = _highlightHits.indexWhere(
+      final noteIndex = _noteHits.indexWhere(
         (hit) => hit.start <= start && end <= hit.end,
       );
-      final highlighted = highlightIndex >= 0;
+      final isNote = noteIndex >= 0;
       TextStyle? style;
       if (urlIndex >= 0) {
         style = widget.style.copyWith(
@@ -157,7 +157,7 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
           decorationColor: theme.colorScheme.primary,
         );
       }
-      if (highlighted) {
+      if (isNote) {
         style = (style ?? widget.style).copyWith(
           backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.18),
         );
@@ -166,9 +166,7 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
           ? (urlIndex < _urlRecognizers.length
                 ? _urlRecognizers[urlIndex]
                 : null)
-          : (highlightIndex >= 0
-                ? _highlightHits[highlightIndex].recognizer
-                : null);
+          : (noteIndex >= 0 ? _noteHits[noteIndex].recognizer : null);
       spans.add(TextSpan(text: chunk, style: style, recognizer: recognizer));
     }
 
@@ -222,13 +220,13 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
                   );
                 },
               ),
-            if (selected.isNotEmpty && widget.onHighlight != null)
+            if (selected.isNotEmpty && widget.onNote != null)
               ContextMenuButtonItem(
                 label: 'Save as note',
                 onPressed: () {
                   state.hideToolbar();
                   unawaited(
-                    widget.onHighlight!(
+                    widget.onNote!(
                       selected,
                       Rect.fromLTWH(
                         state.contextMenuAnchors.primaryAnchor.dx,
@@ -247,9 +245,9 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
     );
   }
 
-  List<(int, int)> _highlightRanges() {
+  List<(int, int)> _noteRanges() {
     final ranges = <(int, int)>[
-      for (final hit in _highlightHits) (hit.start, hit.end),
+      for (final hit in _noteHits) (hit.start, hit.end),
     ];
     ranges.sort((a, b) => a.$1.compareTo(b.$1));
     final merged = <(int, int)>[];
@@ -264,8 +262,8 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   }
 }
 
-class _HighlightHit {
-  const _HighlightHit(this.start, this.end, this.recognizer);
+class _NoteHit {
+  const _NoteHit(this.start, this.end, this.recognizer);
 
   final int start;
   final int end;

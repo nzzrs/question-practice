@@ -29,7 +29,7 @@ void refreshDataProviders(WidgetRef ref) {
   ref.invalidate(manualCardsProvider);
   ref.invalidate(allManualCardsProvider);
   ref.invalidate(skippedQuestionsProvider);
-  ref.invalidate(highlightsProvider);
+  ref.invalidate(notesProvider);
   ref.invalidate(inProgressSessionProvider);
   ref.invalidate(inProgressSessionsProvider);
 }

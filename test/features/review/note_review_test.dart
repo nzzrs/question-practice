@@ -30,8 +30,8 @@ void main() {
     await harness.close();
   });
 
-  Future<int> seedHighlight(SessionStart start, int questionId) {
-    return harness.cards.createHighlight(
+  Future<int> seedNote(SessionStart start, int questionId) {
+    return harness.cards.createNote(
       sessionId: start.session.id,
       questionId: questionId,
       text: 'managed service',
@@ -42,33 +42,7 @@ void main() {
     );
   }
 
-  test(
-    'highlights wait in the review and keeping one closes the step',
-    () async {
-      final practice = await harness.seedPractice(count: 1);
-      final start = await sessions.startPractice(practice.practiceId);
-      await sessions.submitAnswer(
-        start: start,
-        item: start.items.single,
-        selectedIndexes: const [0],
-        reasoning: '',
-        distracted: false,
-      );
-      await seedHighlight(start, start.items.single.question.id);
-
-      final data = await review.load(start.session.id);
-      final step = data!.steps.whereType<HighlightReviewStep>().single;
-      expect(step.highlight.text, 'managed service');
-
-      await review.keepHighlight(step.highlight.id);
-      final after = await review.load(start.session.id);
-      expect(after!.steps.whereType<HighlightReviewStep>(), isEmpty);
-      final saved = await harness.cards.highlightsForSession(start.session.id);
-      expect(saved.single.isKept, isTrue);
-    },
-  );
-
-  test('a highlight can become a concept card', () async {
+  test('notes wait in the review and keeping one closes the step', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await sessions.startPractice(practice.practiceId);
     await sessions.submitAnswer(
@@ -78,34 +52,54 @@ void main() {
       reasoning: '',
       distracted: false,
     );
-    final highlightId = await seedHighlight(
-      start,
-      start.items.single.question.id,
-    );
+    await seedNote(start, start.items.single.question.id);
+
     final data = await review.load(start.session.id);
-    final step = data!.steps.whereType<HighlightReviewStep>().single;
+    final step = data!.steps.whereType<NoteReviewStep>().single;
+    expect(step.note.text, 'managed service');
+
+    await review.keepNote(step.note.id);
+    final after = await review.load(start.session.id);
+    expect(after!.steps.whereType<NoteReviewStep>(), isEmpty);
+    final saved = await harness.cards.notesForSession(start.session.id);
+    expect(saved.single.isKept, isTrue);
+  });
+
+  test('a note can become a concept card', () async {
+    final practice = await harness.seedPractice(count: 1);
+    final start = await sessions.startPractice(practice.practiceId);
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items.single,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    final noteId = await seedNote(start, start.items.single.question.id);
+    final data = await review.load(start.session.id);
+    final step = data!.steps.whereType<NoteReviewStep>().single;
 
     await review.createConcept(
       sessionId: start.session.id,
-      questionId: step.highlight.questionId,
-      term: step.highlight.text,
+      questionId: step.note.questionId,
+      term: step.note.text,
       definition: 'A cloud service run by the provider.',
-      context: step.highlight.context,
-      topicName: step.highlight.topicName,
+      context: step.note.context,
+      topicName: step.note.topicName,
       source: ConceptSource.manual,
     );
-    await review.markHighlightConverted(step.highlight.id);
+    await review.markNoteConverted(step.note.id);
 
     final concepts = await harness.cards.watchConcepts().first;
     expect(concepts.single.term, 'managed service');
-    final saved = await harness.cards.highlightsForSession(start.session.id);
+    final saved = await harness.cards.notesForSession(start.session.id);
     expect(saved.single.hasCard, isTrue);
     final after = await review.load(start.session.id);
-    expect(after!.steps.whereType<HighlightReviewStep>(), isEmpty);
-    expect(highlightId, step.highlight.id);
+    expect(after!.steps.whereType<NoteReviewStep>(), isEmpty);
+    expect(noteId, step.note.id);
   });
 
-  test('deleting a highlight removes it from the review', () async {
+  test('deleting a note removes it from the review', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await sessions.startPractice(practice.practiceId);
     await sessions.submitAnswer(
@@ -115,10 +109,10 @@ void main() {
       reasoning: '',
       distracted: false,
     );
-    final id = await seedHighlight(start, start.items.single.question.id);
-    await harness.cards.deleteHighlight(id);
+    final id = await seedNote(start, start.items.single.question.id);
+    await harness.cards.deleteNote(id);
 
     final data = await review.load(start.session.id);
-    expect(data!.steps.whereType<HighlightReviewStep>(), isEmpty);
+    expect(data!.steps.whereType<NoteReviewStep>(), isEmpty);
   });
 }

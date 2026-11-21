@@ -35,7 +35,7 @@ class BackupInfo {
     required this.errorCards,
     required this.manualCards,
     this.skippedQuestions = 0,
-    this.highlights = 0,
+    this.notes = 0,
     this.archivedTopics = 0,
     this.formatVersion = 1,
     this.appVersion,
@@ -54,7 +54,7 @@ class BackupInfo {
   final int errorCards;
   final int manualCards;
   final int skippedQuestions;
-  final int highlights;
+  final int notes;
   final int archivedTopics;
 
   /// Format of the file this information came from.
@@ -81,8 +81,8 @@ class BackupInfo {
     if (skippedQuestions > 0) {
       buffer.write(', $skippedQuestions skipped questions');
     }
-    if (highlights > 0) {
-      buffer.write(', $highlights notes');
+    if (notes > 0) {
+      buffer.write(', $notes notes');
     }
     return buffer.toString();
   }
@@ -105,7 +105,7 @@ class BackupService {
       _clock = clock;
 
   /// Format written by this version of the app.
-  static const formatVersion = 2;
+  static const formatVersion = 3;
 
   /// Oldest format this app can still read.
   static const minimumFormatVersion = 1;
@@ -135,7 +135,7 @@ class BackupService {
   };
 
   /// Tables added after the first backup format.
-  static const optionalTables = <String>{'skippedQuestions', 'highlights'};
+  static const optionalTables = <String>{'skippedQuestions', 'notes'};
 
   final AppDatabase _db;
   final Clock _clock;
@@ -221,8 +221,8 @@ class BackupService {
           batch.insertAll(_db.skippedQuestions, [
             for (final row in backup.skippedQuestions) row.toCompanion(false),
           ]);
-          batch.insertAll(_db.highlights, [
-            for (final row in backup.highlights) row.toCompanion(false),
+          batch.insertAll(_db.notes, [
+            for (final row in backup.notes) row.toCompanion(false),
           ]);
           batch.insertAll(_db.settings, [
             for (final row in backup.settings) row.toCompanion(false),
@@ -277,7 +277,7 @@ class BackupService {
     final errorCards = await _db.select(_db.errorCards).get();
     final manualCards = await _db.select(_db.manualCards).get();
     final skippedQuestions = await _db.select(_db.skippedQuestions).get();
-    final highlights = await _db.select(_db.highlights).get();
+    final notes = await _db.select(_db.notes).get();
     final settings = await _db.select(_db.settings).get();
 
     return <String, dynamic>{
@@ -291,7 +291,7 @@ class BackupService {
       'errorCards': [for (final row in errorCards) row.toJson()],
       'manualCards': [for (final row in manualCards) row.toJson()],
       'skippedQuestions': [for (final row in skippedQuestions) row.toJson()],
-      'highlights': [for (final row in highlights) row.toJson()],
+      'notes': [for (final row in notes) row.toJson()],
       'settings': [for (final row in settings) row.toJson()],
     };
   }
@@ -360,7 +360,7 @@ class BackupService {
       errorCards: content.errorCards.length,
       manualCards: content.manualCards.length,
       skippedQuestions: content.skippedQuestions.length,
-      highlights: content.highlights.length,
+      notes: content.notes.length,
       archivedTopics: content.topics.where((row) => row.archived).length,
       formatVersion: version,
       appVersion: _stringOrNull(metadata['appVersion']),
@@ -422,6 +422,13 @@ class BackupService {
         'schema ${_db.schemaVersion}. Update the app and try again.',
       );
     }
+  }
+
+  /// New files store notes under `notes`; v1 and v2 files used `highlights`.
+  String _noteTableKey(Map<String, dynamic> tables) {
+    if (tables.containsKey('notes')) return 'notes';
+    if (tables.containsKey('highlights')) return 'highlights';
+    return 'notes';
   }
 
   _BackupContent _readContent(Map<String, dynamic> tables) {
@@ -497,11 +504,11 @@ class BackupService {
         parse: _skippedQuestion,
         identities: (row) => ['id ${row.id}'],
       ),
-      highlights: _readRows<HighlightRow>(
+      notes: _readRows<NoteRow>(
         tables,
-        'highlights',
+        _noteTableKey(tables),
         optional: true,
-        parse: _highlight,
+        parse: _note,
         identities: (row) => ['id ${row.id}'],
       ),
       settings: _readRows<SettingRow>(
@@ -737,31 +744,19 @@ class BackupService {
         );
       }
     }
-    for (final row in content.highlights) {
+    for (final row in content.notes) {
       final sessionId = row.sessionId;
       final questionId = row.questionId;
       final manualCardId = row.manualCardId;
       if (sessionId != null) {
-        _requireReference(
-          'highlights',
-          row.id,
-          'session',
-          sessionId,
-          sessionIds,
-        );
+        _requireReference('notes', row.id, 'session', sessionId, sessionIds);
       }
       if (questionId != null) {
-        _requireReference(
-          'highlights',
-          row.id,
-          'question',
-          questionId,
-          questionIds,
-        );
+        _requireReference('notes', row.id, 'question', questionId, questionIds);
       }
       if (manualCardId != null) {
         _requireReference(
-          'highlights',
+          'notes',
           row.id,
           'manual card',
           manualCardId,
@@ -967,12 +962,12 @@ class BackupService {
     );
   }
 
-  HighlightRow _highlight(_Row row) {
-    return HighlightRow(
+  NoteRow _note(_Row row) {
+    return NoteRow(
       id: row.requireInt('id'),
       sessionId: row.optionalInt('sessionId'),
       questionId: row.optionalInt('questionId'),
-      phrase: row.requireString('phrase'),
+      noteText: row.requireStringAny(const ['text', 'phrase']),
       context: row.stringOr('context', ''),
       topicName: row.stringOr('topicName', ''),
       subtopic: row.stringOr('subtopic', ''),
@@ -1027,6 +1022,15 @@ class _Row {
     final value = _json[field];
     if (value is! String) _fail(field, 'a string');
     return value;
+  }
+
+  /// Reads the first field present, used where older files used another name.
+  String requireStringAny(List<String> fields) {
+    for (final field in fields) {
+      if (!_json.containsKey(field)) continue;
+      return requireString(field);
+    }
+    _fail(fields.last, 'a string');
   }
 
   String stringOr(String field, String fallback) {
@@ -1165,7 +1169,7 @@ class _BackupTables {
   List<ErrorCardRow> get errorCards => content.errorCards;
   List<ManualCardRow> get manualCards => content.manualCards;
   List<SkippedQuestionRow> get skippedQuestions => content.skippedQuestions;
-  List<HighlightRow> get highlights => content.highlights;
+  List<NoteRow> get notes => content.notes;
   List<SettingRow> get settings => content.settings;
 }
 
@@ -1181,7 +1185,7 @@ class _BackupContent {
     required this.errorCards,
     required this.manualCards,
     required this.skippedQuestions,
-    required this.highlights,
+    required this.notes,
     required this.settings,
   });
 
@@ -1195,6 +1199,6 @@ class _BackupContent {
   final List<ErrorCardRow> errorCards;
   final List<ManualCardRow> manualCards;
   final List<SkippedQuestionRow> skippedQuestions;
-  final List<HighlightRow> highlights;
+  final List<NoteRow> notes;
   final List<SettingRow> settings;
 }

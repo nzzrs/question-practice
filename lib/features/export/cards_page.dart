@@ -8,11 +8,11 @@ import '../../core/ui/widgets.dart';
 import '../errors/error_cards_review_page.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
-import '../review/highlight_review_page.dart';
+import '../review/note_review_page.dart';
 import '../review/skipped_question_view.dart';
 import 'domain/anki_note_builder.dart';
 
-enum _Filter { all, facts, heuristics, contrasts, concepts, errors, highlights }
+enum _Filter { all, facts, heuristics, contrasts, concepts, errors, notes }
 
 class CardsPage extends ConsumerStatefulWidget {
   const CardsPage({super.key});
@@ -26,7 +26,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   final _selectedErrors = <int>{};
   final _selectedBasic = <int>{};
   final _selectedSkipped = <int>{};
-  final _selectedHighlights = <int>{};
+  final _selectedNotes = <int>{};
   bool _selectionActive = false;
   bool _initialized = false;
   bool _busy = false;
@@ -38,7 +38,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _selectedErrors.isNotEmpty ||
       _selectedBasic.isNotEmpty ||
       _selectedSkipped.isNotEmpty ||
-      _selectedHighlights.isNotEmpty;
+      _selectedNotes.isNotEmpty;
 
   void _clearSelection() {
     setState(() {
@@ -47,7 +47,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _selectedErrors.clear();
       _selectedBasic.clear();
       _selectedSkipped.clear();
-      _selectedHighlights.clear();
+      _selectedNotes.clear();
     });
   }
 
@@ -108,7 +108,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final errorsAsync = ref.watch(allErrorCardsProvider);
     final manualsAsync = ref.watch(allManualCardsProvider);
     final skippedAsync = ref.watch(skippedQuestionsProvider);
-    final highlightsAsync = ref.watch(highlightsProvider);
+    final notesAsync = ref.watch(notesProvider);
     final topicSummaries = ref.watch(topicSummariesProvider).value ?? const [];
     final defaultDeck =
         ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
@@ -129,7 +129,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final allErrors = errorsAsync.value ?? const <ErrorCard>[];
     final allManuals = manualsAsync.value ?? const <ManualCard>[];
     final skipped = skippedAsync.value ?? const <SkippedQuestion>[];
-    final highlights = highlightsAsync.value ?? const <StudyHighlight>[];
+    final notes = notesAsync.value ?? const <Note>[];
     final concepts = _showExported
         ? allConcepts
         : allConcepts.where((item) => item.exportedAt == null).toList();
@@ -142,8 +142,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
     final showConcepts = _filter == _Filter.all || _filter == _Filter.concepts;
     final showErrors = _filter == _Filter.all || _filter == _Filter.errors;
-    final showHighlights =
-        _filter == _Filter.all || _filter == _Filter.highlights;
+    final showNotes = _filter == _Filter.all || _filter == _Filter.notes;
     final manualType = switch (_filter) {
       _Filter.facts => CognitiveType.fact,
       _Filter.heuristics => CognitiveType.heuristic,
@@ -181,15 +180,15 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         errorsAsync.isLoading ||
         manualsAsync.isLoading ||
         skippedAsync.isLoading ||
-        highlightsAsync.isLoading;
+        notesAsync.isLoading;
     final selectedErrorCards = errors
         .where((card) => _selectedErrors.contains(card.id))
         .toList();
     final selectedSkipped = skipped
         .where((question) => _selectedSkipped.contains(question.id))
         .toList();
-    final selectedHighlights = highlights
-        .where((highlight) => _selectedHighlights.contains(highlight.id))
+    final selectedNotes = notes
+        .where((note) => _selectedNotes.contains(note.id))
         .toList();
     final selectableErrors = errors
         .where((card) => card.exportedAt == null)
@@ -203,18 +202,18 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         selection.total +
         selectedErrorCards.length +
         selectedSkipped.length +
-        selectedHighlights.length;
+        selectedNotes.length;
     final hasVisibleRows =
         (showConcepts && concepts.isNotEmpty) ||
         (showErrors && (errors.isNotEmpty || skipped.isNotEmpty)) ||
         (showManuals && visibleManuals.isNotEmpty) ||
-        (showHighlights && highlights.isNotEmpty);
+        (showNotes && notes.isNotEmpty);
     final hasAnyRows =
         concepts.isNotEmpty ||
         errors.isNotEmpty ||
         manuals.isNotEmpty ||
         skipped.isNotEmpty ||
-        highlights.isNotEmpty;
+        notes.isNotEmpty;
     final subtitle = selectedCount == 0
         ? 'Ready for AnkiDroid'
         : selection.total == 0
@@ -283,7 +282,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             allErrors.isEmpty &&
             allManuals.isEmpty &&
             skipped.isEmpty &&
-            highlights.isEmpty)
+            notes.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 64),
             child: Center(child: M3ELoadingIndicator()),
@@ -485,13 +484,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             const SizedBox(height: 28),
           ],
-          if (showHighlights && highlights.isNotEmpty) ...[
+          if (showNotes && notes.isNotEmpty) ...[
             SectionTitle(
               'Notes',
-              count: highlights.length,
+              count: notes.length,
               supporting: 'Plain text only. Notes are never sent to AnkiDroid.',
               trailing: M3EButton.text(
-                onPressed: _busy ? null : () => _downloadHighlights(highlights),
+                onPressed: _busy ? null : () => _downloadNotes(notes),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -507,8 +506,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               runSpacing: 8,
               children: [
                 M3EButton.tonal(
-                  key: const ValueKey('review-highlights'),
-                  onPressed: () => _reviewHighlights(highlights),
+                  key: const ValueKey('review-notes'),
+                  onPressed: () => _reviewNotes(notes),
                   icon: const Icon(Icons.rate_review_outlined),
                   label: const Text('Review notes'),
                 ),
@@ -517,21 +516,18 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             const SizedBox(height: 12),
             AppGroup(
               children: [
-                for (final highlight in highlights)
-                  _HighlightRow(
-                    key: ValueKey('highlight-row-${highlight.id}'),
-                    highlight: highlight,
-                    selected: _selectedHighlights.contains(highlight.id),
+                for (final note in notes)
+                  _NoteRow(
+                    key: ValueKey('note-row-${note.id}'),
+                    note: note,
+                    selected: _selectedNotes.contains(note.id),
                     onTap: () => _handleRowTap(
-                      _selectedHighlights,
-                      highlight.id,
-                      () => _reviewHighlights(
-                        highlights,
-                        initialHighlightId: highlight.id,
-                      ),
+                      _selectedNotes,
+                      note.id,
+                      () => _reviewNotes(notes, initialNoteId: note.id),
                     ),
                     onLongPress: () =>
-                        _handleRowLongPress(_selectedHighlights, highlight.id),
+                        _handleRowLongPress(_selectedNotes, note.id),
                   ),
               ],
             ),
@@ -679,7 +675,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           errorCardIds: _selectedErrors.toList(),
           manualCardIds: _selectedBasic.toList(),
           skippedQuestionIds: _selectedSkipped.toList(),
-          highlightIds: _selectedHighlights.toList(),
+          noteIds: _selectedNotes.toList(),
         );
     setState(() {
       _selectionActive = false;
@@ -687,7 +683,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _selectedErrors.clear();
       _selectedBasic.clear();
       _selectedSkipped.clear();
-      _selectedHighlights.clear();
+      _selectedNotes.clear();
     });
     if (mounted) await showSnack(context, 'Cards deleted.');
   }
@@ -904,26 +900,21 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     return Wrap(spacing: 6, runSpacing: 4, children: children);
   }
 
-  Future<void> _reviewHighlights(
-    List<StudyHighlight> highlights, {
-    int? initialHighlightId,
-  }) async {
-    if (highlights.isEmpty) return;
+  Future<void> _reviewNotes(List<Note> notes, {int? initialNoteId}) async {
+    if (notes.isEmpty) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         fullscreenDialog: true,
-        builder: (context) => HighlightReviewPage(
-          highlights: highlights,
-          initialHighlightId: initialHighlightId,
-        ),
+        builder: (context) =>
+            NoteReviewPage(notes: notes, initialNoteId: initialNoteId),
       ),
     );
   }
 
-  Future<void> _downloadHighlights(List<StudyHighlight> highlights) async {
+  Future<void> _downloadNotes(List<Note> notes) async {
     setState(() => _busy = true);
     try {
-      await ref.read(exportServiceProvider).shareHighlights(highlights);
+      await ref.read(exportServiceProvider).shareNotes(notes);
     } on Object catch (error) {
       if (mounted) {
         await showSnack(context, 'Could not share notes: $error');
@@ -1059,7 +1050,7 @@ class _FilterBar extends StatelessWidget {
           (_Filter.contrasts, 'Contrasts', 'contrasts'),
           (_Filter.concepts, 'Concepts', 'concepts'),
           (_Filter.errors, 'Errors & skipped', 'errors'),
-          (_Filter.highlights, 'Notes', 'notes'),
+          (_Filter.notes, 'Notes', 'notes'),
         ])
           M3EChip(
             key: ValueKey('cards-filter-${entry.$3}'),
@@ -1383,16 +1374,16 @@ class _ManualRow extends StatelessWidget {
   }
 }
 
-class _HighlightRow extends StatelessWidget {
-  const _HighlightRow({
-    required this.highlight,
+class _NoteRow extends StatelessWidget {
+  const _NoteRow({
+    required this.note,
     required this.selected,
     required this.onTap,
     required this.onLongPress,
     super.key,
   });
 
-  final StudyHighlight highlight;
+  final Note note;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -1414,7 +1405,7 @@ class _HighlightRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              highlight.text,
+              note.text,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: theme.typography.baseline.titleSmall.copyWith(
@@ -1422,10 +1413,10 @@ class _HighlightRow extends StatelessWidget {
               ),
             ),
           ),
-          if (highlight.context.trim().isNotEmpty) ...[
+          if (note.context.trim().isNotEmpty) ...[
             const SizedBox(height: 5),
             Text(
-              highlight.context,
+              note.context,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.typography.baseline.bodySmall.copyWith(
@@ -1439,11 +1430,9 @@ class _HighlightRow extends StatelessWidget {
             runSpacing: 4,
             children: [
               const Pill('Note', tone: PillTone.primary),
-              if (highlight.topicName.trim().isNotEmpty)
-                Pill(highlight.topicName),
-              if (highlight.isKept) const Pill('Kept', tone: PillTone.success),
-              if (highlight.hasCard)
-                const Pill('Card made', tone: PillTone.success),
+              if (note.topicName.trim().isNotEmpty) Pill(note.topicName),
+              if (note.isKept) const Pill('Kept', tone: PillTone.success),
+              if (note.hasCard) const Pill('Card made', tone: PillTone.success),
             ],
           ),
         ],

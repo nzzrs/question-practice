@@ -70,13 +70,13 @@ void main() {
     );
   }
 
-  Future<int> seedHighlight(
+  Future<int> seedNote(
     TestHarness harness,
     Question question, {
     String text = 'managed service',
     String subtopic = '',
   }) {
-    return harness.cards.createHighlight(
+    return harness.cards.createNote(
       sessionId: null,
       questionId: question.id,
       text: text,
@@ -250,14 +250,12 @@ void main() {
     expect(find.text('Review the skipped question'), findsOneWidget);
   });
 
-  testWidgets('saved highlights stay visible in the cards view', (
-    tester,
-  ) async {
+  testWidgets('saved notes stay visible in the cards view', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
     final question = await onlyQuestion(harness, seeded);
-    await seedHighlight(harness, question);
+    await seedNote(harness, question);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     expect(find.textContaining('Notes ·'), findsOneWidget);
@@ -313,7 +311,7 @@ void main() {
     await harness.keyStore.writeApiKey('secret-key');
     final seeded = await harness.seedPractice(count: 1);
     final question = await onlyQuestion(harness, seeded);
-    final highlightId = await seedHighlight(
+    final noteId = await seedNote(
       harness,
       question,
       text: 'A VPC is a private network owned by the account.',
@@ -321,12 +319,12 @@ void main() {
     );
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    final row = find.byKey(ValueKey('highlight-row-$highlightId'));
+    final row = find.byKey(ValueKey('note-row-$noteId'));
     await tester.ensureVisible(row);
     await tester.tap(row);
     await pumpFrames(tester);
 
-    final create = find.byKey(const ValueKey('highlight-make-card'));
+    final create = find.byKey(const ValueKey('note-make-card'));
     expect(create, findsOneWidget);
     await tester.ensureVisible(create);
     await tester.tap(create);
@@ -379,18 +377,16 @@ void main() {
     );
     expect(manuals.every((card) => card.subtopic == 'Networking'), isTrue);
     expect(manuals.first.context, question.prompt);
-    final highlights = await tester.runAsync(
-      () => harness.cards.watchHighlights().first,
-    );
-    expect(highlights!.single.hasCard, isTrue);
+    final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
+    expect(notes!.single.hasCard, isTrue);
   });
 
-  testWidgets('Cards review opens the shared highlight view', (tester) async {
+  testWidgets('Cards review opens the shared note view', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
     final question = await onlyQuestion(harness, seeded);
-    final highlightId = await seedHighlight(harness, question);
+    final noteId = await seedNote(harness, question);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     expect(find.text('Review notes'), findsOneWidget);
@@ -398,7 +394,7 @@ void main() {
     expect(find.byTooltip('Make a card'), findsNothing);
     expect(find.byTooltip('Delete note'), findsNothing);
 
-    final row = find.byKey(ValueKey('highlight-row-$highlightId'));
+    final row = find.byKey(ValueKey('note-row-$noteId'));
     await tester.ensureVisible(row);
     await tester.tap(row);
     await pumpFrames(tester);
@@ -413,7 +409,7 @@ void main() {
     expect(find.text('Keep & done'), findsOneWidget);
     expect(find.text('Delete note'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('highlight-delete')));
+    await tester.tap(find.byKey(const ValueKey('note-delete')));
     await pumpFrames(tester);
     expect(find.text('Delete note?'), findsOneWidget);
     expect(
@@ -425,26 +421,20 @@ void main() {
     expect(find.text('Review the note'), findsOneWidget);
   });
 
-  testWidgets('highlight card action offers only a concept card', (
-    tester,
-  ) async {
+  testWidgets('note card action offers only a concept card', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
     final question = await onlyQuestion(harness, seeded);
-    final highlightId = await seedHighlight(
-      harness,
-      question,
-      subtopic: 'Networking',
-    );
+    final noteId = await seedNote(harness, question, subtopic: 'Networking');
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    final row = find.byKey(ValueKey('highlight-row-$highlightId'));
+    final row = find.byKey(ValueKey('note-row-$noteId'));
     await tester.ensureVisible(row);
     await tester.tap(row);
     await pumpFrames(tester);
 
-    await tester.tap(find.byKey(const ValueKey('highlight-make-card')));
+    await tester.tap(find.byKey(const ValueKey('note-make-card')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 
@@ -477,10 +467,8 @@ void main() {
       () => harness.cards.watchManualCards().first,
     );
     expect(manuals, isEmpty);
-    final highlights = await tester.runAsync(
-      () => harness.cards.watchHighlights().first,
-    );
-    expect(highlights!.single.hasCard, isTrue);
+    final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
+    expect(notes!.single.hasCard, isTrue);
   });
 
   testWidgets('cognitive filters show only matching card types', (
@@ -514,7 +502,7 @@ void main() {
     final conceptId = await seedConcept(harness, question);
     final errorId = await seedError(harness, question, complete: true);
     final skippedId = await seedSkipped(harness, question);
-    final highlightId = await seedHighlight(harness, question);
+    final noteId = await seedNote(harness, question);
 
     Future<void> choose(String filter) async {
       await tester.tap(find.byKey(ValueKey('cards-filter-$filter')));
@@ -529,7 +517,7 @@ void main() {
     expect(find.byKey(ValueKey('concept-row-$conceptId')), findsOneWidget);
     expect(find.byKey(ValueKey('error-row-$errorId')), findsOneWidget);
     expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsOneWidget);
-    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsOneWidget);
+    expect(find.byKey(ValueKey('note-row-$noteId')), findsOneWidget);
 
     await choose('facts');
     expect(find.byKey(ValueKey('basic-row-$factId')), findsOneWidget);
@@ -538,7 +526,7 @@ void main() {
     expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
     expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
     expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsNothing);
-    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsNothing);
+    expect(find.byKey(ValueKey('note-row-$noteId')), findsNothing);
 
     await choose('heuristics');
     expect(find.byKey(ValueKey('basic-row-$heuristicId')), findsOneWidget);
@@ -555,7 +543,7 @@ void main() {
     expect(find.byKey(ValueKey('basic-row-$contrastId')), findsNothing);
     expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
     expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsNothing);
-    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsNothing);
+    expect(find.byKey(ValueKey('note-row-$noteId')), findsNothing);
 
     await choose('errors');
     expect(find.byKey(ValueKey('error-row-$errorId')), findsOneWidget);
@@ -564,7 +552,7 @@ void main() {
     expect(find.byKey(ValueKey('basic-row-$factId')), findsNothing);
 
     await choose('notes');
-    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsOneWidget);
+    expect(find.byKey(ValueKey('note-row-$noteId')), findsOneWidget);
     expect(find.byKey(ValueKey('error-row-$errorId')), findsNothing);
     expect(find.byKey(ValueKey('concept-row-$conceptId')), findsNothing);
 
@@ -575,7 +563,7 @@ void main() {
     expect(find.byKey(ValueKey('concept-row-$conceptId')), findsOneWidget);
     expect(find.byKey(ValueKey('error-row-$errorId')), findsOneWidget);
     expect(find.byKey(ValueKey('skipped-row-$skippedId')), findsOneWidget);
-    expect(find.byKey(ValueKey('highlight-row-$highlightId')), findsOneWidget);
+    expect(find.byKey(ValueKey('note-row-$noteId')), findsOneWidget);
   });
 
   testWidgets('long-press selects a concept row', (tester) async {
@@ -650,15 +638,15 @@ void main() {
     expect(find.byType(M3ECheckbox), findsNothing);
   });
 
-  testWidgets('long-press selects a highlight row', (tester) async {
+  testWidgets('long-press selects a note row', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
     final question = await onlyQuestion(harness, seeded);
-    final id = await seedHighlight(harness, question);
+    final id = await seedNote(harness, question);
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
-    final row = find.byKey(ValueKey('highlight-row-$id'));
+    final row = find.byKey(ValueKey('note-row-$id'));
     await tester.ensureVisible(row);
     await tester.longPress(row);
     await pumpFrames(tester);
@@ -728,28 +716,28 @@ void main() {
     expect(questions, hasLength(1));
   });
 
-  testWidgets('multi-selection deletes highlights and keeps their cards', (
+  testWidgets('multi-selection deletes notes and keeps their cards', (
     tester,
   ) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
     final question = await onlyQuestion(harness, seeded);
-    final firstId = await seedHighlight(harness, question, text: 'first');
-    final secondId = await seedHighlight(harness, question, text: 'second');
+    final firstId = await seedNote(harness, question, text: 'first');
+    final secondId = await seedNote(harness, question, text: 'second');
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     // Created after Cards initialized, so it is not part of the selection.
     final manualId = await seedBasic(harness, question);
-    await harness.cards.markHighlightConverted(
+    await harness.cards.markNoteConverted(
       firstId,
       cardCreatedAt: harness.clock.now().toUtc(),
       manualCardId: manualId,
     );
     await pumpFrames(tester);
 
-    final first = find.byKey(ValueKey('highlight-row-$firstId'));
-    final second = find.byKey(ValueKey('highlight-row-$secondId'));
+    final first = find.byKey(ValueKey('note-row-$firstId'));
+    final second = find.byKey(ValueKey('note-row-$secondId'));
     await tester.scrollUntilVisible(
       first,
       300,
@@ -773,10 +761,8 @@ void main() {
     await tester.tap(find.text('Delete'));
     await pumpFrames(tester, frames: 24);
 
-    final highlights = await tester.runAsync(
-      () => harness.cards.watchHighlights().first,
-    );
-    expect(highlights, isEmpty);
+    final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
+    expect(notes, isEmpty);
     final manuals = await tester.runAsync(
       () => harness.cards.watchManualCards().first,
     );

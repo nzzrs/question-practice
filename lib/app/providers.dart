@@ -163,8 +163,8 @@ final skippedQuestionsProvider = StreamProvider<List<SkippedQuestion>>(
   (ref) => ref.watch(cardRepositoryProvider).watchUnhandledSkippedQuestions(),
 );
 
-final highlightsProvider = StreamProvider<List<StudyHighlight>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchHighlights(),
+final notesProvider = StreamProvider<List<Note>>(
+  (ref) => ref.watch(cardRepositoryProvider).watchNotes(),
 );
 
 final httpClientProvider = Provider<http.Client>((ref) {

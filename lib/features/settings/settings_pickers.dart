@@ -44,6 +44,8 @@ class SettingsChoiceField extends StatelessWidget {
       button: true,
       label: semanticLabel,
       value: hasValue ? value : null,
+      onTap: onTap,
+      excludeSemantics: true,
       child: Material(
         color: scheme.surfaceContainerHighest,
         clipBehavior: Clip.antiAlias,
@@ -146,6 +148,8 @@ class _ChoiceRow extends StatelessWidget {
       button: true,
       selected: selected,
       label: label,
+      onTap: onTap,
+      excludeSemantics: true,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Material(

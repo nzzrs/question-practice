@@ -147,7 +147,7 @@ void main() {
     expect(find.byKey(const ValueKey('error-card-reading-time')), findsNothing);
     expect(find.byType(AdaptiveSplitView), findsOneWidget);
     expect(find.byType(CardCreatorPane), findsOneWidget);
-    expect(find.text('Card creator'), findsOneWidget);
+    expect(find.text('Create cards'), findsOneWidget);
   });
 
   testWidgets('manual error cards work without an AI provider', (tester) async {
@@ -242,7 +242,7 @@ void main() {
       tester
           .widget<Pill>(find.byKey(const ValueKey('creator-ai-type-1')))
           .label,
-      'Exam heuristic',
+      'Exam tip',
     );
     expect(
       find.textContaining(
@@ -254,7 +254,7 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-ai-add')));
     await pumpFrames(tester);
-    expect(find.text('Save 2 cards'), findsOneWidget);
+    expect(find.text('Cards to save · 2'), findsOneWidget);
     expect(sentBody, isNotNull);
     expect(sentBody, contains('Chosen wrong answer: Wrong 1'));
     expect(sentBody, contains('Correct answer: Correct 1'));
@@ -303,9 +303,7 @@ void main() {
     expect(detail.data, contains('Can be answered with yes or no'));
     expect(
       detail.data,
-      contains(
-        'Exam heuristic front does not use the required prompt structure',
-      ),
+      contains('Exam tip front does not use the required prompt structure'),
     );
   });
 
@@ -386,12 +384,22 @@ void main() {
 
     await _pumpView(tester, harness, card);
 
-    expect(find.byKey(const ValueKey('creator-ai-suggest')), findsNothing);
+    expect(find.byKey(const ValueKey('creator-ai-suggest')), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-ai-unavailable')), findsNothing);
     await tester.ensureVisible(
-      find.byKey(const ValueKey('creator-ai-unavailable')),
+      find.byKey(const ValueKey('creator-ai-suggest')),
     );
     await pumpFrames(tester);
-    expect(find.textContaining('Add an API key in Settings'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('creator-ai-suggest')));
+    await pumpFrames(tester, frames: 8);
+    expect(
+      find.byKey(const ValueKey('creator-ai-unavailable')),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Add an AI provider in Settings'),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Suggest again retries after an AI error', (tester) async {

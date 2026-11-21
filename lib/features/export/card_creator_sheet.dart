@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -13,6 +11,28 @@ import '../review/domain/card_litmus.dart';
 import 'card_creator_controller.dart';
 import 'domain/anki_note_builder.dart';
 import 'domain/card_templates.dart';
+
+/// Lets a review host save the creator's drafts from its own action.
+///
+/// Pass it to [CardCreatorBody] or [CardCreatorPane] together with
+/// `showSaveButton: false`; the creator then renders no competing save action.
+class CardCreatorSaveHandle {
+  Future<int> Function()? _handler;
+
+  /// Whether a mounted creator is attached and can save.
+  bool get isAttached => _handler != null;
+
+  /// Saves the current drafts and returns how many cards were created.
+  Future<int> save() async => await _handler?.call() ?? 0;
+
+  void _attach(Future<int> Function() handler) {
+    _handler = handler;
+  }
+
+  void _detach(Future<int> Function() handler) {
+    if (_handler == handler) _handler = null;
+  }
+}
 
 /// The error being turned into cards, with any learner edits already applied.
 class CardCreatorErrorSource {
@@ -51,6 +71,7 @@ class CardCreatorRequest {
     this.initialBack = '',
     this.initialTerm = '',
     this.initialDefinition = '',
+    this.existingFronts = const [],
     this.note,
     this.error,
     this.skippedQuestionId,
@@ -70,6 +91,13 @@ class CardCreatorRequest {
   final String initialBack;
   final String initialTerm;
   final String initialDefinition;
+
+  /// Fronts or terms already written for this review context.
+  ///
+  /// AI suggestions that repeat any of them are dropped. Callers that know the
+  /// review's existing cards pass their fronts and terms here; the creator
+  /// always adds its own drafts before asking the AI.
+  final List<String> existingFronts;
 
   /// Note context: enables AI suggestions and marks the note converted on save.
   final Note? note;
@@ -134,6 +162,8 @@ class CardCreatorPane extends StatefulWidget {
     required this.controller,
     this.onSaved,
     this.onDraftCountChanged,
+    this.saveHandle,
+    this.showSaveButton = true,
     super.key,
   });
 
@@ -141,6 +171,12 @@ class CardCreatorPane extends StatefulWidget {
   final CardCreatorController controller;
   final ValueChanged<int>? onSaved;
   final ValueChanged<int>? onDraftCountChanged;
+
+  /// Lets the host save drafts when [showSaveButton] is false.
+  final CardCreatorSaveHandle? saveHandle;
+
+  /// Whether the pane renders its sticky save footer.
+  final bool showSaveButton;
 
   @override
   State<CardCreatorPane> createState() => _CardCreatorPaneState();
@@ -160,7 +196,7 @@ class _CardCreatorPaneState extends State<CardCreatorPane> {
     final theme = M3ETheme.of(context);
     return Semantics(
       container: true,
-      label: 'Card creator',
+      label: 'Create cards',
       child: ColoredBox(
         color: theme.colorScheme.surfaceContainerLow,
         child: CardCreatorBody(
@@ -173,6 +209,8 @@ class _CardCreatorPaneState extends State<CardCreatorPane> {
           ),
           onSaved: widget.onSaved,
           onDraftCountChanged: widget.onDraftCountChanged,
+          saveHandle: widget.saveHandle,
+          showSaveButton: widget.showSaveButton,
         ),
       ),
     );
@@ -190,6 +228,7 @@ class CardCreatorBody extends ConsumerStatefulWidget {
     this.onDraftCountChanged,
     this.scrollController,
     this.scrollStorageKey,
+    this.saveHandle,
     this.showSaveButton = true,
     super.key,
   });
@@ -199,11 +238,15 @@ class CardCreatorBody extends ConsumerStatefulWidget {
   final VoidCallback? onClose;
   final bool embedded;
 
-  /// Whether the scrolling body renders its own save action.
+  /// Whether the creator renders its own save action.
   ///
   /// The sheet keeps it in the scroll; the embedded pane moves it to a sticky
-  /// footer so it is always reachable.
+  /// footer so it is always reachable. Set false and pass [saveHandle] when a
+  /// review host owns the single save action.
   final bool showSaveButton;
+
+  /// Lets the host save drafts from its own action.
+  final CardCreatorSaveHandle? saveHandle;
 
   /// The page's seed bridge, used by the embedded pane only.
   final CardCreatorController? controller;
@@ -266,15 +309,6 @@ class _ConceptDraft extends _CardDraft {
 
   @override
   CardTemplate get template => CardTemplate.definition;
-}
-
-enum _DefinitionSource {
-  cards('From your cards'),
-  ai('From AI');
-
-  const _DefinitionSource(this.label);
-
-  final String label;
 }
 
 class _SuggestedIdea {
@@ -349,21 +383,13 @@ class _AiVariant {
 class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   late final TextEditingController _front;
   late final TextEditingController _back;
-  late final TextEditingController _term;
+  late final TextEditingController _definitionCloze;
+  late final Future<int> Function() _saveHandler = _save;
 
   late CardTemplate? _template;
   String _appliedScaffoldFront = '';
   String _appliedScaffoldBack = '';
-
-  String _meaning = '';
-  String _meaningExtra = '';
-  String _meaningTerm = '';
-  _DefinitionSource? _meaningSource;
-  bool _definitionLoading = false;
-  String? _definitionError;
-  LookupFailure? _definitionFailure;
-  Timer? _definitionDebounce;
-  int _definitionRequest = 0;
+  String _appliedDefinitionCloze = '';
 
   final _drafts = <_CardDraft>[];
   List<_SuggestedIdea>? _ideas;
@@ -371,6 +397,8 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   final _retiredVariants = <_AiVariant>[];
   String? _aiError;
   bool _aiLoading = false;
+  bool _aiPanelOpen = false;
+  bool _aiUnavailable = false;
   bool _saving = false;
 
   int _appliedSeedRevision = -1;
@@ -379,6 +407,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   Note? _noteToConvert;
   String _seedInitialFront = '';
   String _seedInitialBack = '';
+  String _seedInitialCloze = '';
   SuggestedCard? _seedSuggestion;
   bool _seedTouched = false;
   bool _seedLoading = false;
@@ -392,22 +421,15 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   void initState() {
     super.initState();
     widget.controller?.addListener(_onControllerChanged);
+    widget.saveHandle?._attach(_saveHandler);
     final request = widget.request;
     _front = TextEditingController(text: request.initialFront);
     _back = TextEditingController(text: request.initialBack);
-    _term = TextEditingController(text: request.initialTerm);
+    _definitionCloze = TextEditingController();
     _template = _initialTemplate();
     if (_template == CardTemplate.definition) {
-      if (request.initialDefinition.trim().isNotEmpty &&
-          request.initialTerm.trim().isNotEmpty) {
-        _meaning = request.initialDefinition.trim();
-        _meaningTerm = request.initialTerm.trim();
-        _meaningSource = _DefinitionSource.cards;
-      } else if (request.initialTerm.trim().isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _scheduleDefinitionLookup(immediate: true);
-        });
-      }
+      _definitionCloze.text = _initialDefinitionCloze();
+      _appliedDefinitionCloze = _definitionCloze.text;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -419,6 +441,10 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   @override
   void didUpdateWidget(covariant CardCreatorBody oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.saveHandle != widget.saveHandle) {
+      oldWidget.saveHandle?._detach(_saveHandler);
+      widget.saveHandle?._attach(_saveHandler);
+    }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller?.removeListener(_onControllerChanged);
       widget.controller?.addListener(_onControllerChanged);
@@ -457,8 +483,6 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     }
     if (controller.seedRevision == _appliedSeedRevision) return;
     _appliedSeedRevision = controller.seedRevision;
-    _definitionDebounce?.cancel();
-    _definitionRequest++;
     final requestId = ++_seedRequest;
 
     _applyingSeed = true;
@@ -479,25 +503,40 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
           _appliedScaffoldBack = '';
           _seedInitialFront = bullet;
           _seedInitialBack = '';
-          _clearMeaningFields();
+          _seedInitialCloze = _definitionCloze.text;
         case NoteCardSeed(:final note):
           _seedBulletId = null;
           _seedNote = note;
           _noteToConvert = note;
           _template = CardTemplate.definition;
-          _term.text = note.text;
+          _definitionCloze.text = seedDefinitionCloze(source: note.text);
+          _appliedDefinitionCloze = _definitionCloze.text;
           _front.clear();
           _back.clear();
           _appliedScaffoldFront = '';
           _appliedScaffoldBack = '';
           _seedInitialFront = note.text;
           _seedInitialBack = '';
-          _clearMeaningFields();
+          _seedInitialCloze = _definitionCloze.text;
       }
     });
     _applyingSeed = false;
     _seedScrollToTop();
     await _runSeedRequest(seed, requestId);
+  }
+
+  void _applySuggestion(SuggestedCard suggestion) {
+    _template = suggestion.template;
+    if (suggestion.template == CardTemplate.definition) {
+      _definitionCloze.text = seedDefinitionCloze(
+        term: suggestion.front,
+        definition: suggestion.back,
+      );
+      _appliedDefinitionCloze = _definitionCloze.text;
+    } else {
+      _front.text = suggestion.front;
+      _back.text = suggestion.back;
+    }
   }
 
   void _seedScrollToTop() {
@@ -555,11 +594,10 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
                 _back.text.trim().isNotEmpty) {
               _seedSuggestion = suggestion;
             } else {
-              _template = suggestion.template;
-              _front.text = suggestion.front;
-              _back.text = suggestion.back;
+              _applySuggestion(suggestion);
               _seedInitialFront = suggestion.front;
               _seedInitialBack = suggestion.back;
+              _seedInitialCloze = _definitionCloze.text;
             }
           });
         case NoteCardSeed(:final note):
@@ -613,10 +651,10 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   @override
   void dispose() {
     widget.controller?.removeListener(_onControllerChanged);
-    _definitionDebounce?.cancel();
+    widget.saveHandle?._detach(_saveHandler);
     _front.dispose();
     _back.dispose();
-    _term.dispose();
+    _definitionCloze.dispose();
     for (final idea in _ideas ?? const <_SuggestedIdea>[]) {
       idea.dispose();
     }
@@ -634,99 +672,94 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   bool get _hasAiContext =>
       widget.request.note != null || widget.request.error != null;
 
+  ParsedDefinitionCloze get _parsedDefinition =>
+      parseDefinitionCloze(_definitionCloze.text);
+
+  String _initialDefinitionCloze() {
+    final request = widget.request;
+    if (request.initialTerm.trim().isNotEmpty ||
+        request.initialDefinition.trim().isNotEmpty) {
+      return seedDefinitionCloze(
+        term: request.initialTerm,
+        definition: request.initialDefinition,
+      );
+    }
+    final note = request.note;
+    if (note != null) return seedDefinitionCloze(source: note.text);
+    if (request.initialFront.trim().isNotEmpty) {
+      return seedDefinitionCloze(source: request.initialFront);
+    }
+    return seedDefinitionCloze();
+  }
+
   bool get _canAdd {
     if (_saving) return false;
     if (_template == CardTemplate.definition) {
-      return _term.text.trim().isNotEmpty;
+      return _parsedDefinition.isComplete;
     }
     return _front.text.trim().isNotEmpty && _back.text.trim().isNotEmpty;
   }
 
-  bool get _waitingForText => _template == CardTemplate.definition
-      ? _term.text.trim().isEmpty
-      : _front.text.trim().isEmpty && _back.text.trim().isEmpty;
-
-  LitmusReport get _currentReport => checkCardLitmus(
-    front: _template == CardTemplate.definition ? _term.text : _front.text,
-    back: _template == CardTemplate.definition ? _meaning : _back.text,
-    template: _effectiveTemplate,
-  );
-
-  bool get _hasCustomText {
-    final template = _template;
-    if (template == null || template == CardTemplate.definition) return false;
-    if (_front.text.trim().isEmpty && _back.text.trim().isEmpty) return false;
-    return _front.text != _appliedScaffoldFront ||
-        _back.text != _appliedScaffoldBack;
+  bool get _waitingForText {
+    if (_template != CardTemplate.definition) {
+      return _front.text.trim().isEmpty && _back.text.trim().isEmpty;
+    }
+    final parsed = _parsedDefinition;
+    return parsed.term.isEmpty && parsed.definition.isEmpty;
   }
+
+  LitmusReport get _currentReport {
+    final parsed = _parsedDefinition;
+    return checkCardLitmus(
+      front: _template == CardTemplate.definition ? parsed.term : _front.text,
+      back: _template == CardTemplate.definition
+          ? parsed.definition
+          : _back.text,
+      template: _effectiveTemplate,
+    );
+  }
+
+  String get _readingText => _template == CardTemplate.definition
+      ? _parsedDefinition.term
+      : _front.text;
 
   void _selectTemplate(CardTemplate template) {
     if (_saving) return;
-    if (template == CardTemplate.definition) {
-      final term = _term.text.trim();
-      final keepMeaning =
-          _meaning.isNotEmpty &&
-          _meaningTerm.toLowerCase() == term.toLowerCase();
-      setState(() => _template = template);
-      if (term.isEmpty) {
-        setState(_clearMeaningFields);
-      } else if (!keepMeaning && !_definitionLoading) {
-        _scheduleDefinitionLookup(immediate: true);
-      }
-      return;
-    }
-    final scaffold = fillScaffold(
-      template,
-      wrongAnswer: widget.request.error?.wrongAnswer ?? '',
-      correctAnswer: widget.request.error?.correctAnswer ?? '',
-    );
-    final fieldsEmpty = _front.text.trim().isEmpty && _back.text.trim().isEmpty;
-    final matchesApplied =
-        _appliedScaffoldFront.isNotEmpty &&
-        _front.text == _appliedScaffoldFront &&
-        _back.text == _appliedScaffoldBack;
     setState(() {
       _template = template;
-      if (scaffold != null && (fieldsEmpty || matchesApplied)) {
+      if (template == CardTemplate.definition) {
+        if (_definitionCloze.text.trim().isEmpty ||
+            (_appliedDefinitionCloze.isNotEmpty &&
+                _definitionCloze.text == _appliedDefinitionCloze)) {
+          _definitionCloze.text = _initialDefinitionCloze();
+          _appliedDefinitionCloze = _definitionCloze.text;
+          _placeCursorInCloze(_definitionCloze);
+        }
+        return;
+      }
+
+      final scaffold = fillScaffold(
+        template,
+        wrongAnswer: widget.request.error?.wrongAnswer ?? '',
+        correctAnswer: widget.request.error?.correctAnswer ?? '',
+      );
+      if (scaffold == null) return;
+      final frontEmpty = _front.text.trim().isEmpty;
+      final frontGenerated =
+          _appliedScaffoldFront.isNotEmpty &&
+          _front.text == _appliedScaffoldFront;
+      if (frontEmpty || frontGenerated) {
         _front.text = scaffold.front;
-        _back.text = scaffold.back;
         _appliedScaffoldFront = scaffold.front;
-        _appliedScaffoldBack = scaffold.back;
         _placeCursorAtPlaceholder(_front);
       }
-    });
-  }
-
-  Future<void> _fillTemplate() async {
-    final template = _template;
-    if (template == null || template == CardTemplate.definition || _saving) {
-      return;
-    }
-    final scaffold = fillScaffold(
-      template,
-      wrongAnswer: widget.request.error?.wrongAnswer ?? '',
-      correctAnswer: widget.request.error?.correctAnswer ?? '',
-    );
-    if (scaffold == null) return;
-    final hasText =
-        _front.text.trim().isNotEmpty || _back.text.trim().isNotEmpty;
-    if (hasText) {
-      final confirmed = await confirmDialog(
-        context,
-        title: 'Replace the text with this template?',
-        message:
-            'The current front and back will be replaced by the '
-            '${template.chipLabel} template.',
-        confirmLabel: 'Replace',
-      );
-      if (!confirmed || !mounted) return;
-    }
-    setState(() {
-      _front.text = scaffold.front;
-      _back.text = scaffold.back;
-      _appliedScaffoldFront = scaffold.front;
-      _appliedScaffoldBack = scaffold.back;
-      _placeCursorAtPlaceholder(_front);
+      final backEmpty = _back.text.trim().isEmpty;
+      final backGenerated =
+          _appliedScaffoldBack.isNotEmpty && _back.text == _appliedScaffoldBack;
+      if (backEmpty || backGenerated) {
+        _back.text = scaffold.back;
+        _appliedScaffoldBack = scaffold.back;
+      }
     });
   }
 
@@ -736,184 +769,57 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     controller.selection = TextSelection.collapsed(offset: index);
   }
 
+  void _placeCursorInCloze(TextEditingController controller) {
+    final start = controller.text.indexOf('{{c1::');
+    if (start < 0) return;
+    final contentStart = start + '{{c1::'.length;
+    final contentEnd = controller.text.indexOf('}}', contentStart);
+    if (contentEnd < contentStart) return;
+    controller.selection = TextSelection(
+      baseOffset: contentStart,
+      extentOffset: contentEnd,
+    );
+  }
+
   void _markSeedEdited() {
     if (_applyingSeed) return;
     if (_seedBulletId == null && _seedNote == null) return;
     final changed =
         _front.text != _seedInitialFront ||
         _back.text != _seedInitialBack ||
-        (_seedNote != null && _term.text != _seedInitialFront);
+        (_seedNote != null && _definitionCloze.text != _seedInitialCloze);
     if (!changed) return;
     _seedTouched = true;
     widget.controller?.markSeedDirty();
   }
 
-  void _onTermChanged(String value) {
-    if (_template != CardTemplate.definition) {
-      setState(_markSeedEdited);
-      return;
-    }
+  void _onDefinitionChanged(String value) {
     setState(_markSeedEdited);
-    _scheduleDefinitionLookup();
   }
 
   void _onFrontBackChanged(String value) {
     setState(_markSeedEdited);
   }
 
-  void _scheduleDefinitionLookup({bool immediate = false}) {
-    _definitionDebounce?.cancel();
-    final term = _term.text.trim();
-    final requestId = ++_definitionRequest;
-    if (term.isEmpty) {
-      if (mounted) setState(_clearMeaningFields);
-      return;
-    }
-    if (mounted) {
-      setState(() {
-        _meaning = '';
-        _meaningExtra = '';
-        _meaningTerm = '';
-        _meaningSource = null;
-        _definitionError = null;
-        _definitionFailure = null;
-        _definitionLoading = true;
-      });
-    }
-    if (immediate) {
-      _resolveMeaning(term, requestId);
-      return;
-    }
-    _definitionDebounce = Timer(
-      const Duration(milliseconds: 600),
-      () => _resolveMeaning(term, requestId),
-    );
-  }
-
-  void _clearMeaningFields() {
-    _meaning = '';
-    _meaningExtra = '';
-    _meaningTerm = '';
-    _meaningSource = null;
-    _definitionLoading = false;
-    _definitionError = null;
-    _definitionFailure = null;
-  }
-
-  void _retryDefinition() {
-    if (_saving) return;
-    _scheduleDefinitionLookup(immediate: true);
-  }
-
-  bool _isCurrentDefinition(String term, int requestId) {
-    return mounted &&
-        requestId == _definitionRequest &&
-        _term.text.trim() == term;
-  }
-
-  Future<void> _resolveMeaning(String term, int requestId) async {
-    final initialDefinition = widget.request.initialDefinition.trim();
-    final initialTerm = widget.request.initialTerm.trim();
-    if (initialDefinition.isNotEmpty &&
-        term.toLowerCase() == initialTerm.toLowerCase()) {
-      if (!_isCurrentDefinition(term, requestId)) return;
-      setState(() {
-        _meaning = initialDefinition;
-        _meaningExtra = '';
-        _meaningTerm = term;
-        _meaningSource = _DefinitionSource.cards;
-        _definitionLoading = false;
-        _definitionError = null;
-        _definitionFailure = null;
-      });
-      return;
-    }
-
-    Concept? existing;
-    try {
-      existing = await ref
-          .read(cardRepositoryProvider)
-          .latestConceptForTerm(term);
-    } on Object {
-      existing = null;
-    }
-    if (!_isCurrentDefinition(term, requestId)) return;
-    if (existing != null && existing.definition.trim().isNotEmpty) {
-      setState(() {
-        _meaning = existing!.definition.trim();
-        _meaningExtra = existing.extra;
-        _meaningTerm = term;
-        _meaningSource = _DefinitionSource.cards;
-        _definitionLoading = false;
-        _definitionError = null;
-        _definitionFailure = null;
-      });
-      return;
-    }
-
-    try {
-      final suggestion = await ref
-          .read(lookupServiceProvider)
-          .resolveDefinition(
-            term: term,
-            question: widget.request.questionContext,
-            topicName: widget.request.topicName,
-            subtopic: widget.request.subtopic,
-          );
-      if (!_isCurrentDefinition(term, requestId)) return;
-      setState(() {
-        _meaning = suggestion.definition.trim();
-        _meaningExtra = suggestion.extra;
-        _meaningTerm = term;
-        _meaningSource = _DefinitionSource.ai;
-        _definitionLoading = false;
-        _definitionError = null;
-        _definitionFailure = null;
-      });
-    } on LookupException catch (error) {
-      if (!_isCurrentDefinition(term, requestId)) return;
-      setState(() {
-        _definitionLoading = false;
-        if (error.failure == LookupFailure.noProvider) {
-          _definitionFailure = LookupFailure.noProvider;
-          _definitionError = null;
-        } else {
-          _definitionFailure = LookupFailure.providerError;
-          _definitionError = error.message;
-        }
-      });
-    } on Object catch (error) {
-      if (!_isCurrentDefinition(term, requestId)) return;
-      setState(() {
-        _definitionLoading = false;
-        _definitionFailure = LookupFailure.providerError;
-        _definitionError = 'Could not look up the meaning: $error';
-      });
-    }
-  }
-
   void _addDraft() {
     if (!_canAdd || _saving) return;
     final bulletId = _seedBulletId;
     if (_template == CardTemplate.definition) {
-      final term = _term.text.trim();
-      final source = _meaningSource == _DefinitionSource.ai
-          ? ConceptSource.ai
-          : ConceptSource.manual;
-      _definitionDebounce?.cancel();
-      _definitionRequest++;
+      final parsed = _parsedDefinition;
+      if (!parsed.isComplete) return;
       setState(() {
         _drafts.add(
           _ConceptDraft(
-            term: term,
-            definition: _meaning.trim(),
-            extra: _meaningExtra,
-            source: source,
+            term: parsed.term,
+            definition: parsed.definition,
+            extra: '',
+            source: ConceptSource.manual,
             sourceBulletId: bulletId,
           ),
         );
-        _term.clear();
-        _clearMeaningFields();
+        _definitionCloze.text = seedDefinitionCloze();
+        _appliedDefinitionCloze = _definitionCloze.text;
+        _placeCursorInCloze(_definitionCloze);
         _clearSeedComposer();
       });
       _afterDraftAdded(bulletId);
@@ -957,6 +863,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     _seedLoading = false;
     _seedInitialFront = '';
     _seedInitialBack = '';
+    _seedInitialCloze = '';
   }
 
   void _removeDraft(int index) {
@@ -973,14 +880,46 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     }
   }
 
+  void _toggleAiPanel() {
+    if (_saving) return;
+    final open = !_aiPanelOpen;
+    setState(() => _aiPanelOpen = open);
+    if (!open || _aiLoading || _ideas != null || _aiError != null) return;
+    _loadAiSuggestions();
+  }
+
+  /// Card fronts and terms the AI must not repeat.
+  List<String> get _knownCardTexts => [
+    ...widget.request.existingFronts,
+    if (widget.request.initialFront.trim().isNotEmpty)
+      widget.request.initialFront,
+    if (widget.request.initialTerm.trim().isNotEmpty)
+      widget.request.initialTerm,
+    for (final draft in _drafts)
+      switch (draft) {
+        _BasicDraft(:final front) => front,
+        _ConceptDraft(:final term) => term,
+      },
+  ];
+
   Future<void> _loadAiSuggestions() async {
     if (_aiLoading || _saving) return;
     setState(() {
       _aiLoading = true;
       _aiError = null;
+      _aiUnavailable = false;
       _retiredIdeas.addAll(_ideas ?? const []);
       _ideas = null;
     });
+    final hasKey = await _hasApiKey();
+    if (!mounted) return;
+    if (!hasKey) {
+      setState(() {
+        _aiLoading = false;
+        _aiUnavailable = true;
+      });
+      return;
+    }
     try {
       final lookup = ref.read(lookupServiceProvider);
       final List<SuggestedCardIdea> ideas;
@@ -1009,8 +948,12 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         ideas = const [];
       }
       if (!mounted) return;
+      final filtered = filterDuplicateIdeas(
+        ideas,
+        existingTexts: _knownCardTexts,
+      );
       setState(() {
-        _ideas = [for (final idea in ideas) _SuggestedIdea(idea)];
+        _ideas = [for (final idea in filtered) _SuggestedIdea(idea)];
         _aiLoading = false;
       });
     } on LookupException catch (error) {
@@ -1063,8 +1006,8 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     _reportDraftCount();
   }
 
-  Future<void> _save() async {
-    if (_drafts.isEmpty || _saving) return;
+  Future<int> _save() async {
+    if (_drafts.isEmpty || _saving) return 0;
     setState(() => _saving = true);
     final service = ref.read(reviewServiceProvider);
     final request = widget.request;
@@ -1130,7 +1073,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       }
     }
 
-    if (!mounted) return;
+    if (!mounted) return created;
     setState(() {
       _saving = false;
       if (created > 0) {
@@ -1147,16 +1090,16 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
                   'could not be saved: $failure'
             : 'Could not create the cards: $failure',
       );
-      return;
+      return created;
     }
     widget.onSaved?.call(created);
+    return created;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final request = widget.request;
-    final hasKey = ref.watch(hasApiKeyProvider);
     final count = _drafts.length;
     final hasContext =
         request.error != null ||
@@ -1173,21 +1116,12 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         if (widget.embedded)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Card creator',
-                  style: theme.typography.emphasized.titleLarge,
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'One idea per card.',
-                  style: theme.typography.baseline.labelSmall.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+            child: Semantics(
+              header: true,
+              child: Text(
+                'Create cards',
+                style: theme.typography.emphasized.titleLarge,
+              ),
             ),
           )
         else
@@ -1210,7 +1144,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
                   key: const ValueKey('creator-close'),
                   variant: M3EIconButtonVariant.standard,
                   icon: const Icon(Icons.close),
-                  tooltip: 'Close card creator',
+                  tooltip: 'Close',
                   onPressed: _saving ? null : widget.onClose,
                 ),
             ],
@@ -1231,9 +1165,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
         _LitmusRow(
           report: _currentReport,
           waiting: _waitingForText,
-          readingTime: readingTimeLabel(
-            _template == CardTemplate.definition ? _term.text : _front.text,
-          ),
+          readingTime: readingTimeLabel(_readingText),
           badgeKey: const ValueKey('creator-litmus-current'),
           detailKey: const ValueKey('creator-litmus-detail-current'),
         ),
@@ -1247,9 +1179,9 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             label: const Text('Add to list'),
           ),
         ),
-        if (_hasAiContext) ...[
-          const SizedBox(height: 20),
-          _buildAiSection(theme, hasKey),
+        if (_hasAiContext && _aiPanelOpen) ...[
+          const SizedBox(height: 16),
+          _buildAiPanel(theme),
         ],
         if (count > 0) ...[
           const SizedBox(height: 20),
@@ -1300,12 +1232,13 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(child: scroll),
-              _buildStickyFooter(
-                theme,
-                count,
-                showEmptyHint: constraints.maxHeight >= 320,
-                compact: constraints.maxHeight < 220,
-              ),
+              if (widget.showSaveButton)
+                _buildStickyFooter(
+                  theme,
+                  count,
+                  showEmptyHint: constraints.maxHeight >= 320,
+                  compact: constraints.maxHeight < 220,
+                ),
             ],
           );
         },
@@ -1324,7 +1257,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     return AppPrimaryButton(
       key: const ValueKey('creator-save'),
       onPressed: count == 0 || _saving ? null : _save,
-      label: _saving ? 'Saving…' : 'Save $count card${count == 1 ? '' : 's'}',
+      label: _saving ? 'Saving…' : 'Save',
       icon: Icons.check,
     );
   }
@@ -1495,11 +1428,10 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
                 key: const ValueKey('creator-seed-use-ai'),
                 onPressed: () {
                   setState(() {
-                    _template = suggestion.template;
-                    _front.text = suggestion.front;
-                    _back.text = suggestion.back;
+                    _applySuggestion(suggestion);
                     _seedInitialFront = suggestion.front;
                     _seedInitialBack = suggestion.back;
+                    _seedInitialCloze = _definitionCloze.text;
                     _seedSuggestion = null;
                     _seedTouched = false;
                   });
@@ -1526,50 +1458,69 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
   }
 
   Widget _buildTemplateSection(M3EThemeData theme) {
-    Widget? trailing;
-    if (_template == null) {
-      trailing = const Pill('Custom card');
-    } else if (_hasCustomText && !_saving) {
-      trailing = M3EButton.text(
-        key: const ValueKey('creator-template-fill'),
-        onPressed: _fillTemplate,
-        child: const Text('Fill template'),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionTitle(
-          'Card template',
-          supporting:
-              'Each template writes the front and back. Replace the bracketed '
-              'parts.',
-          trailing: trailing,
-        ),
-        Semantics(
-          container: true,
-          label: 'Card template',
-          child: M3ETheme(
-            data: theme.copyWith(
-              chipTheme: theme.chipTheme.copyWith(height: 48),
-            ),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
+    final selected = _template;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: M3EDropdownMenu<CardTemplate>(
+              key: const ValueKey('creator-template-picker'),
+              items: [
                 for (final template in CardTemplate.values)
-                  M3EChip(
-                    key: ValueKey('creator-template-${template.name}'),
-                    type: M3EChipType.filter,
+                  M3EDropdownItem<CardTemplate>(
                     label: template.chipLabel,
-                    selected: _template == template,
-                    onPressed: _saving ? null : () => _selectTemplate(template),
+                    value: template,
+                    selected: selected == template,
                   ),
               ],
+              singleSelect: true,
+              showChipAnimation: false,
+              enabled: !_saving,
+              fieldStyle: M3EDropdownFieldStyle(
+                hintText: 'Card template',
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                prefixIcon: Icon(
+                  Icons.style_outlined,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                selectedTextStyle: theme.typography.baseline.labelLarge,
+                hintStyle: theme.typography.baseline.labelLarge.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              itemStyle: const M3EDropdownItemStyle(
+                itemPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              ),
+              onSelectionChanged: (items) {
+                if (items.isEmpty) {
+                  final current = _template;
+                  if (current != null) _selectTemplate(current);
+                  return;
+                }
+                _selectTemplate(items.first.value);
+              },
             ),
           ),
-        ),
-      ],
+          if (_hasAiContext) ...[
+            const SizedBox(width: 4),
+            M3EIconButton(
+              key: const ValueKey('creator-ai-suggest'),
+              variant: M3EIconButtonVariant.standard,
+              icon: const Icon(Icons.auto_awesome_outlined),
+              tooltip: _aiPanelOpen
+                  ? 'Hide AI suggestions'
+                  : 'Suggest cards with AI',
+              onPressed: _saving ? null : _toggleAiPanel,
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1609,169 +1560,36 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         M3ETextField(
-          key: const ValueKey('creator-term'),
-          controller: _term,
-          label: 'Term',
+          key: const ValueKey('creator-definition-cloze'),
+          controller: _definitionCloze,
+          label: 'Definition',
+          placeholder: '{{c1::term}}: {{c2::meaning}}',
+          minLines: 3,
+          maxLines: 6,
           isRequired: true,
           enabled: !_saving,
-          onChanged: _onTermChanged,
+          onChanged: _onDefinitionChanged,
+          trailing: Tooltip(
+            message:
+                'Put the term in {{c1::…}} and the definition in {{c2::…}}.',
+            child: Icon(
+              Icons.info_outline,
+              size: 20,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ),
-        const SizedBox(height: 12),
-        _buildMeaningBlock(theme),
         const SizedBox(height: 12),
         _buildDefinitionPreview(theme),
       ],
     );
   }
 
-  Widget _buildMeaningBlock(M3EThemeData theme) {
-    final termEmpty = _term.text.trim().isEmpty;
-    if (termEmpty && _meaning.isEmpty) {
-      return TonalBox(
-        key: const ValueKey('creator-definition-idle'),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Text(
-          'Type a term. The meaning is filled from your cards or AI.',
-          style: theme.typography.baseline.bodySmall.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            height: 1.45,
-          ),
-        ),
-      );
-    }
-    if (_definitionLoading) {
-      return TonalBox(
-        key: const ValueKey('creator-definition-loading'),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-        child: Row(
-          children: [
-            const M3ELoadingIndicator(),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                'Looking up the meaning…',
-                style: theme.typography.baseline.bodyMedium,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    if (_definitionFailure == LookupFailure.noProvider) {
-      return TonalBox(
-        key: const ValueKey('creator-definition-unavailable'),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Text(
-          'No definition found. This card will be saved without a definition '
-          'and will not export until one is added. Turn on AI lookup in '
-          'Settings to fill it automatically.',
-          style: theme.typography.baseline.bodySmall.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            height: 1.45,
-          ),
-        ),
-      );
-    }
-    if (_definitionError != null) {
-      return Semantics(
-        liveRegion: true,
-        child: TonalBox(
-          key: const ValueKey('creator-definition-error'),
-          color: theme.colorScheme.errorContainer,
-          padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Could not look up the meaning. You can try again or '
-                      'save the term now.',
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onErrorContainer,
-                        height: 1.4,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _definitionError!,
-                      style: theme.typography.baseline.bodySmall.copyWith(
-                        color: theme.colorScheme.onErrorContainer.withValues(
-                          alpha: 0.8,
-                        ),
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              M3EIconButton(
-                key: const ValueKey('creator-definition-refresh'),
-                variant: M3EIconButtonVariant.standard,
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Look up the meaning again',
-                onPressed: _saving ? null : _retryDefinition,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    if (_meaning.isNotEmpty) {
-      return Column(
-        key: const ValueKey('creator-definition-meaning'),
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(child: _RecapLabel('Meaning')),
-              M3EIconButton(
-                key: const ValueKey('creator-definition-refresh'),
-                variant: M3EIconButtonVariant.standard,
-                icon: const Icon(Icons.refresh),
-                tooltip: 'Look up the meaning again',
-                onPressed: _saving ? null : _retryDefinition,
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _meaning,
-            style: theme.typography.baseline.bodyMedium.copyWith(height: 1.4),
-          ),
-          if (_meaningSource != null) ...[
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [Pill(_meaningSource!.label, tone: PillTone.secondary)],
-            ),
-          ],
-        ],
-      );
-    }
-    return TonalBox(
-      key: const ValueKey('creator-definition-idle'),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      child: Text(
-        'Type a term. The meaning is filled from your cards or AI.',
-        style: theme.typography.baseline.bodySmall.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-          height: 1.45,
-        ),
-      ),
-    );
-  }
-
   Widget _buildDefinitionPreview(M3EThemeData theme) {
-    final term = _term.text.trim();
-    final meaning = _meaning.trim();
+    final parsed = _parsedDefinition;
+    final preview = definitionPreview(parsed.term, parsed.definition);
     return Semantics(
-      label:
-          'Anki front field. Definition of $term. The meaning is shown in '
-          'the Meaning section.',
+      label: 'Anki front field. ${stripCloze(preview)}',
       excludeSemantics: true,
       child: TonalBox(
         key: const ValueKey('creator-definition-preview'),
@@ -1782,7 +1600,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             const _RecapLabel('Anki front field'),
             const SizedBox(height: 4),
             Text(
-              definitionPreview(term, meaning),
+              preview,
               style: theme.typography.baseline.bodySmall.copyWith(
                 fontFamily: 'monospace',
                 height: 1.4,
@@ -1794,28 +1612,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     );
   }
 
-  Widget _buildAiSection(M3EThemeData theme, AsyncValue<bool> hasKey) {
-    final keyLoading = hasKey.isLoading;
-    final keyAvailable = hasKey.value ?? false;
-    final showRetry = !_aiLoading && (_aiError != null || _ideas != null);
-    final trailing = _aiLoading
-        ? M3EIconButton(
-            key: const ValueKey('creator-ai-retry'),
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Suggest again',
-            onPressed: null,
-          )
-        : showRetry
-        ? M3EIconButton(
-            key: const ValueKey('creator-ai-retry'),
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Suggest again',
-            onPressed: _saving ? null : _loadAiSuggestions,
-          )
-        : null;
-
+  Widget _buildAiPanel(M3EThemeData theme) {
     final Widget body;
     if (_aiLoading) {
       body = TonalBox(
@@ -1834,79 +1631,63 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
           ],
         ),
       );
-    } else if (_aiError != null) {
-      body = Semantics(
-        liveRegion: true,
-        child: TonalBox(
-          key: const ValueKey('creator-ai-error'),
-          color: theme.colorScheme.errorContainer,
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _aiError!,
-                style: theme.typography.baseline.bodyMedium.copyWith(
-                  color: theme.colorScheme.onErrorContainer,
-                  height: 1.4,
-                ),
-              ),
-              if (_aiError!.toLowerCase().contains('settings')) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Open Settings to add an AI provider and key.',
-                  style: theme.typography.baseline.labelSmall.copyWith(
-                    color: theme.colorScheme.onErrorContainer,
-                  ),
-                ),
-              ],
-            ],
+    } else if (_aiUnavailable) {
+      body = TonalBox(
+        key: const ValueKey('creator-ai-unavailable'),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Text(
+          'Add an AI provider in Settings.',
+          style: theme.typography.baseline.bodySmall.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.4,
           ),
         ),
       );
-    } else if (_ideas == null) {
-      if (keyLoading) {
-        body = SizedBox(
-          width: double.infinity,
-          child: M3EButton.tonal(
-            key: const ValueKey('creator-ai-suggest'),
-            onPressed: null,
-            icon: const Icon(Icons.auto_awesome_outlined),
-            label: const Text('Suggest with AI'),
-          ),
-        );
-      } else if (!keyAvailable) {
-        body = TonalBox(
-          key: const ValueKey('creator-ai-unavailable'),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Text(
-            'AI suggestions need a provider. Add an API key in Settings. '
-            'Manual cards work without one.',
-            style: theme.typography.baseline.bodySmall.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              height: 1.45,
+    } else if (_aiError != null) {
+      body = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Semantics(
+              liveRegion: true,
+              child: TonalBox(
+                key: const ValueKey('creator-ai-error'),
+                color: theme.colorScheme.errorContainer,
+                padding: const EdgeInsets.all(14),
+                child: Text(
+                  _aiError!,
+                  style: theme.typography.baseline.bodyMedium.copyWith(
+                    color: theme.colorScheme.onErrorContainer,
+                    height: 1.4,
+                  ),
+                ),
+              ),
             ),
           ),
-        );
-      } else {
-        body = SizedBox(
-          width: double.infinity,
-          child: M3EButton.tonal(
-            key: const ValueKey('creator-ai-suggest'),
-            onPressed: _saving ? null : _loadAiSuggestions,
-            icon: const Icon(Icons.auto_awesome_outlined),
-            label: const Text('Suggest with AI'),
-          ),
-        );
-      }
+          const SizedBox(width: 4),
+          _aiRetryButton(),
+        ],
+      );
+    } else if (_ideas == null) {
+      body = const SizedBox.shrink();
     } else if (_ideas!.isEmpty) {
-      body = TonalBox(
-        key: const ValueKey('creator-ai-empty'),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Text(
-          'The AI found no new cards here.',
-          style: theme.typography.baseline.bodyMedium.copyWith(height: 1.45),
-        ),
+      body = Row(
+        children: [
+          Expanded(
+            child: TonalBox(
+              key: const ValueKey('creator-ai-empty'),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Text(
+                'No new cards found.',
+                style: theme.typography.baseline.bodyMedium.copyWith(
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          _aiRetryButton(),
+        ],
       );
     } else {
       body = _buildAiResults(theme);
@@ -1915,15 +1696,17 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     return Column(
       key: const ValueKey('creator-ai-section'),
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SectionTitle(
-          'AI suggestions',
-          supporting:
-              'Optional. AI proposes ideas; keep the variants that help.',
-          trailing: trailing,
-        ),
-        body,
-      ],
+      children: [body],
+    );
+  }
+
+  Widget _aiRetryButton() {
+    return M3EIconButton(
+      key: const ValueKey('creator-ai-retry'),
+      variant: M3EIconButtonVariant.standard,
+      icon: const Icon(Icons.refresh),
+      tooltip: 'Suggest again',
+      onPressed: _saving ? null : _loadAiSuggestions,
     );
   }
 
@@ -1936,14 +1719,21 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          '${ideas.length} idea${ideas.length == 1 ? '' : 's'} · '
-          '$variants variant${variants == 1 ? '' : 's'}',
-          style: theme.typography.baseline.labelSmall.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${ideas.length} idea${ideas.length == 1 ? '' : 's'} · '
+                '$variants variant${variants == 1 ? '' : 's'}',
+                style: theme.typography.baseline.labelSmall.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            _aiRetryButton(),
+          ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         for (var ideaIndex = 0; ideaIndex < ideas.length; ideaIndex++) ...[
           if (ideaIndex > 0) const SizedBox(height: 10),
           _AiIdeaCard(

@@ -52,11 +52,11 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    expect(find.text('Save 1 card'), findsOneWidget);
+    expect(find.text('Cards to save · 1'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Save 1 card'));
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester);
-    await tester.tap(find.text('Save 1 card'));
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
     final cards = await tester.runAsync(

@@ -233,9 +233,9 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
-    await tester.ensureVisible(find.text('Save 1 card'));
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester);
-    await tester.tap(find.text('Save 1 card'));
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
     final manuals = await tester.runAsync(
@@ -380,11 +380,18 @@ void main() {
     await tester.tap(suggest);
     await pumpFrames(tester, frames: 24);
 
-    expect(find.text('AI suggestions'), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-ai-section')), findsOneWidget);
+    expect(find.text('AI suggestions'), findsNothing);
     expect(find.text('3 ideas · 3 variants'), findsOneWidget);
-    expect(find.text('Contrast'), findsOneWidget);
-    expect(find.text('Mechanism'), findsNWidgets(2));
-    expect(find.text('Ready'), findsNWidgets(2));
+    expect(find.text('Contrast'), findsWidgets);
+    expect(find.text('Cause and effect'), findsNWidgets(2));
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('creator-ai-section')),
+        matching: find.text('Ready'),
+      ),
+      findsNWidgets(2),
+    );
     expect(
       find.textContaining('Can be answered with yes or no'),
       findsOneWidget,
@@ -482,19 +489,36 @@ void main() {
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 
-    expect(find.byKey(const ValueKey('creator-term')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('creator-definition-cloze')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('creator-front')), findsNothing);
     expect(find.text('Basic'), findsNothing);
     expect(find.text('Concept'), findsNothing);
-    expect(find.text('Definition / term'), findsOneWidget);
+    expect(find.text('Definition'), findsWidgets);
     expect(
       tester
-          .widget<M3ETextField>(find.byKey(const ValueKey('creator-term')))
+          .widget<M3ETextField>(
+            find.byKey(const ValueKey('creator-definition-cloze')),
+          )
           .controller!
           .text,
-      'managed service',
+      contains('managed service'),
+    );
+    expect(
+      tester
+          .widget<M3EButton>(find.byKey(const ValueKey('creator-add')))
+          .onPressed,
+      isNull,
     );
 
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-definition-cloze')),
+      'Definition of {{c1::managed service}}: '
+      '{{c2::A service run by the provider.}}',
+    );
+    await pumpFrames(tester);
     await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
     await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('creator-add')));
@@ -509,6 +533,7 @@ void main() {
     );
     expect(concepts, hasLength(1));
     expect(concepts!.single.term, 'managed service');
+    expect(concepts.single.definition, 'A service run by the provider.');
     expect(concepts.single.subtopic, 'Networking');
     final manuals = await tester.runAsync(
       () => harness.cards.watchManualCards().first,

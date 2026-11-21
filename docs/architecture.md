@@ -97,12 +97,18 @@ of the random queue.
    explanation, per-alternative explanations, topic and practice names.
 2. `dueAt` is the last wrong time plus 48 hours. One active card per question is
    enforced by the partial unique index `error_cards_active_question`.
-3. The end-of-session review and Cards put an error step in a non-modal split
-   studio: `QuestionFeedbackView` on top and `CardCreatorPane` below, or side
-   by side on tablets and phone landscape. The divider drags between the panes,
-   each pane owns its scroll position, and the creator keeps a sticky **Save N
-   cards** action. The ratio lives in `PageStorage`, per axis, under the review
-   page's key; it is never written to settings or the database. Manual entry
+3. The end-of-session review and Cards put every error, skipped, concept and
+   note step in one full-width reading surface with a shared `ReviewActionDock`.
+   The card icon opens `CardCreatorSheet` as a modal bottom sheet over the
+   feedback, so there is no split view. The sheet has no save action: the dock
+   owns the single Save, which writes the cached drafts through
+   `saveCardCreatorDrafts`. Every item keeps a `CardCreatorSnapshot` on the
+   page's `CardCreatorController`; closing or hiding the sheet stores typed
+   text, template, drafts, AI ideas and seed state, and reopening the same item
+   restores them. Snapshots clear only after a successful save, note delete or
+   reviewed exit. The dock order is back, create, delete when available, Save
+   and forward; the last step labels it Finish, note review labels it Save and
+   finish, and leaving with pending work asks first. Manual entry
    adds cards one at a time and needs no AI. Five templates (Definition,
    Contrast, Mechanism, Exam heuristic, Procedure) write the front and back;
    Definition becomes a Cloze concept, the other four become Basic
@@ -118,18 +124,24 @@ of the random queue.
    Bias/vaccine text boxes and the old AI check were removed.
 
    The creator UI is split into `CardCreatorBody`, which holds the template
-   picker, fields, quality, drafts, AI section and save loop, and two hosts:
-   `CardCreatorSheet` for the modal bottom sheet (skipped and note steps) and
-   `CardCreatorPane` for embedding without a modal, close button or context
-   recap. `CardCreatorPane` reports its draft count so the page can guard
-   Previous, Skip, Continue and close. The page owns one
-   `CardCreatorController`; the feedback pane seeds it from a bullet
-   (`seedFromBullet`) or a note (`seedFromNote`), and the creator applies a seed
-   only when `seedRevision` changes. `LookupService.suggestCardFromWrongNote`
-   drafts one front/back pair; without an AI key the front is the bullet and the
-   back stays empty. AI loading, inline failure, **Use AI draft**, added-bullet
-   state and draft removal all flow through the same controller. Both hosts keep
-   an independent scroll view and report saves through `onSaved`.
+   picker, fields, quality, drafts, AI section and save loop, and the review
+   host `CardCreatorSheet`. Review pages pass `showSaveButton: false`,
+   `showContextRecap: false` and `showSeedSource: false` so the dock owns the
+   only Save. Each reviewed item gets a `CardCreatorSnapshot` keyed by its page
+   and id; `_storeSnapshot` runs before the controllers are disposed, so a
+   drag-down, system back or close keeps typed text, template, drafts, AI ideas
+   and seed state for that item. Moving to another step clears only the live
+   seed. The dock Save writes cached drafts through
+   `saveCardCreatorDrafts`, which also marks the note converted, the error
+   details complete or the skipped question handled. `CardCreatorPane` remains
+   the non-modal host for embedded/tests and reports draft counts.
+   `CardCreatorController` seeds from a bullet (`seedFromBullet`) or a note
+   (`seedFromNote`), and the creator applies a seed only when `seedRevision`
+   changes. `LookupService.suggestCardFromWrongNote` drafts one front/back pair
+   and chooses its template; without an AI key the front is the bullet and the
+   back stays empty with a Settings hint. AI loading, inline failure,
+   **Use AI draft**, added-bullet state and draft removal all flow through the
+   same controller.
 4. After the delay, the card appears in Past errors. A correct re-test sets
    `status = resolved` and `resolvedAt`, keeping the row for history. A wrong
    re-test updates `lastWrongAt` and pushes `dueAt` another 48 hours.
@@ -184,13 +196,12 @@ banner, **Why this answer**, and Define / Ask / Save as note / URL actions. The
 review passes read-only bullets and the notes for the question; practice passes
 the editable bullet editor and the distraction checks. A distracted card adds
 **You were distracted or misread. This card stays due.** In the review each
-bullet offers **Turn bullet into card**, and each note offers Copy and
-**Create card with AI**; both seed the embedded creator instead of opening a
-sheet. The feedback pane is announced as a region and stays inside one
+bullet offers an icon-only sparkle that seeds the bottom-sheet creator, and
+each note offers Copy plus a sparkle that seeds it from the note. Both keep the
+feedback readable and open no split pane. The feedback stays inside one
 selection area, so Define, Ask, Save as note and Copy work across the question,
 bullets and notes. The old card-content editor has no entry point. Skipped,
-concept and session-note steps keep their existing scroll body and sheet; only
-the error step uses the split studio.
+concept and session-note steps share the same dock and sheet.
 
 ### Concepts, basic cards, skipped questions and notes
 
@@ -202,7 +213,7 @@ the error step uses the split studio.
 | Concept cards | Cloze text `Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Topic and subtopic travel as tags only. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
 | Basic cards | Question/answer cards from skipped questions, Ask, a note or a review bullet, with optional context above the front and a cognitive type (fact, heuristic, contrast). | `CardRepository.createManualCard`, `card_creator_sheet.dart`, `review_service.dart` | `manual_cards` |
 | Skipped queue | Every skipped/unknown answer is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
-| Notes (`notes` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it is shown again whenever that question is practised. Tapping a note offers Define, Ask and **Delete note**; deletion is immediate with no confirmation. At review a note can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one at a time and works without AI; optional AI suggestions offer up to three variants per idea and the learner keeps any combination. Each saved variant becomes a Basic card (or a Cloze concept for a Definition idea) with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards, where tapping one walks them one at a time through the shared view. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createNote/notesForQuestion/keepNote/markNoteConverted/deleteNotes`, `LookupService.suggestArchetypeCards`, `note_review_page.dart`, `note_review_view.dart`, `card_creator_sheet.dart` | `notes`, `manual_cards` |
+| Notes (`notes` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it is shown again whenever that question is practised. In practice, tapping a note offers Define, Ask and **Delete note**; that deletion is immediate with no confirmation. In review the dock delete icon asks before removing the note. A note can be kept with Save or turned into cards with the dock Create cards action. The creator's manual entry adds cards one at a time and works without AI; optional AI suggestions offer up to three variants per idea and the learner keeps any combination. Each saved variant becomes a Basic card (or a Cloze concept for a Definition idea) with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards, where tapping one walks them one at a time through the shared view with **See context**. They can be downloaded as plain text and are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createNote/notesForQuestion/keepNote/markNoteConverted/deleteNotes`, `LookupService.suggestArchetypeCards`, `note_review_page.dart`, `note_review_view.dart`, `card_creator_sheet.dart` | `notes`, `manual_cards` |
 | Note download | The download action in the Notes header writes a plain-text file through the system share sheet. | `CardsPage._downloadNotes`, `ExportService.shareNotes` | `notes` |
 
 ### Statistics and statistics export
@@ -298,10 +309,11 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   combined error/skipped review. A separate app-bar **Review all pending**
   action opens every pending error and skipped question.
 - There is no **Review notes** button: tapping a note walks the notes one at a
-  time, with Previous, Keep/Skip and Done like the error review. The contextual
-  **Create cards** action opens the shared card creator. The shared
-  `NoteReviewView` shows the phrase, its question context, topic and practice
-  pills, and the card actions; the end-of-session note step uses the same view.
+  time with the shared dock. **Create cards** opens the creator sheet; **Save
+  and finish** keeps the note, and the delete icon asks first. The shared
+  `NoteReviewView` shows the phrase, its topic and practice pills, and **See
+  context** for a read-only question and attempt; the end-of-session note step
+  uses the same view.
 - **Export to AnkiDroid** creates missing decks and note types, bulk-adds notes,
   marks cards exported and broadcasts `com.ichi2.anki.DO_SYNC`.
 - **Share as files** writes Anki-compatible cloze `.txt` and basic `.tsv` files. File export does not encode a deck or tags and never includes notes. Exported Anki notes carry hierarchical `topic::` and `subtopic::` tags in the direct AnkiDroid path.

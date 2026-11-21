@@ -77,20 +77,21 @@ Review opens fullscreen.
 
 - **Wrong questions** use the same feedback as practice: the topic and subtopic labels, the question, every alternative with its correct/wrong state and explanation, the status banner, **Why this answer**, and your read-only **What went wrong?** bullets.
 - If the card was kept because a re-test was distracted, a warning says **You were distracted or misread. This card stays due.**
-- Notes saved for the question appear below the bullets. **Copy** copies a note; **Create card with AI** seeds the creator with it. The note menu also offers Define, Ask and Delete note.
-- The review does not edit the question or options. An error step is a non-modal studio: the feedback sits above the card creator, or beside it on tablets and phone landscape. Drag the divider to give the feedback or the creator more room. Each pane has its own scroll position, and a sticky **Save N cards** action stays at the bottom of the creator.
-- **Turn bullet into card** on any read-only bullet seeds the creator with that bullet. With an AI provider the creator shows **Drafting…** and fills the front and back; without one it prefills the front and leaves the back for you to write. If you edit the fields before the draft arrives, the creator offers **Use AI draft** instead of overwriting your text. A second bullet or a note asks before replacing edits you started.
+- Notes saved for the question appear below the bullets. **Copy** copies a note; the sparkle action seeds the creator with it. The note menu also offers Define, Ask and Delete; Delete asks for confirmation.
+- The review does not edit the question or options. Every step is one full-width reading surface with a shared bottom dock. The card icon opens the creator as a bottom sheet, so the feedback stays readable above it. The creator keeps a separate session for each item: typed text, the selected template, drafts and AI results stay when the sheet closes and when you move between steps.
+- The sparkle action beside any read-only bullet seeds the creator with that bullet. With an AI provider the creator shows **Drafting a card…** and fills the front and back, choosing the template; without one it prefills the front and leaves the back for you to write. If you edit the fields before the draft arrives, the creator offers **Use AI draft** instead of overwriting your text. A second bullet or note asks before replacing a draft you started.
 - Manual entry adds cards one at a time and works offline without AI. Five templates write the front and back: Definition / term, Contrast / difference, Mechanism / cause-effect, Exam heuristic and Phase transition / procedure.
-- Unsaved drafts ask **Discard unsaved cards?** before Previous, Skip, Continue or closing the review. Save the cards first to advance without a prompt.
+- The dock keeps the same controls in the same order: back arrow, Create cards, Delete when the step has something to delete, Save and the forward arrow. The back arrow is disabled on the first step. Save creates the listed drafts and moves on; the last step shows **Finish**, and note review shows **Save and finish**. The forward arrow moves without saving, but the drafts stay with their item. Leaving the last step asks before discarding any drafts or typed text.
+- Delete is an icon with a confirmation. No Delete note or Delete card text sits in the dock.
 - AI suggestions are optional: each idea offers up to three wording variants, and the error breakdown proposes a contrast between your choice and the correct option and/or an exam heuristic. The refresh icon asks for another try and keeps your drafts.
 - Every builder card, draft and AI variant carries an advisory quality badge and the estimated reading time. The badge warns about yes/no questions, fronts over 30 words, cards over 15 seconds to read, answer clues, template mismatches, empty fronts or backs, a missing definition, and a definition that repeats its term. It never blocks saving. Choose the cards to add; the error is then marked reviewed. There are no bias or vaccine text boxes and no Check with AI button.
-- **Skipped questions** ask **What was missing here?**.
+- **Skipped questions** ask what was missing.
   - **A concept** creates a concept card from a term and definition.
   - **Another question** creates a basic card from a question and answer.
-- **Create cards** also sits inside the skipped review and opens the same creator with the question and correct answer prefilled as a custom card. Manual entry adds one card at a time; AI is not required.
+- **Create cards** also sits in the skipped review dock and opens the same creator with the question and correct answer prefilled as a custom card. Manual entry adds one card at a time; AI is not required.
 - **Concepts without a definition** get a definition field.
-- **Notes** from the session can be kept or turned into cards with **Create cards**. The creator's manual entry adds cards one by one and needs no AI provider. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
-- **Skip** leaves a step for later. Missing card details can be finished from **Cards**.
+- **Notes** from the session can be kept with **Save** or turned into cards with **Create cards**. The creator's manual entry adds cards one by one and needs no AI provider. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
+- The forward arrow leaves a step for later and the last one reports completion. Missing card details can be finished from **Cards**.
 
 ## Past errors
 
@@ -119,10 +120,10 @@ Review opens fullscreen.
 ## Notes
 
 - Select any question, answer or explanation text during practice and choose **Save as note**. The phrase is shown in place and belongs to the question, so it appears whenever that question is practised again.
-- Tap a note to **Define**, **Ask** or **Delete note**. Deleting is immediate and asks no confirmation.
-- Notes stay in **Cards** and can be reviewed one at a time by tapping one.
-- **Create cards** sits inside the note review and opens the card creator. Manual entry adds cards one at a time and works without AI. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
-- A note with a card hides the card-making actions. **Keep for later** marks it as kept, and **Delete note** removes only the saved phrase.
+- In practice, tapping a note offers **Define**, **Ask** or **Delete note**; deletion is immediate and asks no confirmation.
+- Notes stay in **Cards** and can be reviewed one at a time by tapping one. Review notes with **See context** opens the original question and your attempt read-only, without repeating the note.
+- **Create cards** sits in the note review dock and opens the card creator as a bottom sheet. Manual entry adds cards one at a time and works without AI. AI suggestions are optional and offer up to three wording variants per idea; check the ones to add.
+- The dock delete icon removes only the saved phrase and asks first. A note with a card keeps its text until you delete it. **Save and finish** keeps the note and closes the review.
 - The download action in the Notes header saves notes as plain text.
 - Notes are never sent to AnkiDroid.
 

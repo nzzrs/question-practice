@@ -4,10 +4,14 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/ui/adaptive_split_view.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_card_review_view.dart';
+import '../export/card_creator_controller.dart';
 import '../export/card_creator_sheet.dart';
 import '../export/cards_page.dart';
+import '../feedback/domain/wrong_notes.dart';
+import '../feedback/feedback_step_header.dart';
 import 'domain/review_service.dart';
 import 'note_review_view.dart';
 import 'skipped_question_view.dart';
@@ -30,8 +34,13 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   bool _busy = false;
   bool _finished = false;
 
+  static const _splitStorageKey = ValueKey<String>('session-review-split');
+
   final _definition = TextEditingController();
   final _scroll = ScrollController();
+  final _feedbackScroll = ScrollController();
+  final _creator = CardCreatorController();
+  int _draftCount = 0;
 
   @override
   void initState() {
@@ -43,6 +52,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   void dispose() {
     _definition.dispose();
     _scroll.dispose();
+    _feedbackScroll.dispose();
+    _creator.dispose();
     super.dispose();
   }
 
@@ -86,7 +97,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       _index++;
       _prepareStep();
     });
-    _resetScroll();
+    _resetStepState();
   }
 
   void _goBack() {
@@ -95,11 +106,71 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       _index--;
       _prepareStep();
     });
+    _resetStepState();
+  }
+
+  void _resetStepState() {
+    _creator.clearSeed();
+    _draftCount = 0;
     _resetScroll();
+    if (_feedbackScroll.hasClients) _feedbackScroll.jumpTo(0);
   }
 
   void _resetScroll() {
     if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  Future<bool> _confirmDiscard() async {
+    if (_draftCount <= 0) return true;
+    final count = _draftCount;
+    return confirmDialog(
+      context,
+      title: 'Discard unsaved cards?',
+      message:
+          '$count card${count == 1 ? ' is' : 's are'} not saved yet. '
+          'Leaving this step discards ${count == 1 ? 'it' : 'them'}.',
+      confirmLabel: 'Discard cards',
+      cancelLabel: 'Keep editing',
+    );
+  }
+
+  Future<void> _requestAdvance() async {
+    if (_busy) return;
+    if (!await _confirmDiscard() || !mounted) return;
+    _advance();
+  }
+
+  Future<void> _requestBack() async {
+    if (_busy) return;
+    if (!await _confirmDiscard() || !mounted) return;
+    _goBack();
+  }
+
+  Future<void> _requestClose() async {
+    if (!await _confirmDiscard() || !mounted) return;
+    // Pop directly: the focus shell's PopScope delegates back here, so
+    // maybePop would re-enter this guard.
+    Navigator.of(context).pop();
+  }
+
+  CardCreatorRequest _requestFor(ErrorCard card) {
+    return CardCreatorRequest(
+      title: 'Create cards',
+      sessionId: card.sessionId,
+      questionId: card.questionId,
+      questionContext: card.question,
+      topicName: card.topicName,
+      subtopic: card.subtopic,
+      error: CardCreatorErrorSource(
+        card: card,
+        question: card.question,
+        wrongAnswer: card.wrongAnswer,
+        correctAnswer: card.correctAnswer,
+        reasoning: card.reasoning,
+        explanation: card.explanation,
+        wrongNotes: WrongNotes.parse(card.reasoning),
+      ),
+    );
   }
 
   Future<void> _createSkippedCards(SkippedReviewStep step) async {
@@ -266,6 +337,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     }
 
     final step = _step!;
+    final errorStep = step is ErrorReviewStep ? step : null;
+    final isError = errorStep != null;
     final heading = switch (step) {
       ErrorReviewStep() => 'Analyse the error',
       SkippedReviewStep() => 'What was missing?',
@@ -276,6 +349,8 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       title: 'Review',
       showBack: true,
       focus: true,
+      maxWidth: isError ? 1200 : 720,
+      onBack: _requestClose,
       scrollController: _scroll,
       variant: M3EAppBarVariant.small,
       bottomBar: AppActionDock(
@@ -283,7 +358,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           children: [
             if (_index > 0) ...[
               M3EButton.text(
-                onPressed: _busy ? null : _goBack,
+                onPressed: _busy ? null : _requestBack,
                 child: const Text('Previous'),
               ),
               const SizedBox(width: 4),
@@ -295,7 +370,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     : () {
                         switch (step) {
                           case ErrorReviewStep():
-                            _advance();
+                            _requestAdvance();
                           case SkippedReviewStep():
                             _createSkippedCards(step);
                           case ConceptDefinitionStep():
@@ -322,55 +397,81 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
             ),
             const SizedBox(width: 8),
             M3EButton.text(
-              onPressed: _busy ? null : _advance,
+              onPressed: _busy ? null : _requestAdvance,
               child: const Text('Skip'),
             ),
           ],
         ),
       ),
-      children: [
-        Text(
-          'Step ${_index + 1} of ${data.steps.length}',
-          style: theme.typography.baseline.labelMedium.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 8),
-        LinearScore(value: (_index + 1) / data.steps.length),
-        const SizedBox(height: 22),
-        Text(heading, style: theme.typography.emphasized.headlineSmall),
-        const SizedBox(height: 16),
-        switch (step) {
-          ErrorReviewStep(:final card) => ErrorCardReviewView(
-            card: card,
-            onCardsAdded: (count) {
-              if (!mounted) return;
-              setState(() => _created += count);
-              _advance();
-            },
-          ),
-          SkippedReviewStep(
-            :final question,
-            :final topicName,
-            :final reasoning,
-            :final unknown,
-          ) =>
-            _SkippedStep(
-              question: question,
-              topicName: topicName,
-              reasoning: reasoning,
-              unknown: unknown,
-            ),
-          ConceptDefinitionStep(:final concept) => _ConceptStep(
-            concept: concept,
-            definition: _definition,
-          ),
-          NoteReviewStep(:final note) => NoteReviewView(
-            note: note,
-            onCreateCards: () => _createNoteCards(step),
-          ),
-        },
-      ],
+      body: isError
+          ? AdaptiveSplitView(
+              storageKey: _splitStorageKey,
+              leading: ErrorCardReviewView(
+                card: errorStep.card,
+                creator: _creator,
+                onSeedRequested: () {},
+                leading: FeedbackStepHeader(
+                  label: 'Step ${_index + 1} of ${data.steps.length}',
+                  progress: (_index + 1) / data.steps.length,
+                  heading: heading,
+                ),
+                scrollController: _feedbackScroll,
+              ),
+              trailing: CardCreatorPane(
+                key: ValueKey('creator-${errorStep.card.id}'),
+                request: _requestFor(errorStep.card),
+                controller: _creator,
+                onSaved: (count) {
+                  if (!mounted || count <= 0) return;
+                  setState(() => _created += count);
+                  _creator.clearSeed();
+                  _advance();
+                },
+                onDraftCountChanged: (count) {
+                  if (!mounted || count == _draftCount) return;
+                  setState(() => _draftCount = count);
+                },
+              ),
+            )
+          : null,
+      children: isError
+          ? const []
+          : [
+              Text(
+                'Step ${_index + 1} of ${data.steps.length}',
+                style: theme.typography.baseline.labelMedium.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              LinearScore(value: (_index + 1) / data.steps.length),
+              const SizedBox(height: 22),
+              Text(heading, style: theme.typography.emphasized.headlineSmall),
+              const SizedBox(height: 16),
+              switch (step) {
+                ErrorReviewStep() => const SizedBox.shrink(),
+                SkippedReviewStep(
+                  :final question,
+                  :final topicName,
+                  :final reasoning,
+                  :final unknown,
+                ) =>
+                  _SkippedStep(
+                    question: question,
+                    topicName: topicName,
+                    reasoning: reasoning,
+                    unknown: unknown,
+                  ),
+                ConceptDefinitionStep(:final concept) => _ConceptStep(
+                  concept: concept,
+                  definition: _definition,
+                ),
+                NoteReviewStep(:final note) => NoteReviewView(
+                  note: note,
+                  onCreateCards: () => _createNoteCards(step),
+                ),
+              },
+            ],
     );
   }
 }

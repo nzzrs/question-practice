@@ -6,10 +6,10 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
+import '../export/card_creator_controller.dart';
 import '../feedback/feedback_actions.dart';
 import '../feedback/feedback_snapshot.dart';
 import '../feedback/question_feedback_view.dart';
-import '../export/card_creator_sheet.dart';
 import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 
@@ -21,15 +21,30 @@ enum _NoteAction { define, ask, delete }
 ///
 /// The same feedback surface as practice renders the question, alternatives,
 /// explanations, status and what-went-wrong bullets. The review is read-only:
-/// bullets and notes are text, and cards are created through the existing
-/// card-creator sheet.
+/// bullets and notes are text, and cards are written in the embedded creator
+/// beside this pane.
 class ErrorCardReviewView extends ConsumerStatefulWidget {
-  const ErrorCardReviewView({required this.card, this.onCardsAdded, super.key});
+  const ErrorCardReviewView({
+    required this.card,
+    required this.creator,
+    required this.onSeedRequested,
+    this.leading,
+    this.scrollController,
+    super.key,
+  });
 
   final ErrorCard card;
 
-  /// Reports how many atomic cards were added so the page can advance.
-  final ValueChanged<int>? onCardsAdded;
+  /// Page-scoped bridge to the embedded creator.
+  final CardCreatorController creator;
+
+  /// Lets the page reveal the creator after a bullet or note seed.
+  final VoidCallback onSeedRequested;
+
+  /// Review step header, scrolled with the feedback.
+  final Widget? leading;
+
+  final ScrollController? scrollController;
 
   @override
   ConsumerState<ErrorCardReviewView> createState() =>
@@ -39,7 +54,6 @@ class ErrorCardReviewView extends ConsumerStatefulWidget {
 class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
   List<Note> _notes = const [];
   Object? _notesError;
-  bool _cardsBusy = false;
 
   @override
   void initState() {
@@ -112,25 +126,37 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
   }
 
   Future<void> _createCardFromNote(Note note) async {
-    final card = widget.card;
-    final added = await showCardCreator(
-      context,
-      request: CardCreatorRequest(
-        title: 'Create cards',
-        sessionId: card.sessionId,
-        questionId: card.questionId,
-        questionContext: card.question,
-        topicName: card.topicName,
-        subtopic: card.subtopic,
-        initialTemplate: CardTemplate.definition,
-        initialTerm: note.text,
-        note: note,
-      ),
-    );
-    if (!mounted || added == 0) return;
-    await _loadNotes();
-    if (!mounted) return;
-    await showSnack(context, '$added card${added == 1 ? '' : 's'} created.');
+    if (widget.creator.seedDirty) {
+      final replace = await confirmDialog(
+        context,
+        title: 'Replace the draft you started?',
+        message:
+            'The creator already has edits from the previous bullet or note. '
+            'Replace them with this note?',
+        confirmLabel: 'Replace',
+        cancelLabel: 'Keep editing',
+      );
+      if (!replace || !mounted) return;
+    }
+    widget.creator.seedFromNote(note);
+    widget.onSeedRequested();
+  }
+
+  Future<void> _turnBulletIntoCard(String bulletId, String bullet) async {
+    if (widget.creator.seedDirty) {
+      final replace = await confirmDialog(
+        context,
+        title: 'Replace the draft you started?',
+        message:
+            'The creator already has edits from the previous bullet or note. '
+            'Replace them with this bullet?',
+        confirmLabel: 'Replace',
+        cancelLabel: 'Keep editing',
+      );
+      if (!replace || !mounted) return;
+    }
+    widget.creator.seedFromBullet(bulletId: bulletId, bullet: bullet);
+    widget.onSeedRequested();
   }
 
   Future<void> _deleteNote(Note note) async {
@@ -208,127 +234,67 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
     );
   }
 
-  Future<void> _createCards() async {
-    if (_cardsBusy) return;
-    final card = widget.card;
-    setState(() => _cardsBusy = true);
-    try {
-      final added = await showCardCreator(
-        context,
-        request: CardCreatorRequest(
-          title: 'Create cards',
-          sessionId: card.sessionId,
-          questionId: card.questionId,
-          questionContext: card.question,
-          topicName: card.topicName,
-          subtopic: card.subtopic,
-          error: CardCreatorErrorSource(
-            card: card,
-            question: card.question,
-            wrongAnswer: card.wrongAnswer,
-            correctAnswer: card.correctAnswer,
-            reasoning: card.reasoning,
-            explanation: card.explanation,
-          ),
-        ),
-      );
-      if (!mounted || added == 0) return;
-      final report = widget.onCardsAdded;
-      if (report != null) {
-        report(added);
-      } else {
-        await showSnack(
-          context,
-          '$added card${added == 1 ? '' : 's'} created.',
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _cardsBusy = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final card = widget.card;
-    return QuestionFeedbackView(
-      snapshot: FeedbackSnapshot.fromCard(card: card, notes: _notes),
-      actions: FeedbackActions(
-        onDefine: _define,
-        onOpenUrl: _openUrl,
-        onAsk: _ask,
-        onSaveNote: _saveNote,
-      ),
-      notes: _notes,
-      onCopyNote: _copyNote,
-      onCreateCardFromNote: _createCardFromNote,
-      onNoteOverflow: _openNoteActions,
-      readOnly: true,
-      hostFooter: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _CreateCardsSection(busy: _cardsBusy, onCreateCards: _createCards),
-          if (_notesError != null) ...[
-            const SizedBox(height: 12),
-            TonalBox(
-              key: const ValueKey('feedback-notes-error'),
-              color: theme.colorScheme.errorContainer,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Could not load notes: $_notesError',
-                    style: theme.typography.baseline.bodySmall.copyWith(
-                      color: theme.colorScheme.onErrorContainer,
-                      height: 1.4,
+    return ListenableBuilder(
+      listenable: widget.creator,
+      builder: (context, _) {
+        final activeBulletId = widget.creator.activeBulletId;
+        return Semantics(
+          container: true,
+          label: 'Question feedback',
+          child: QuestionFeedbackView(
+            snapshot: FeedbackSnapshot.fromCard(card: card, notes: _notes),
+            actions: FeedbackActions(
+              onDefine: _define,
+              onOpenUrl: _openUrl,
+              onAsk: _ask,
+              onSaveNote: _saveNote,
+            ),
+            leading: widget.leading,
+            notes: _notes,
+            onCopyNote: _copyNote,
+            onCreateCardFromNote: _createCardFromNote,
+            onNoteOverflow: _openNoteActions,
+            onTurnBulletIntoCard: _turnBulletIntoCard,
+            bulletBusy: activeBulletId != null,
+            activeBulletId: activeBulletId,
+            addedBulletIds: widget.creator.addedBulletIds,
+            readOnly: true,
+            scrollable: true,
+            pageStorageKey: PageStorageKey<String>(
+              'feedback-${card.questionId}',
+            ),
+            scrollController: widget.scrollController,
+            hostFooter: _notesError == null
+                ? null
+                : TonalBox(
+                    key: const ValueKey('feedback-notes-error'),
+                    color: theme.colorScheme.errorContainer,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Could not load notes: $_notesError',
+                          style: theme.typography.baseline.bodySmall.copyWith(
+                            color: theme.colorScheme.onErrorContainer,
+                            height: 1.4,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        M3EButton.text(
+                          key: const ValueKey('feedback-notes-retry'),
+                          onPressed: _loadNotes,
+                          child: const Text('Try again'),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  M3EButton.text(
-                    key: const ValueKey('feedback-notes-retry'),
-                    onPressed: _loadNotes,
-                    child: const Text('Try again'),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _CreateCardsSection extends StatelessWidget {
-  const _CreateCardsSection({required this.busy, required this.onCreateCards});
-
-  final bool busy;
-  final VoidCallback onCreateCards;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Create cards', style: theme.typography.emphasized.titleSmall),
-        const SizedBox(height: 4),
-        Text(
-          'Turn this error and your bullets into atomic cards. AI suggestions '
-          'are optional when an AI provider is configured.',
-          style: theme.typography.baseline.bodySmall.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            height: 1.4,
           ),
-        ),
-        const SizedBox(height: 12),
-        M3EButton.filled(
-          key: const ValueKey('error-create-cards'),
-          onPressed: busy ? null : onCreateCards,
-          icon: const Icon(Icons.add_card),
-          label: const Text('Create cards'),
-        ),
-      ],
+        );
+      },
     );
   }
 }

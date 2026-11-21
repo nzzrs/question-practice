@@ -97,29 +97,38 @@ of the random queue.
    explanation, per-alternative explanations, topic and practice names.
 2. `dueAt` is the last wrong time plus 48 hours. One active card per question is
    enforced by the partial unique index `error_cards_active_question`.
-3. The end-of-session review and Cards offer a contextual **Create cards**
-   button inside the review, not a floating button. It opens one card creator
-   shared by errors, notes and skipped questions as a draggable half-height
-   bottom sheet, so the review stays visible above it. Manual entry adds cards
-   one at a time and needs no AI. Five templates (Definition, Contrast,
-   Mechanism, Exam heuristic, Procedure) write the front and back; Definition
-   becomes a Cloze concept, the other four become Basic `manual_cards` with the
-   matching cognitive type. Every builder card, draft and AI variant carries an
-   advisory quality badge covering yes/no questions, long fronts and cards,
-   answer clues, template mismatches, missing fields, a missing definition and
-   a definition that repeats its term. AI suggestions sit below manual entry:
-   each idea offers up to three wording variants, and an error breakdown offers
-   at most two ideas (contrast and heuristic). Saved cards keep the topic and
-   subtopic as Anki tags, never in the text; the error then gets
-   `detailsCompletedAt`. Errors are not exported directly. Bias/vaccine text
-   boxes and the old AI check were removed.
+3. The end-of-session review and Cards put an error step in a non-modal split
+   studio: `QuestionFeedbackView` on top and `CardCreatorPane` below, or side
+   by side on tablets and phone landscape. The divider drags between the panes,
+   each pane owns its scroll position, and the creator keeps a sticky **Save N
+   cards** action. The ratio lives in `PageStorage`, per axis, under the review
+   page's key; it is never written to settings or the database. Manual entry
+   adds cards one at a time and needs no AI. Five templates (Definition,
+   Contrast, Mechanism, Exam heuristic, Procedure) write the front and back;
+   Definition becomes a Cloze concept, the other four become Basic
+   `manual_cards` with the matching cognitive type. Every builder card, draft
+   and AI variant carries an advisory quality badge covering yes/no questions,
+   long fronts and cards, answer clues, template mismatches, missing fields, a
+   missing definition and a definition that repeats its term. AI suggestions
+   sit below manual entry: each idea offers up to three wording variants, and
+   an error breakdown offers at most two ideas (contrast and heuristic). Saved
+   cards keep the topic and subtopic as Anki tags, never in the text; the error
+   then gets `detailsCompletedAt`. Errors are not exported directly.
+   Bias/vaccine text boxes and the old AI check were removed.
 
    The creator UI is split into `CardCreatorBody`, which holds the template
    picker, fields, quality, drafts, AI section and save loop, and two hosts:
-   `CardCreatorSheet` for the modal bottom sheet and `CardCreatorPane` for
-   embedding without a modal or context recap. Both keep an independent scroll
-   view; `CardCreatorBody` reports the saved count through `onSaved` so a split
-   view can stay open while the review behind it changes.
+   `CardCreatorSheet` for the modal bottom sheet (skipped and note steps) and
+   `CardCreatorPane` for embedding without a modal, close button or context
+   recap. `CardCreatorPane` reports its draft count so the page can guard
+   Previous, Skip, Continue and close. The page owns one
+   `CardCreatorController`; the feedback pane seeds it from a bullet
+   (`seedFromBullet`) or a note (`seedFromNote`), and the creator applies a seed
+   only when `seedRevision` changes. `LookupService.suggestCardFromWrongNote`
+   drafts one front/back pair; without an AI key the front is the bullet and the
+   back stays empty. AI loading, inline failure, **Use AI draft**, added-bullet
+   state and draft removal all flow through the same controller. Both hosts keep
+   an independent scroll view and report saves through `onSaved`.
 4. After the delay, the card appears in Past errors. A correct re-test sets
    `status = resolved` and `resolvedAt`, keeping the row for history. A wrong
    re-test updates `lastWrongAt` and pushes `dueAt` another 48 hours.
@@ -173,10 +182,14 @@ alternatives with correct/wrong state and expandable explanations, the status
 banner, **Why this answer**, and Define / Ask / Save as note / URL actions. The
 review passes read-only bullets and the notes for the question; practice passes
 the editable bullet editor and the distraction checks. A distracted card adds
-**You were distracted or misread. This card stays due.** Notes in the review can
-be copied or used to seed the existing card creator with **Create cards**.
-The old card-content editor has no entry point. There is no split view yet; the
-card creator remains the existing sheet.
+**You were distracted or misread. This card stays due.** In the review each
+bullet offers **Turn bullet into card**, and each note offers Copy and
+**Create card with AI**; both seed the embedded creator instead of opening a
+sheet. The feedback pane is announced as a region and stays inside one
+selection area, so Define, Ask, Save as note and Copy work across the question,
+bullets and notes. The old card-content editor has no entry point. Skipped,
+concept and session-note steps keep their existing scroll body and sheet; only
+the error step uses the split studio.
 
 ### Concepts, basic cards, skipped questions and notes
 

@@ -5,8 +5,10 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/core/ui/adaptive_split_view.dart';
 import 'package:question_practice/core/ui/app_sections.dart';
 import 'package:question_practice/features/errors/error_card_review_view.dart';
+import 'package:question_practice/features/export/card_creator_controller.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
 
 import '../../helpers/test_harness.dart';
@@ -76,11 +78,39 @@ Future<void> _pumpView(
   ErrorCard card, {
   ValueChanged<int>? onCardsAdded,
 }) async {
+  final creator = CardCreatorController();
+  addTearDown(creator.dispose);
   await pumpTestApp(
     tester,
     home: Scaffold(
-      body: SingleChildScrollView(
-        child: ErrorCardReviewView(card: card, onCardsAdded: onCardsAdded),
+      body: AdaptiveSplitView(
+        leading: SingleChildScrollView(
+          child: ErrorCardReviewView(
+            card: card,
+            creator: creator,
+            onSeedRequested: () {},
+          ),
+        ),
+        trailing: CardCreatorPane(
+          request: CardCreatorRequest(
+            title: 'Create cards',
+            sessionId: card.sessionId,
+            questionId: card.questionId,
+            questionContext: card.question,
+            topicName: card.topicName,
+            subtopic: card.subtopic,
+            error: CardCreatorErrorSource(
+              card: card,
+              question: card.question,
+              wrongAnswer: card.wrongAnswer,
+              correctAnswer: card.correctAnswer,
+              reasoning: card.reasoning,
+              explanation: card.explanation,
+            ),
+          ),
+          controller: creator,
+          onSaved: onCardsAdded,
+        ),
       ),
     ),
     harness: harness,
@@ -115,8 +145,9 @@ void main() {
     expect(find.text('Flawed assumption (bias)'), findsNothing);
     expect(find.text('Vaccine (rule / protocol)'), findsNothing);
     expect(find.byKey(const ValueKey('error-card-reading-time')), findsNothing);
-    expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
-    expect(find.text('Create cards'), findsWidgets);
+    expect(find.byType(AdaptiveSplitView), findsOneWidget);
+    expect(find.byType(CardCreatorPane), findsOneWidget);
+    expect(find.text('Card creator'), findsOneWidget);
   });
 
   testWidgets('manual error cards work without an AI provider', (tester) async {
@@ -125,40 +156,9 @@ void main() {
     final card = await _createError(harness);
 
     await _pumpView(tester, harness, card);
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('error-create-cards')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
-    await pumpFrames(tester);
 
-    expect(find.byType(CardCreatorSheet), findsOneWidget);
-    expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
-    final context = find.byKey(const ValueKey('creator-context'));
-    expect(
-      find.descendant(of: context, matching: find.text('Wrong answer chosen')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: context, matching: find.text('Wrong 1')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: context, matching: find.text('Correct answer')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(of: context, matching: find.text('Correct 1')),
-      findsOneWidget,
-    );
-    expect(
-      find.descendant(
-        of: context,
-        matching: find.text('Confusion between 2 options'),
-      ),
-      findsOneWidget,
-    );
-    await expandCardCreatorSheet(tester);
+    expect(find.byType(CardCreatorPane), findsOneWidget);
+    expect(find.byType(CardCreatorSheet), findsNothing);
 
     await tester.enterText(
       find.byKey(const ValueKey('creator-front')),
@@ -216,13 +216,6 @@ void main() {
     final card = await _createError(harness);
 
     await _pumpView(tester, harness, card);
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('error-create-cards')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
-    await pumpFrames(tester);
-    await expandCardCreatorSheet(tester);
     await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
     );
@@ -289,13 +282,6 @@ void main() {
 
     await _pumpView(tester, harness, card);
     await tester.ensureVisible(
-      find.byKey(const ValueKey('error-create-cards')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
-    await pumpFrames(tester);
-    await expandCardCreatorSheet(tester);
-    await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
     );
     await pumpFrames(tester);
@@ -355,13 +341,6 @@ void main() {
       onCardsAdded: (count) => reported = count,
     );
     await tester.ensureVisible(
-      find.byKey(const ValueKey('error-create-cards')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
-    await pumpFrames(tester);
-    await expandCardCreatorSheet(tester);
-    await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
     );
     await pumpFrames(tester);
@@ -406,13 +385,6 @@ void main() {
     final card = await _createError(harness);
 
     await _pumpView(tester, harness, card);
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('error-create-cards')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
-    await pumpFrames(tester);
-    await expandCardCreatorSheet(tester);
 
     expect(find.byKey(const ValueKey('creator-ai-suggest')), findsNothing);
     await tester.ensureVisible(
@@ -442,13 +414,6 @@ void main() {
     final card = await _createError(harness);
 
     await _pumpView(tester, harness, card);
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('error-create-cards')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-create-cards')));
-    await pumpFrames(tester);
-    await expandCardCreatorSheet(tester);
     await tester.ensureVisible(
       find.byKey(const ValueKey('creator-ai-suggest')),
     );

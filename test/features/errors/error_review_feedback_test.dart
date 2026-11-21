@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/core/ui/adaptive_split_view.dart';
 import 'package:question_practice/features/errors/error_cards_review_page.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/feedback/feedback_option_card.dart';
@@ -63,7 +64,13 @@ void main() {
       expect(find.byType(QuestionFeedbackView), findsOneWidget);
       expect(find.byType(FeedbackOptionCard), findsNWidgets(2));
       expect(find.byKey(const ValueKey('wrong-notes-list')), findsOneWidget);
-      expect(find.byType(EditableText), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byType(QuestionFeedbackView),
+          matching: find.byType(EditableText),
+        ),
+        findsNothing,
+      );
       expect(
         find.text('I confused the network and transport layers.'),
         findsOneWidget,
@@ -158,14 +165,15 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.byKey(ValueKey('feedback-note-card-$noteId')));
     await pumpFrames(tester);
-    expect(find.byType(CardCreatorSheet), findsOneWidget);
-    await expandCardCreatorSheet(tester);
+    expect(find.byType(CardCreatorSheet), findsNothing);
+    expect(find.byType(CardCreatorPane), findsOneWidget);
+    expect(find.text('From this note'), findsOneWidget);
+    expect(find.byKey(const ValueKey('creator-seed-hint')), findsOneWidget);
 
     final term = tester.widget<M3ETextField>(
       find.byKey(const ValueKey('creator-term')),
     );
     expect(term.controller!.text, 'a managed service removes host maintenance');
-    expect(find.text('From this note'), findsOneWidget);
   });
 
   testWidgets('the old error content editor is unreachable', (tester) async {
@@ -181,7 +189,8 @@ void main() {
 
     expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);
     expect(find.text('Edit card content'), findsNothing);
-    expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
+    expect(find.byType(AdaptiveSplitView), findsOneWidget);
+    expect(find.byType(CardCreatorPane), findsOneWidget);
   });
 
   testWidgets('the review fits 360 dp at 2.0 text scale', (tester) async {
@@ -209,14 +218,9 @@ void main() {
       harness: harness,
     );
     expect(tester.takeException(), isNull);
-
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('error-create-cards')),
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await pumpFrames(tester);
-    expect(tester.takeException(), isNull);
+    expect(find.byType(AdaptiveSplitView), findsOneWidget);
+    expect(find.byType(CardCreatorPane), findsOneWidget);
     expect(find.byKey(const ValueKey('wrong-notes-list')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }

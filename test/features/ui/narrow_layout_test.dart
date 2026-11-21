@@ -7,8 +7,10 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/theme.dart';
 import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/core/ui/adaptive_split_view.dart';
 import 'package:question_practice/core/ui/immersive_review.dart';
 import 'package:question_practice/features/errors/past_errors_page.dart';
+import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/export/cards_page.dart';
 import 'package:question_practice/features/help/help_page.dart';
 import 'package:question_practice/features/home/home_page.dart';
@@ -179,11 +181,10 @@ void main() {
       home: ReviewPage(sessionId: start.session.id),
       harness: harness,
     );
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
-    await pumpFrames(tester);
     expect(tester.takeException(), isNull);
+    expect(find.byType(AdaptiveSplitView), findsOneWidget);
+    expect(find.byType(CardCreatorPane), findsOneWidget);
     expect(find.text('What went wrong?'), findsOneWidget);
-    expect(find.byKey(const ValueKey('error-create-cards')), findsOneWidget);
     expect(find.text('Check with AI'), findsNothing);
   });
 

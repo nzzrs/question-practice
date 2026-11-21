@@ -705,6 +705,16 @@ void main() {
 
     tester.view.viewInsets = const FakeViewPadding(bottom: 160);
     await pumpFrames(tester);
+    for (final key in _controlKeys) {
+      await tester.scrollUntilVisible(
+        find.byKey(ValueKey(key)),
+        120,
+        scrollable: _sheetScrollable(),
+      );
+      await pumpFrames(tester);
+      expect(find.byKey(ValueKey(key)), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    }
     expect(_saveButton().hitTestable(), findsOneWidget);
     expect(tester.getRect(_saveButton()).bottom, lessThanOrEqualTo(360 - 160));
     expect(tester.takeException(), isNull);

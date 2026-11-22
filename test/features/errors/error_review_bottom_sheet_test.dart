@@ -363,7 +363,7 @@ void main() {
     expect(_field(tester, 'creator-front'), 'I read reliable as secure.');
   });
 
-  testWidgets('a bullet icon disables when added and re-enables on removal', (
+  testWidgets('a bullet menu card action tracks the added state', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -393,6 +393,8 @@ void main() {
     await _closeCreator(tester);
 
     await _openBulletMenu(tester, 0);
+    expect(find.text('Card created'), findsOneWidget);
+    expect(find.text('Create card with AI'), findsNothing);
     expect(_menuItemEnabled(tester, _bulletCard(0)), isFalse);
     await _dismissMenu(tester);
 
@@ -405,6 +407,8 @@ void main() {
     await _closeCreator(tester);
 
     await _openBulletMenu(tester, 0);
+    expect(find.text('Create card with AI'), findsOneWidget);
+    expect(find.text('Card created'), findsNothing);
     expect(_menuItemEnabled(tester, _bulletCard(0)), isTrue);
     await _dismissMenu(tester);
   });

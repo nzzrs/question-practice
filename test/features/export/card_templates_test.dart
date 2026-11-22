@@ -23,7 +23,7 @@ void main() {
       CognitiveType.contrast,
       CognitiveType.fact,
       CognitiveType.heuristic,
-      CognitiveType.heuristic,
+      CognitiveType.procedure,
     ]);
   });
 
@@ -194,6 +194,25 @@ void main() {
     expect(CardTemplate.heuristic.chipLabel, CognitiveType.heuristic.label);
     expect(CardTemplate.heuristic.label, CognitiveType.heuristic.label);
     expect(CardTemplate.heuristic.cognitiveType, CognitiveType.heuristic);
+  });
+
+  test('saved Steps cards keep their own procedure type', () {
+    expect(CardTemplate.procedure.chipLabel, 'Steps');
+    expect(CardTemplate.procedure.label, 'Steps');
+    expect(CardTemplate.procedure.cognitiveType, CognitiveType.procedure);
+    expect(CardTemplate.procedure.cognitiveType.name, 'procedure');
+    expect(CardTemplate.procedure.cognitiveType.label, 'Steps');
+  });
+
+  test('stored cognitive type names stay backward compatible', () {
+    expect(CognitiveType.fromName('heuristic'), CognitiveType.heuristic);
+    expect(CognitiveType.fromName('heuristic').label, 'Scenario and rule');
+    expect(CognitiveType.fromName('procedure'), CognitiveType.procedure);
+    expect(CognitiveType.fromName('contrast'), CognitiveType.contrast);
+    expect(CognitiveType.fromName('concept'), CognitiveType.concept);
+    expect(CognitiveType.fromName('fact'), CognitiveType.fact);
+    expect(CognitiveType.fromName('unknown'), CognitiveType.fact);
+    expect(CognitiveType.fromName(null), CognitiveType.fact);
   });
 
   test('legacy and current AI templates map with a fallback', () {

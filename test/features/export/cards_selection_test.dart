@@ -218,6 +218,37 @@ void main() {
     expect(stored, isNull);
   });
 
+  testWidgets('deselecting the last section removes the saved value', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final conceptId = await seedConcept(harness, question);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    final row = find.byKey(ValueKey('concept-row-$conceptId'));
+    await tester.ensureVisible(row);
+    await tester.longPress(row);
+    await pumpFrames(tester);
+    await settlePersistence(tester);
+
+    final section = find.byKey(const ValueKey('concepts-select-all'));
+    await tester.ensureVisible(section);
+    await tester.tap(section);
+    await pumpFrames(tester);
+    await settlePersistence(tester);
+
+    expect(find.text('Ready for AnkiDroid'), findsOneWidget);
+    expect(find.text('Select all'), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    final stored = await tester.runAsync(
+      () => harness.settings.loadCardsSelection(),
+    );
+    expect(stored, isNull);
+  });
+
   testWidgets('stale ids are pruned and repaired in settings', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);

@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/plural.dart';
 import '../../core/platform/practice_sound_player.dart';
 import '../../core/ui/widgets.dart';
 import '../feedback/domain/wrong_answer_bullets.dart';
@@ -460,7 +461,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
       dialog: M3EDialog(
         title: 'Finish practice?',
         content: Text(
-          '$unanswered question${unanswered == 1 ? '' : 's'} are unanswered. '
+          '${formatCount(unanswered, 'question')} '
+          '${unanswered == 1 ? 'is' : 'are'} unanswered. '
           'Leave them out of the score, or mark them skipped?',
         ),
         actions: [

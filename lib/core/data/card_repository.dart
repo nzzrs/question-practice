@@ -104,19 +104,14 @@ class CardRepository {
 
   /// Snapshots kept for [sessionId], oldest card first.
   ///
-  /// A damaged journal is removed and treated as empty so a discard still
-  /// deletes the session instead of trapping the learner.
+  /// A damaged journal is treated as empty so a discard still deletes the
+  /// session instead of trapping the learner. The journal is removed only when
+  /// the discard transaction commits.
   Future<List<ErrorCardUndoSnapshot>> errorCardUndoForSession(
     int sessionId,
   ) async {
-    final key = errorCardUndoKey(sessionId);
-    final raw = await _db.settingsDao.getValue(key);
-    final snapshots = tryDecodeErrorCardUndo(raw);
-    if (snapshots == null) {
-      await _db.settingsDao.removeValue(key);
-      return const [];
-    }
-    return snapshots;
+    final raw = await _db.settingsDao.getValue(errorCardUndoKey(sessionId));
+    return tryDecodeErrorCardUndo(raw) ?? const [];
   }
 
   /// Newest saved concept with [term], ignoring case and empty definitions.

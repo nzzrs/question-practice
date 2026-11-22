@@ -131,7 +131,9 @@ void main() {
       questions[1],
       reasoning: 'Second original',
       wrongIndexes: const [2],
+      distracted: true,
     );
+    expect((await harness.cards.errorCardById(second.id))!.distracted, isTrue);
 
     final start = await service.startPractice(seeded.practiceId);
     await service.submitAnswer(
@@ -148,6 +150,7 @@ void main() {
       reasoning: 'Second changed',
       distracted: false,
     );
+    expect((await harness.cards.errorCardById(second.id))!.distracted, isFalse);
 
     await service.discard(start.session.id);
 
@@ -387,6 +390,154 @@ void main() {
     },
   );
 
+  test('a journal restores only the session that recorded it', () async {
+    final seeded = await _seedThreeOptionPractice(harness, count: 3);
+    final questions = await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    );
+    final first = await _seedExistingCard(harness, questions[0]);
+    final second = await _seedExistingCard(harness, questions[1]);
+
+    final firstSession = await service.startPractice(seeded.practiceId);
+    await service.submitAnswer(
+      start: firstSession,
+      item: firstSession.items[0],
+      selectedIndexes: const [2],
+      reasoning: 'First session change',
+      distracted: false,
+    );
+
+    final secondSession = await service.startPractice(seeded.practiceId);
+    await service.submitAnswer(
+      start: secondSession,
+      item: secondSession.items[1],
+      selectedIndexes: const [2],
+      reasoning: 'Second session change',
+      distracted: false,
+    );
+
+    await service.discard(firstSession.session.id);
+
+    _expectSameUndoState((await harness.cards.errorCardById(first.id))!, first);
+    expect(
+      (await harness.cards.errorCardById(second.id))!.reasoning,
+      'Second session change',
+    );
+    expect(
+      await harness.database.settingsDao.getValue(
+        errorCardUndoKey(secondSession.session.id),
+      ),
+      isNotNull,
+    );
+
+    await service.discard(secondSession.session.id);
+
+    _expectSameUndoState(
+      (await harness.cards.errorCardById(second.id))!,
+      second,
+    );
+  });
+
+  test('a corrupt journal cannot trap a discard', () async {
+    final seeded = await _seedThreeOptionPractice(harness, count: 2);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).first;
+    final baseline = await _seedExistingCard(harness, question);
+
+    final start = await service.startPractice(seeded.practiceId);
+    await service.submitAnswer(
+      start: start,
+      item: start.items.first,
+      selectedIndexes: const [2],
+      reasoning: 'Recorded before corruption',
+      distracted: false,
+    );
+    await harness.database.settingsDao.setValue(
+      errorCardUndoKey(start.session.id),
+      '{not a journal',
+    );
+
+    await service.discard(start.session.id);
+
+    expect(await harness.sessions.sessionById(start.session.id), isNull);
+    expect(
+      await harness.database.settingsDao.getValue(
+        errorCardUndoKey(start.session.id),
+      ),
+      isNull,
+    );
+    // A damaged journal cannot be replayed, so the session's card changes
+    // remain. Discarding still gets the learner unstuck.
+    expect(
+      (await harness.cards.errorCardById(baseline.id))!.reasoning,
+      'Recorded before corruption',
+    );
+  });
+
+  testWidgets('a failed discard keeps the session open and a retry succeeds', (
+    tester,
+  ) async {
+    final seeded = await _seedThreeOptionPractice(harness, count: 2);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).first;
+    final baseline = await _seedExistingCard(harness, question);
+
+    final start = await service.startPractice(seeded.practiceId);
+    await service.submitAnswer(
+      start: start,
+      item: start.items.first,
+      selectedIndexes: const [2],
+      reasoning: 'Changed before the conflict',
+      distracted: false,
+    );
+    await harness.cards.resolveError(baseline.id, harness.clock.now().toUtc());
+    final conflicting = await _seedExistingCard(
+      harness,
+      question,
+      reasoning: 'Conflicting active card',
+    );
+
+    await pumpTestApp(
+      tester,
+      home: SessionPage(start: start),
+      harness: harness,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('session-leave')));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Discard'));
+    await pumpFrames(tester);
+
+    expect(
+      find.textContaining('Could not discard this session'),
+      findsOneWidget,
+    );
+    expect(find.byType(SessionPage), findsOneWidget);
+    expect(await harness.sessions.sessionById(start.session.id), isNotNull);
+    expect(
+      await harness.database.settingsDao.getValue(
+        errorCardUndoKey(start.session.id),
+      ),
+      isNotNull,
+    );
+
+    await harness.cards.deleteErrorCard(conflicting.id);
+
+    await tester.tap(find.byKey(const ValueKey('session-leave')));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Discard'));
+    await pumpFrames(tester);
+
+    expect(await harness.sessions.sessionById(start.session.id), isNull);
+    _expectSameUndoState(
+      (await harness.cards.errorCardById(baseline.id))!,
+      baseline,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the exit dialog still discards the session and its attempts', (
     tester,
   ) async {
@@ -469,6 +620,7 @@ Future<ErrorCard> _seedExistingCard(
   String reasoning = 'Original reasoning',
   List<int> wrongIndexes = const [1],
   DateTime? exportedAt,
+  bool distracted = false,
 }) async {
   final id = await harness.cards.createErrorCard(
     questionId: question.id,
@@ -484,6 +636,7 @@ Future<ErrorCard> _seedExistingCard(
     practiceName: 'Rollback practice',
     lastWrongAt: DateTime.utc(2025, 12, 1, 8),
     dueAfter: const Duration(hours: 48),
+    distracted: distracted,
   );
   if (exportedAt != null) {
     await harness.database.cardDao.markErrorCardsExported([id], exportedAt);

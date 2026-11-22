@@ -290,6 +290,9 @@ class _TopicPageState extends ConsumerState<TopicPage> {
         setState(() => _starting = true);
         try {
           await ref.read(sessionServiceProvider).discard(sessionId);
+        } on SessionException catch (error) {
+          if (mounted) await showSnack(context, error.message);
+          return;
         } finally {
           if (mounted) setState(() => _starting = false);
         }

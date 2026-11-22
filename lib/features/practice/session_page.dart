@@ -545,7 +545,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
         title: 'Leave this practice?',
         content: const Text(
           'Save for later to keep your answers and continue from Home. '
-          'Discard deletes this unfinished session and the error cards it created.',
+          'Discard deletes this unfinished session and the error cards it '
+          'created, and restores earlier cards it changed.',
         ),
         actions: [
           M3EButton.text(

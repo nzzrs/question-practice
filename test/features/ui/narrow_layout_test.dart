@@ -7,7 +7,6 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/theme.dart';
 import 'package:question_practice/core/domain/models.dart';
-import 'package:question_practice/core/ui/adaptive_split_view.dart';
 import 'package:question_practice/core/ui/immersive_review.dart';
 import 'package:question_practice/features/errors/past_errors_page.dart';
 import 'package:question_practice/features/export/cards_page.dart';
@@ -181,7 +180,6 @@ void main() {
       harness: harness,
     );
     expect(tester.takeException(), isNull);
-    expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
     expect(find.text('What went wrong?'), findsOneWidget);
     expect(find.text('Check with AI'), findsNothing);

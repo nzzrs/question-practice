@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
-import 'package:question_practice/core/ui/adaptive_split_view.dart';
 import 'package:question_practice/core/ui/app_sections.dart';
 import 'package:question_practice/features/errors/error_card_review_view.dart';
 import 'package:question_practice/features/export/card_creator_controller.dart';
@@ -149,7 +148,6 @@ void main() {
     expect(find.text('Flawed assumption (bias)'), findsNothing);
     expect(find.text('Vaccine (rule / protocol)'), findsNothing);
     expect(find.byKey(const ValueKey('error-card-reading-time')), findsNothing);
-    expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorPane), findsOneWidget);
     expect(find.text('Create cards'), findsOneWidget);
   });

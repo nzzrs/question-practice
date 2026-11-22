@@ -57,6 +57,7 @@ class ErrorCardReviewView extends ConsumerStatefulWidget {
 class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
   List<Note> _notes = const [];
   Object? _notesError;
+  int _notesLoadToken = 0;
 
   @override
   void initState() {
@@ -76,17 +77,20 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
   }
 
   Future<void> _loadNotes() async {
+    final token = ++_notesLoadToken;
     try {
       final notes = await ref
           .read(cardRepositoryProvider)
           .notesForQuestion(widget.card.questionId);
-      if (!mounted) return;
+      // The review reuses this view across error cards. A slow response for
+      // the previous card must not show its notes on the current card.
+      if (!mounted || token != _notesLoadToken) return;
       setState(() {
         _notes = notes;
         _notesError = null;
       });
     } on Object catch (error) {
-      if (!mounted) return;
+      if (!mounted || token != _notesLoadToken) return;
       setState(() => _notesError = error);
     }
   }

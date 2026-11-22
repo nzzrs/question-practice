@@ -29,6 +29,7 @@ class _NoteReviewViewState extends ConsumerState<NoteReviewView> {
   Question? _question;
   Attempt? _attempt;
   bool _loading = true;
+  int _loadToken = 0;
 
   @override
   void initState() {
@@ -50,6 +51,7 @@ class _NoteReviewViewState extends ConsumerState<NoteReviewView> {
   }
 
   Future<void> _loadContext() async {
+    final token = ++_loadToken;
     final questionId = widget.note.questionId;
     Question? question;
     Attempt? attempt;
@@ -69,7 +71,9 @@ class _NoteReviewViewState extends ConsumerState<NoteReviewView> {
         attempt = null;
       }
     }
-    if (!mounted) return;
+    // The review reuses this view while moving between notes, so a slow load
+    // for the previous note must not replace the current note's context.
+    if (!mounted || token != _loadToken) return;
     setState(() {
       _question = question;
       _attempt = attempt;

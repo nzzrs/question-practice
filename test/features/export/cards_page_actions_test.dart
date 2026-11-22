@@ -203,6 +203,41 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('cards page fits a 320dp window at normal text', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    await seedConcept(harness, question);
+    await seedBasic(harness, question);
+    await seedError(harness, question);
+    await seedSkipped(harness, question);
+    await seedNote(harness, question);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    await pumpFrames(tester);
+
+    expect(find.byKey(const ValueKey('cards-status')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-filter-bar')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('review-all-pending')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('select-all')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('cards-info')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('cards page fits a 720dp landscape window', (tester) async {
     tester.view.physicalSize = const Size(720, 360);
     tester.view.devicePixelRatio = 1;

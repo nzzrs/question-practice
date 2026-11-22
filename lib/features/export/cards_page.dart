@@ -477,12 +477,15 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         : null;
 
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    // The large flexible app bar cannot fit the title and the status line on
+    // the narrowest phones, even at the default text scale.
+    final compactHeader = largeText || MediaQuery.sizeOf(context).width < 360;
 
     return AppPage(
       title: 'Cards',
-      subtitle: largeText ? null : subtitle,
+      subtitle: compactHeader ? null : subtitle,
       showBack: true,
-      variant: largeText
+      variant: compactHeader
           ? M3EAppBarVariant.small
           : M3EAppBarVariant.largeFlexible,
       actions: [
@@ -570,7 +573,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           ],
         ),
         const SizedBox(height: 16),
-        if (largeText) ...[
+        if (compactHeader) ...[
           Text(
             subtitle,
             key: const ValueKey('cards-status'),

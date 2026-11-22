@@ -62,7 +62,7 @@ class HelpPage extends StatelessWidget {
           points: [
             'Topic cards show practices, questions, accuracy and progress.',
             'The sort icon orders topics by name or recency, in either direction.',
-            'The archive icon lists archived topics. Long-press a topic to edit, archive or delete it. Valid topic edits save automatically; closing with an invalid value offers Discard changes.',
+            'The archive icon lists archived topics. Long-press a topic to edit, archive or delete it. Valid topic edits save automatically; closing with an invalid value or a failed save offers Discard changes.',
             'Long-press a practice to edit, split or delete it. Split asks for a part count, mixes the questions and names the parts Slice A, Slice B and so on.',
             'Paused sessions sit at the top with Resume and Discard.',
             'The Shuffle floating button opens Start shuffled practice.',

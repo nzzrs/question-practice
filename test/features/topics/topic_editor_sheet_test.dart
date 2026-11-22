@@ -110,6 +110,39 @@ class _BlockingPracticeRepository extends PracticeRepository {
   }
 }
 
+/// Fails every write so close recovery can be exercised without a real disk
+/// failure.
+class _FailingPracticeRepository extends PracticeRepository {
+  // The repository's constructor parameters are private to its library.
+  // ignore: use_super_parameters
+  _FailingPracticeRepository(AppDatabase database, Clock clock)
+    : super(database, clock);
+
+  bool failUpdates = true;
+
+  @override
+  Future<void> updateTopic({
+    required int id,
+    required String name,
+    required String description,
+    required int? priority,
+    String? ankiDeck,
+    int minimumScore = 70,
+    int targetScore = 80,
+  }) async {
+    if (failUpdates) throw StateError('disk is unavailable');
+    return super.updateTopic(
+      id: id,
+      name: name,
+      description: description,
+      priority: priority,
+      ankiDeck: ankiDeck,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
+    );
+  }
+}
+
 base class _PickedPlatformFile extends PlatformFile {
   _PickedPlatformFile(this.bytes);
 
@@ -744,6 +777,55 @@ void main() {
     final after = await harness.practices.topicById(seeded.topicId);
     expect(after!.name, 'Cloud');
     expect(after.description, 'Saved baseline');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a failed close still offers Discard changes instead of trapping '
+      'the learner', (tester) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+    final repository = _FailingPracticeRepository(
+      harness.database,
+      harness.clock,
+    );
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      overrides: [topicRepositoryProvider.overrideWithValue(repository)],
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    await _openField(tester, 'name', 'Name');
+    await _type(tester, _nameField(), 'Renamed Cloud');
+    await _closeSheet(tester);
+
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('topic-editor-close-blocked')),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('discard the changes you have not saved'),
+      findsOneWidget,
+    );
+    expect(find.text('Discard changes'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Discard changes'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Discard changes'));
+    await pumpFrames(tester, frames: 10);
+
+    expect(find.byType(TopicEditorSheet), findsNothing);
+    final stored = await harness.practices.topicById(seeded.topicId);
+    expect(stored!.name, 'Cloud');
     expect(tester.takeException(), isNull);
   });
 

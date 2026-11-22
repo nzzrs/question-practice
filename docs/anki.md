@@ -62,7 +62,7 @@ the definition bubble in the app.
 
 ### Atomic error cards
 
-The end-of-session review and the Cards screen show the same feedback as practice: the question, every alternative with its correct/wrong state and explanation, the status, and your read-only wrong-answer bullets. Each saved note has a three-dot menu for Copy, Create card, Define, and Ask when AI is configured; notes are deleted from Cards, never from a review. Each wrong-answer bullet has a menu for Copy and Create card with AI. A distracted re-test keeps the card due and adds a warning. The review no longer edits the question or options. There are no free-text bias or vaccine fields and no "Check with AI" button.
+The end-of-session review and the Cards screen show the same feedback as practice: the question, every alternative with its correct/wrong state and explanation, the status, and your read-only wrong-answer bullets. Each saved note has a three-dot menu for Copy, Create card, Define, and Ask when AI is configured; notes are deleted from Cards, never from a review. Each wrong-answer bullet has a menu for Copy and Create card with AI. Practice keeps the bullets editable and shows no Copy/AI row menu. A distracted re-test keeps the card due and adds a warning. The review does not edit the question or options.
 
 An error step is one full-width reading surface with a shared bottom dock. The floating card button above the dock opens **Create cards** as a bottom sheet, so the feedback stays readable above it; there is no split view. Create card with AI in a bullet's three-dot menu seeds the sheet from it; with AI it drafts the front and back and picks the template, and without a key it prefills the bullet as the front with a Settings hint. Manual entry adds cards one at a time and works offline without AI. Five templates write the front and back: **Definition**, **Contrast**, **Cause and effect**, **Scenario and rule** and **Steps**. A Definition card becomes a Cloze concept; the other four become Basic cards. Definition uses one raw cloze field with the term in `{{c1::…}}` and the definition in `{{c2::…}}`; both are required.
 
@@ -70,8 +70,8 @@ The sparkle icon beside the template opens optional AI suggestions. Each idea
 offers up to three wording variants, and an error breakdown proposes at most
 two ideas:
 
-- a **contrast** idea that asks you to distinguish the chosen wrong option from the correct one;
-- a **heuristic** idea whose front follows the mandatory template
+- a **Contrast** idea that asks you to distinguish the chosen wrong option from the correct one;
+- a **Scenario and rule** idea whose front follows
   `If a scenario asks X but restricts with Y, which option is always discarded?` and whose back starts with `Discard Z because ...`.
 
 Every builder card, draft and AI variant carries an advisory quality badge and

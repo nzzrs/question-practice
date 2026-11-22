@@ -106,9 +106,10 @@ of the random queue.
    page's `CardCreatorController`; closing or hiding the sheet stores typed
    text, template, drafts, AI ideas and seed state, and reopening the same item
    restores them. Snapshots clear only after a successful save or reviewed
-   exit. The dock order is back, Save and forward side by side; the back arrow
+   exit. The dock has only back, Save and forward side by side; the back arrow
    is disabled on the first item, the forward arrow on the last, and the last
-   item labels Save as Save and finish on every surface. Leaving with pending
+   item labels Save as Save and finish on every surface. The dock has no Create
+   or Delete action. Leaving with pending
    work asks first, including when Save finishes the last item and another item
    still has cached work. Manual entry
    adds cards one at a time and needs no AI. Five templates (Definition,
@@ -120,11 +121,10 @@ of the random queue.
    cards, answer clues, template mismatches, missing fields, a missing
    definition and a definition that repeats its term. The sparkle icon beside
    the template opens an optional AI panel: each idea offers up to three wording
-   variants, and an error breakdown offers at most two ideas (contrast and exam
-   tip). Saved cards keep the topic and subtopic as Anki tags, never in the
-   text; the error then gets `detailsCompletedAt`. Errors are not exported
-   directly.
-   Bias/vaccine text boxes and the old AI check were removed.
+   variants, and an error breakdown offers at most two ideas: a **Contrast** and
+   a **Scenario and rule** idea. Saved cards keep the topic and subtopic as
+   Anki tags, never in the text; the error then gets `detailsCompletedAt`.
+   Errors are not exported directly.
 
    The Create cards UI is split into `CardCreatorBody`, which holds the compact
    template dropdown, fields, quality, drafts, AI panel and save loop, and the
@@ -200,14 +200,15 @@ banner, **Why this answer**, and Define / Ask / Save as note / URL actions. The
 review passes read-only bullets and the notes for the question; practice passes
 the editable bullet editor and the distraction checks. A distracted card adds
 **You were distracted or misread. This card stays due.** In the review each
-bullet and note has a three-dot overflow menu. A bullet menu offers Copy and
-Create card with AI; a note menu offers Copy, Create card, Define, Ask when an
-AI key is configured, and Delete with confirmation. The card action seeds the
-bottom-sheet Create cards. Both menus keep the feedback readable and open no
-split pane. The feedback stays inside one
+read-only bullet has a three-dot menu with Copy and Create card with AI, and
+each saved note has one with Copy, Create card, Define, and Ask when an AI key
+is configured. Reviews offer no note delete; notes are deleted from Cards. In
+practice the bullets stay editable and have no row menus or Copy/AI actions.
+The card action seeds the bottom-sheet Create cards. Both menus keep the
+feedback readable and open no split pane. The feedback stays inside one
 selection area, so Define, Ask, Save as note and Copy work across the question,
-bullets and notes. The old card-content editor has no entry point. Skipped,
-concept and session-note steps share the same dock and sheet.
+bullets and notes. Skipped, concept and session-note steps share the same dock
+and sheet.
 
 ### Concepts, basic cards, skipped questions and notes
 
@@ -289,8 +290,9 @@ Code: `lib/features/topics/topic_stats_page.dart`,
 
 - Cards filters with one compact, horizontally scrolling row: **All**,
   **Cards**, **Errors** and **Notes**, plus a discrete visibility action for
-  exported rows. **Cards** groups concepts and manual basic cards; **Errors**
-  also includes skipped questions.
+  exported rows. **Cards** groups concepts and basic cards; **Errors** also
+  includes skipped questions. The `?` action opens a short guide to Cloze
+  cards, Basic cards, tags, decks and what stays in the app.
 - Selection uses long-press, not checkboxes. Long-press any row to enter
   selection mode and select it; while selection mode is active a tap toggles
   that row, and a normal tap otherwise previews it. A note preview offers
@@ -336,6 +338,14 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   export looks up the current deck by that name and falls back to the Settings
   default. Renaming a topic affects new cards only. There is no per-practice
   deck and practice JSON never contains one.
+- `CardsViewCache` rebuilds the derived groups only when a source stream list
+  changes identity or the exported toggle flips, and rebuilds the visible view
+  only when that data, the filter or the selection revision changes. A
+  long-press selection therefore does not re-derive every group. Topic and
+  practice summaries are scoped to the requested rows, and the schema 15
+  indexes serve the list and due-queue ordering. See
+  [Database reference: indexes and query plans](database.md#indexes-and-query-plans)
+  and [schema 15](database.md#migration-history).
 
 Code: `lib/features/export/cards_page.dart`,
 `lib/features/review/note_review_page.dart`,

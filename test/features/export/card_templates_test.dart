@@ -8,14 +8,14 @@ void main() {
       'Definition',
       'Contrast',
       'Cause and effect',
-      'Exam tip',
+      'Scenario and rule',
       'Steps',
     ]);
     expect(CardTemplate.values.map((template) => template.label), [
       'Definition',
       'Contrast',
       'Cause and effect',
-      'Exam tip',
+      'Scenario and rule',
       'Steps',
     ]);
     expect(CardTemplate.values.map((template) => template.cognitiveType), [
@@ -44,7 +44,7 @@ void main() {
     );
   });
 
-  test('cause and effect, exam tip and steps scaffolds are exact', () {
+  test('cause and effect, scenario and rule and steps scaffolds are exact', () {
     expect(fillScaffold(CardTemplate.mechanism)!.front, contains('[effect]'));
     expect(
       fillScaffold(CardTemplate.mechanism)!.back,
@@ -188,10 +188,24 @@ void main() {
     );
   });
 
+  test('saved heuristic cards use the Scenario and rule display label', () {
+    expect(CognitiveType.heuristic.name, 'heuristic');
+    expect(CognitiveType.heuristic.label, 'Scenario and rule');
+    expect(CardTemplate.heuristic.chipLabel, CognitiveType.heuristic.label);
+    expect(CardTemplate.heuristic.label, CognitiveType.heuristic.label);
+    expect(CardTemplate.heuristic.cognitiveType, CognitiveType.heuristic);
+  });
+
   test('legacy and current AI templates map with a fallback', () {
     expect(templateFromLegacyType('contrast'), CardTemplate.contrast);
     expect(templateFromLegacyType('heuristic'), CardTemplate.heuristic);
     expect(templateFromLegacyType('rule'), CardTemplate.heuristic);
+    expect(templateFromLegacyType('exam tip'), CardTemplate.heuristic);
+    expect(templateFromLegacyType('exam heuristic'), CardTemplate.heuristic);
+    expect(templateFromLegacyType('scenario'), CardTemplate.heuristic);
+    expect(templateFromLegacyType('scenario and rule'), CardTemplate.heuristic);
+    expect(templateFromLegacyType('scenario/rule'), CardTemplate.heuristic);
+    expect(templateFromLegacyType('scenario & rule'), CardTemplate.heuristic);
     expect(templateFromLegacyType('procedure'), CardTemplate.procedure);
     expect(templateFromLegacyType('fact'), CardTemplate.mechanism);
     expect(templateFromLegacyType(null), CardTemplate.mechanism);
@@ -200,6 +214,10 @@ void main() {
     expect(templateFromName('Cause and effect'), CardTemplate.mechanism);
     expect(templateFromName('exam tip'), CardTemplate.heuristic);
     expect(templateFromName('Exam heuristic'), CardTemplate.heuristic);
+    expect(templateFromName('Scenario and rule'), CardTemplate.heuristic);
+    expect(templateFromName('scenario'), CardTemplate.heuristic);
+    expect(templateFromName('scenario/rule'), CardTemplate.heuristic);
+    expect(templateFromName('scenario & rule'), CardTemplate.heuristic);
     expect(templateFromName('Phase transition'), CardTemplate.procedure);
     expect(
       templateFromName('Mechanism / cause-effect'),

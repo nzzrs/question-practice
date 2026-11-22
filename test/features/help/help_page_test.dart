@@ -77,8 +77,8 @@ void main() {
     expect(
       texts.any(
         (text) => text.contains(
-          'Contrast, Cause and effect, Exam tip and Steps cards use the Basic '
-          'note type',
+          'Contrast, Cause and effect, Scenario and rule, and Steps cards use '
+          'the Basic note type',
         ),
       ),
       isTrue,
@@ -88,11 +88,13 @@ void main() {
     expect(
       texts.any(
         (text) => text.contains(
-          'Definition, Contrast, Cause and effect, Exam tip and Steps',
+          'Definition, Contrast, Cause and effect, Scenario and rule, and '
+          'Steps',
         ),
       ),
       isTrue,
     );
+    expect(texts.any((text) => text.contains('Exam tip')), isFalse);
     expect(texts.any((text) => text.contains('Exam heuristic')), isFalse);
     expect(texts.any((text) => text.contains('Phase transition')), isFalse);
     expect(

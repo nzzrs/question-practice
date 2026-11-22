@@ -104,7 +104,7 @@ class HelpPage extends StatelessWidget {
             'Add cards to the list by hand one at a time, then save them together with the dock Save. No AI provider is needed.',
             'Drafts and typed text stay with their item when the sheet closes or you move between steps. Save asks you to add a typed card to the list first; leaving the last step asks before discarding anything.',
             'Save creates the listed cards and moves on. The back and forward arrows move between steps, and the last step uses Finish. Note review uses Save and finish. Delete is an icon with a confirmation.',
-            'Five templates write the front and back: Definition, Contrast, Cause and effect, Exam tip and Steps. Selecting one fills the empty fields, and your own text is kept.',
+            'Five templates write the front and back: Definition, Contrast, Cause and effect, Scenario and rule, and Steps. Selecting one fills the empty fields, and your own text is kept.',
             'The sparkle icon beside the template shows optional AI suggestions when a provider is set. Each idea offers up to three variants; keep the ones that help and add them to your list. The retry icon asks again and keeps your drafts.',
             'Card quality shows the estimated reading time and flags yes/no questions, long fronts, long cards, answer clues, template mismatches and missing fields. It never blocks saving.',
             'A Definition card uses a raw cloze: put the term in {{c1::…}} and the definition in {{c2::…}}. Both are required before it can be added.',
@@ -155,7 +155,7 @@ class HelpPage extends StatelessWidget {
           title: 'AnkiDroid export',
           points: [
             'Export to AnkiDroid sends the selected cards to AnkiDroid.',
-            'Concepts use the Cloze note type. Contrast, Cause and effect, Exam tip and Steps cards use the Basic note type with Front and Back.',
+            'Concepts use the Cloze note type. Contrast, Cause and effect, Scenario and rule, and Steps cards use the Basic note type with Front and Back.',
             'Cards carry question-practice, topic::<topic> and subtopic::<subtopic> tags. Those tags are never written inside the card text.',
             'File exports put tags in a third column. Map that column to Tags when importing; if an app ignores it, the tags are dropped rather than placed in the text.',
             'Each topic can use its own deck. Topics without one use the default deck from Settings.',

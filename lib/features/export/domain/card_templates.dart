@@ -239,7 +239,14 @@ CardTemplate? templateFromLegacyType(String? value) {
   return switch (type) {
     'definition' => CardTemplate.definition,
     'contrast' => CardTemplate.contrast,
-    'heuristic' || 'rule' => CardTemplate.heuristic,
+    'heuristic' ||
+    'rule' ||
+    'exam tip' ||
+    'exam heuristic' ||
+    'scenario' ||
+    'scenario and rule' ||
+    'scenario/rule' ||
+    'scenario & rule' => CardTemplate.heuristic,
     'procedure' || 'steps' => CardTemplate.procedure,
     'fact' || 'mechanism' || 'cause and effect' || '' => CardTemplate.mechanism,
     _ => null,
@@ -256,7 +263,13 @@ CardTemplate templateFromName(String? value) {
     if (template.name == name) return template;
   }
   return switch (name) {
-    'rule' || 'exam tip' || 'exam heuristic' => CardTemplate.heuristic,
+    'rule' ||
+    'exam tip' ||
+    'exam heuristic' ||
+    'scenario' ||
+    'scenario and rule' ||
+    'scenario/rule' ||
+    'scenario & rule' => CardTemplate.heuristic,
     'steps' ||
     'procedure' ||
     'phase transition' ||

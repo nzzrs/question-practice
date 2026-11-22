@@ -246,7 +246,7 @@ void main() {
       tester
           .widget<Pill>(find.byKey(const ValueKey('creator-ai-type-1')))
           .label,
-      'Exam tip',
+      'Scenario and rule',
     );
     expect(
       find.textContaining(
@@ -307,7 +307,9 @@ void main() {
     expect(detail.data, contains('Can be answered with yes or no'));
     expect(
       detail.data,
-      contains('Exam tip front does not use the required prompt structure'),
+      contains(
+        'Scenario and rule front does not use the required prompt structure',
+      ),
     );
   });
 

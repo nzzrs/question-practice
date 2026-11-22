@@ -389,7 +389,7 @@ void main() {
       final database = AppDatabase(NativeDatabase.opened(sqlite));
       addTearDown(database.close);
 
-      expect(database.schemaVersion, 14);
+      expect(database.schemaVersion, 15);
       final rows = await database.select(database.errorCards).get();
       expect(rows, hasLength(4));
       final byId = {for (final row in rows) row.id: row};

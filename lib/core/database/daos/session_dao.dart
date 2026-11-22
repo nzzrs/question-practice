@@ -229,7 +229,10 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
   Stream<List<SessionRow>> watchCompletedSessions() {
     return (select(sessions)
           ..where((s) => s.status.equals('completed'))
-          ..orderBy([(s) => OrderingTerm.desc(s.finishedAt)]))
+          ..orderBy([
+            (s) => OrderingTerm.desc(s.finishedAt),
+            (s) => OrderingTerm.asc(s.id),
+          ]))
         .watch();
   }
 

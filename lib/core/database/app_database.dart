@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -167,11 +167,87 @@ class AppDatabase extends _$AppDatabase {
           ''');
         }
       }
+      if (from < 15) {
+        // Indexes for the current query patterns: ordered question lists per
+        // practice, session history by status, newest card and note lists,
+        // the due/needs-details review queues and the skipped-question queue.
+        // Each statement is guarded so a hand-built or partial database
+        // without that table or column still upgrades; IF NOT EXISTS keeps a
+        // database that already has the index, or a retried upgrade, at rest.
+        if (await _hasColumn('questions', 'position')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS questions_practice_position '
+            'ON questions (practice_id, position)',
+          );
+        }
+        if (await _hasColumn('sessions', 'finished_at')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS sessions_status_finished '
+            'ON sessions (status, finished_at)',
+          );
+        }
+        if (await _hasColumn('sessions', 'started_at')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS sessions_status_started '
+            'ON sessions (status, started_at)',
+          );
+        }
+        if (await _hasColumn('concepts', 'created_at')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS concepts_created '
+            'ON concepts (created_at)',
+          );
+        }
+        if (await _hasColumn('manual_cards', 'created_at')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS manual_cards_created '
+            'ON manual_cards (created_at)',
+          );
+        }
+        if (await _hasColumn('notes', 'created_at')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS notes_created ON notes (created_at)',
+          );
+        }
+        if (await _hasColumn('error_cards', 'created_at')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS error_cards_created '
+            'ON error_cards (created_at)',
+          );
+        }
+        if (await _hasColumn('error_cards', 'last_wrong_at')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS error_cards_last_wrong '
+            'ON error_cards (status, last_wrong_at)',
+          );
+        }
+        if (await _hasColumn('skipped_questions', 'created_at')) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS skipped_questions_handled_created '
+            'ON skipped_questions (handled_at, created_at)',
+          );
+        }
+        // The single-column indexes above are prefixes of the new composite
+        // indexes, so keeping both would only add write cost.
+        await customStatement('DROP INDEX IF EXISTS questions_practice');
+        await customStatement('DROP INDEX IF EXISTS sessions_status');
+        await customStatement('DROP INDEX IF EXISTS skipped_questions_handled');
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },
   );
+
+  /// Whether [table] and [column] both exist in the connected database.
+  ///
+  /// Older, partial or hand-built databases used by recovery and tests may
+  /// lack parts of the current schema; upgrade steps use this to skip an
+  /// index instead of failing the whole migration.
+  Future<bool> _hasColumn(String table, String column) async {
+    final rows = await customSelect('PRAGMA table_info($table)').get();
+    return rows.any((row) => row.read<String>('name') == column);
+  }
 
   Future<void> clearAll() {
     return transaction(() async {

@@ -96,7 +96,7 @@ void main() {
     expect(names, contains('notes_question'));
     expect(names, isNot(contains('highlights_session')));
     expect(names, isNot(contains('highlights_question')));
-    expect(database.schemaVersion, 14);
+    expect(database.schemaVersion, 15);
 
     // Renaming keeps the foreign keys attached to the new table.
     final foreignKeys = await database
@@ -236,7 +236,7 @@ void main() {
     expect(rows, hasLength(1));
     expect(rows.single.distracted, isFalse);
     expect(rows.single.reasoning, 'I read too fast.');
-    expect(database.schemaVersion, 14);
+    expect(database.schemaVersion, 15);
 
     final columns = await database
         .customSelect('PRAGMA table_info(error_cards)')

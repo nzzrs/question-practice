@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -383,11 +382,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
       await showSnack(context, 'A split needs at least two questions.');
       return;
     }
-    final parts = await showSplitPracticeDialog(
-      context,
-      practiceName: summary.practice.name,
-      questionCount: count,
-    );
+    final parts = await showSplitPracticeDialog(context, questionCount: count);
     if (parts == null || !mounted) return;
     setState(() => _starting = true);
     try {
@@ -413,138 +408,229 @@ class _TopicPageState extends ConsumerState<TopicPage> {
 /// Asks how many parts to create and previews their question distribution.
 Future<int?> showSplitPracticeDialog(
   BuildContext context, {
-  required String practiceName,
   required int questionCount,
-}) async {
-  final controller = TextEditingController(text: '2');
-  String? error;
+}) {
+  return M3EDialog.show<int>(
+    context,
+    dialog: _SplitPracticeDialog(questionCount: questionCount),
+  );
+}
 
-  void setParts(StateSetter setDialogState, int value) {
-    controller.text = '$value';
-    setDialogState(() => error = null);
+/// Compact split form: one stepper, a distribution preview and one warning.
+class _SplitPracticeDialog extends StatefulWidget {
+  const _SplitPracticeDialog({required this.questionCount});
+
+  final int questionCount;
+
+  @override
+  State<_SplitPracticeDialog> createState() => _SplitPracticeDialogState();
+}
+
+class _SplitPracticeDialogState extends State<_SplitPracticeDialog> {
+  static const int _minParts = 2;
+
+  int _parts = _minParts;
+
+  int get _maxParts => widget.questionCount;
+
+  bool get _hasRange => _maxParts >= _minParts;
+
+  void _step(int delta) {
+    final next = _parts + delta;
+    if (next < _minParts || next > _maxParts) return;
+    setState(() => _parts = next);
   }
 
-  final parts = await M3EDialog.show<int>(
-    context,
-    dialog: StatefulBuilder(
-      builder: (context, setDialogState) {
-        final value = int.tryParse(controller.text.trim());
-        final valid = value != null && value >= 2 && value <= questionCount;
-        final sizes = valid ? splitPartSizes(questionCount, value) : null;
-        return M3EDialog(
-          title: 'Split practice?',
-          content: SizedBox(
-            width: 400,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'This replaces "$practiceName" with '
-                  '${valid ? formatCount(value, 'practice') : 'new practices'}. '
-                  'Questions are shuffled, so each part gets a random mix '
-                  'and sizes differ by at most one.\n\n'
-                  'Sessions, answers and error cards for the original '
-                  'practice are removed.',
+  void _submit() {
+    if (_hasRange) Navigator.of(context).pop(_parts);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final sizes = _hasRange
+        ? splitPartSizes(widget.questionCount, _parts)
+        : null;
+    return M3EDialog(
+      title: 'Split practice',
+      icon: const Icon(Icons.call_split),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Divide ${formatCount(widget.questionCount, 'question')} '
+              'into parts.',
+              key: const ValueKey('split-subtitle'),
+              textAlign: TextAlign.center,
+              style: theme.typography.baseline.bodyLarge.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (_hasRange) ...[
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(28),
                 ),
-                const SizedBox(height: 18),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    M3EIconButton(
-                      key: const ValueKey('split-parts-remove'),
-                      icon: const Icon(Icons.remove),
-                      semanticLabel: 'Remove a part',
-                      variant: M3EIconButtonVariant.outlined,
-                      onPressed: value != null && value > 2
-                          ? () => setParts(setDialogState, value - 1)
-                          : null,
-                    ),
-                    const SizedBox(width: 10),
-                    SizedBox(
-                      width: 104,
-                      child: M3ETextField(
-                        key: const ValueKey('split-parts-field'),
-                        controller: controller,
-                        label: 'Parts',
-                        supportingText: 'Between 2 and $questionCount',
-                        errorText: error,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        onChanged: (_) {
-                          setDialogState(() => error = null);
-                        },
-                        onSubmitted: (_) {
-                          final submitted = int.tryParse(
-                            controller.text.trim(),
-                          );
-                          if (submitted != null &&
-                              submitted >= 2 &&
-                              submitted <= questionCount) {
-                            Navigator.of(context).pop(submitted);
-                          }
-                        },
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    children: [
+                      M3EIconButton(
+                        key: const ValueKey('split-parts-remove'),
+                        icon: const Icon(Icons.remove),
+                        semanticLabel: 'Remove a part',
+                        tooltip: 'Remove a part',
+                        variant: M3EIconButtonVariant.outlined,
+                        size: M3EIconButtonSize.md,
+                        onPressed: _parts > _minParts ? () => _step(-1) : null,
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Semantics(
+                              label: 'Parts',
+                              value: '$_parts',
+                              liveRegion: true,
+                              excludeSemantics: true,
+                              child: Text(
+                                '$_parts',
+                                key: const ValueKey('split-parts-value'),
+                                maxLines: 1,
+                                style: theme.typography.emphasized.displaySmall
+                                    .copyWith(color: theme.colorScheme.primary),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      M3EIconButton(
+                        key: const ValueKey('split-parts-add'),
+                        icon: const Icon(Icons.add),
+                        semanticLabel: 'Add a part',
+                        tooltip: 'Add a part',
+                        variant: M3EIconButtonVariant.outlined,
+                        size: M3EIconButtonSize.md,
+                        onPressed: _parts < _maxParts ? () => _step(1) : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                key: const ValueKey('split-distribution'),
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var index = 0; index < sizes!.length; index++)
+                    _PartSizeChip(part: index + 1, questions: sizes[index]),
+                ],
+              ),
+            ] else
+              Row(
+                key: const ValueKey('split-range-error'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 20,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'A split needs at least two questions.',
+                      style: theme.typography.baseline.bodySmall.copyWith(
+                        color: theme.colorScheme.error,
+                        height: 1.35,
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    M3EIconButton(
-                      key: const ValueKey('split-parts-add'),
-                      icon: const Icon(Icons.add),
-                      semanticLabel: 'Add a part',
-                      variant: M3EIconButtonVariant.outlined,
-                      onPressed: value != null && value < questionCount
-                          ? () => setParts(setDialogState, value + 1)
-                          : null,
-                    ),
-                  ],
+                  ),
+                ],
+              ),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    size: 20,
+                    color: theme.colorScheme.warning,
+                    semanticLabel: 'Warning',
+                  ),
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  valid
-                      ? '${formatCount(value, 'practice')} with '
-                            '${sizes!.join(' + ')} questions.'
-                      : 'Choose between 2 and $questionCount parts.',
-                  key: const ValueKey('split-distribution'),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Original session history will be removed.',
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-          actions: [
-            M3EButton.text(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            M3EButton.filled(
-              onPressed: () {
-                final chosen = int.tryParse(controller.text.trim());
-                if (chosen == null) {
-                  setDialogState(() => error = 'Enter how many parts.');
-                  return;
-                }
-                if (chosen < 2) {
-                  setDialogState(() => error = 'Use at least 2 parts.');
-                  return;
-                }
-                if (chosen > questionCount) {
-                  setDialogState(
-                    () => error =
-                        'Use at most $questionCount parts, one per question.',
-                  );
-                  return;
-                }
-                Navigator.of(context).pop(chosen);
-              },
-              child: const Text('Split'),
-            ),
           ],
-        );
-      },
-    ),
-  );
-  controller.dispose();
-  return parts;
+        ),
+      ),
+      actions: [
+        M3EButton.text(
+          key: const ValueKey('split-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        M3EButton.filled(
+          key: const ValueKey('split-confirm'),
+          onPressed: _hasRange ? _submit : null,
+          child: const Text('Split'),
+        ),
+      ],
+    );
+  }
+}
+
+/// One part in the distribution preview, e.g. `Part 2 · 3`.
+class _PartSizeChip extends StatelessWidget {
+  const _PartSizeChip({required this.part, required this.questions});
+
+  final int part;
+  final int questions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Semantics(
+      label: 'Part $part, ${formatCount(questions, 'question')}',
+      excludeSemantics: true,
+      child: Container(
+        key: ValueKey('split-part-$part'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          'Part $part · $questions',
+          style: theme.typography.baseline.labelLarge.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 String _summarizeSplitNames(List<String> names) {

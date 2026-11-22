@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/ui/widgets.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
@@ -159,19 +160,24 @@ void main() {
 
     await tester.tap(find.text('Split'));
     await pumpFrames(tester);
-    expect(find.text('Split practice?'), findsOneWidget);
-    final field = tester.widget<EditableText>(
-      find.descendant(
-        of: find.byKey(const ValueKey('split-parts-field')),
-        matching: find.byType(EditableText),
-      ),
+    expect(find.text('Split practice'), findsOneWidget);
+    expect(find.text('Divide 6 questions into parts.'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('split-parts-value'))).data,
+      '2',
     );
-    expect(field.controller.text, '2');
-    expect(find.text('2 practices with 3 + 3 questions.'), findsOneWidget);
+    expect(find.text('Part 1 · 3'), findsOneWidget);
+    expect(find.text('Part 2 · 3'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('split-parts-add')));
     await pumpFrames(tester);
-    expect(find.text('3 practices with 2 + 2 + 2 questions.'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('split-parts-value'))).data,
+      '3',
+    );
+    expect(find.text('Part 1 · 2'), findsOneWidget);
+    expect(find.text('Part 2 · 2'), findsOneWidget);
+    expect(find.text('Part 3 · 2'), findsOneWidget);
     await tester.tap(find.text('Split'));
     await pumpFrames(tester);
 
@@ -221,12 +227,12 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(find.text('Split'));
     await pumpFrames(tester);
-    expect(find.text('Split practice?'), findsOneWidget);
+    expect(find.text('Split practice'), findsOneWidget);
 
     await tester.tap(find.text('Cancel'));
     await pumpFrames(tester);
 
-    expect(find.text('Split practice?'), findsNothing);
+    expect(find.text('Split practice'), findsNothing);
     final practices = await harness.practices.allPractices();
     expect(practices.single.id, seeded.practiceId);
     expect(
@@ -235,9 +241,7 @@ void main() {
     );
   });
 
-  testWidgets('the split dialog rejects parts outside the valid range', (
-    tester,
-  ) async {
+  testWidgets('the split stepper stays within the valid range', (tester) async {
     tester.view.physicalSize = const Size(360, 720);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -262,22 +266,34 @@ void main() {
     await tester.tap(find.text('Split'));
     await pumpFrames(tester);
 
-    final field = find.byKey(const ValueKey('split-parts-field'));
-    await tester.enterText(field, '1');
-    await tester.tap(find.text('Split'));
-    await pumpFrames(tester);
-    expect(find.text('Use at least 2 parts.'), findsOneWidget);
-    expect(find.text('Split practice?'), findsOneWidget);
+    M3EIconButton stepperButton(String key) =>
+        tester.widget<M3EIconButton>(find.byKey(ValueKey(key)));
 
-    await tester.enterText(field, '5');
-    await tester.tap(find.text('Split'));
-    await pumpFrames(tester);
-    expect(find.text('Use at most 4 parts, one per question.'), findsOneWidget);
+    expect(stepperButton('split-parts-remove').onPressed, isNull);
+    expect(stepperButton('split-parts-add').onPressed, isNotNull);
 
-    await tester.enterText(field, '');
-    await tester.tap(find.text('Split'));
+    await tester.tap(find.byKey(const ValueKey('split-parts-add')));
+    await tester.tap(find.byKey(const ValueKey('split-parts-add')));
     await pumpFrames(tester);
-    expect(find.text('Enter how many parts.'), findsOneWidget);
+
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('split-parts-value'))).data,
+      '4',
+    );
+    expect(stepperButton('split-parts-remove').onPressed, isNotNull);
+    expect(stepperButton('split-parts-add').onPressed, isNull);
+    expect(find.text('Part 1 · 1'), findsOneWidget);
+    expect(find.text('Part 4 · 1'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('split-parts-add')),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+    expect(
+      tester.widget<Text>(find.byKey(const ValueKey('split-parts-value'))).data,
+      '4',
+    );
 
     final practices = await harness.practices.allPractices();
     expect(practices.single.id, seeded.practiceId);
@@ -285,6 +301,33 @@ void main() {
       await harness.practices.questionsForPractice(seeded.practiceId),
       hasLength(4),
     );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the split dialog explains an impossible range', (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await pumpTestApp(
+      tester,
+      home: const _SplitDialogHost(questionCount: 1),
+      harness: harness,
+    );
+    await pumpFrames(tester);
+
+    expect(find.text('Split practice'), findsOneWidget);
+    expect(find.byKey(const ValueKey('split-range-error')), findsOneWidget);
+    expect(find.text('A split needs at least two questions.'), findsOneWidget);
+    expect(
+      tester
+          .widget<M3EButton>(find.byKey(const ValueKey('split-confirm')))
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('a split is blocked while a session is in progress', (
@@ -320,7 +363,7 @@ void main() {
     await tester.tap(find.text('Split'));
     await pumpFrames(tester);
 
-    expect(find.text('Split practice?'), findsNothing);
+    expect(find.text('Split practice'), findsNothing);
     expect(
       find.textContaining('session in progress before splitting'),
       findsOneWidget,
@@ -358,7 +401,7 @@ void main() {
     await tester.tap(find.text('Split'));
     await pumpFrames(tester);
 
-    expect(find.text('Split practice?'), findsNothing);
+    expect(find.text('Split practice'), findsNothing);
     expect(find.text('A split needs at least two questions.'), findsOneWidget);
     expect(
       (await harness.practices.allPractices()).single.id,
@@ -609,20 +652,16 @@ void main() {
     await tester.tap(find.text('Split'));
     await pumpFrames(tester);
 
-    expect(find.text('Split practice?'), findsOneWidget);
-    expect(find.text('2 practices with 3 + 2 questions.'), findsOneWidget);
+    expect(find.text('Split practice'), findsOneWidget);
+    expect(find.text('Divide 5 questions into parts.'), findsOneWidget);
+    expect(find.text('Part 1 · 3'), findsOneWidget);
+    expect(find.text('Part 2 · 2'), findsOneWidget);
     expect(
-      find.textContaining(
-        'Questions are shuffled, so each part gets a random mix',
-      ),
+      find.text('Original session history will be removed.'),
       findsOneWidget,
     );
-    expect(
-      find.textContaining(
-        'Sessions, answers and error cards for the original practice are removed',
-      ),
-      findsOneWidget,
-    );
+    expect(find.textContaining('This replaces'), findsNothing);
+    expect(find.textContaining('Questions are shuffled'), findsNothing);
     expect(find.textContaining('even'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -638,13 +677,14 @@ void main() {
     addTearDown(harness.close);
     await pumpTestApp(
       tester,
-      home: const _SplitDialogHost(practiceName: 'TCP/IP', questionCount: 6),
+      home: const _SplitDialogHost(questionCount: 6),
       harness: harness,
     );
     await pumpFrames(tester);
 
-    expect(find.text('Split practice?'), findsOneWidget);
-    expect(find.text('2 practices with 3 + 3 questions.'), findsOneWidget);
+    expect(find.text('Split practice'), findsOneWidget);
+    expect(find.text('Divide 6 questions into parts.'), findsOneWidget);
+    expect(find.text('Part 1 · 3'), findsOneWidget);
     expect(find.text('Split').hitTestable(), findsOneWidget);
     await tester.ensureVisible(find.byKey(const ValueKey('split-parts-add')));
     await pumpFrames(tester);
@@ -664,13 +704,14 @@ void main() {
     addTearDown(harness.close);
     await pumpTestApp(
       tester,
-      home: const _SplitDialogHost(practiceName: 'TCP/IP', questionCount: 6),
+      home: const _SplitDialogHost(questionCount: 6),
       harness: harness,
     );
     await pumpFrames(tester);
 
-    expect(find.text('Split practice?'), findsOneWidget);
-    expect(find.text('2 practices with 3 + 3 questions.'), findsOneWidget);
+    expect(find.text('Split practice'), findsOneWidget);
+    expect(find.text('Divide 6 questions into parts.'), findsOneWidget);
+    expect(find.text('Part 1 · 3'), findsOneWidget);
     expect(find.text('Split').hitTestable(), findsOneWidget);
     await tester.ensureVisible(find.byKey(const ValueKey('split-parts-add')));
     await pumpFrames(tester);
@@ -683,12 +724,8 @@ void main() {
 }
 
 class _SplitDialogHost extends StatefulWidget {
-  const _SplitDialogHost({
-    required this.practiceName,
-    required this.questionCount,
-  });
+  const _SplitDialogHost({required this.questionCount});
 
-  final String practiceName;
   final int questionCount;
 
   @override
@@ -700,11 +737,7 @@ class _SplitDialogHostState extends State<_SplitDialogHost> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      showSplitPracticeDialog(
-        context,
-        practiceName: widget.practiceName,
-        questionCount: widget.questionCount,
-      );
+      showSplitPracticeDialog(context, questionCount: widget.questionCount);
     });
   }
 

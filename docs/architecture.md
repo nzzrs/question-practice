@@ -407,7 +407,7 @@ See [User guide: Backup and restore](user-guide.md#backup-and-restore).
 - **AnkiDroid:** install/API/permission/Cloze status, a refresh action, the
   permission request, default deck name and live deck browsing.
 - **Data:** export backup, restore backup and erase all data.
-- **About:** app version `0.9.11`. Backup metadata records the same app version
+- **About:** app version `0.10.0`. Backup metadata records the same app version
   and build number (`BackupService.appVersion/buildNumber`).
 
 Code: `lib/features/settings/settings_page.dart`,

@@ -15,16 +15,21 @@ import '../review/note_review_page.dart';
 import '../review/skipped_question_view.dart';
 import 'domain/anki_note_builder.dart';
 
-enum _Filter { all, cards, errors, notes }
+enum CardsFilter { all, cards, errors, notes }
 
 class CardsPage extends ConsumerStatefulWidget {
-  const CardsPage({super.key});
+  const CardsPage({super.key, this.viewCache});
+
+  /// Test seam for counting derivations; production builds a fresh cache.
+  @visibleForTesting
+  final CardsViewCache? viewCache;
 
   @override
   ConsumerState<CardsPage> createState() => _CardsPageState();
 }
 
 class _CardsPageState extends ConsumerState<CardsPage> {
+  late final CardsViewCache _viewCache = widget.viewCache ?? CardsViewCache();
   final _selectedConcepts = <int>{};
   final _selectedErrors = <int>{};
   final _selectedBasic = <int>{};
@@ -37,7 +42,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   bool _pruneScheduled = false;
   bool _busy = false;
   bool _showExported = false;
-  _Filter _filter = _Filter.all;
+  CardsFilter _filter = CardsFilter.all;
 
   bool get _hasSelection =>
       _selectedConcepts.isNotEmpty ||
@@ -83,28 +88,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     bool selectable = true,
   }) {
     if (selectable) _startSelection(selection, id);
-  }
-
-  ExportSelection _selection({
-    required List<Concept> concepts,
-    required List<ManualCard> manuals,
-  }) {
-    return ExportSelection(
-      concepts: concepts
-          .where(
-            (item) =>
-                item.isExportable &&
-                item.exportedAt == null &&
-                _selectedConcepts.contains(item.id),
-          )
-          .toList(),
-      manualCards: manuals
-          .where(
-            (item) =>
-                item.exportedAt == null && _selectedBasic.contains(item.id),
-          )
-          .toList(),
-    );
   }
 
   CardsSelection get _currentSelection {
@@ -195,6 +178,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _selectionActive = _hasSelection;
       _restored = true;
     });
+    // The restored ids change the selection without a user action, so the
+    // selection revision must advance for the view cache.
+    _selectionRevision++;
     if (stored != null && stored != valid) {
       await ref.read(settingsRepositoryProvider).saveCardsSelection(valid);
     }
@@ -327,35 +313,25 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final allManuals = manualsAsync.value ?? const <ManualCard>[];
     final skipped = skippedAsync.value ?? const <SkippedQuestion>[];
     final notes = notesAsync.value ?? const <Note>[];
-    final concepts = _showExported
-        ? allConcepts
-        : allConcepts.where((item) => item.exportedAt == null).toList();
-    final errors = _showExported
-        ? allErrors
-        : allErrors.where((item) => item.exportedAt == null).toList();
-    final manuals = _showExported
-        ? allManuals
-        : allManuals.where((item) => item.exportedAt == null).toList();
 
-    final showCards = _filter == _Filter.all || _filter == _Filter.cards;
-    final showErrors = _filter == _Filter.all || _filter == _Filter.errors;
-    final showNotes = _filter == _Filter.all || _filter == _Filter.notes;
-    final visibleManuals = manuals;
-
-    final selectableConceptIds = {
-      for (final item in allConcepts)
-        if (item.isExportable && item.exportedAt == null) item.id,
-    };
-    final selectableBasicIds = {
-      for (final item in allManuals)
-        if (item.exportedAt == null) item.id,
-    };
-    final selectableErrorIds = {
-      for (final item in allErrors)
-        if (item.exportedAt == null) item.id,
-    };
-    final selectableSkippedIds = {for (final item in skipped) item.id};
-    final selectableNoteIds = {for (final item in notes) item.id};
+    final data = _viewCache.data(
+      concepts: allConcepts,
+      errors: allErrors,
+      manuals: allManuals,
+      skipped: skipped,
+      notes: notes,
+      showExported: _showExported,
+    );
+    final view = _viewCache.view(
+      data: data,
+      filter: _filter,
+      selectionRevision: _selectionRevision,
+      selectedConcepts: _selectedConcepts,
+      selectedBasic: _selectedBasic,
+      selectedErrors: _selectedErrors,
+      selectedSkipped: _selectedSkipped,
+      selectedNotes: _selectedNotes,
+    );
 
     if (!_restoreStarted &&
         conceptsAsync.hasValue &&
@@ -366,95 +342,55 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _restoreStarted = true;
       unawaited(
         _restoreSelection(
-          concepts: selectableConceptIds,
-          basic: selectableBasicIds,
-          errors: selectableErrorIds,
-          skipped: selectableSkippedIds,
-          notes: selectableNoteIds,
+          concepts: data.conceptSelectableIdSet,
+          basic: data.basicSelectableIdSet,
+          errors: data.errorSelectableIdSet,
+          skipped: data.skippedSelectableIdSet,
+          notes: data.noteSelectableIdSet,
         ),
       );
     }
 
     if (_restored) {
       _scheduleStalePrune(
-        concepts: selectableConceptIds,
-        basic: selectableBasicIds,
-        errors: selectableErrorIds,
-        skipped: selectableSkippedIds,
-        notes: selectableNoteIds,
+        concepts: data.conceptSelectableIdSet,
+        basic: data.basicSelectableIdSet,
+        errors: data.errorSelectableIdSet,
+        skipped: data.skippedSelectableIdSet,
+        notes: data.noteSelectableIdSet,
       );
     }
 
-    final selection = _selection(concepts: concepts, manuals: manuals);
+    final concepts = data.concepts;
+    final errors = data.errors;
+    final manuals = data.manuals;
+    final visibleManuals = manuals;
+    final showCards = view.showCards;
+    final showErrors = view.showErrors;
+    final showNotes = view.showNotes;
+    final selection = view.exportSelection;
     final loading =
         conceptsAsync.isLoading ||
         errorsAsync.isLoading ||
         manualsAsync.isLoading ||
         skippedAsync.isLoading ||
         notesAsync.isLoading;
-    final selectedErrorCards = errors
-        .where((card) => _selectedErrors.contains(card.id))
-        .toList();
-    final selectedSkipped = skipped
-        .where((question) => _selectedSkipped.contains(question.id))
-        .toList();
-    final selectedNotes = notes
-        .where((note) => _selectedNotes.contains(note.id))
-        .toList();
-    final pendingSelectedErrors = selectedErrorCards
-        .where((card) => card.needsDetails)
-        .toList();
-    final selectedPendingCount =
-        pendingSelectedErrors.length + selectedSkipped.length;
-    final allPendingErrors = allErrors
-        .where((card) => card.needsDetails && card.exportedAt == null)
-        .toList();
-    final globalPendingCount = allPendingErrors.length + skipped.length;
-    final selectedCount =
-        selection.total +
-        selectedErrorCards.length +
-        selectedSkipped.length +
-        selectedNotes.length;
-
-    final conceptSelectableIds = [
-      for (final item in concepts)
-        if (item.isExportable && item.exportedAt == null) item.id,
-    ];
-    final basicSelectableIds = [
-      for (final item in visibleManuals)
-        if (item.exportedAt == null) item.id,
-    ];
-    final errorSelectableIds = [
-      for (final item in errors)
-        if (item.exportedAt == null) item.id,
-    ];
-    final skippedSelectableIds = [for (final item in skipped) item.id];
-    final noteSelectableIds = [for (final item in notes) item.id];
-    final visibleGroups = <(Set<int>, List<int>)>[
-      if (showCards) (_selectedConcepts, conceptSelectableIds),
-      if (showCards) (_selectedBasic, basicSelectableIds),
-      if (showErrors) (_selectedErrors, errorSelectableIds),
-      if (showErrors) (_selectedSkipped, skippedSelectableIds),
-      if (showNotes) (_selectedNotes, noteSelectableIds),
-    ];
-    final visibleEntryCount = visibleGroups.fold<int>(
-      0,
-      (count, group) => count + group.$2.length,
-    );
-    final allVisibleSelected =
-        visibleEntryCount > 0 &&
-        visibleGroups.every((group) => group.$2.every(group.$1.contains));
-
-    final hasVisibleRows =
-        (showCards && (concepts.isNotEmpty || visibleManuals.isNotEmpty)) ||
-        (showErrors && (errors.isNotEmpty || skipped.isNotEmpty)) ||
-        (showNotes && notes.isNotEmpty);
-    final hasAnyRows =
-        concepts.isNotEmpty ||
-        errors.isNotEmpty ||
-        manuals.isNotEmpty ||
-        skipped.isNotEmpty ||
-        notes.isNotEmpty;
+    final selectedSkipped = view.selectedSkipped;
+    final pendingSelectedErrors = view.pendingSelectedErrors;
+    final selectedPendingCount = view.selectedPendingCount;
+    final allPendingErrors = data.pendingErrors;
+    final globalPendingCount = data.globalPendingCount;
+    final selectedCount = view.selectedCount;
+    final conceptSelectableIds = data.conceptSelectableIds;
+    final basicSelectableIds = data.basicSelectableIds;
+    final errorSelectableIds = data.errorSelectableIds;
+    final skippedSelectableIds = data.skippedSelectableIds;
+    final noteSelectableIds = data.noteSelectableIds;
+    final visibleGroups = view.visibleGroups;
+    final visibleEntryCount = view.visibleEntryCount;
+    final allVisibleSelected = view.allVisibleSelected;
+    final hasVisibleRows = view.hasVisibleRows;
+    final hasAnyRows = data.hasAnyRows;
     final subtitle = selectedCount == 0
         ? 'Ready for AnkiDroid'
         : selectedPendingCount > 0
@@ -583,12 +519,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           ),
           const SizedBox(height: 12),
         ],
-        if (loading &&
-            allConcepts.isEmpty &&
-            allErrors.isEmpty &&
-            allManuals.isEmpty &&
-            skipped.isEmpty &&
-            notes.isEmpty)
+        if (loading && !data.hasAnyData)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 64),
             child: Center(child: M3ELoadingIndicator()),
@@ -1372,6 +1303,381 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   }
 }
 
+/// Immutable Cards data derived in one pass over each stream list.
+///
+/// The visible rows respect the exported toggle. Selectable ids always exclude
+/// rows that cannot be selected, so the restore and prune paths share them.
+@immutable
+class CardsDerivedData {
+  const CardsDerivedData._({
+    required this.concepts,
+    required this.errors,
+    required this.manuals,
+    required this.skipped,
+    required this.notes,
+    required this.conceptSelectableIds,
+    required this.conceptSelectableIdSet,
+    required this.basicSelectableIds,
+    required this.basicSelectableIdSet,
+    required this.errorSelectableIds,
+    required this.errorSelectableIdSet,
+    required this.skippedSelectableIds,
+    required this.skippedSelectableIdSet,
+    required this.noteSelectableIds,
+    required this.noteSelectableIdSet,
+    required this.pendingErrors,
+    required this.globalPendingCount,
+    required this.hasAnyRows,
+    required this.hasAnyData,
+  });
+
+  factory CardsDerivedData._derive({
+    required List<Concept> allConcepts,
+    required List<ErrorCard> allErrors,
+    required List<ManualCard> allManuals,
+    required List<SkippedQuestion> allSkipped,
+    required List<Note> allNotes,
+    required bool showExported,
+  }) {
+    final concepts = <Concept>[];
+    final conceptSelectableIds = <int>[];
+    final conceptSelectableIdSet = <int>{};
+    for (final concept in allConcepts) {
+      if (showExported || concept.exportedAt == null) {
+        concepts.add(concept);
+      }
+      if (concept.isExportable && concept.exportedAt == null) {
+        conceptSelectableIds.add(concept.id);
+        conceptSelectableIdSet.add(concept.id);
+      }
+    }
+
+    final errors = <ErrorCard>[];
+    final errorSelectableIds = <int>[];
+    final errorSelectableIdSet = <int>{};
+    final pendingErrors = <ErrorCard>[];
+    for (final card in allErrors) {
+      if (showExported || card.exportedAt == null) {
+        errors.add(card);
+      }
+      if (card.exportedAt == null) {
+        errorSelectableIds.add(card.id);
+        errorSelectableIdSet.add(card.id);
+        if (card.needsDetails) pendingErrors.add(card);
+      }
+    }
+
+    final manuals = <ManualCard>[];
+    final basicSelectableIds = <int>[];
+    final basicSelectableIdSet = <int>{};
+    for (final card in allManuals) {
+      if (showExported || card.exportedAt == null) {
+        manuals.add(card);
+      }
+      if (card.exportedAt == null) {
+        basicSelectableIds.add(card.id);
+        basicSelectableIdSet.add(card.id);
+      }
+    }
+
+    final skippedSelectableIds = <int>[];
+    final skippedSelectableIdSet = <int>{};
+    for (final question in allSkipped) {
+      skippedSelectableIds.add(question.id);
+      skippedSelectableIdSet.add(question.id);
+    }
+    final noteSelectableIds = <int>[];
+    final noteSelectableIdSet = <int>{};
+    for (final note in allNotes) {
+      noteSelectableIds.add(note.id);
+      noteSelectableIdSet.add(note.id);
+    }
+
+    final hasAnyRows =
+        concepts.isNotEmpty ||
+        errors.isNotEmpty ||
+        manuals.isNotEmpty ||
+        allSkipped.isNotEmpty ||
+        allNotes.isNotEmpty;
+
+    return CardsDerivedData._(
+      concepts: List.unmodifiable(concepts),
+      errors: List.unmodifiable(errors),
+      manuals: List.unmodifiable(manuals),
+      skipped: List.unmodifiable(allSkipped),
+      notes: List.unmodifiable(allNotes),
+      conceptSelectableIds: List.unmodifiable(conceptSelectableIds),
+      conceptSelectableIdSet: Set.unmodifiable(conceptSelectableIdSet),
+      basicSelectableIds: List.unmodifiable(basicSelectableIds),
+      basicSelectableIdSet: Set.unmodifiable(basicSelectableIdSet),
+      errorSelectableIds: List.unmodifiable(errorSelectableIds),
+      errorSelectableIdSet: Set.unmodifiable(errorSelectableIdSet),
+      skippedSelectableIds: List.unmodifiable(skippedSelectableIds),
+      skippedSelectableIdSet: Set.unmodifiable(skippedSelectableIdSet),
+      noteSelectableIds: List.unmodifiable(noteSelectableIds),
+      noteSelectableIdSet: Set.unmodifiable(noteSelectableIdSet),
+      pendingErrors: List.unmodifiable(pendingErrors),
+      globalPendingCount: pendingErrors.length + allSkipped.length,
+      hasAnyRows: hasAnyRows,
+      hasAnyData:
+          allConcepts.isNotEmpty ||
+          allErrors.isNotEmpty ||
+          allManuals.isNotEmpty ||
+          allSkipped.isNotEmpty ||
+          allNotes.isNotEmpty,
+    );
+  }
+
+  final List<Concept> concepts;
+  final List<ErrorCard> errors;
+  final List<ManualCard> manuals;
+  final List<SkippedQuestion> skipped;
+  final List<Note> notes;
+  final List<int> conceptSelectableIds;
+  final Set<int> conceptSelectableIdSet;
+  final List<int> basicSelectableIds;
+  final Set<int> basicSelectableIdSet;
+  final List<int> errorSelectableIds;
+  final Set<int> errorSelectableIdSet;
+  final List<int> skippedSelectableIds;
+  final Set<int> skippedSelectableIdSet;
+  final List<int> noteSelectableIds;
+  final Set<int> noteSelectableIdSet;
+  final List<ErrorCard> pendingErrors;
+  final int globalPendingCount;
+
+  /// Whether any row is visible with the current exported toggle.
+  final bool hasAnyRows;
+
+  /// Whether any stream holds a row, including filtered-out exported rows.
+  final bool hasAnyData;
+}
+
+/// Immutable filter and selection view over one [CardsDerivedData].
+@immutable
+class CardsPageView {
+  const CardsPageView._({
+    required this.filter,
+    required this.showCards,
+    required this.showErrors,
+    required this.showNotes,
+    required this.exportSelection,
+    required this.selectedErrors,
+    required this.selectedSkipped,
+    required this.selectedNotes,
+    required this.pendingSelectedErrors,
+    required this.selectedPendingCount,
+    required this.selectedCount,
+    required this.visibleGroups,
+    required this.visibleEntryCount,
+    required this.allVisibleSelected,
+    required this.hasVisibleRows,
+  });
+
+  factory CardsPageView._derive({
+    required CardsDerivedData data,
+    required CardsFilter filter,
+    required Set<int> selectedConcepts,
+    required Set<int> selectedBasic,
+    required Set<int> selectedErrors,
+    required Set<int> selectedSkipped,
+    required Set<int> selectedNotes,
+  }) {
+    final showCards = filter == CardsFilter.all || filter == CardsFilter.cards;
+    final showErrors =
+        filter == CardsFilter.all || filter == CardsFilter.errors;
+    final showNotes = filter == CardsFilter.all || filter == CardsFilter.notes;
+
+    final exportConcepts = <Concept>[];
+    for (final concept in data.concepts) {
+      if (concept.isExportable &&
+          concept.exportedAt == null &&
+          selectedConcepts.contains(concept.id)) {
+        exportConcepts.add(concept);
+      }
+    }
+    final exportManuals = <ManualCard>[];
+    for (final card in data.manuals) {
+      if (card.exportedAt == null && selectedBasic.contains(card.id)) {
+        exportManuals.add(card);
+      }
+    }
+    final exportSelection = ExportSelection(
+      concepts: exportConcepts,
+      manualCards: exportManuals,
+    );
+
+    final selectedErrorCards = <ErrorCard>[];
+    final pendingSelectedErrors = <ErrorCard>[];
+    for (final card in data.errors) {
+      if (!selectedErrors.contains(card.id)) continue;
+      selectedErrorCards.add(card);
+      if (card.needsDetails) pendingSelectedErrors.add(card);
+    }
+    final selectedSkippedQuestions = <SkippedQuestion>[
+      for (final question in data.skipped)
+        if (selectedSkipped.contains(question.id)) question,
+    ];
+    final selectedNoteCards = <Note>[
+      for (final note in data.notes)
+        if (selectedNotes.contains(note.id)) note,
+    ];
+
+    final visibleGroups = <(Set<int>, List<int>)>[
+      if (showCards) (selectedConcepts, data.conceptSelectableIds),
+      if (showCards) (selectedBasic, data.basicSelectableIds),
+      if (showErrors) (selectedErrors, data.errorSelectableIds),
+      if (showErrors) (selectedSkipped, data.skippedSelectableIds),
+      if (showNotes) (selectedNotes, data.noteSelectableIds),
+    ];
+    final visibleEntryCount = visibleGroups.fold<int>(
+      0,
+      (count, group) => count + group.$2.length,
+    );
+    final hasVisibleRows =
+        (showCards && (data.concepts.isNotEmpty || data.manuals.isNotEmpty)) ||
+        (showErrors && (data.errors.isNotEmpty || data.skipped.isNotEmpty)) ||
+        (showNotes && data.notes.isNotEmpty);
+
+    return CardsPageView._(
+      filter: filter,
+      showCards: showCards,
+      showErrors: showErrors,
+      showNotes: showNotes,
+      exportSelection: exportSelection,
+      selectedErrors: List.unmodifiable(selectedErrorCards),
+      selectedSkipped: List.unmodifiable(selectedSkippedQuestions),
+      selectedNotes: List.unmodifiable(selectedNoteCards),
+      pendingSelectedErrors: List.unmodifiable(pendingSelectedErrors),
+      selectedPendingCount:
+          pendingSelectedErrors.length + selectedSkippedQuestions.length,
+      selectedCount:
+          exportSelection.total +
+          selectedErrorCards.length +
+          selectedSkippedQuestions.length +
+          selectedNoteCards.length,
+      visibleGroups: List.unmodifiable(visibleGroups),
+      visibleEntryCount: visibleEntryCount,
+      allVisibleSelected:
+          visibleEntryCount > 0 &&
+          visibleGroups.every((group) => group.$2.every(group.$1.contains)),
+      hasVisibleRows: hasVisibleRows,
+    );
+  }
+
+  final CardsFilter filter;
+  final bool showCards;
+  final bool showErrors;
+  final bool showNotes;
+  final ExportSelection exportSelection;
+  final List<ErrorCard> selectedErrors;
+  final List<SkippedQuestion> selectedSkipped;
+  final List<Note> selectedNotes;
+  final List<ErrorCard> pendingSelectedErrors;
+  final int selectedPendingCount;
+  final int selectedCount;
+  final List<(Set<int>, List<int>)> visibleGroups;
+  final int visibleEntryCount;
+  final bool allVisibleSelected;
+  final bool hasVisibleRows;
+}
+
+/// Memoizes Cards derivation across builds.
+///
+/// Data is rebuilt only when a stream list changes identity or the exported
+/// toggle flips. The page view is rebuilt only when that data, the filter or
+/// the selection revision changes. Selection mutation sites bump the revision
+/// through `_persistSelection`; the restore path bumps it explicitly.
+@visibleForTesting
+class CardsViewCache {
+  int dataBuilds = 0;
+  int viewBuilds = 0;
+
+  List<Concept>? _sourceConcepts;
+  List<ErrorCard>? _sourceErrors;
+  List<ManualCard>? _sourceManuals;
+  List<SkippedQuestion>? _sourceSkipped;
+  List<Note>? _sourceNotes;
+  bool? _sourceShowExported;
+  CardsDerivedData? _data;
+
+  CardsDerivedData? _viewData;
+  CardsFilter? _viewFilter;
+  int? _viewSelectionRevision;
+  CardsPageView? _view;
+
+  CardsDerivedData data({
+    required List<Concept> concepts,
+    required List<ErrorCard> errors,
+    required List<ManualCard> manuals,
+    required List<SkippedQuestion> skipped,
+    required List<Note> notes,
+    required bool showExported,
+  }) {
+    final cached = _data;
+    if (cached != null &&
+        identical(_sourceConcepts, concepts) &&
+        identical(_sourceErrors, errors) &&
+        identical(_sourceManuals, manuals) &&
+        identical(_sourceSkipped, skipped) &&
+        identical(_sourceNotes, notes) &&
+        _sourceShowExported == showExported) {
+      return cached;
+    }
+    _sourceConcepts = concepts;
+    _sourceErrors = errors;
+    _sourceManuals = manuals;
+    _sourceSkipped = skipped;
+    _sourceNotes = notes;
+    _sourceShowExported = showExported;
+    final derived = CardsDerivedData._derive(
+      allConcepts: concepts,
+      allErrors: errors,
+      allManuals: manuals,
+      allSkipped: skipped,
+      allNotes: notes,
+      showExported: showExported,
+    );
+    _data = derived;
+    dataBuilds++;
+    return derived;
+  }
+
+  CardsPageView view({
+    required CardsDerivedData data,
+    required CardsFilter filter,
+    required int selectionRevision,
+    required Set<int> selectedConcepts,
+    required Set<int> selectedBasic,
+    required Set<int> selectedErrors,
+    required Set<int> selectedSkipped,
+    required Set<int> selectedNotes,
+  }) {
+    final cached = _view;
+    if (cached != null &&
+        identical(_viewData, data) &&
+        _viewFilter == filter &&
+        _viewSelectionRevision == selectionRevision) {
+      return cached;
+    }
+    _viewData = data;
+    _viewFilter = filter;
+    _viewSelectionRevision = selectionRevision;
+    final derived = CardsPageView._derive(
+      data: data,
+      filter: filter,
+      selectedConcepts: selectedConcepts,
+      selectedBasic: selectedBasic,
+      selectedErrors: selectedErrors,
+      selectedSkipped: selectedSkipped,
+      selectedNotes: selectedNotes,
+    );
+    _view = derived;
+    viewBuilds++;
+    return derived;
+  }
+}
+
 class _FilterBar extends StatelessWidget {
   const _FilterBar({
     required this.filter,
@@ -1380,9 +1686,9 @@ class _FilterBar extends StatelessWidget {
     required this.onShowExported,
   });
 
-  final _Filter filter;
+  final CardsFilter filter;
   final bool showExported;
-  final ValueChanged<_Filter> onFilter;
+  final ValueChanged<CardsFilter> onFilter;
   final VoidCallback onShowExported;
 
   @override
@@ -1398,10 +1704,10 @@ class _FilterBar extends StatelessWidget {
               child: Row(
                 children: [
                   for (final entry in const [
-                    (_Filter.all, 'All', 'all'),
-                    (_Filter.cards, 'Cards', 'cards'),
-                    (_Filter.errors, 'Errors', 'errors'),
-                    (_Filter.notes, 'Notes', 'notes'),
+                    (CardsFilter.all, 'All', 'all'),
+                    (CardsFilter.cards, 'Cards', 'cards'),
+                    (CardsFilter.errors, 'Errors', 'errors'),
+                    (CardsFilter.notes, 'Notes', 'notes'),
                   ]) ...[
                     M3EChip(
                       key: ValueKey('cards-filter-${entry.$3}'),

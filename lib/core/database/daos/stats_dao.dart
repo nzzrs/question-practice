@@ -59,13 +59,11 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
     );
   }
 
-  Stream<List<TopicSummaryRow>> watchTopicSummaries(
-    DateTime now, {
-    bool includeArchived = false,
-  }) {
-    final archivedFilter = includeArchived ? '' : 'WHERE t.archived = 0';
-    final query = customSelect(
-      '''
+  /// Topic columns and counts, ending at the topics table.
+  ///
+  /// Callers append their own filter, so archived, active and single-topic
+  /// summaries share one definition and compute only the rows they return.
+  static const _topicSummarySelect = '''
       SELECT
         t.id AS topic_id,
         t.name AS topic_name,
@@ -152,10 +150,52 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
           WHERE p.topic_id = t.id AND s.status = 'completed'
         ) AS last_practiced_at
       FROM topics t
-      $archivedFilter
-      ORDER BY (t.priority IS NULL) ASC, t.priority ASC, t.name COLLATE NOCASE ASC
-      ''',
-      variables: [Variable.withDateTime(now)],
+      ''';
+
+  static const _topicSummaryOrder =
+      'ORDER BY (t.priority IS NULL) ASC, t.priority ASC, '
+      't.name COLLATE NOCASE ASC';
+
+  /// Summaries of active topics, or of every topic when [includeArchived].
+  Stream<List<TopicSummaryRow>> watchTopicSummaries(
+    DateTime now, {
+    bool includeArchived = false,
+  }) {
+    return _watchTopicSummaries(now, archived: includeArchived ? null : false);
+  }
+
+  /// Summaries of archived topics only.
+  Stream<List<TopicSummaryRow>> watchArchivedTopicSummaries(DateTime now) {
+    return _watchTopicSummaries(now, archived: true);
+  }
+
+  /// Summary of [topicId], archived or not, or null when it does not exist.
+  Stream<TopicSummaryRow?> watchTopicSummary(DateTime now, int topicId) {
+    return _watchTopicSummaries(
+      now,
+      archived: null,
+      topicId: topicId,
+    ).map((rows) => rows.isEmpty ? null : rows.first);
+  }
+
+  Stream<List<TopicSummaryRow>> _watchTopicSummaries(
+    DateTime now, {
+    required bool? archived,
+    int? topicId,
+  }) {
+    final conditions = [
+      if (topicId != null) 't.id = ?',
+      if (archived != null) 't.archived = ${archived ? 1 : 0}',
+    ];
+    final filter = conditions.isEmpty
+        ? ''
+        : 'WHERE ${conditions.join(' AND ')}';
+    final query = customSelect(
+      '$_topicSummarySelect\n$filter\n$_topicSummaryOrder',
+      variables: [
+        Variable.withDateTime(now),
+        if (topicId != null) Variable.withInt(topicId),
+      ],
       readsFrom: {
         topics,
         practices,
@@ -280,16 +320,8 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         p.imported_at AS practice_imported_at,
         p.is_done AS practice_is_done,
         COUNT(q.id) AS question_count,
-        (
-          SELECT s.correct FROM sessions s
-          WHERE s.practice_id = p.id AND s.status = 'completed'
-          ORDER BY s.finished_at DESC LIMIT 1
-        ) AS last_correct,
-        (
-          SELECT s.total FROM sessions s
-          WHERE s.practice_id = p.id AND s.status = 'completed'
-          ORDER BY s.finished_at DESC LIMIT 1
-        ) AS last_total,
+        last_session.correct AS last_correct,
+        last_session.total AS last_total,
         (
           SELECT s.id FROM sessions s
           WHERE s.practice_id = p.id AND s.status = 'inProgress'
@@ -297,6 +329,11 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         ) AS in_progress_session_id
       FROM practices p
       LEFT JOIN questions q ON q.practice_id = p.id
+      LEFT JOIN sessions last_session ON last_session.id = (
+        SELECT s.id FROM sessions s
+        WHERE s.practice_id = p.id AND s.status = 'completed'
+        ORDER BY s.finished_at DESC LIMIT 1
+      )
       WHERE p.topic_id = ?
       GROUP BY p.id
       ORDER BY p.id ASC

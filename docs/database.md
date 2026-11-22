@@ -388,6 +388,32 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `error_cards_active_question` | `error_cards` | `question_id` | UNIQUE | `status = 'active'` |
 <!-- END GENERATED: database -->
 
+## Indexes and query plans
+
+The indexes above match the query patterns in `lib/core/database/daos/`. The
+composites put the equality filter first and the leading sort column second:
+`questions_practice_position` serves `WHERE practice_id = ? ORDER BY position`,
+`sessions_status_started` serves the in-progress queries
+(`ORDER BY started_at DESC, id DESC`), and the `created_at` indexes serve the
+card, note and concept lists.
+
+The recency and history lists also end with `id ASC` so rows sharing a
+timestamp keep a stable order. When the leading sort column is descending, that tie-break runs
+in the opposite direction, so the index alone cannot produce the full order:
+SQLite still uses it for the equality filter and the leading term, then adds a
+temp B-tree for the trailing `id` term (`USE TEMP B-TREE FOR LAST TERM OF
+ORDER BY`). That is a sort of the rows the index already narrowed, not a full
+table sort. Without the tie-break the same query is served entirely from the
+index, but tied rows come back in an unspecified order. The
+`error_cards_last_wrong` index behaves the same way: `status` equality comes
+from the index and `ORDER BY last_wrong_at DESC, id ASC` sorts the match.
+
+Every index is maintained on insert, update and delete of its table. The three
+single-column indexes replaced by a composite (`questions_practice`,
+`sessions_status`, `skipped_questions_handled`) are dropped in the version 15
+upgrade so no table carries both; a database that cannot build the replacement
+keeps the single-column index.
+
 ## Relationships and deletion behaviour
 
 - `topics` own `practices`; deleting a topic deletes its practices and

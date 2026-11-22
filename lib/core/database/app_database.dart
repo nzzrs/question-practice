@@ -365,7 +365,12 @@ class AppDatabase extends _$AppDatabase {
     final definition = definitionRow.read<String?>('sql');
     if (definition == null) return;
     final repaired = definition.replaceAllMapped(
-      RegExp(r'REFERENCES\s+manual_cards\b', caseSensitive: false),
+      // Hand-built tables may quote the target or write the statement in
+      // lower case; the word boundary keeps `manual_cards_extra` untouched.
+      RegExp(
+        r'REFERENCES\s+["`\[]?manual_cards(?:["`\]]|\b)',
+        caseSensitive: false,
+      ),
       (match) => 'REFERENCES basic_cards',
     );
     if (repaired == definition) return;
@@ -381,7 +386,10 @@ class AppDatabase extends _$AppDatabase {
     );
     await customStatement(
       repaired.replaceFirst(
-        RegExp(r'CREATE\s+TABLE\s+(?:"notes"|notes)'),
+        RegExp(
+          r'CREATE\s+TABLE\s+(?:"notes"|`notes`|\[notes\]|notes)',
+          caseSensitive: false,
+        ),
         'CREATE TABLE notes_rebuilt',
       ),
     );

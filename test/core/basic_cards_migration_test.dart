@@ -180,6 +180,52 @@ void main() {
     expect(afterDelete.read<int?>('basic_card_id'), isNull);
   });
 
+  test('a quoted legacy notes foreign key is repointed', () async {
+    final sqlite = sqlite3.openInMemory();
+    sqlite.execute('''
+        CREATE TABLE basic_cards (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          question TEXT NOT NULL,
+          answer TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          exported_at INTEGER NULL
+        )
+      ''');
+    // Lower-case DDL with a quoted target, as a hand-built database may keep.
+    sqlite.execute('''
+        create table notes (
+          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+          text TEXT NOT NULL,
+          created_at INTEGER NOT NULL,
+          manual_card_id INTEGER NULL
+            REFERENCES "manual_cards" (id) ON DELETE SET NULL
+        )
+      ''');
+    sqlite.execute('''
+        INSERT INTO basic_cards (id, question, answer, created_at)
+        VALUES (1, 'Front?', 'Back', 1700000000)
+      ''');
+    sqlite.execute('''
+        INSERT INTO notes (id, text, created_at, manual_card_id)
+        VALUES (1, 'Quoted link', 1700000000, 1)
+      ''');
+    sqlite.execute('PRAGMA user_version = 15');
+
+    final database = AppDatabase(NativeDatabase.opened(sqlite));
+    addTearDown(database.close);
+
+    expect(await _columnNames(database, 'notes'), contains('basic_card_id'));
+    final foreignKeys = await _foreignKeys(database, 'notes');
+    expect(foreignKeys, isNot(contains('manual_cards')));
+    expect(foreignKeys['basic_cards'], 'SET NULL');
+
+    await database.customStatement('DELETE FROM basic_cards WHERE id = 1');
+    final afterDelete = await database
+        .customSelect('SELECT basic_card_id FROM notes')
+        .getSingle();
+    expect(afterDelete.read<int?>('basic_card_id'), isNull);
+  });
+
   test('a fresh database uses basic card names and indexes', () async {
     final database = AppDatabase(NativeDatabase.memory());
     addTearDown(database.close);

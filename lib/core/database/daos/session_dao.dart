@@ -62,14 +62,6 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
         .getSingleOrNull();
   }
 
-  Stream<SessionRow?> watchLatestInProgressSession() {
-    return (select(sessions)
-          ..where((s) => s.status.equals('inProgress'))
-          ..orderBy([(s) => OrderingTerm.desc(s.startedAt)])
-          ..limit(1))
-        .watchSingleOrNull();
-  }
-
   Stream<List<InProgressSessionRow>> watchInProgressSessions() {
     final query = customSelect(
       '''
@@ -217,12 +209,6 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     );
   }
 
-  Future<void> updateAttemptMistakeKinds(int id, String mistakeKindsJson) {
-    return (update(attempts)..where((a) => a.id.equals(id))).write(
-      AttemptsCompanion(mistakeKindsJson: Value(mistakeKindsJson)),
-    );
-  }
-
   Future<void> completeSession({
     required int id,
     required int total,
@@ -260,17 +246,6 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     return (delete(
       sessions,
     )..where((s) => s.id.isIn(values) & s.status.equals('completed'))).go();
-  }
-
-  Stream<List<SessionRow>> watchCompletedSessions() {
-    return (select(sessions)
-          ..where((s) => s.status.equals('completed'))
-          ..orderBy([(s) => OrderingTerm.desc(s.finishedAt)]))
-        .watch();
-  }
-
-  Future<List<PracticeRow>> practicesWithSessions() {
-    return (select(practices)..orderBy([(p) => OrderingTerm.asc(p.id)])).get();
   }
 
   Future<int> lookupCountForSession(int sessionId) async {

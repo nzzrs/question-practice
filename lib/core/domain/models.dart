@@ -833,9 +833,6 @@ class SessionSummary {
   /// originally created each card, so a repeated error is counted here.
   final int errorCardsNeedingReview;
 
-  /// Backwards-compatible name used by the session summary page.
-  int get errorCardsNeedingNotes => errorCardsNeedingReview;
-
   int get wrongCount => session.total - session.correct - session.skipped;
   bool get hasReviewableIssues =>
       errorCardsNeedingReview > 0 || session.skipped > 0;

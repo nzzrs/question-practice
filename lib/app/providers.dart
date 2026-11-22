@@ -112,10 +112,6 @@ final topicSubtopicStatsProvider =
           ref.watch(topicRepositoryProvider).watchSubtopicStats(topicId),
     );
 
-final inProgressSessionProvider = StreamProvider<PracticeSession?>(
-  (ref) => ref.watch(sessionRepositoryProvider).watchLatestInProgress(),
-);
-
 final inProgressSessionsProvider = StreamProvider<List<PracticeSession>>(
   (ref) => ref.watch(sessionRepositoryProvider).watchInProgress(),
 );
@@ -128,30 +124,14 @@ final resolvedErrorsProvider = StreamProvider<List<ErrorCard>>(
   (ref) => ref.watch(cardRepositoryProvider).watchResolvedErrors(),
 );
 
-final errorsNeedingDetailsProvider = StreamProvider<List<ErrorCard>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchErrorsNeedingDetails(),
-);
-
-final conceptsProvider = StreamProvider<List<Concept>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchConcepts(),
-);
-
 final allConceptsProvider = StreamProvider<List<Concept>>(
   (ref) =>
       ref.watch(cardRepositoryProvider).watchConcepts(includeExported: true),
 );
 
-final errorCardsProvider = StreamProvider<List<ErrorCard>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchErrorCards(),
-);
-
 final allErrorCardsProvider = StreamProvider<List<ErrorCard>>(
   (ref) =>
       ref.watch(cardRepositoryProvider).watchErrorCards(includeExported: true),
-);
-
-final manualCardsProvider = StreamProvider<List<ManualCard>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchManualCards(),
 );
 
 final allManualCardsProvider = StreamProvider<List<ManualCard>>(

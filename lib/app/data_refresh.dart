@@ -22,15 +22,10 @@ void refreshDataProviders(WidgetRef ref) {
   ref.invalidate(homeStatsProvider);
   ref.invalidate(dueErrorsProvider);
   ref.invalidate(resolvedErrorsProvider);
-  ref.invalidate(errorsNeedingDetailsProvider);
-  ref.invalidate(conceptsProvider);
   ref.invalidate(allConceptsProvider);
-  ref.invalidate(errorCardsProvider);
   ref.invalidate(allErrorCardsProvider);
-  ref.invalidate(manualCardsProvider);
   ref.invalidate(allManualCardsProvider);
   ref.invalidate(skippedQuestionsProvider);
   ref.invalidate(notesProvider);
-  ref.invalidate(inProgressSessionProvider);
   ref.invalidate(inProgressSessionsProvider);
 }

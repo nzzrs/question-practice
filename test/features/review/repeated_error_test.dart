@@ -155,7 +155,7 @@ void main() {
       final outcome = await answerWrong(second);
 
       expect(outcome.summary, isNotNull);
-      expect(outcome.summary!.errorCardsNeedingNotes, 1);
+      expect(outcome.summary!.errorCardsNeedingReview, 1);
       expect(outcome.summary!.hasReviewableIssues, isTrue);
 
       final data = await review.load(second.session.id);
@@ -304,7 +304,7 @@ void main() {
       expect(await harness.cards.watchErrorsNeedingDetails().first, isEmpty);
       expect(await harness.cards.dueErrors(), isEmpty);
       final summary = await sessions.summaryFor(start.session.id);
-      expect(summary.errorCardsNeedingNotes, 0);
+      expect(summary.errorCardsNeedingReview, 0);
       final data = await review.load(start.session.id);
       expect(data!.steps.whereType<ErrorReviewStep>(), isEmpty);
     },
@@ -332,7 +332,7 @@ void main() {
     expect(stored!.needsDetails, isFalse);
     expect(stored.distracted, isTrue);
     expect(await harness.cards.watchErrorsNeedingDetails().first, isEmpty);
-    expect(outcome.summary!.errorCardsNeedingNotes, 0);
+    expect(outcome.summary!.errorCardsNeedingReview, 0);
     final data = await review.load(second.session.id);
     expect(data!.steps.whereType<ErrorReviewStep>(), isEmpty);
   });

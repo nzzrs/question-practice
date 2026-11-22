@@ -122,11 +122,13 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
   bool _validationRequested = false;
   bool _syncingFields = false;
   bool _didSave = false;
+  bool _closeBlocked = false;
   Object? _loadError;
   _TopicField? _expanded;
 
   String _topicName = '';
   String? _savedKey;
+  _SavedFields? _savedFields;
 
   String? _nameError;
   String? _priorityError;
@@ -211,10 +213,12 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       _applyTopic(current);
       setState(() {
         _topicName = current.name;
+        _savedFields = _SavedFields.fromTopic(current);
         _savedKey = _currentKey;
         _loading = false;
         _loadError = null;
         _validationRequested = false;
+        _closeBlocked = false;
         _nameError = null;
         _priorityError = null;
         _minimumScoreError = null;
@@ -268,15 +272,18 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
 
     final validation = _validateDraft();
     if (validation.draft == null) {
+      _closeBlocked = true;
       _showValidation(validation, revealFirst: true);
       return false;
     }
+    _closeBlocked = false;
 
     _closing = true;
     try {
       while (_currentKey != _savedKey) {
         final current = _validateDraft();
         if (current.draft == null) {
+          _closeBlocked = true;
           _showValidation(current, revealFirst: true);
           return false;
         }
@@ -329,6 +336,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
             targetScore: draft.targetScore,
           );
       _savedKey = draft.key;
+      _savedFields = _SavedFields.fromDraft(draft);
       _didSave = true;
       saved = true;
       return true;
@@ -449,6 +457,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
     _priorityError = validation.priorityError;
     _minimumScoreError = validation.minimumScoreError;
     _targetScoreError = validation.targetScoreError;
+    if (validation.draft != null) _closeBlocked = false;
   }
 
   void _showValidation(
@@ -480,6 +489,41 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       }
       _focusNodes[field]?.requestFocus();
     });
+  }
+
+  /// Restores the last saved values and closes, dropping only unsaved edits.
+  ///
+  /// A blocked close must always offer a way out. This keeps the invalid-close
+  /// gate without adding a Save/Cancel footer, and it never writes.
+  void _discardAndClose() {
+    final saved = _savedFields;
+    if (saved == null || _busy || _closing) return;
+    _autosaveTimer?.cancel();
+    _autosaveTimer = null;
+    _syncingFields = true;
+    try {
+      _name.text = saved.name;
+      _description.text = saved.description;
+      _priority.text = saved.priority;
+      _minimumScore.text = saved.minimumScore;
+      _targetScore.text = saved.targetScore;
+      _deck.text = saved.deck;
+    } finally {
+      _syncingFields = false;
+    }
+    setState(() {
+      _topicName = saved.name;
+      _savedKey = _currentKey;
+      _closeBlocked = false;
+      _validationRequested = false;
+      _expanded = null;
+      _nameError = null;
+      _priorityError = null;
+      _minimumScoreError = null;
+      _targetScoreError = null;
+    });
+    _syncGuard();
+    Navigator.of(context).pop(true);
   }
 
   Future<void> _browseDecks() async {
@@ -661,18 +705,32 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
         top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _SheetHeader(
-                title: 'Edit topic',
-                subtitle: _topicName.isEmpty ? widget.topic.name : _topicName,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (_closeBlocked && !_loading && _loadError == null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 0),
+                child: _closeBlockedBanner(context),
               ),
-              ..._content(context),
-            ],
-          ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _SheetHeader(
+                      title: 'Edit topic',
+                      subtitle: _topicName.isEmpty
+                          ? widget.topic.name
+                          : _topicName,
+                    ),
+                    ..._content(context),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -829,6 +887,80 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
     ];
   }
 
+  /// Recovery shown after a close attempt that kept the sheet open.
+  Widget _closeBlockedBanner(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: TonalBox(
+        key: const ValueKey('topic-editor-close-blocked'),
+        color: theme.colorScheme.errorContainer,
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 6),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final message = _closeBlockedMessage(theme);
+            final action = _discardChangesButton(theme);
+            if (constraints.maxWidth >= 420) {
+              return Row(
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 20,
+                    color: theme.colorScheme.onErrorContainer,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: message),
+                  const SizedBox(width: 8),
+                  action,
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 20,
+                      color: theme.colorScheme.onErrorContainer,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: message),
+                  ],
+                ),
+                Align(alignment: Alignment.centerRight, child: action),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _closeBlockedMessage(M3EThemeData theme) {
+    return Text(
+      'Fix the highlighted field, or discard the changes you have not saved.',
+      style: theme.typography.baseline.bodySmall.copyWith(
+        height: 1.35,
+        color: theme.colorScheme.onErrorContainer,
+      ),
+    );
+  }
+
+  Widget _discardChangesButton(M3EThemeData theme) {
+    return M3EButton.text(
+      onPressed: _busy ? null : _discardAndClose,
+      child: Text(
+        'Discard changes',
+        style: theme.typography.baseline.labelLarge.copyWith(
+          color: theme.colorScheme.onErrorContainer,
+        ),
+      ),
+    );
+  }
+
   Widget _fieldTile({
     required _TopicField field,
     required IconData icon,
@@ -850,6 +982,43 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       ),
     );
   }
+}
+
+/// The last persisted field values, used as the discard baseline.
+class _SavedFields {
+  const _SavedFields({
+    required this.name,
+    required this.description,
+    required this.priority,
+    required this.minimumScore,
+    required this.targetScore,
+    required this.deck,
+  });
+
+  factory _SavedFields.fromTopic(Topic topic) => _SavedFields(
+    name: topic.name,
+    description: topic.description,
+    priority: topic.priority?.toString() ?? '',
+    minimumScore: topic.minimumScore.toString(),
+    targetScore: topic.targetScore.toString(),
+    deck: topic.ankiDeck ?? '',
+  );
+
+  factory _SavedFields.fromDraft(_TopicDraft draft) => _SavedFields(
+    name: draft.name,
+    description: draft.description,
+    priority: draft.priority?.toString() ?? '',
+    minimumScore: draft.minimumScore.toString(),
+    targetScore: draft.targetScore.toString(),
+    deck: draft.deck ?? '',
+  );
+
+  final String name;
+  final String description;
+  final String priority;
+  final String minimumScore;
+  final String targetScore;
+  final String deck;
 }
 
 /// The persisted fields of one valid draft.

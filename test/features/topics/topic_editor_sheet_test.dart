@@ -525,6 +525,10 @@ void main() {
     final before = await harness.practices.topicById(seeded.topicId);
     expect(before!.name, 'Cloud');
 
+    await tester.pump(const Duration(milliseconds: 250));
+    final beforeDebounce = await harness.practices.topicById(seeded.topicId);
+    expect(beforeDebounce!.name, 'Cloud');
+
     await _waitForAutosave(tester);
 
     final stored = await harness.practices.topicById(seeded.topicId);
@@ -681,6 +685,110 @@ void main() {
 
     final after = await harness.practices.topicById(seeded.topicId);
     expect(after!.name, 'Cloud');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a blocked close can discard unsaved edits and keep the saved '
+      'baseline', (tester) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+    final repository = _CountingPracticeRepository(
+      harness.database,
+      harness.clock,
+    );
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      overrides: [topicRepositoryProvider.overrideWithValue(repository)],
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    await _openField(tester, 'description', 'Description');
+    await _type(tester, _descriptionField(), 'Saved baseline');
+    await _waitForAutosave(tester);
+    expect(repository.updateCalls, 1);
+
+    await _openField(tester, 'name', 'Name');
+    await _type(tester, _nameField(), '');
+    await _closeSheet(tester);
+
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('topic-editor-close-blocked')),
+      findsOneWidget,
+    );
+    expect(find.text('Discard changes'), findsOneWidget);
+    expect(find.text('Name is required.'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Discard changes'));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Discard changes'));
+    await pumpFrames(tester, frames: 10);
+
+    expect(find.byType(TopicEditorSheet), findsNothing);
+    expect(repository.updateCalls, 1);
+    final stored = await harness.practices.topicById(seeded.topicId);
+    expect(stored!.name, 'Cloud');
+    expect(stored.description, 'Saved baseline');
+
+    await tester.pump(const Duration(seconds: 5));
+    await pumpFrames(tester);
+    final after = await harness.practices.topicById(seeded.topicId);
+    expect(after!.name, 'Cloud');
+    expect(after.description, 'Saved baseline');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('updating from JSON while an invalid edit waits asks before '
+      'replacing it', (tester) async {
+    tester.view.physicalSize = const Size(480, 1000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(topicName: 'Cloud', count: 1);
+
+    await pumpTestApp(
+      tester,
+      home: const HomePage(),
+      harness: harness,
+      fontFamily: 'Roboto',
+    );
+    await _openFromLongPress(tester);
+
+    await _openField(tester, 'name', 'Name');
+    await _type(tester, _nameField(), '');
+    await _waitForAutosave(tester);
+
+    await tester.ensureVisible(_updateJsonTile());
+    await pumpFrames(tester);
+    await tester.tap(_updateJsonTile());
+    await pumpFrames(tester);
+
+    expect(find.text('Replace this topic?'), findsOneWidget);
+    await tester.tap(
+      find.descendant(
+        of: find.byType(M3EDialog),
+        matching: find.text('Cancel'),
+      ),
+    );
+    await pumpFrames(tester);
+
+    expect(find.text('Replace this topic?'), findsNothing);
+    expect(find.byType(TopicEditorSheet), findsOneWidget);
+    expect(find.text('Name is required.'), findsOneWidget);
+    expect(tester.widget<M3ETextField>(_nameField()).controller!.text, '');
+    final stored = await harness.practices.topicById(seeded.topicId);
+    expect(stored!.name, 'Cloud');
     expect(tester.takeException(), isNull);
   });
 
@@ -957,6 +1065,21 @@ void main() {
 
     expect(find.byKey(const ValueKey('topic-editor-save')), findsNothing);
     expect(tester.takeException(), isNull);
+
+    await _openField(tester, 'name', 'Name');
+    await _type(tester, _nameField(), '');
+    await _closeSheet(tester);
+    expect(
+      find.byKey(const ValueKey('topic-editor-close-blocked')),
+      findsOneWidget,
+    );
+    expect(find.text('Discard changes').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Discard changes'));
+    await pumpFrames(tester, frames: 10);
+    expect(find.byType(TopicEditorSheet), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('the compact sheet stays usable in landscape with the keyboard', (
@@ -1006,6 +1129,15 @@ void main() {
       expect(find.byKey(ValueKey(key)), findsOneWidget);
       expect(tester.takeException(), isNull);
     }
+
+    await _type(tester, _nameField(), '');
+    await _closeSheet(tester);
+    expect(find.text('Discard changes').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.text('Discard changes'));
+    await pumpFrames(tester, frames: 10);
+    expect(find.byType(TopicEditorSheet), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

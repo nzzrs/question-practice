@@ -35,10 +35,10 @@ Questions is an offline Android app for practising questions and exporting study
 - The **insights** icon opens **Statistics**.
 - **Practices** lists each practice with its question count and last score. Tap one to start it.
 - The **sort** icon beside **Practices** orders them by **Name** or **Recency**, increasing or decreasing. Each topic remembers its own order.
-- Long-press a practice to **Edit practice**, mark it done or active, **Split into two**, or delete it.
+- Long-press a practice to **Edit practice**, mark it done or active, **Split**, or delete it.
 - A practice marked done keeps a **Done** tag.
 - **Edit practice** offers **Rename**, **Edit description**, **Download practice JSON** and **Update practice JSON**.
-- **Split into two** needs an even number of questions. It replaces the practice with Slice A and Slice B, and removes the original practice's sessions and cards.
+- **Split** asks how many parts to create, from two up to the number of questions. It shuffles the questions, so parts differ by at most one question, names them Slice A, Slice B and so on, and removes the original practice's sessions, answers and cards.
 - **Edit topic** is in the topic long-press menu. It is one compact form of **Name**, **Description**, **Priority**, **Minimum score**, **Target score**, **AnkiDroid deck**, **Download topic JSON** and **Update topic JSON**, with no section headings between them. Tap a row to edit its value in place.
 - The topic long-press menu groups **Edit topic**, **Archive topic**/**Unarchive topic** and **Delete topic**, like the practice menu.
 - Decks are set per topic. There is no per-practice deck.

@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -379,35 +380,23 @@ class _TopicPageState extends ConsumerState<TopicPage> {
       await showSnack(context, 'A split needs at least two questions.');
       return;
     }
-    if (count.isOdd) {
-      await showSnack(
-        context,
-        'A split needs an even number of questions. This practice has $count.',
-      );
-      return;
-    }
-    final confirmed = await confirmDialog(
+    final parts = await showSplitPracticeDialog(
       context,
-      title: 'Split practice?',
-      message:
-          'This replaces "${summary.practice.name}" with two practices of '
-          '${formatCount(count ~/ 2, 'randomly chosen question')} each, named '
-          '"${summary.practice.name} Slice A" and '
-          '"${summary.practice.name} Slice B".\n\n'
-          'Sessions, answers and error cards for the original practice are '
-          'removed.',
-      confirmLabel: 'Split',
+      practiceName: summary.practice.name,
+      questionCount: count,
     );
-    if (!confirmed || !mounted) return;
+    if (parts == null || !mounted) return;
     setState(() => _starting = true);
     try {
       final result = await ref
           .read(topicRepositoryProvider)
-          .splitPractice(summary.practice.id);
+          .splitPractice(summary.practice.id, parts: parts);
       if (mounted) {
+        final names = [for (final part in result.parts) part.name];
         await showSnack(
           context,
-          'Split into ${result.sliceA.name} and ${result.sliceB.name}.',
+          'Split into ${formatCount(names.length, 'practice')}: '
+          '${_summarizeSplitNames(names)}.',
         );
       }
     } on PracticeSplitException catch (error) {
@@ -416,6 +405,153 @@ class _TopicPageState extends ConsumerState<TopicPage> {
       if (mounted) setState(() => _starting = false);
     }
   }
+}
+
+/// Asks how many parts to create and previews their question distribution.
+Future<int?> showSplitPracticeDialog(
+  BuildContext context, {
+  required String practiceName,
+  required int questionCount,
+}) async {
+  final controller = TextEditingController(text: '2');
+  String? error;
+
+  void setParts(StateSetter setDialogState, int value) {
+    controller.text = '$value';
+    setDialogState(() => error = null);
+  }
+
+  final parts = await M3EDialog.show<int>(
+    context,
+    dialog: StatefulBuilder(
+      builder: (context, setDialogState) {
+        final value = int.tryParse(controller.text.trim());
+        final valid = value != null && value >= 2 && value <= questionCount;
+        final sizes = valid ? splitPartSizes(questionCount, value) : null;
+        return M3EDialog(
+          title: 'Split practice?',
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'This replaces "$practiceName" with '
+                  '${valid ? formatCount(value, 'practice') : 'new practices'}. '
+                  'Questions are shuffled, so each part gets a random mix '
+                  'and sizes differ by at most one.\n\n'
+                  'Sessions, answers and error cards for the original '
+                  'practice are removed.',
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    M3EIconButton(
+                      key: const ValueKey('split-parts-remove'),
+                      icon: const Icon(Icons.remove),
+                      semanticLabel: 'Remove a part',
+                      variant: M3EIconButtonVariant.outlined,
+                      onPressed: value != null && value > 2
+                          ? () => setParts(setDialogState, value - 1)
+                          : null,
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: 104,
+                      child: M3ETextField(
+                        key: const ValueKey('split-parts-field'),
+                        controller: controller,
+                        label: 'Parts',
+                        supportingText: 'Between 2 and $questionCount',
+                        errorText: error,
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly,
+                        ],
+                        onChanged: (_) {
+                          setDialogState(() => error = null);
+                        },
+                        onSubmitted: (_) {
+                          final submitted = int.tryParse(
+                            controller.text.trim(),
+                          );
+                          if (submitted != null &&
+                              submitted >= 2 &&
+                              submitted <= questionCount) {
+                            Navigator.of(context).pop(submitted);
+                          }
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    M3EIconButton(
+                      key: const ValueKey('split-parts-add'),
+                      icon: const Icon(Icons.add),
+                      semanticLabel: 'Add a part',
+                      variant: M3EIconButtonVariant.outlined,
+                      onPressed: value != null && value < questionCount
+                          ? () => setParts(setDialogState, value + 1)
+                          : null,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  valid
+                      ? '${formatCount(value, 'practice')} with '
+                            '${sizes!.join(' + ')} questions.'
+                      : 'Choose between 2 and $questionCount parts.',
+                  key: const ValueKey('split-distribution'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            M3EButton.text(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            M3EButton.filled(
+              onPressed: () {
+                final chosen = int.tryParse(controller.text.trim());
+                if (chosen == null) {
+                  setDialogState(() => error = 'Enter how many parts.');
+                  return;
+                }
+                if (chosen < 2) {
+                  setDialogState(() => error = 'Use at least 2 parts.');
+                  return;
+                }
+                if (chosen > questionCount) {
+                  setDialogState(
+                    () => error =
+                        'Use at most $questionCount parts, one per question.',
+                  );
+                  return;
+                }
+                Navigator.of(context).pop(chosen);
+              },
+              child: const Text('Split'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+  controller.dispose();
+  return parts;
+}
+
+String _summarizeSplitNames(List<String> names) {
+  if (names.length <= 3) return _joinNames(names);
+  return '${names.first} to ${names.last}';
+}
+
+String _joinNames(List<String> names) {
+  if (names.length == 1) return names.single;
+  return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
 }
 
 class _TopicHero extends StatelessWidget {

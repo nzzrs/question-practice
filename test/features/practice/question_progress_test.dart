@@ -483,4 +483,61 @@ void main() {
     expect(find.textContaining('1 question'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('finish dialog says one question is unanswered', (tester) async {
+    final practice = await harness.seedPractice(count: 2);
+    final start = await service.startPractice(practice.practiceId);
+    await service.submitAnswer(
+      start: start,
+      item: start.items.first,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+
+    await pumpTestApp(
+      tester,
+      home: SessionPage(start: start),
+      harness: harness,
+    );
+    await tester.tap(find.byIcon(Icons.flag_outlined));
+    await pumpFrames(tester);
+
+    expect(
+      find.text(
+        '1 question is unanswered. '
+        'Leave them out of the score, or mark them skipped?',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Leave unanswered'), findsOneWidget);
+    expect(find.text('Mark skipped'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('finish dialog says multiple questions are unanswered', (
+    tester,
+  ) async {
+    final practice = await harness.seedPractice(count: 2);
+    final start = await service.startPractice(practice.practiceId);
+
+    await pumpTestApp(
+      tester,
+      home: SessionPage(start: start),
+      harness: harness,
+    );
+    await tester.tap(find.byIcon(Icons.flag_outlined));
+    await pumpFrames(tester);
+
+    expect(
+      find.text(
+        '2 questions are unanswered. '
+        'Leave them out of the score, or mark them skipped?',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Leave unanswered'), findsOneWidget);
+    expect(find.text('Mark skipped'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }

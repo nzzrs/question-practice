@@ -150,7 +150,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 
 **Drift class:** `Attempts` · **Row class:** `AttemptRow`
 
-**Feature use:** One submitted answer, reasoning, distraction and "I didn't know this" flags, and the done/solved/skipped history.
+**Feature use:** One submitted answer, reasoning, distraction and the legacy unknown flag, plus the done/solved/skipped history.
 
 **Domain model:** `Attempt` · **Repository:** `SessionRepository` · **DAO:** `SessionDao`, `StatsDao`
 
@@ -488,9 +488,9 @@ defaults; the sort values use the `field:direction` form from `ListSort`.
 |---|---|---|
 | `lookup_mode` | `web` or `ai` | Define lookup mode; Ask always uses AI |
 | `web_engine` | `duckDuckGo` or `wikipedia` | Web lookup engine |
-| `ai_provider` | `openai`, `groq`, `openRouter`, `gemini`, `custom` | AI lookup and review checks |
+| `ai_provider` | `openai`, `groq`, `openRouter`, `gemini`, `custom` | AI lookup and card suggestions |
 | `ai_base_url` | URL string | Custom/OpenAI-compatible endpoint |
-| `ai_model` | model id | AI lookup and review checks |
+| `ai_model` | model id | AI lookup and card suggestions |
 | `dynamic_color` | `true` or `false` | Material You wallpaper colors |
 | `sounds_enabled` | `true` or `false` | Practice correct/wrong/finished cues |
 | `sound_volume` | `0.05`–`1` | Practice sound volume |
@@ -527,6 +527,10 @@ Current schema version: **16**. Migration steps are read from `AppDatabase.migra
 
 The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 16.
 <!-- END GENERATED: migrations -->
+
+The current schema has `basic_cards` and `notes.basic_card_id`. The old
+`manual_cards` table and `notes.manual_card_id` column exist only in migration
+steps that upgrade older databases; they are not present at version 16.
 
 ## Backup coverage
 

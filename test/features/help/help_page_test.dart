@@ -72,7 +72,55 @@ void main() {
     expect(
       texts.any(
         (text) => text.contains(
-          'Review all pending sits beside Select all below the filters. It '
+          'Long-press a practice to edit, split or delete it. Split asks for '
+          'a part count, mixes the questions and names the parts Slice A, '
+          'Slice B and so on.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'Valid topic edits save automatically; closing with an invalid value '
+          'offers Discard changes.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'In practice the bullets stay editable and have no Copy or Create '
+          'card menu.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'The ? icon opens a short guide to Cloze and Basic cards, tags, '
+          'decks and what stays in Question Practice.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains('The dock has no Create or Delete button.'),
+      ),
+      isTrue,
+    );
+    expect(texts.any((text) => text.contains('Clear selection')), isFalse);
+    expect(texts.any((text) => text.contains('Review selected')), isFalse);
+    expect(texts.any((text) => text.contains('Split into two')), isFalse);
+    expect(texts.any((text) => text.contains('WrongNotes')), isFalse);
+    expect(texts.any((text) => text.contains('AdaptiveSplitView')), isFalse);
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'Review all pending sits beside Select all on the right. It '
           'opens every pending error and skipped question, even ones not '
           'selected.',
         ),

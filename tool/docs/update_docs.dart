@@ -1293,8 +1293,8 @@ const _tableDocs = <String, _TableDoc>{
     'SessionRepository',
   ),
   'attempts': _TableDoc(
-    'One submitted answer, reasoning, distraction and "I didn\'t know this" '
-        'flags, and the done/solved/skipped history.',
+    'One submitted answer, reasoning, distraction and the legacy unknown flag, '
+        'plus the done/solved/skipped history.',
     'Attempt',
     'SessionRepository',
   ),

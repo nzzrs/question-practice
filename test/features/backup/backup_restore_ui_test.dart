@@ -142,10 +142,20 @@ void main() {
       'Topic description',
     );
 
-    await tester.tap(find.text('Save'));
+    await tester.tap(find.text('Name'));
+    await pumpFrames(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('topic-editor-name')),
+      'Cloud renamed',
+    );
+    await pumpFrames(tester);
+    await tester.binding.handlePopRoute();
     await pumpFrames(tester);
 
+    expect(find.byType(M3EBottomSheet), findsNothing);
     final stored = (await harness.practices.allTopics()).single;
+    expect(stored.name, 'Cloud renamed');
+    expect(stored.description, 'Topic description');
     expect(stored.ankiDeck, 'Cloud deck');
   });
 }

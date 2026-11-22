@@ -94,8 +94,12 @@ void main() {
     await tester.tap(find.text('AnkiDroid deck'));
     await pumpFrames(tester);
     expect(find.text('Browse decks'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
+    await tester.tap(find.text('AnkiDroid deck'));
     await pumpFrames(tester);
+    expect(find.text('Browse decks'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await pumpFrames(tester);
+    expect(find.text('Edit topic'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

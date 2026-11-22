@@ -62,32 +62,28 @@ Future<void> _deleteTopic(
 
 /// Edits a topic's name, description, priority and AnkiDroid deck.
 ///
-/// Opens the [TopicEditorSheet] and returns whether the topic was saved.
-/// Callers keep their existing refresh and snackbar behaviour.
+/// Opens the [TopicEditorSheet] and returns whether anything was saved.
+/// Valid edits are written by the sheet before it closes, so a dismissal that
+/// flushes an autosave refreshes the topic providers here.
 Future<bool> showEditTopicDialog(
   BuildContext context,
   WidgetRef ref,
   Topic topic,
 ) async {
   final guard = TopicEditorSheetGuard();
-  final saved = await M3EBottomSheet.show<bool>(
+  await M3EBottomSheet.show<bool>(
     context,
     initialValue: M3EBottomSheetValue.expanded,
-    onDismissRequest: () async {
-      if (guard.saving) return false;
-      if (!guard.dirty) return true;
-      if (!context.mounted) return true;
-      return confirmDiscardTopicChanges(context);
-    },
+    onDismissRequest: guard.requestClose,
     builder: (context) => TopicEditorSheet(topic: topic, guard: guard),
   );
-  if (saved == true) {
+  if (guard.saved) {
     ref.invalidate(topicSummariesProvider);
     ref.invalidate(archivedTopicSummariesProvider);
     ref.invalidate(topicSummaryProvider(topic.id));
     if (context.mounted) await showSnack(context, 'Topic updated.');
   }
-  return saved == true;
+  return guard.saved;
 }
 
 /// The options sheet shown for a long-pressed topic.

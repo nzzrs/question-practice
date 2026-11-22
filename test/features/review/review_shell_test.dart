@@ -399,6 +399,46 @@ void main() {
     expect(tester.getRect(fab).overlaps(tester.getRect(dock)), isFalse);
   });
 
+  testWidgets('the create FAB sits at endFloat above the dock, icon only and '
+      'spoken', (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final notes = await seedTwoNotes(tester, harness);
+
+    await pumpTestApp(
+      tester,
+      home: NoteReviewPage(notes: notes),
+      harness: harness,
+    );
+
+    final fab = find.byKey(ReviewCreateFab.fabKey);
+    final dock = find.byType(ReviewActionDock);
+    final scaffold = tester.widget<Scaffold>(
+      find.byKey(const ValueKey('app-focus-page')),
+    );
+    final fabRect = tester.getRect(fab);
+    final dockRect = tester.getRect(dock);
+    final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+
+    expect(
+      scaffold.floatingActionButtonLocation,
+      FloatingActionButtonLocation.endFloat,
+    );
+    expect(fabRect.bottom, lessThanOrEqualTo(dockRect.top));
+    expect(dockRect.top - fabRect.bottom, closeTo(16, 0.5));
+    expect(screen.width - fabRect.right, closeTo(16, 0.5));
+    expect(fabRect.right, greaterThan(screen.width / 2));
+    expect(find.descendant(of: fab, matching: find.byType(Text)), findsNothing);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Create cards')),
+      isSemantics(label: 'Create cards', isButton: true, hasTapAction: true),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the create FAB fits every review layout without overlapping', (
     tester,
   ) async {

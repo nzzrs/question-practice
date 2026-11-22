@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:question_practice/core/data/error_card_undo.dart';
 import 'package:question_practice/core/domain/list_sort.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/backup/domain/backup_service.dart';
@@ -143,6 +144,121 @@ void main() {
     expect(settings.lookupMode, LookupMode.ai);
     // The AI key lives in secure storage, outside the database and the backup.
     expect(await harness.settings.hasApiKey(), isTrue);
+  });
+
+  test(
+    'a backup keeps only undo journals owned by unfinished sessions',
+    () async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await harness.seedPractice(count: 1);
+      final question = (await harness.practices.questionsForPractice(
+        seeded.practiceId,
+      )).single;
+      final live = await harness.sessions.startSession(
+        practiceId: seeded.practiceId,
+        mode: SessionMode.practice,
+        questions: [question],
+        startedAt: harness.clock.now().toUtc(),
+      );
+      final abandoned = await harness.sessions.startSession(
+        practiceId: seeded.practiceId,
+        mode: SessionMode.practice,
+        questions: [question],
+        startedAt: harness.clock.now().toUtc(),
+      );
+      final cardId = await _seedUndoCard(harness, question);
+      await harness.cards.recordErrorCardUndo(
+        sessionId: live.id,
+        cardId: cardId,
+      );
+      await harness.cards.recordErrorCardUndo(
+        sessionId: abandoned.id,
+        cardId: cardId,
+      );
+      await harness.sessions.abandonSession(abandoned.id);
+      await harness.database.settingsDao.setValue(
+        errorCardUndoKey(999999),
+        encodeErrorCardUndo(const []),
+      );
+
+      final service = _service(harness);
+      final payload = _payload(await service.encode());
+      final tables = payload['tables'] as Map<String, dynamic>;
+      final settings = tables['settings'] as List<dynamic>;
+      final keys = [
+        for (final item in settings) (item as Map<String, dynamic>)['key'],
+      ];
+
+      expect(keys, contains(errorCardUndoKey(live.id)));
+      expect(keys, isNot(contains(errorCardUndoKey(abandoned.id))));
+      expect(keys, isNot(contains(errorCardUndoKey(999999))));
+    },
+  );
+
+  test('a restore drops stale and damaged undo journals', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
+    final first = await harness.sessions.startSession(
+      practiceId: seeded.practiceId,
+      mode: SessionMode.practice,
+      questions: [question],
+      startedAt: harness.clock.now().toUtc(),
+    );
+    final second = await harness.sessions.startSession(
+      practiceId: seeded.practiceId,
+      mode: SessionMode.practice,
+      questions: [question],
+      startedAt: harness.clock.now().toUtc(),
+    );
+    final cardId = await _seedUndoCard(harness, question);
+    await harness.cards.recordErrorCardUndo(
+      sessionId: first.id,
+      cardId: cardId,
+    );
+    await harness.cards.recordErrorCardUndo(
+      sessionId: second.id,
+      cardId: cardId,
+    );
+
+    final service = _service(harness);
+    final payload = _payload(await service.encode());
+    final tables = payload['tables'] as Map<String, dynamic>;
+    final settings = tables['settings'] as List<dynamic>;
+    final firstRow = settings.firstWhere(
+      (item) =>
+          (item as Map<String, dynamic>)['key'] == errorCardUndoKey(first.id),
+    ) as Map<String, dynamic>;
+    final secondRow = settings.firstWhere(
+      (item) =>
+          (item as Map<String, dynamic>)['key'] == errorCardUndoKey(second.id),
+    ) as Map<String, dynamic>;
+    secondRow['value'] = '{damaged journal';
+    settings.add({'key': errorCardUndoKey(999999), 'value': firstRow['value']});
+    final metadata = payload['metadata'] as Map<String, dynamic>;
+    final counts = metadata['tableCounts'] as Map<String, dynamic>;
+    counts['settings'] = settings.length;
+    _resign(payload);
+
+    await harness.database.clearAll();
+    await service.restoreText(jsonEncode(payload));
+
+    expect(
+      await harness.database.settingsDao.getValue(errorCardUndoKey(first.id)),
+      isNotNull,
+    );
+    expect(
+      await harness.database.settingsDao.getValue(errorCardUndoKey(second.id)),
+      isNull,
+    );
+    expect(
+      await harness.database.settingsDao.getValue(errorCardUndoKey(999999)),
+      isNull,
+    );
   });
 
   test('a v1 backup still restores its topic deck', () async {
@@ -756,6 +872,24 @@ Map<String, dynamic> _asV1(Map<String, dynamic> payload) {
 
 void _resign(Map<String, dynamic> payload) {
   payload['checksum'] = _checksum(payload['tables'] as Map<String, dynamic>);
+}
+
+Future<int> _seedUndoCard(TestHarness harness, Question question) {
+  return harness.cards.createErrorCard(
+    questionId: question.id,
+    sessionId: null,
+    question: question.prompt,
+    alternatives: question.alternatives,
+    correctIndexes: question.correctIndexes,
+    wrongIndexes: const [1],
+    reasoning: 'Original reasoning',
+    explanation: question.explanation,
+    alternativeExplanations: question.alternativeExplanations,
+    topicName: 'Topic',
+    practiceName: 'Practice',
+    lastWrongAt: DateTime.utc(2025, 12, 1, 8),
+    dueAfter: const Duration(hours: 48),
+  );
 }
 
 /// Seeds two topics, one practice with four questions, a completed session, all

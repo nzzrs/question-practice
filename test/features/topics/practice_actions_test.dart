@@ -410,6 +410,91 @@ void main() {
     expect(sessions!.id, start.session.id);
   });
 
+  testWidgets(
+    'a failed discard keeps the session and does not start another practice',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 720);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await harness.seedPractice(
+        topicName: 'Networking',
+        practiceName: 'TCP/IP',
+        count: 2,
+      );
+      final question = (await harness.practices.questionsForPractice(
+        seeded.practiceId,
+      )).first;
+      final baselineId = await harness.cards.createErrorCard(
+        questionId: question.id,
+        sessionId: null,
+        question: question.prompt,
+        alternatives: question.alternatives,
+        correctIndexes: question.correctIndexes,
+        wrongIndexes: const [1],
+        reasoning: 'Original reasoning',
+        explanation: question.explanation,
+        alternativeExplanations: question.alternativeExplanations,
+        topicName: 'Networking',
+        practiceName: 'TCP/IP',
+        lastWrongAt: DateTime.utc(2025, 12, 1, 8),
+        dueAfter: const Duration(hours: 48),
+      );
+      final service = SessionService(
+        practices: harness.practices,
+        sessions: harness.sessions,
+        cards: harness.cards,
+        clock: harness.clock,
+      );
+      final start = await service.startPractice(seeded.practiceId);
+      await service.submitAnswer(
+        start: start,
+        item: start.items.first,
+        selectedIndexes: const [1],
+        reasoning: 'Changed before the conflict',
+        distracted: false,
+      );
+      await harness.cards.resolveError(baselineId, harness.clock.now().toUtc());
+      await harness.cards.createErrorCard(
+        questionId: question.id,
+        sessionId: null,
+        question: question.prompt,
+        alternatives: question.alternatives,
+        correctIndexes: question.correctIndexes,
+        wrongIndexes: const [1],
+        reasoning: 'Conflicting active card',
+        explanation: question.explanation,
+        alternativeExplanations: question.alternativeExplanations,
+        topicName: 'Networking',
+        practiceName: 'TCP/IP',
+        lastWrongAt: DateTime.utc(2025, 12, 1, 9),
+        dueAfter: const Duration(hours: 48),
+      );
+
+      await pumpTestApp(
+        tester,
+        home: TopicPage(topicId: seeded.topicId),
+        harness: harness,
+      );
+      await tester.ensureVisible(find.text('TCP/IP'));
+      await tester.tap(find.text('TCP/IP'));
+      await pumpFrames(tester);
+      await tester.tap(find.text('Discard and start another'));
+      await pumpFrames(tester);
+
+      expect(
+        find.textContaining('Could not discard this session'),
+        findsOneWidget,
+      );
+      expect(find.text('Continue this practice?'), findsNothing);
+      expect(find.text('Question 1 of 2'), findsNothing);
+      expect((await harness.sessions.latestInProgress())!.id, start.session.id);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('practices can be sorted by name or recency', (tester) async {
     tester.view.physicalSize = const Size(360, 720);
     tester.view.devicePixelRatio = 1;

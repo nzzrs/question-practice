@@ -127,6 +127,15 @@ class SessionService {
   final Clock _clock;
   final Random _random;
 
+  /// Keeps the card's pre-session state for Discard.
+  ///
+  /// Cards created by this session are deleted with it, so only a card that
+  /// already existed before the session needs a snapshot.
+  Future<void> _snapshotBeforeChange(int sessionId, ErrorCard card) async {
+    if (card.sessionId == sessionId) return;
+    await _cards.recordErrorCardUndo(sessionId: sessionId, cardId: card.id);
+  }
+
   SessionQuestionItem _itemFor(
     Question question, {
     required String topicName,
@@ -359,6 +368,7 @@ class SessionService {
           start.errorCards[item.question.id] ??
           await _cards.activeErrorForQuestion(item.question.id);
       if (card != null) {
+        await _snapshotBeforeChange(session.id, card);
         if (isCorrect) {
           await _cards.resolveError(card.id, now);
         } else if (wasDistracted) {
@@ -377,6 +387,7 @@ class SessionService {
     } else if (wasDistracted) {
       final active = await _cards.activeErrorForQuestion(item.question.id);
       if (active != null && active.sessionId != session.id) {
+        await _snapshotBeforeChange(session.id, active);
         await _cards.setErrorCardDistracted(active.id, true);
       }
     } else if (!isCorrect && selected.isNotEmpty) {
@@ -399,6 +410,7 @@ class SessionService {
           dueAfter: errorReviewDelay,
         );
       } else {
+        await _snapshotBeforeChange(session.id, active);
         await _cards.touchWrongError(
           id: active.id,
           wrongIndexes: selected,
@@ -468,6 +480,7 @@ class SessionService {
     }
     final card = await _cards.activeErrorForQuestion(item.question.id);
     if (card != null && card.reasoning != canonical) {
+      await _snapshotBeforeChange(start.session.id, card);
       await _cards.updateErrorCardReasoning(card.id, canonical);
     }
     await _cards.updateSkippedReasoning(
@@ -513,6 +526,7 @@ class SessionService {
       } else if (card != null) {
         // A re-test of an earlier error stays due, but the review warns that
         // this attempt was distracted instead of counting as a new mistake.
+        await _snapshotBeforeChange(session.id, card);
         await _cards.setErrorCardDistracted(card.id, true);
       }
     } else if (!attempt.isCorrect && !attempt.isSkipped) {
@@ -535,6 +549,7 @@ class SessionService {
           dueAfter: errorReviewDelay,
         );
       } else {
+        await _snapshotBeforeChange(session.id, card);
         await _cards.touchWrongError(
           id: card.id,
           wrongIndexes: attempt.selectedIndexes,
@@ -608,6 +623,7 @@ class SessionService {
           dueAfter: errorReviewDelay,
         );
       } else {
+        await _snapshotBeforeChange(session.id, card);
         await _cards.touchWrongError(
           id: card.id,
           wrongIndexes: attempt.selectedIndexes,
@@ -725,5 +741,17 @@ class SessionService {
     );
   }
 
-  Future<void> discard(int sessionId) => _sessions.discardSession(sessionId);
+  /// Deletes an unfinished session and undoes the error cards it changed.
+  ///
+  /// The journal is read before the transaction so a restart can restore the
+  /// state recorded by an earlier run. Restore, delete and journal cleanup are
+  /// one transaction in [SessionRepository.discardSession].
+  Future<void> discard(int sessionId) async {
+    try {
+      final snapshots = await _cards.errorCardUndoForSession(sessionId);
+      await _sessions.discardSession(sessionId, restore: snapshots);
+    } on Object catch (error) {
+      throw SessionException('Could not discard this session: $error');
+    }
+  }
 }

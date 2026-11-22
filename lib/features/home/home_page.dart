@@ -301,12 +301,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     final confirmed = await confirmDialog(
       context,
       title: 'Discard session?',
-      message: 'The answers and error cards from this unfinished session will be deleted.',
+      message:
+          'The answers and the error cards this session created will be '
+          'deleted. Earlier cards return to their previous state.',
       confirmLabel: 'Discard',
       destructive: true,
     );
     if (!confirmed) return;
-    await ref.read(sessionServiceProvider).discard(id);
+    try {
+      await ref.read(sessionServiceProvider).discard(id);
+    } on SessionException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+      return;
+    }
     if (mounted) ref.invalidate(homeStatsProvider);
   }
 }

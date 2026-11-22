@@ -547,7 +547,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
         title: 'Leave this practice?',
         content: const Text(
           'Save for later to keep your answers and continue from Home. '
-          'Discard deletes this unfinished session and the error cards it created.',
+          'Discard deletes this unfinished session and the error cards it '
+          'created, and restores earlier cards it changed.',
         ),
         actions: [
           M3EButton.text(
@@ -567,7 +568,12 @@ class _SessionPageState extends ConsumerState<SessionPage>
     );
     if (choice == null || !mounted) return;
     if (choice == _ExitChoice.discard) {
-      await ref.read(sessionServiceProvider).discard(_start.session.id);
+      try {
+        await ref.read(sessionServiceProvider).discard(_start.session.id);
+      } on SessionException catch (error) {
+        if (mounted) await showSnack(context, error.message);
+        return;
+      }
     }
     if (mounted) Navigator.of(context).pop();
   }

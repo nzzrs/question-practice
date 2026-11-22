@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
 import '../domain/models.dart';
+import 'error_card_undo.dart';
 import 'mappers.dart';
 
 class CardRepository {
@@ -73,6 +74,44 @@ class CardRepository {
   Future<ErrorCard?> errorCardById(int id) async {
     final row = await _db.cardDao.errorCardById(id);
     return row == null ? null : errorCardFromRow(row);
+  }
+
+  /// Records the original state of an existing card before this session
+  /// changes it.
+  ///
+  /// Only the first write per card and session is recorded. Later wrong
+  /// answers and toggles therefore still undo to the state the learner had
+  /// before the session, not to an intermediate answer. Cards created by the
+  /// session are left out: they cascade away when the session is deleted.
+  Future<void> recordErrorCardUndo({
+    required int sessionId,
+    required int cardId,
+  }) {
+    return _db.transaction(() async {
+      final key = errorCardUndoKey(sessionId);
+      final raw = await _db.settingsDao.getValue(key);
+      final stored = tryDecodeErrorCardUndo(raw);
+      final snapshots = stored == null
+          ? <ErrorCardUndoSnapshot>[]
+          : List<ErrorCardUndoSnapshot>.of(stored);
+      if (snapshots.any((snapshot) => snapshot.cardId == cardId)) return;
+      final row = await _db.cardDao.errorCardById(cardId);
+      if (row == null || row.sessionId == sessionId) return;
+      snapshots.add(ErrorCardUndoSnapshot.fromCard(errorCardFromRow(row)));
+      await _db.settingsDao.setValue(key, encodeErrorCardUndo(snapshots));
+    });
+  }
+
+  /// Snapshots kept for [sessionId], oldest card first.
+  ///
+  /// A damaged journal is treated as empty so a discard still deletes the
+  /// session instead of trapping the learner. The journal is removed only when
+  /// the discard transaction commits.
+  Future<List<ErrorCardUndoSnapshot>> errorCardUndoForSession(
+    int sessionId,
+  ) async {
+    final raw = await _db.settingsDao.getValue(errorCardUndoKey(sessionId));
+    return tryDecodeErrorCardUndo(raw) ?? const [];
   }
 
   /// Newest saved concept with [term], ignoring case and empty definitions.

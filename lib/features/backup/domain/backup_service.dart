@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/data/error_card_undo.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/domain/plural.dart';
@@ -198,6 +199,11 @@ class BackupService {
   /// itself is atomic, so an invalid backup leaves the current data untouched.
   Future<BackupInfo> restoreText(String text) async {
     final backup = _parse(text);
+    final inProgressSessionIds = _inProgressSessionIds(backup.sessions);
+    final settings = [
+      for (final row in backup.settings)
+        if (_keepUndoJournal(row.key, row.value, inProgressSessionIds)) row,
+    ];
     try {
       await _db.transaction(() async {
         await _db.clearAll();
@@ -236,7 +242,7 @@ class BackupService {
             for (final row in backup.notes) row.toCompanion(false),
           ]);
           batch.insertAll(_db.settings, [
-            for (final row in backup.settings) row.toCompanion(false),
+            for (final row in settings) row.toCompanion(false),
           ]);
         });
       });
@@ -289,7 +295,12 @@ class BackupService {
     final basicCards = await _db.select(_db.basicCards).get();
     final skippedQuestions = await _db.select(_db.skippedQuestions).get();
     final notes = await _db.select(_db.notes).get();
-    final settings = await _db.select(_db.settings).get();
+    final settingsRows = await _db.select(_db.settings).get();
+    final inProgressSessionIds = _inProgressSessionIds(sessions);
+    final settings = [
+      for (final row in settingsRows)
+        if (_keepUndoJournal(row.key, row.value, inProgressSessionIds)) row,
+    ];
 
     return <String, dynamic>{
       'topics': [for (final row in topics) row.toJson()],
@@ -306,6 +317,25 @@ class BackupService {
       'notes': [for (final row in notes) row.toJson()],
       'settings': [for (final row in settings) row.toJson()],
     };
+  }
+
+  Set<int> _inProgressSessionIds(Iterable<SessionRow> sessions) {
+    return {
+      for (final row in sessions)
+        if (row.status == SessionStatus.inProgress.name) row.id,
+    };
+  }
+
+  /// Keeps an undo journal only while its session is unfinished.
+  ///
+  /// A journal belongs to a live in-progress session. Shipping stale keys, or
+  /// a damaged journal, would let a restored backup reuse a session id and
+  /// roll back unrelated cards, so both are dropped at the backup boundary.
+  bool _keepUndoJournal(String key, String value, Set<int> sessionIds) {
+    if (!isErrorCardUndoKey(key)) return true;
+    final sessionId = errorCardUndoSessionId(key);
+    if (sessionId == null || !sessionIds.contains(sessionId)) return false;
+    return tryDecodeErrorCardUndo(value) != null;
   }
 
   String _decodeBytes(Uint8List bytes) {

@@ -20,12 +20,43 @@ class PracticeSplitException implements Exception {
   String toString() => message;
 }
 
-/// The two practices produced by splitting one practice.
+/// The practices produced by splitting one practice.
 class SplitPracticeResult {
-  const SplitPracticeResult({required this.sliceA, required this.sliceB});
+  const SplitPracticeResult({required this.parts});
 
-  final Practice sliceA;
-  final Practice sliceB;
+  /// New practices in slice order: A, B, C, and so on.
+  final List<Practice> parts;
+
+  /// First practice of a two-part split.
+  Practice get sliceA => parts[0];
+
+  /// Second practice of a two-part split.
+  Practice get sliceB => parts[1];
+}
+
+/// Sizes of the parts for a split, in slice order.
+///
+/// Each part gets the same number of questions; when the count is not
+/// divisible, the first parts get one extra question, so sizes differ by at
+/// most one. For example, 10 questions in 3 parts gives `[4, 3, 3]`.
+List<int> splitPartSizes(int questionCount, int parts) {
+  if (questionCount < 2) {
+    throw const PracticeSplitException('A split needs at least two questions.');
+  }
+  if (parts < 2) {
+    throw const PracticeSplitException('A split needs at least two parts.');
+  }
+  if (parts > questionCount) {
+    throw PracticeSplitException(
+      'A split cannot have more parts than questions. '
+      'This practice has $questionCount.',
+    );
+  }
+  final base = questionCount ~/ parts;
+  final extra = questionCount % parts;
+  return List<int>.unmodifiable([
+    for (var index = 0; index < parts; index++) base + (index < extra ? 1 : 0),
+  ]);
 }
 
 class PracticeRepository {
@@ -460,67 +491,63 @@ class PracticeRepository {
     return _db.topicDao.deletePractice(id);
   }
 
-  Future<SplitPracticeResult> splitPractice(int id, {Random? random}) {
+  /// Splits one practice into [parts] new practices in one transaction.
+  ///
+  /// Questions are shuffled before they are dealt, so every part gets a
+  /// random mix. Sizes differ by at most one. The original practice is deleted
+  /// together with its sessions, answers and error cards.
+  Future<SplitPracticeResult> splitPractice(
+    int id, {
+    int parts = 2,
+    Random? random,
+  }) {
     return _db.transaction(() async {
       final practice = await _db.topicDao.practiceById(id);
       if (practice == null) {
         throw const PracticeSplitException('This practice no longer exists.');
       }
       final questions = await _db.topicDao.questionsForPractice(id);
-      if (questions.length < 2) {
-        throw const PracticeSplitException(
-          'A split needs at least two questions.',
-        );
-      }
-      if (questions.length.isOdd) {
-        throw PracticeSplitException(
-          'A split needs an even number of questions. '
-          'This practice has ${questions.length}.',
-        );
-      }
+      final sizes = splitPartSizes(questions.length, parts);
 
       final shuffled = List<QuestionRow>.of(questions)
         ..shuffle(random ?? Random());
-      final half = shuffled.length ~/ 2;
-      final sliceAQuestions = shuffled.sublist(0, half);
-      final sliceBQuestions = shuffled.sublist(half);
-      final nameA = await _uniqueSplitName(
-        practice.topicId,
-        practice.name,
-        'A',
-      );
-      final nameB = await _uniqueSplitName(
-        practice.topicId,
-        practice.name,
-        'B',
-      );
       final now = _clock.now().toUtc();
-
-      final sliceAId = await _db.topicDao.insertPractice(
-        topicId: practice.topicId,
-        name: nameA,
-        description: practice.description,
-        contentHash: _splitHash(practice.contentHash, 'a', sliceAQuestions),
-        importedAt: now,
-      );
-      await _copyQuestions(sliceAId, sliceAQuestions);
-      final sliceBId = await _db.topicDao.insertPractice(
-        topicId: practice.topicId,
-        name: nameB,
-        description: practice.description,
-        contentHash: _splitHash(practice.contentHash, 'b', sliceBQuestions),
-        importedAt: now,
-      );
-      await _copyQuestions(sliceBId, sliceBQuestions);
+      final created = <Practice>[];
+      var offset = 0;
+      for (var index = 0; index < sizes.length; index++) {
+        final partQuestions = shuffled.sublist(offset, offset + sizes[index]);
+        offset += sizes[index];
+        final label = _sliceLabel(index);
+        final name = await _uniqueSplitName(
+          practice.topicId,
+          practice.name,
+          label,
+        );
+        final partId = await _db.topicDao.insertPractice(
+          topicId: practice.topicId,
+          name: name,
+          description: practice.description,
+          contentHash: _splitHash(
+            practice.contentHash,
+            label.toLowerCase(),
+            partQuestions,
+          ),
+          importedAt: now,
+        );
+        await _copyQuestions(partId, partQuestions);
+        final row = await _db.topicDao.practiceById(partId);
+        created.add(practiceFromRow(row!));
+      }
       await _db.topicDao.deletePractice(id);
 
-      final sliceARow = await _db.topicDao.practiceById(sliceAId);
-      final sliceBRow = await _db.topicDao.practiceById(sliceBId);
-      return SplitPracticeResult(
-        sliceA: practiceFromRow(sliceARow!),
-        sliceB: practiceFromRow(sliceBRow!),
-      );
+      return SplitPracticeResult(parts: List<Practice>.unmodifiable(created));
     });
+  }
+
+  /// Slice labels run A–Z, then fall back to the 1-based part number.
+  String _sliceLabel(int index) {
+    if (index < 26) return String.fromCharCode(65 + index);
+    return '${index + 1}';
   }
 
   Future<String> _uniqueSplitName(

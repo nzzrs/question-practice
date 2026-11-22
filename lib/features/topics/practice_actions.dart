@@ -311,10 +311,10 @@ class _PracticeOptionsSheet extends StatelessWidget {
             ),
             OptionTile(
               icon: Icons.call_split,
-              title: 'Split into two',
-              subtitle: summary.questionCount.isEven
-                  ? 'Create Slice A and Slice B with half the questions each'
-                  : 'Needs an even number of questions',
+              title: 'Split',
+              subtitle: summary.questionCount < 2
+                  ? 'Needs at least two questions'
+                  : 'Create two or more practices with a random mix of questions',
               onTap: () => Navigator.of(context).pop(PracticeAction.split),
             ),
             OptionTile(

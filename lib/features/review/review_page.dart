@@ -143,7 +143,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           correctAnswer: card.correctAnswer,
           reasoning: card.reasoning,
           explanation: card.explanation,
-          wrongNotes: WrongAnswerBullets.parse(card.reasoning),
+          wrongAnswerBullets: WrongAnswerBullets.parse(card.reasoning),
         ),
       ),
       SkippedReviewStep() => CardCreatorRequest(

@@ -94,7 +94,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
           correctAnswer: card.correctAnswer,
           reasoning: card.reasoning,
           explanation: card.explanation,
-          wrongNotes: WrongAnswerBullets.parse(card.reasoning),
+          wrongAnswerBullets: WrongAnswerBullets.parse(card.reasoning),
         ),
       ),
       _SkippedStep(:final question) => CardCreatorRequest(

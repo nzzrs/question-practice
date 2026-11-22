@@ -695,6 +695,53 @@ void main() {
     },
   );
 
+  test('breakdown error card sends the wrong-answer bullets', () async {
+    await useAi();
+    String? userPrompt;
+    final client = MockClient((request) async {
+      final body = jsonDecode(request.body) as Map<String, dynamic>;
+      final messages = body['messages'] as List<dynamic>;
+      userPrompt = (messages.last as Map<String, dynamic>)['content'] as String;
+      return http.Response(
+        jsonEncode({
+          'choices': [
+            {
+              'message': {
+                'content': jsonEncode({
+                  'ideas': [
+                    {
+                      'template': 'contrast',
+                      'variants': [
+                        {'front': 'A or B?', 'back': 'A, because of size.'},
+                      ],
+                    },
+                  ],
+                }),
+              },
+            },
+          ],
+        }),
+        200,
+      );
+    });
+
+    await serviceWith(client).breakdownErrorCard(
+      question: 'Question',
+      wrongAnswer: 'Wrong',
+      correctAnswer: 'Correct',
+      reasoning: 'Reason',
+      explanation: 'Explanation',
+      topicName: 'Topic',
+      wrongAnswerBullets: const ['Misread the scale', '  ', 'Ignored units'],
+    );
+
+    expect(
+      userPrompt,
+      contains('What went wrong (learner\'s own notes, one per line):'),
+    );
+    expect(userPrompt, contains('- Misread the scale\n- Ignored units'));
+  });
+
   test(
     'AI card suggestions accept legacy flat cards as one-variant ideas',
     () async {

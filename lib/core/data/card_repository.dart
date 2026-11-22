@@ -67,7 +67,7 @@ class CardRepository {
     return row == null ? null : errorCardFromRow(row);
   }
 
-  /// Active cards for [questionIds], keyed by question, in one query.
+  /// Active cards for [questionIds], keyed by question, in batched queries.
   Future<Map<int, ErrorCard>> activeErrorsForQuestions(
     Iterable<int> questionIds,
   ) async {

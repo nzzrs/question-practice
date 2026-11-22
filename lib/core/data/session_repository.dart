@@ -70,7 +70,8 @@ class SessionRepository {
     return row == null ? null : attemptFromRow(row);
   }
 
-  /// Question rows for [ids] in one query. The result order is unspecified.
+  /// Question rows for [ids] in batched queries. The result order is
+  /// unspecified.
   Future<List<Question>> questionsByIds(Iterable<int> ids) async {
     final rows = await _db.topicDao.questionsByIds(ids);
     return rows.map(questionFromRow).toList();

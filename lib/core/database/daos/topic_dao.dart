@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
+import '../id_batches.dart';
 import '../tables.dart';
 
 part 'topic_dao.g.dart';
@@ -66,11 +67,17 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     return (select(questions)..where((q) => q.id.equals(id))).getSingleOrNull();
   }
 
-  /// Question rows for [ids] in one query. The result order is unspecified.
-  Future<List<QuestionRow>> questionsByIds(Iterable<int> ids) {
-    final values = ids.toSet().toList(growable: false);
-    if (values.isEmpty) return Future.value(const []);
-    return (select(questions)..where((q) => q.id.isIn(values))).get();
+  /// Question rows for [ids] in batched queries.
+  ///
+  /// The result order is unspecified. Empty sets issue no query.
+  Future<List<QuestionRow>> questionsByIds(Iterable<int> ids) async {
+    final rows = <QuestionRow>[];
+    for (final batch in idBatches(ids)) {
+      rows.addAll(
+        await (select(questions)..where((q) => q.id.isIn(batch))).get(),
+      );
+    }
+    return rows;
   }
 
   Future<TopicRow?> topicById(int id) {

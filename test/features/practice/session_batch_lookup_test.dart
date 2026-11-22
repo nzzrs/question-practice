@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:question_practice/core/database/id_batches.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 
 import '../../helpers/test_harness.dart';
@@ -68,6 +69,13 @@ void main() {
 
     expect(past.items, hasLength(3));
     expect(
+      past.items.map((item) => item.question.id),
+      (await harness.cards.dueErrors()).map((card) => card.questionId),
+    );
+    expect(past.errorCards.keys.toSet(), {
+      for (final item in past.items) item.question.id,
+    });
+    expect(
       counter.statements.where(
         (statement) => _readsTable(statement, 'questions'),
       ),
@@ -86,10 +94,50 @@ void main() {
 
     expect(resumed.errorCards, hasLength(3));
     expect(
+      resumed.items.map((item) => item.question.id),
+      past.items.map((item) => item.question.id),
+    );
+    for (final item in resumed.items) {
+      expect(
+        resumed.errorCards[item.question.id]?.questionId,
+        item.question.id,
+      );
+    }
+    expect(
       counter.statements.where(
         (statement) => _readsTable(statement, 'error_cards'),
       ),
       hasLength(1),
     );
+  });
+
+  test('batched lookups skip empty sets and chunk large id sets', () async {
+    final practice = await harness.seedPractice(count: 3);
+    final questions = await harness.practices.questionsForPractice(
+      practice.practiceId,
+    );
+    final seededIds = {for (final question in questions) question.id};
+
+    counter.statements.clear();
+    expect(await harness.sessions.questionsByIds(const []), isEmpty);
+    expect(await harness.cards.activeErrorsForQuestions(const []), isEmpty);
+    expect(counter.statements, isEmpty);
+
+    counter.statements.clear();
+    final found = await harness.sessions.questionsByIds([
+      ...seededIds,
+      for (var id = 1; id <= 1200; id++) id,
+    ]);
+
+    expect(found.map((question) => question.id).toSet(), seededIds);
+    final lookups = [
+      for (final statement in counter.statements)
+        if (_readsTable(statement, 'questions')) statement,
+    ];
+    expect(lookups, hasLength(2));
+    for (final statement in lookups) {
+      final bound = RegExp(r'\?').allMatches(statement).length;
+      expect(bound, lessThanOrEqualTo(maxIdsPerQuery));
+    }
   });
 }

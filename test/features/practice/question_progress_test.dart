@@ -210,6 +210,46 @@ void main() {
     expect(progress.skippedQuestionIds, ids([2, 3, 4, 5, 6, 7]));
   });
 
+  test('distracted attempts are done but never solved or skipped', () async {
+    final practice = await harness.seedPractice(count: 2);
+    final questions = await harness.practices.questionsForPractice(
+      practice.practiceId,
+    );
+    final now = harness.clock.now().toUtc();
+    final session = await harness.sessions.startSession(
+      practiceId: practice.practiceId,
+      mode: SessionMode.practice,
+      questions: questions,
+      startedAt: now,
+    );
+    await harness.sessions.recordAttempt(
+      sessionId: session.id,
+      questionId: questions[0].id,
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: true,
+      isCorrect: false,
+      answeredAt: now,
+    );
+    await harness.sessions.recordAttempt(
+      sessionId: session.id,
+      questionId: questions[1].id,
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: true,
+      isCorrect: false,
+      unknown: true,
+      answeredAt: now,
+    );
+
+    final progress = await harness.sessions.questionProgress();
+    expect(progress.isDone(questions[0].id), isTrue);
+    expect(progress.isSolved(questions[0].id), isFalse);
+    expect(progress.isSkipped(questions[0].id), isFalse);
+    expect(progress.isDone(questions[1].id), isFalse);
+    expect(progress.isSkipped(questions[1].id), isTrue);
+  });
+
   test('shuffled practice reports when nothing is left to practise', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await service.startPractice(practice.practiceId);

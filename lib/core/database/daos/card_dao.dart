@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
+import '../id_batches.dart';
 import '../tables.dart';
 
 part 'card_dao.g.dart';
@@ -154,15 +155,22 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
         .watch();
   }
 
-  /// Active cards for [questionIds] in one query.
+  /// Active cards for [questionIds] in batched queries.
+  ///
+  /// Empty sets issue no query.
   Future<List<ErrorCardRow>> activeErrorCardsForQuestions(
     Iterable<int> questionIds,
-  ) {
-    final ids = questionIds.toSet().toList(growable: false);
-    if (ids.isEmpty) return Future.value(const []);
-    return (select(
-      errorCards,
-    )..where((e) => e.status.equals('active') & e.questionId.isIn(ids))).get();
+  ) async {
+    final rows = <ErrorCardRow>[];
+    for (final batch in idBatches(questionIds)) {
+      rows.addAll(
+        await (select(errorCards)..where(
+              (e) => e.status.equals('active') & e.questionId.isIn(batch),
+            ))
+            .get(),
+      );
+    }
+    return rows;
   }
 
   Future<int> insertErrorCard(ErrorCardsCompanion card) {

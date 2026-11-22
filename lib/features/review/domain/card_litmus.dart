@@ -9,7 +9,7 @@ enum LitmusIssue {
   longCard('Card needs more than 15 seconds to read'),
   syntacticClue('The question hints at the answer'),
   heuristicTemplate(
-    'Exam tip front does not use the required prompt structure',
+    'Scenario and rule front does not use the required prompt structure',
   ),
   procedureTemplate('Steps front does not ask what must be true first'),
   missingFront('No front yet'),

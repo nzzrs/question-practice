@@ -95,7 +95,12 @@ void main() {
     );
 
     expect(report.issues, contains(LitmusIssue.heuristicTemplate));
-    expect(report.detail, contains('required prompt structure'));
+    expect(
+      report.detail,
+      contains(
+        'Scenario and rule front does not use the required prompt structure',
+      ),
+    );
   });
 
   test('procedure front must contain before and end with ?', () {

@@ -19,7 +19,8 @@ enum AiProvider { openai, groq, openRouter, gemini, custom }
 /// The cognitive shape a card tests.
 enum CognitiveType {
   fact('Fact'),
-  heuristic('Heuristic'),
+  heuristic('Scenario and rule'),
+  procedure('Steps'),
   contrast('Contrast'),
   concept('Concept');
 
@@ -44,8 +45,8 @@ enum CardTemplate {
   definition('Definition', 'Definition', CognitiveType.concept),
   contrast('Contrast', 'Contrast', CognitiveType.contrast),
   mechanism('Cause and effect', 'Cause and effect', CognitiveType.fact),
-  heuristic('Exam tip', 'Exam tip', CognitiveType.heuristic),
-  procedure('Steps', 'Steps', CognitiveType.heuristic);
+  heuristic('Scenario and rule', 'Scenario and rule', CognitiveType.heuristic),
+  procedure('Steps', 'Steps', CognitiveType.procedure);
 
   const CardTemplate(this.label, this.chipLabel, this.cognitiveType);
 
@@ -692,7 +693,8 @@ class ManualCard {
   final DateTime createdAt;
   final DateTime? exportedAt;
 
-  /// Cognitive shape of the card: fact, heuristic, contrast or concept.
+  /// Cognitive shape of the card: fact, scenario and rule, steps, contrast or
+  /// concept.
   final CognitiveType cognitiveType;
 
   /// Optional grouping inside the topic, copied from the source question.

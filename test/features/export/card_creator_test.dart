@@ -290,6 +290,57 @@ void main() {
     );
   });
 
+  testWidgets(
+    'template picker names the heuristic template Scenario and rule',
+    (tester) async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+
+      await openCreator(
+        tester,
+        harness,
+        const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+      );
+
+      final picker = find.byKey(const ValueKey('creator-template-picker'));
+      await reveal(tester, picker);
+      await tester.tap(picker);
+      await pumpFrames(tester, frames: 24);
+
+      expect(find.text('Scenario and rule'), findsWidgets);
+      expect(find.text('Exam tip'), findsNothing);
+      expect(find.text('Exam heuristic'), findsNothing);
+    },
+  );
+
+  testWidgets('a saved Steps draft keeps the Steps type', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+
+    await openCreator(
+      tester,
+      harness,
+      const CardCreatorRequest(title: 'Create cards', topicName: 'Topic'),
+    );
+
+    await tapTemplate(tester, CardTemplate.procedure);
+    await enter(
+      tester,
+      'creator-front',
+      'In the handshake, what must be true before the client sends?',
+    );
+    await enter(tester, 'creator-back', 'The server chose a cipher.');
+    await addBuilderCard(tester);
+    await saveAll(tester);
+
+    final cards = await tester.runAsync(
+      () => harness.cards.watchManualCards().first,
+    );
+    expect(cards, hasLength(1));
+    expect(cards!.single.cognitiveType, CognitiveType.procedure);
+    expect(cards.single.cognitiveType.label, 'Steps');
+  });
+
   testWidgets('template picker fills the exact scaffolds', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);

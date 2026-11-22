@@ -451,7 +451,7 @@ class SessionService {
   Future<Attempt> setWrongAnswerBullets({
     required SessionStart start,
     required SessionQuestionItem item,
-    required List<String> notes,
+    required List<String> bullets,
   }) async {
     final attempt = await _sessions.attemptForQuestion(
       start.session.id,
@@ -460,7 +460,7 @@ class SessionService {
     if (attempt == null) {
       throw const SessionException('This question has no answer to update.');
     }
-    final canonical = WrongAnswerBullets.format(notes);
+    final canonical = WrongAnswerBullets.format(bullets);
     // Each target is written only when it differs, so a retry after a partial
     // failure can still repair the card instead of returning early.
     if (canonical != attempt.reasoning) {

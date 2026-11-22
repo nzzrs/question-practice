@@ -1,6 +1,6 @@
-/// Canonical helpers for the learner's "What went wrong?" bullet notes.
+/// Canonical helpers for the learner's "What went wrong?" bullets.
 ///
-/// The persisted value is one atomic note per line in `reasoning`, so the
+/// The persisted value is one atomic bullet per line in `reasoning`, so the
 /// editor, the error review and the card creator can all read the same text
 /// without a second table.
 abstract final class WrongAnswerBullets {
@@ -20,26 +20,26 @@ abstract final class WrongAnswerBullets {
   /// trims each line, drops empty lines and applies both hard caps.
   static List<String> parse(String raw) {
     if (raw.isEmpty) return const [];
-    final notes = <String>[];
+    final bullets = <String>[];
     for (final line in raw.split(_lineBreak)) {
-      final note = _normalizeLine(line);
-      if (note.isEmpty) continue;
-      notes.add(note);
-      if (notes.length == maxBullets) break;
+      final bullet = _normalizeLine(line);
+      if (bullet.isEmpty) continue;
+      bullets.add(bullet);
+      if (bullets.length == maxBullets) break;
     }
-    return notes;
+    return bullets;
   }
 
   /// Canonical persisted value: trimmed non-empty bullets joined by newlines.
-  static String format(Iterable<String> notes) {
-    return normalize(notes).join('\n');
+  static String format(Iterable<String> bullets) {
+    return normalize(bullets).join('\n');
   }
 
   /// Cleans each bullet, preserving order and duplicates.
-  static List<String> normalize(Iterable<String> notes) {
+  static List<String> normalize(Iterable<String> bullets) {
     final clean = <String>[];
-    for (final note in notes) {
-      final value = _normalizeLine(note);
+    for (final bullet in bullets) {
+      final value = _normalizeLine(bullet);
       if (value.isEmpty) continue;
       clean.add(value);
       if (clean.length == maxBullets) break;

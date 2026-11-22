@@ -65,7 +65,7 @@ Finder _noteAction(int noteId, String action) =>
     find.byKey(ValueKey('feedback-note-$action-$noteId'));
 
 Future<void> _openBulletMenu(WidgetTester tester, int index) async {
-  final more = find.byKey(ValueKey('wrong-note-more-$index'));
+  final more = find.byKey(ValueKey('wrong-answer-bullets-more-$index'));
   await tester.ensureVisible(more);
   await pumpFrames(tester);
   await tester.tap(more);
@@ -73,7 +73,7 @@ Future<void> _openBulletMenu(WidgetTester tester, int index) async {
 }
 
 Finder _bulletAction(int index, String action) =>
-    find.byKey(ValueKey('wrong-note-$action-$index'));
+    find.byKey(ValueKey('wrong-answer-bullets-$action-$index'));
 
 bool _menuItemEnabled(WidgetTester tester, Finder item) {
   final row = find.ancestor(of: item, matching: find.byType(M3ETappable));
@@ -402,9 +402,12 @@ void main() {
       harness: harness,
     );
 
-    final firstMore = find.byKey(const ValueKey('wrong-note-more-0'));
+    final firstMore = find.byKey(const ValueKey('wrong-answer-bullets-more-0'));
     expect(firstMore, findsOneWidget);
-    expect(find.byKey(const ValueKey('wrong-note-more-1')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('wrong-answer-bullets-more-1')),
+      findsOneWidget,
+    );
     expect(tester.getSemantics(firstMore).label, 'Bullet actions');
     expect(_bulletAction(0, 'copy'), findsNothing);
     expect(_bulletAction(0, 'card'), findsNothing);

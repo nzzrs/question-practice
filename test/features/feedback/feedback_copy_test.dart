@@ -111,12 +111,18 @@ void main() {
       find.byKey(const ValueKey('wrong-answer-bullets-list')),
       findsNothing,
     );
-    expect(find.byKey(const ValueKey('wrong-note-more-0')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('wrong-answer-bullets-more-0')),
+      findsNothing,
+    );
     expect(find.text('Copy'), findsNothing);
     expect(find.text('Create card'), findsNothing);
     expect(find.text('Create card with AI'), findsNothing);
     expect(find.byKey(const ValueKey('feedback-note-more-0')), findsNothing);
-    expect(find.byKey(const ValueKey('wrong-note-more-0')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('wrong-answer-bullets-more-0')),
+      findsNothing,
+    );
   });
 
   testWidgets('a busy bullet disables its AI card action', (tester) async {
@@ -126,7 +132,7 @@ void main() {
       tester,
       home: Scaffold(
         body: WrongAnswerBulletsReadonly(
-          notes: const ['I confused the layers.'],
+          bullets: const ['I confused the layers.'],
           actions: FeedbackActions(onDefine: (_, _) {}, onOpenUrl: (_) {}),
           onTurnBulletIntoCard: (_, _) {},
           bulletBusy: true,
@@ -135,11 +141,11 @@ void main() {
       harness: harness,
     );
 
-    await tester.tap(find.byKey(const ValueKey('wrong-note-more-0')));
+    await tester.tap(find.byKey(const ValueKey('wrong-answer-bullets-more-0')));
     await pumpFrames(tester);
     expect(find.text('Create card with AI'), findsOneWidget);
     final row = find.ancestor(
-      of: find.byKey(const ValueKey('wrong-note-card-0')),
+      of: find.byKey(const ValueKey('wrong-answer-bullets-card-0')),
       matching: find.byType(M3ETappable),
     );
     expect(tester.widget<M3ETappable>(row).enabled, isFalse);

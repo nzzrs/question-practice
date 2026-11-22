@@ -85,14 +85,15 @@ SkippedQuestion _skippedQuestion(
 }
 
 Future<void> _openBulletMenu(WidgetTester tester, int index) async {
-  final more = find.byKey(ValueKey('wrong-note-more-$index'));
+  final more = find.byKey(ValueKey('wrong-answer-bullets-more-$index'));
   await tester.ensureVisible(more);
   await pumpFrames(tester);
   await tester.tap(more);
   await pumpFrames(tester);
 }
 
-Finder _bulletCard(int index) => find.byKey(ValueKey('wrong-note-card-$index'));
+Finder _bulletCard(int index) =>
+    find.byKey(ValueKey('wrong-answer-bullets-card-$index'));
 
 Future<void> _openNoteMenu(WidgetTester tester, int noteId) async {
   final more = find.byKey(ValueKey('feedback-note-more-$noteId'));

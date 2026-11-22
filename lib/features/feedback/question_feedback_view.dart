@@ -194,7 +194,7 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> {
         if (snapshot.mode == FeedbackMode.review) ...[
           const SizedBox(height: 16),
           WrongAnswerBulletsReadonly(
-            notes: snapshot.wrongAnswerBullets,
+            bullets: snapshot.wrongAnswerBullets,
             actions: widget.actions,
             onTurnBulletIntoCard: widget.onTurnBulletIntoCard,
             bulletBusy: widget.bulletBusy,

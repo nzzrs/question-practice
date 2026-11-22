@@ -22,7 +22,7 @@ class _FailingSessionService extends SessionService {
   Future<Attempt> setWrongAnswerBullets({
     required SessionStart start,
     required SessionQuestionItem item,
-    required List<String> notes,
+    required List<String> bullets,
   }) async {
     throw const SessionException('The notes could not be saved.');
   }

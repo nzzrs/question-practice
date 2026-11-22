@@ -22,7 +22,7 @@ class WrongAnswerBulletsController extends ChangeNotifier {
   static const int maxRows = WrongAnswerBullets.maxBullets;
   static const int maxLength = WrongAnswerBullets.maxBulletLength;
 
-  final Future<void> Function(List<String> notes) onSave;
+  final Future<void> Function(List<String> bullets) onSave;
   final Duration debounce;
   final List<String> _rows;
 
@@ -132,10 +132,10 @@ class WrongAnswerBulletsController extends ChangeNotifier {
     final done = _savingDone = Completer<void>();
     _failed = false;
     notifyListeners();
-    final notes = _rows.map((row) => row.trim()).toList(growable: false);
-    final canonical = WrongAnswerBullets.format(notes);
+    final bullets = _rows.map((row) => row.trim()).toList(growable: false);
+    final canonical = WrongAnswerBullets.format(bullets);
     try {
-      await onSave(notes);
+      await onSave(bullets);
       _saved = canonical;
       return true;
     } on Object {

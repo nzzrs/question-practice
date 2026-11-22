@@ -133,7 +133,7 @@ void main() {
     await sessions.setWrongAnswerBullets(
       start: start,
       item: start.items.single,
-      notes: const ['I had never seen this term.'],
+      bullets: const ['I had never seen this term.'],
     );
 
     final queued = await harness.cards.watchUnhandledSkippedQuestions().first;

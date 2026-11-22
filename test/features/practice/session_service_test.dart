@@ -392,51 +392,54 @@ void main() {
     );
   });
 
-  test('wrong notes persist to the attempt and its error card', () async {
-    final practice = await harness.seedPractice(count: 1);
-    final start = await service.startPractice(practice.practiceId);
-    final item = start.items.single;
-    await service.submitAnswer(
-      start: start,
-      item: item,
-      selectedIndexes: const [1],
-      reasoning: '',
-      distracted: false,
-    );
+  test(
+    'wrong-answer bullets persist to the attempt and its error card',
+    () async {
+      final practice = await harness.seedPractice(count: 1);
+      final start = await service.startPractice(practice.practiceId);
+      final item = start.items.single;
+      await service.submitAnswer(
+        start: start,
+        item: item,
+        selectedIndexes: const [1],
+        reasoning: '',
+        distracted: false,
+      );
 
-    final updated = await service.setWrongAnswerBullets(
-      start: start,
-      item: item,
-      notes: const ['I confused X with Y.', ' - I read too fast. ', ''],
-    );
-    expect(updated.reasoning, 'I confused X with Y.\nI read too fast.');
+      final updated = await service.setWrongAnswerBullets(
+        start: start,
+        item: item,
+        bullets: const ['I confused X with Y.', ' - I read too fast. ', ''],
+      );
+      expect(updated.reasoning, 'I confused X with Y.\nI read too fast.');
 
-    final attempt = await harness.sessions.attemptForQuestion(
-      start.session.id,
-      item.question.id,
-    );
-    expect(attempt!.reasoning, updated.reasoning);
-    final card = await harness.cards.activeErrorForQuestion(item.question.id);
-    expect(card!.reasoning, updated.reasoning);
-    expect(card.mistakeKinds, isEmpty);
+      final attempt = await harness.sessions.attemptForQuestion(
+        start.session.id,
+        item.question.id,
+      );
+      expect(attempt!.reasoning, updated.reasoning);
+      final card = await harness.cards.activeErrorForQuestion(item.question.id);
+      expect(card!.reasoning, updated.reasoning);
+      expect(card.mistakeKinds, isEmpty);
 
-    final unchanged = await service.setWrongAnswerBullets(
-      start: start,
-      item: item,
-      notes: const ['I confused X with Y.', 'I read too fast.'],
-    );
-    expect(unchanged.reasoning, updated.reasoning);
+      final unchanged = await service.setWrongAnswerBullets(
+        start: start,
+        item: item,
+        bullets: const ['I confused X with Y.', 'I read too fast.'],
+      );
+      expect(unchanged.reasoning, updated.reasoning);
 
-    await service.setWrongAnswerBullets(
-      start: start,
-      item: item,
-      notes: const [],
-    );
-    final cleared = await harness.cards.activeErrorForQuestion(
-      item.question.id,
-    );
-    expect(cleared!.reasoning, '');
-  });
+      await service.setWrongAnswerBullets(
+        start: start,
+        item: item,
+        bullets: const [],
+      );
+      final cleared = await harness.cards.activeErrorForQuestion(
+        item.question.id,
+      );
+      expect(cleared!.reasoning, '');
+    },
+  );
 
   test(
     'a repeated save repairs a card left behind by a partial failure',
@@ -458,7 +461,7 @@ void main() {
       await service.setWrongAnswerBullets(
         start: start,
         item: item,
-        notes: const ['Saved on the attempt.'],
+        bullets: const ['Saved on the attempt.'],
       );
 
       final repaired = await harness.cards.activeErrorForQuestion(
@@ -468,7 +471,7 @@ void main() {
     },
   );
 
-  test('wrong notes update an earlier-session active card', () async {
+  test('wrong-answer bullets update an earlier-session active card', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await service.startPractice(practice.practiceId);
     final item = start.items.single;
@@ -498,7 +501,7 @@ void main() {
     await service.setWrongAnswerBullets(
       start: start,
       item: item,
-      notes: const ['Fresh bullet from practice.'],
+      bullets: const ['Fresh bullet from practice.'],
     );
 
     final card = await harness.cards.errorCardById(cardId);

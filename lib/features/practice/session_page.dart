@@ -239,17 +239,17 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final questionItem = item;
     _wrongAnswerBullets = WrongAnswerBulletsController(
       initial: WrongAnswerBullets.parse(attempt.reasoning),
-      onSave: (notes) => _saveWrongAnswerBullets(questionItem, notes),
+      onSave: (bullets) => _saveWrongAnswerBullets(questionItem, bullets),
     );
   }
 
   Future<void> _saveWrongAnswerBullets(
     SessionQuestionItem item,
-    List<String> notes,
+    List<String> bullets,
   ) async {
     final attempt = await ref
         .read(sessionServiceProvider)
-        .setWrongAnswerBullets(start: _start, item: item, notes: notes);
+        .setWrongAnswerBullets(start: _start, item: item, bullets: bullets);
     if (!mounted) return;
     _start.attempts[item.question.id] = attempt;
     ref.invalidate(dueErrorsProvider);
@@ -261,9 +261,9 @@ class _SessionPageState extends ConsumerState<SessionPage>
 
   /// Persists a pending bullet edit before leaving the question.
   Future<bool> _flushWrongAnswerBullets() async {
-    final notes = _wrongAnswerBullets;
-    if (notes == null) return true;
-    return notes.flush();
+    final bullets = _wrongAnswerBullets;
+    if (bullets == null) return true;
+    return bullets.flush();
   }
 
   void _restartQuestionTimer() {

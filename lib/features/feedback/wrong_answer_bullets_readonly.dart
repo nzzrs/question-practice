@@ -12,7 +12,7 @@ enum _BulletRowAction { copy, createCard }
 /// Read-only bullet list used by the error review.
 class WrongAnswerBulletsReadonly extends StatelessWidget {
   const WrongAnswerBulletsReadonly({
-    required this.notes,
+    required this.bullets,
     required this.actions,
     this.onTurnBulletIntoCard,
     this.bulletBusy = false,
@@ -21,9 +21,9 @@ class WrongAnswerBulletsReadonly extends StatelessWidget {
     super.key,
   });
 
-  final List<String> notes;
+  final List<String> bullets;
   final FeedbackActions actions;
-  final void Function(String bulletId, String note)? onTurnBulletIntoCard;
+  final void Function(String bulletId, String bullet)? onTurnBulletIntoCard;
   final bool bulletBusy;
   final String? activeBulletId;
   final Set<String> addedBulletIds;
@@ -37,7 +37,7 @@ class WrongAnswerBulletsReadonly extends StatelessWidget {
       children: [
         Text('What went wrong?', style: theme.typography.emphasized.titleSmall),
         const SizedBox(height: 8),
-        if (notes.isEmpty)
+        if (bullets.isEmpty)
           Text(
             'Nothing was written for this attempt.',
             key: const ValueKey('wrong-answer-bullets-empty'),
@@ -46,7 +46,7 @@ class WrongAnswerBulletsReadonly extends StatelessWidget {
             ),
           )
         else
-          for (var index = 0; index < notes.length; index++)
+          for (var index = 0; index < bullets.length; index++)
             Builder(
               builder: (context) {
                 final bulletId = '$index';
@@ -71,7 +71,7 @@ class WrongAnswerBulletsReadonly extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 6),
                           child: SelectableLinkifiedText(
-                            text: notes[index],
+                            text: bullets[index],
                             style: theme.typography.baseline.bodyMedium
                                 .copyWith(height: 1.45),
                             useSelectionArea: false,
@@ -85,14 +85,14 @@ class WrongAnswerBulletsReadonly extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       RowActionMenu<_BulletRowAction>(
-                        menuKey: ValueKey('wrong-note-more-$index'),
+                        menuKey: ValueKey('wrong-answer-bullets-more-$index'),
                         tooltip: 'Bullet actions',
                         items: [
                           RowActionItem(
                             value: _BulletRowAction.copy,
                             label: 'Copy',
                             icon: Icons.copy_all_outlined,
-                            key: ValueKey('wrong-note-copy-$index'),
+                            key: ValueKey('wrong-answer-bullets-copy-$index'),
                           ),
                           if (onTurnBulletIntoCard != null)
                             RowActionItem(
@@ -105,18 +105,18 @@ class WrongAnswerBulletsReadonly extends StatelessWidget {
                                   : active
                                   ? Icons.hourglass_top
                                   : Icons.auto_awesome_outlined,
-                              key: ValueKey('wrong-note-card-$index'),
+                              key: ValueKey('wrong-answer-bullets-card-$index'),
                               enabled: !added && !bulletBusy,
                             ),
                         ],
                         onSelected: (action) {
                           switch (action) {
                             case _BulletRowAction.copy:
-                              _copy(context, notes[index]);
+                              _copy(context, bullets[index]);
                             case _BulletRowAction.createCard:
                               onTurnBulletIntoCard?.call(
                                 bulletId,
-                                notes[index],
+                                bullets[index],
                               );
                           }
                         },

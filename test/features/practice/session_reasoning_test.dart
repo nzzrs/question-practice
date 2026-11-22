@@ -58,7 +58,7 @@ void main() {
       reasoning: '',
       distracted: false,
     );
-    await service.setWrongNotes(
+    await service.setWrongAnswerBullets(
       start: start,
       item: item,
       notes: const ['I rushed the second line.'],

@@ -10,9 +10,9 @@ import 'feedback_option_card.dart';
 import 'feedback_selection_area.dart';
 import 'feedback_snapshot.dart';
 import 'feedback_status_banner.dart';
-import 'wrong_notes_controller.dart';
-import 'wrong_notes_editor.dart';
-import 'wrong_notes_readonly.dart';
+import 'wrong_answer_bullets_controller.dart';
+import 'wrong_answer_bullets_editor.dart';
+import 'wrong_answer_bullets_readonly.dart';
 
 /// One feedback presentation for practice and the error review.
 ///
@@ -53,7 +53,7 @@ class QuestionFeedbackView extends StatefulWidget {
   final Widget? leading;
 
   /// Practice only: the live bullet editor state.
-  final WrongNotesController? controller;
+  final WrongAnswerBulletsController? controller;
 
   /// Practice only: the distraction checkbox.
   final Widget? checks;
@@ -86,7 +86,7 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> {
       !widget.readOnly &&
       widget.snapshot.mode == FeedbackMode.practice &&
       widget.controller != null &&
-      widget.snapshot.canEditWrongNotes;
+      widget.snapshot.canEditWrongAnswerBullets;
 
   @override
   Widget build(BuildContext context) {
@@ -193,8 +193,8 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> {
         ],
         if (snapshot.mode == FeedbackMode.review) ...[
           const SizedBox(height: 16),
-          WrongNotesReadonly(
-            notes: snapshot.wrongNotes,
+          WrongAnswerBulletsReadonly(
+            notes: snapshot.wrongAnswerBullets,
             actions: widget.actions,
             onTurnBulletIntoCard: widget.onTurnBulletIntoCard,
             bulletBusy: widget.bulletBusy,
@@ -226,7 +226,7 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> {
                 child: readOnlyContent,
               ),
               const SizedBox(height: 18),
-              WrongNotesEditor(controller: widget.controller!),
+              WrongAnswerBulletsEditor(controller: widget.controller!),
             ],
           )
         else

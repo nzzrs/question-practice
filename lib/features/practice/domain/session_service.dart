@@ -7,7 +7,7 @@ import '../../../core/data/practice_repository.dart';
 import '../../../core/data/session_repository.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/domain/question_progress.dart';
-import '../../feedback/domain/wrong_notes.dart';
+import '../../feedback/domain/wrong_answer_bullets.dart';
 
 const errorReviewDelay = Duration(hours: 48);
 
@@ -448,7 +448,7 @@ class SessionService {
   /// the active error card for the question, even when that card came from an
   /// earlier session. Editing an old card in practice therefore writes through
   /// to the card the review shows.
-  Future<Attempt> setWrongNotes({
+  Future<Attempt> setWrongAnswerBullets({
     required SessionStart start,
     required SessionQuestionItem item,
     required List<String> notes,
@@ -460,7 +460,7 @@ class SessionService {
     if (attempt == null) {
       throw const SessionException('This question has no answer to update.');
     }
-    final canonical = WrongNotes.format(notes);
+    final canonical = WrongAnswerBullets.format(notes);
     // Each target is written only when it differs, so a retry after a partial
     // failure can still repair the card instead of returning early.
     if (canonical != attempt.reasoning) {

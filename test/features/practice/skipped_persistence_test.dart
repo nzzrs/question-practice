@@ -130,7 +130,7 @@ void main() {
       distracted: false,
     );
 
-    await sessions.setWrongNotes(
+    await sessions.setWrongAnswerBullets(
       start: start,
       item: start.items.single,
       notes: const ['I had never seen this term.'],

@@ -1,6 +1,6 @@
 import '../../core/domain/models.dart';
 import '../practice/domain/session_service.dart';
-import 'domain/wrong_notes.dart';
+import 'domain/wrong_answer_bullets.dart';
 
 /// Where the shared feedback surface is rendered.
 enum FeedbackMode { practice, review }
@@ -17,7 +17,7 @@ class FeedbackSnapshot {
     required this.alternativeExplanations,
     required this.topicName,
     required this.subtopic,
-    required this.wrongNotes,
+    required this.wrongAnswerBullets,
     required this.mode,
     this.isCorrect = false,
     this.isSkipped = false,
@@ -39,7 +39,7 @@ class FeedbackSnapshot {
   final List<String> alternativeExplanations;
   final String topicName;
   final String subtopic;
-  final List<String> wrongNotes;
+  final List<String> wrongAnswerBullets;
   final FeedbackMode mode;
   final bool isCorrect;
   final bool isSkipped;
@@ -52,7 +52,7 @@ class FeedbackSnapshot {
   final List<Note> notes;
 
   bool get allowsMultiple => correctIndexes.length > 1;
-  bool get canEditWrongNotes =>
+  bool get canEditWrongAnswerBullets =>
       mode == FeedbackMode.practice && revealed && !isCorrect && !isSkipped;
 
   factory FeedbackSnapshot.fromQuestion({
@@ -75,7 +75,7 @@ class FeedbackSnapshot {
       alternativeExplanations: question.alternativeExplanations,
       topicName: item.topicName,
       subtopic: question.subtopic,
-      wrongNotes: const [],
+      wrongAnswerBullets: const [],
       mode: mode,
       pastErrors: pastErrors,
       revealed: revealed,
@@ -101,7 +101,7 @@ class FeedbackSnapshot {
       alternativeExplanations: item.question.alternativeExplanations,
       topicName: item.topicName,
       subtopic: item.question.subtopic,
-      wrongNotes: WrongNotes.parse(attempt.reasoning),
+      wrongAnswerBullets: WrongAnswerBullets.parse(attempt.reasoning),
       mode: mode,
       isCorrect: attempt.isCorrect,
       isSkipped: attempt.isSkipped,
@@ -126,7 +126,7 @@ class FeedbackSnapshot {
       alternativeExplanations: card.alternativeExplanations,
       topicName: card.topicName,
       subtopic: card.subtopic,
-      wrongNotes: WrongNotes.parse(card.reasoning),
+      wrongAnswerBullets: WrongAnswerBullets.parse(card.reasoning),
       mode: FeedbackMode.review,
       isDistracted: card.distracted,
       notes: notes,

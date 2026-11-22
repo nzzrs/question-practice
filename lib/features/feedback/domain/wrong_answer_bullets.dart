@@ -3,12 +3,12 @@
 /// The persisted value is one atomic note per line in `reasoning`, so the
 /// editor, the error review and the card creator can all read the same text
 /// without a second table.
-abstract final class WrongNotes {
+abstract final class WrongAnswerBullets {
   /// Most bullets one attempt may keep.
-  static const int maxNotes = 30;
+  static const int maxBullets = 30;
 
   /// Longest single bullet, in characters.
-  static const int maxNoteLength = 500;
+  static const int maxBulletLength = 500;
 
   static final RegExp _lineBreak = RegExp(r'\r\n|\r|\n');
   static final RegExp _marker = RegExp(r'^\s*(?:[-*•]\s+|\d+[.)]\s+)');
@@ -25,7 +25,7 @@ abstract final class WrongNotes {
       final note = _normalizeLine(line);
       if (note.isEmpty) continue;
       notes.add(note);
-      if (notes.length == maxNotes) break;
+      if (notes.length == maxBullets) break;
     }
     return notes;
   }
@@ -42,7 +42,7 @@ abstract final class WrongNotes {
       final value = _normalizeLine(note);
       if (value.isEmpty) continue;
       clean.add(value);
-      if (clean.length == maxNotes) break;
+      if (clean.length == maxBullets) break;
     }
     return clean;
   }
@@ -56,7 +56,7 @@ abstract final class WrongNotes {
   static String _normalizeLine(String line) {
     if (_whitespaceOnly.hasMatch(line)) return '';
     final stripped = stripMarker(line);
-    if (stripped.length <= maxNoteLength) return stripped;
-    return stripped.substring(0, maxNoteLength);
+    if (stripped.length <= maxBulletLength) return stripped;
+    return stripped.substring(0, maxBulletLength);
   }
 }

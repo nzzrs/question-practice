@@ -404,7 +404,7 @@ void main() {
       distracted: false,
     );
 
-    final updated = await service.setWrongNotes(
+    final updated = await service.setWrongAnswerBullets(
       start: start,
       item: item,
       notes: const ['I confused X with Y.', ' - I read too fast. ', ''],
@@ -420,14 +420,18 @@ void main() {
     expect(card!.reasoning, updated.reasoning);
     expect(card.mistakeKinds, isEmpty);
 
-    final unchanged = await service.setWrongNotes(
+    final unchanged = await service.setWrongAnswerBullets(
       start: start,
       item: item,
       notes: const ['I confused X with Y.', 'I read too fast.'],
     );
     expect(unchanged.reasoning, updated.reasoning);
 
-    await service.setWrongNotes(start: start, item: item, notes: const []);
+    await service.setWrongAnswerBullets(
+      start: start,
+      item: item,
+      notes: const [],
+    );
     final cleared = await harness.cards.activeErrorForQuestion(
       item.question.id,
     );
@@ -451,7 +455,7 @@ void main() {
       final card = await harness.cards.activeErrorForQuestion(item.question.id);
       await harness.cards.updateErrorCardReasoning(card!.id, 'Stale card text');
 
-      await service.setWrongNotes(
+      await service.setWrongAnswerBullets(
         start: start,
         item: item,
         notes: const ['Saved on the attempt.'],
@@ -491,7 +495,7 @@ void main() {
       distracted: false,
     );
 
-    await service.setWrongNotes(
+    await service.setWrongAnswerBullets(
       start: start,
       item: item,
       notes: const ['Fresh bullet from practice.'],

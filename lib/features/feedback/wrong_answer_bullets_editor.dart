@@ -3,28 +3,29 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../core/ui/widgets.dart';
-import 'domain/wrong_notes.dart';
-import 'wrong_notes_controller.dart';
+import 'domain/wrong_answer_bullets.dart';
+import 'wrong_answer_bullets_controller.dart';
 
 /// Editable Logseq-style bullets for "What went wrong?".
 ///
 /// Lives outside the feedback selection area so editable fields never join the
 /// read-only selection registrar.
-class WrongNotesEditor extends StatefulWidget {
-  const WrongNotesEditor({required this.controller, super.key});
+class WrongAnswerBulletsEditor extends StatefulWidget {
+  const WrongAnswerBulletsEditor({required this.controller, super.key});
 
-  final WrongNotesController controller;
+  final WrongAnswerBulletsController controller;
 
   @override
-  State<WrongNotesEditor> createState() => _WrongNotesEditorState();
+  State<WrongAnswerBulletsEditor> createState() =>
+      _WrongAnswerBulletsEditorState();
 }
 
-class _WrongNotesEditorState extends State<WrongNotesEditor> {
+class _WrongAnswerBulletsEditorState extends State<WrongAnswerBulletsEditor> {
   final _fields = <_BulletField>[];
   bool _syncing = false;
   bool _wasLimited = false;
 
-  WrongNotesController get _controller => widget.controller;
+  WrongAnswerBulletsController get _controller => widget.controller;
 
   @override
   void initState() {
@@ -34,7 +35,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
   }
 
   @override
-  void didUpdateWidget(covariant WrongNotesEditor oldWidget) {
+  void didUpdateWidget(covariant WrongAnswerBulletsEditor oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_handleModelChanged);
@@ -94,7 +95,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
 
   void _handleChanged(int index, String value) {
     if (_syncing) return;
-    final limited = value.length > WrongNotes.maxNoteLength;
+    final limited = value.length > WrongAnswerBullets.maxBulletLength;
     _controller.setRow(index, value);
     if (limited && !_wasLimited && mounted) {
       showSnack(context, 'A bullet can keep up to 500 characters.');
@@ -171,7 +172,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
     final theme = M3ETheme.of(context);
     final state = _controller.saveState;
     return Column(
-      key: const ValueKey('wrong-notes-editor'),
+      key: const ValueKey('wrong-answer-bullets-editor'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('What went wrong?', style: theme.typography.emphasized.titleSmall),
@@ -185,7 +186,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
         const SizedBox(height: 10),
         for (var index = 0; index < _fields.length; index++)
           _BulletRow(
-            key: ValueKey('wrong-notes-row-$index'),
+            key: ValueKey('wrong-answer-bullets-row-$index'),
             index: index,
             field: _fields[index],
             placeholder: index == 0 ? 'I confused X with Y.' : 'Another idea',
@@ -200,7 +201,7 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
         Row(
           children: [
             M3EButton.text(
-              key: const ValueKey('wrong-notes-add'),
+              key: const ValueKey('wrong-answer-bullets-add'),
               onPressed: _addBullet,
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
@@ -212,14 +213,14 @@ class _WrongNotesEditorState extends State<WrongNotesEditor> {
               ),
             ),
             const Spacer(),
-            if (state != WrongNotesSaveState.clean)
+            if (state != WrongAnswerBulletsSaveState.clean)
               Text(
-                key: const ValueKey('wrong-notes-save-status'),
-                state == WrongNotesSaveState.saving
+                key: const ValueKey('wrong-answer-bullets-save-status'),
+                state == WrongAnswerBulletsSaveState.saving
                     ? 'Saving…'
                     : 'Not saved. Try again.',
                 style: theme.typography.baseline.labelSmall.copyWith(
-                  color: state == WrongNotesSaveState.failed
+                  color: state == WrongAnswerBulletsSaveState.failed
                       ? theme.colorScheme.error
                       : theme.colorScheme.onSurfaceVariant,
                 ),
@@ -333,7 +334,9 @@ class _BulletRowState extends State<_BulletRow> {
                         child: Semantics(
                           label: 'Wrong answer bullet ${widget.index + 1}',
                           child: EditableText(
-                            key: ValueKey('wrong-notes-field-${widget.index}'),
+                            key: ValueKey(
+                              'wrong-answer-bullets-field-${widget.index}',
+                            ),
                             controller: field.controller,
                             focusNode: field.focusNode,
                             style: theme.typography.baseline.bodyMedium
@@ -359,7 +362,7 @@ class _BulletRowState extends State<_BulletRow> {
                   ),
                 ),
                 M3EIconButton(
-                  key: ValueKey('wrong-notes-delete-${widget.index}'),
+                  key: ValueKey('wrong-answer-bullets-delete-${widget.index}'),
                   variant: M3EIconButtonVariant.standard,
                   icon: const Icon(Icons.close),
                   tooltip: 'Delete bullet',
@@ -404,7 +407,7 @@ class _BulletSplitFormatter extends TextInputFormatter {
     final before = parts.first;
     final after = <String>[
       for (final line in parts.skip(1))
-        if (line.trim().isNotEmpty) WrongNotes.stripMarker(line),
+        if (line.trim().isNotEmpty) WrongAnswerBullets.stripMarker(line),
     ];
     if (after.isEmpty && (text.endsWith('\n') || text.endsWith('\r'))) {
       after.add('');

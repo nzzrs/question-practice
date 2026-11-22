@@ -2,25 +2,25 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'domain/wrong_notes.dart';
+import 'domain/wrong_answer_bullets.dart';
 
-enum WrongNotesSaveState { clean, saving, failed }
+enum WrongAnswerBulletsSaveState { clean, saving, failed }
 
 /// Editor state for one attempt's wrong-answer bullets.
 ///
-/// Rows may be empty while editing; only [WrongNotes.format] is persisted.
+/// Rows may be empty while editing; only [WrongAnswerBullets.format] is persisted.
 /// Edits save after a short debounce and [flush] forces the pending save.
-class WrongNotesController extends ChangeNotifier {
-  WrongNotesController({
+class WrongAnswerBulletsController extends ChangeNotifier {
+  WrongAnswerBulletsController({
     required Iterable<String> initial,
     required this.onSave,
     this.debounce = const Duration(milliseconds: 600),
   }) : _rows = _initialRows(initial) {
-    _saved = WrongNotes.format(_rows);
+    _saved = WrongAnswerBullets.format(_rows);
   }
 
-  static const int maxRows = WrongNotes.maxNotes;
-  static const int maxLength = WrongNotes.maxNoteLength;
+  static const int maxRows = WrongAnswerBullets.maxBullets;
+  static const int maxLength = WrongAnswerBullets.maxBulletLength;
 
   final Future<void> Function(List<String> notes) onSave;
   final Duration debounce;
@@ -33,17 +33,17 @@ class WrongNotesController extends ChangeNotifier {
   String _saved = '';
 
   List<String> get rows => List<String>.unmodifiable(_rows);
-  WrongNotesSaveState get saveState => _savingDone != null
-      ? WrongNotesSaveState.saving
+  WrongAnswerBulletsSaveState get saveState => _savingDone != null
+      ? WrongAnswerBulletsSaveState.saving
       : _failed
-      ? WrongNotesSaveState.failed
-      : WrongNotesSaveState.clean;
+      ? WrongAnswerBulletsSaveState.failed
+      : WrongAnswerBulletsSaveState.clean;
   bool get canAddRow => _rows.length < maxRows;
-  String get canonical => WrongNotes.format(_rows);
+  String get canonical => WrongAnswerBullets.format(_rows);
   bool get isDirty => canonical != _saved;
 
   static List<String> _initialRows(Iterable<String> initial) {
-    final parsed = WrongNotes.normalize(initial);
+    final parsed = WrongAnswerBullets.normalize(initial);
     return parsed.isEmpty ? <String>[''] : parsed;
   }
 
@@ -133,7 +133,7 @@ class WrongNotesController extends ChangeNotifier {
     _failed = false;
     notifyListeners();
     final notes = _rows.map((row) => row.trim()).toList(growable: false);
-    final canonical = WrongNotes.format(notes);
+    final canonical = WrongAnswerBullets.format(notes);
     try {
       await onSave(notes);
       _saved = canonical;
@@ -149,7 +149,7 @@ class WrongNotesController extends ChangeNotifier {
   }
 
   String _cleanInput(String value) {
-    final stripped = WrongNotes.stripMarker(value);
+    final stripped = WrongAnswerBullets.stripMarker(value);
     return stripped.length > maxLength
         ? stripped.substring(0, maxLength)
         : stripped;

@@ -5,7 +5,7 @@ import 'package:material_ui/material_ui.dart';
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import '../feedback/domain/wrong_notes.dart';
+import '../feedback/domain/wrong_answer_bullets.dart';
 import '../feedback/feedback_actions.dart';
 import '../feedback/feedback_option_card.dart';
 import '../lookup/lookup_actions.dart';
@@ -190,7 +190,7 @@ class _NoteContextSheet extends ConsumerWidget {
     final selected = attempt?.selectedIndexes.toSet() ?? const <int>{};
     final reasoning = attempt == null
         ? const <String>[]
-        : WrongNotes.parse(attempt!.reasoning);
+        : WrongAnswerBullets.parse(attempt!.reasoning);
     final actions = FeedbackActions(
       onDefine: (term, anchor) => openTermLookup(
         context,

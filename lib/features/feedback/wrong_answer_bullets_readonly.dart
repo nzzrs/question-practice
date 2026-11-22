@@ -10,8 +10,8 @@ import 'row_action_menu.dart';
 enum _BulletRowAction { copy, createCard }
 
 /// Read-only bullet list used by the error review.
-class WrongNotesReadonly extends StatelessWidget {
-  const WrongNotesReadonly({
+class WrongAnswerBulletsReadonly extends StatelessWidget {
+  const WrongAnswerBulletsReadonly({
     required this.notes,
     required this.actions,
     this.onTurnBulletIntoCard,
@@ -32,7 +32,7 @@ class WrongNotesReadonly extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     return Column(
-      key: const ValueKey('wrong-notes-list'),
+      key: const ValueKey('wrong-answer-bullets-list'),
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('What went wrong?', style: theme.typography.emphasized.titleSmall),
@@ -40,7 +40,7 @@ class WrongNotesReadonly extends StatelessWidget {
         if (notes.isEmpty)
           Text(
             'Nothing was written for this attempt.',
-            key: const ValueKey('wrong-notes-empty'),
+            key: const ValueKey('wrong-answer-bullets-empty'),
             style: theme.typography.baseline.labelMedium.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -55,7 +55,7 @@ class WrongNotesReadonly extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
-                    key: ValueKey('wrong-notes-readonly-$index'),
+                    key: ValueKey('wrong-answer-bullets-readonly-$index'),
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Padding(

@@ -101,7 +101,10 @@ void main() {
 
       expect(find.byType(QuestionFeedbackView), findsOneWidget);
       expect(find.byType(FeedbackOptionCard), findsNWidgets(2));
-      expect(find.byKey(const ValueKey('wrong-notes-list')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('wrong-answer-bullets-list')),
+        findsOneWidget,
+      );
       expect(
         find.descendant(
           of: find.byType(QuestionFeedbackView),
@@ -147,7 +150,10 @@ void main() {
       find.byKey(const ValueKey('feedback-distraction-warning')),
       findsNothing,
     );
-    expect(find.byKey(const ValueKey('wrong-notes-list')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('wrong-answer-bullets-list')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('notes can be copied and seed the existing card creator', (
@@ -485,7 +491,10 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorPane), findsNothing);
-    expect(find.byKey(const ValueKey('wrong-notes-list')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('wrong-answer-bullets-list')),
+      findsOneWidget,
+    );
     expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });

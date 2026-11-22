@@ -4,7 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/features/feedback/feedback_actions.dart';
 import 'package:question_practice/features/feedback/feedback_snapshot.dart';
 import 'package:question_practice/features/feedback/question_feedback_view.dart';
-import 'package:question_practice/features/feedback/wrong_notes_readonly.dart';
+import 'package:question_practice/features/feedback/wrong_answer_bullets_readonly.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -30,7 +30,7 @@ FeedbackSnapshot _snapshot({
     ],
     topicName: 'Topic',
     subtopic: 'Layers',
-    wrongNotes: const ['I confused Alpha with Gamma.'],
+    wrongAnswerBullets: const ['I confused Alpha with Gamma.'],
     mode: mode,
     isDistracted: distracted,
     pastErrors: mode == FeedbackMode.review,
@@ -107,7 +107,10 @@ void main() {
     await _pumpFeedback(tester, _snapshot(mode: FeedbackMode.practice));
 
     expect(find.byKey(const ValueKey('feedback-notes')), findsNothing);
-    expect(find.byKey(const ValueKey('wrong-notes-list')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('wrong-answer-bullets-list')),
+      findsNothing,
+    );
     expect(find.byKey(const ValueKey('wrong-note-more-0')), findsNothing);
     expect(find.text('Copy'), findsNothing);
     expect(find.text('Create card'), findsNothing);
@@ -122,7 +125,7 @@ void main() {
     await pumpTestApp(
       tester,
       home: Scaffold(
-        body: WrongNotesReadonly(
+        body: WrongAnswerBulletsReadonly(
           notes: const ['I confused the layers.'],
           actions: FeedbackActions(onDefine: (_, _) {}, onOpenUrl: (_) {}),
           onTurnBulletIntoCard: (_, _) {},

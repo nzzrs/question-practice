@@ -9,11 +9,11 @@ import '../../app/providers.dart';
 import '../../core/domain/models.dart';
 import '../../core/platform/practice_sound_player.dart';
 import '../../core/ui/widgets.dart';
-import '../feedback/domain/wrong_notes.dart';
+import '../feedback/domain/wrong_answer_bullets.dart';
 import '../feedback/feedback_actions.dart';
 import '../feedback/feedback_snapshot.dart';
 import '../feedback/question_feedback_view.dart';
-import '../feedback/wrong_notes_controller.dart';
+import '../feedback/wrong_answer_bullets_controller.dart';
 import '../lookup/lookup_actions.dart';
 import '../lookup/ask_sheet.dart';
 import '../practice/domain/session_service.dart';
@@ -41,7 +41,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   int _index = 0;
   final _selectedIndexes = <int>{};
   final _notes = <int, List<Note>>{};
-  WrongNotesController? _wrongNotes;
+  WrongAnswerBulletsController? _wrongAnswerBullets;
   bool _submitted = false;
   bool _submitting = false;
   bool _distracted = false;
@@ -210,7 +210,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     WidgetsBinding.instance.removeObserver(this);
     _questionTimer?.cancel();
     _toast?.dismiss();
-    _wrongNotes?.dispose();
+    _wrongAnswerBullets?.dispose();
     unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
     super.dispose();
   }
@@ -223,33 +223,33 @@ class _SessionPageState extends ConsumerState<SessionPage>
       _questionTimer?.cancel();
       _toast?.dismiss();
       _toast = null;
-      unawaited(_wrongNotes?.flush());
+      unawaited(_wrongAnswerBullets?.flush());
     }
   }
 
   /// Creates the bullet editor only for a wrong, non-skipped answer.
-  void _syncWrongNotes(Attempt attempt) {
+  void _syncWrongAnswerBullets(Attempt attempt) {
     final item = _item;
     if (item == null || attempt.isCorrect || attempt.isSkipped) {
-      _wrongNotes?.dispose();
-      _wrongNotes = null;
+      _wrongAnswerBullets?.dispose();
+      _wrongAnswerBullets = null;
       return;
     }
-    if (_wrongNotes != null) return;
+    if (_wrongAnswerBullets != null) return;
     final questionItem = item;
-    _wrongNotes = WrongNotesController(
-      initial: WrongNotes.parse(attempt.reasoning),
-      onSave: (notes) => _saveWrongNotes(questionItem, notes),
+    _wrongAnswerBullets = WrongAnswerBulletsController(
+      initial: WrongAnswerBullets.parse(attempt.reasoning),
+      onSave: (notes) => _saveWrongAnswerBullets(questionItem, notes),
     );
   }
 
-  Future<void> _saveWrongNotes(
+  Future<void> _saveWrongAnswerBullets(
     SessionQuestionItem item,
     List<String> notes,
   ) async {
     final attempt = await ref
         .read(sessionServiceProvider)
-        .setWrongNotes(start: _start, item: item, notes: notes);
+        .setWrongAnswerBullets(start: _start, item: item, notes: notes);
     if (!mounted) return;
     _start.attempts[item.question.id] = attempt;
     ref.invalidate(dueErrorsProvider);
@@ -260,8 +260,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   /// Persists a pending bullet edit before leaving the question.
-  Future<bool> _flushWrongNotes() async {
-    final notes = _wrongNotes;
+  Future<bool> _flushWrongAnswerBullets() async {
+    final notes = _wrongAnswerBullets;
     if (notes == null) return true;
     return notes.flush();
   }
@@ -305,8 +305,8 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _outcome = null;
     _submitted = false;
     _distracted = false;
-    _wrongNotes?.dispose();
-    _wrongNotes = null;
+    _wrongAnswerBullets?.dispose();
+    _wrongAnswerBullets = null;
     if (item == null) {
       _restartQuestionTimer();
       return;
@@ -320,13 +320,13 @@ class _SessionPageState extends ConsumerState<SessionPage>
     _submitted = true;
     _distracted = attempt.distracted;
     _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
-    _syncWrongNotes(attempt);
+    _syncWrongAnswerBullets(attempt);
     _restartQuestionTimer();
   }
 
   Future<void> _goTo(int index) async {
     if (index < 0 || index >= _start.items.length || index == _index) return;
-    if (!await _flushWrongNotes()) return;
+    if (!await _flushWrongAnswerBullets()) return;
     setState(() {
       _index = index;
       _loadQuestionState();
@@ -356,7 +356,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
         _submitted = true;
         _outcome = outcome;
         if (outcome.summary != null) _summary = outcome.summary;
-        _syncWrongNotes(outcome.attempt);
+        _syncWrongAnswerBullets(outcome.attempt);
       });
       _questionTimer?.cancel();
       _toast?.dismiss();
@@ -391,7 +391,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
     final item = _item;
     if (item == null || _submitting) return;
     setState(() => _submitting = true);
-    if (!await _flushWrongNotes()) {
+    if (!await _flushWrongAnswerBullets()) {
       if (!mounted) return;
       setState(() => _submitting = false);
       await showSnack(context, 'Your notes are not saved. Try again.');
@@ -407,7 +407,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
       setState(() {
         _distracted = attempt.distracted;
         _outcome = AnswerOutcome(attempt: attempt, summary: _summary);
-        _syncWrongNotes(attempt);
+        _syncWrongAnswerBullets(attempt);
       });
       ref.invalidate(dueErrorsProvider);
     } on SessionException catch (error) {
@@ -418,7 +418,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _next() async {
-    if (!await _flushWrongNotes()) return;
+    if (!await _flushWrongAnswerBullets()) return;
     if (_summary != null && _index >= _start.items.length - 1) {
       _openSummary(_summary!);
       return;
@@ -443,7 +443,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
 
   Future<void> _finishEarly() async {
     if (_submitting) return;
-    if (!await _flushWrongNotes()) return;
+    if (!await _flushWrongAnswerBullets()) return;
     if (!mounted) return;
     final unanswered = _start.pendingUnanswered.length;
     if (unanswered <= 0) {
@@ -529,7 +529,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
   }
 
   Future<void> _requestExit() async {
-    final saved = await _flushWrongNotes();
+    final saved = await _flushWrongAnswerBullets();
     if (!mounted) return;
     if (!saved) {
       await showSnack(context, 'Your notes are not saved. Try again.');
@@ -719,7 +719,7 @@ class _SessionPageState extends ConsumerState<SessionPage>
                     onSaveNote: _addNote,
                     onNoteTap: _openNoteActions,
                   ),
-                  controller: _wrongNotes,
+                  controller: _wrongAnswerBullets,
                   notes: _notes[item.question.id] ?? const [],
                   checks:
                       _submitted &&

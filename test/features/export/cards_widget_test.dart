@@ -248,7 +248,7 @@ void main() {
     expect(find.text('Review the skipped question'), findsOneWidget);
     expect(find.text('Item 1 of 1'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+    await tester.tap(find.byKey(const ValueKey('review-create-fab')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     expect(find.byKey(const ValueKey('creator-front')), findsOneWidget);
@@ -396,7 +396,7 @@ void main() {
     await tester.tap(find.text('Review'));
     await pumpFrames(tester);
 
-    final create = find.byKey(const ValueKey('review-dock-create'));
+    final create = find.byKey(const ValueKey('review-create-fab'));
     expect(create, findsOneWidget);
     await tester.ensureVisible(create);
     await tester.tap(create);
@@ -491,22 +491,16 @@ void main() {
     expect(find.text('From the question'), findsNothing);
     expect(find.byKey(const ValueKey('note-see-context')), findsOneWidget);
     expect(find.text('Suggest with AI'), findsNothing);
-    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
     expect(find.text('Keep for later'), findsNothing);
     expect(find.text('Save and finish'), findsOneWidget);
     expect(find.text('Delete note'), findsNothing);
-    expect(find.byKey(const ValueKey('review-dock-delete')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-delete')), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('review-dock-delete')));
-    await pumpFrames(tester);
-    expect(find.text('Delete note?'), findsOneWidget);
-    expect(
-      find.textContaining('Cards already made from it stay'),
-      findsOneWidget,
-    );
-    await tester.tap(find.text('Cancel'));
-    await pumpFrames(tester);
-    expect(find.text('Review the note'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('review-dock-save')));
+    await pumpFrames(tester, frames: 24);
+    expect(find.text('Note review complete'), findsOneWidget);
   });
 
   testWidgets('note card action offers only a concept card', (tester) async {
@@ -526,7 +520,7 @@ void main() {
     await tester.tap(find.text('Review'));
     await pumpFrames(tester);
 
-    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+    await tester.tap(find.byKey(const ValueKey('review-create-fab')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 

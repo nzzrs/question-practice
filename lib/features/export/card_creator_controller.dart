@@ -186,44 +186,6 @@ class CardCreatorSnapshot {
       composerHasText: composerHasText,
     );
   }
-
-  /// Drops every reference to a deleted note.
-  ///
-  /// Typed text and drafts stay: the learner may already have written a card
-  /// from the note. Only the source quote, its suggestion and the conversion
-  /// target disappear, so a later save cannot point at a note that is gone.
-  CardCreatorSnapshot withoutNote(int noteId) {
-    final fromNote = noteToConvert?.id == noteId || seedNote?.id == noteId;
-    if (!fromNote) return this;
-    return CardCreatorSnapshot(
-      front: front,
-      back: back,
-      definitionCloze: definitionCloze,
-      template: template,
-      appliedScaffoldFront: appliedScaffoldFront,
-      appliedScaffoldBack: appliedScaffoldBack,
-      appliedDefinitionCloze: appliedDefinitionCloze,
-      drafts: drafts,
-      ideas: ideas,
-      aiError: aiError,
-      aiPanelOpen: aiPanelOpen,
-      aiUnavailable: aiUnavailable,
-      appliedSeedRevision: appliedSeedRevision,
-      seedBulletId: seedBulletId,
-      seedNote: null,
-      noteToConvert: null,
-      seedInitialFront: seedInitialFront,
-      seedInitialBack: seedInitialBack,
-      seedInitialCloze: seedInitialCloze,
-      seedSuggestion: null,
-      seedTouched: seedTouched,
-      seedHint: false,
-      seedError: null,
-      composerDirty: composerDirty,
-      canAddDraft: canAddDraft,
-      composerHasText: composerHasText,
-    );
-  }
 }
 
 /// Content pushed from the feedback pane into the embedded card creator.
@@ -370,31 +332,6 @@ class CardCreatorController extends ChangeNotifier {
 
   void clearSnapshot(String itemKey) {
     if (_snapshots.remove(itemKey) != null) notifyListeners();
-  }
-
-  /// Drops a deleted note from the live seed and every stored snapshot.
-  ///
-  /// Review surfaces delete notes while the creator sheet is closed. Any
-  /// session seeded from that note must stop showing it as a source and must
-  /// not try to mark it converted again.
-  void forgetNote(int noteId) {
-    var changed = false;
-    final seed = _seed;
-    if (seed is NoteCardSeed && seed.note.id == noteId) {
-      _seed = null;
-      _seedRevision++;
-      _activeBulletId = null;
-      _seedDirty = false;
-      changed = true;
-    }
-    for (final entry in _snapshots.entries.toList()) {
-      final updated = entry.value.withoutNote(noteId);
-      if (!identical(updated, entry.value)) {
-        _snapshots[entry.key] = updated;
-        changed = true;
-      }
-    }
-    if (changed) notifyListeners();
   }
 
   /// Drops every stored creator session after a successful review exit.

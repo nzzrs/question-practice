@@ -227,19 +227,17 @@ void main() {
     expect(find.text('Edit card content'), findsNothing);
     expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorPane), findsNothing);
-    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
   });
 
-  testWidgets('deleting a note from the error review asks first', (
-    tester,
-  ) async {
+  testWidgets('error review note actions never offer delete', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await _seedCard(harness);
     final noteId = await harness.cards.createNote(
       sessionId: seeded.card.sessionId,
       questionId: seeded.question.id,
-      text: 'keep this until I confirm',
+      text: 'keep this note in Cards',
       context: seeded.question.prompt,
       topicName: 'Topic',
       practiceName: 'Practice',
@@ -257,20 +255,17 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(more);
     await pumpFrames(tester);
-    await tester.tap(find.text('Delete'));
-    await pumpFrames(tester);
 
-    expect(find.text('Delete note?'), findsOneWidget);
-    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsOneWidget);
-
-    await tester.tap(find.text('Delete').last);
-    await pumpFrames(tester, frames: 24);
+    expect(find.text('Define'), findsOneWidget);
+    expect(find.text('Delete'), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+    expect(find.text('Delete note?'), findsNothing);
 
     final notes = await tester.runAsync(
       () => harness.cards.notesForQuestion(seeded.question.id),
     );
-    expect(notes, isEmpty);
-    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsNothing);
+    expect(notes, hasLength(1));
+    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsOneWidget);
   });
 
   testWidgets('a saved note opens one compact action menu', (tester) async {
@@ -305,11 +300,11 @@ void main() {
     expect(find.text('Copy'), findsOneWidget);
     expect(find.text('Create card'), findsOneWidget);
     expect(find.text('Define'), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Delete'), findsNothing);
     expect(find.text('Ask'), findsNothing);
     expect(_noteAction(noteId, 'copy'), findsOneWidget);
     expect(_noteAction(noteId, 'card'), findsOneWidget);
-    expect(_noteAction(noteId, 'delete'), findsOneWidget);
+    expect(_noteAction(noteId, 'delete'), findsNothing);
     await _dismissMenu(tester);
   });
 
@@ -452,7 +447,7 @@ void main() {
     expect(find.text('Copy'), findsOneWidget);
     expect(find.text('Create card'), findsOneWidget);
     expect(find.text('Define'), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Delete'), findsNothing);
     expect(tester.takeException(), isNull);
     await _dismissMenu(tester);
 

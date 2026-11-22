@@ -4,21 +4,22 @@ import '../../core/ui/widgets.dart';
 
 /// Shared bottom action dock for every review surface.
 ///
-/// The same controls sit in the same relative order on end-of-session review,
-/// error review, skipped review and note review:
-/// back, create cards, optional delete, the single Save action, forward.
-/// Compact widths stack the Save action under the icon row so 320 dp and
-/// large text never overflow.
+/// Notes, errors, skipped questions and concepts all use the same
+/// `back · Save · forward` row. Saving is the only primary action; backward
+/// and forward move between items, and the arrows disable at the ends so a
+/// review can never leave its first or last item by accident.
+///
+/// The row stays side by side at every width. The primary button keeps the
+/// remaining space and wraps to two lines at large text sizes, so 320 dp and
+/// 2x text never overflow.
 class ReviewActionDock extends StatelessWidget {
   const ReviewActionDock({
     required this.saveLabel,
     required this.onSave,
     required this.onBack,
     required this.onNext,
-    required this.onCreateCards,
-    this.onDelete,
-    this.canGoBack = false,
-    this.canGoNext = true,
+    required this.canGoBack,
+    required this.canGoNext,
     this.busy = false,
     super.key,
   });
@@ -27,103 +28,42 @@ class ReviewActionDock extends StatelessWidget {
   final VoidCallback? onSave;
   final VoidCallback? onBack;
   final VoidCallback? onNext;
-  final VoidCallback? onCreateCards;
-  final VoidCallback? onDelete;
   final bool canGoBack;
   final bool canGoNext;
   final bool busy;
 
   static const backKey = ValueKey<String>('review-dock-back');
-  static const createKey = ValueKey<String>('review-dock-create');
-  static const deleteKey = ValueKey<String>('review-dock-delete');
   static const saveKey = ValueKey<String>('review-dock-save');
   static const nextKey = ValueKey<String>('review-dock-next');
 
   @override
   Widget build(BuildContext context) {
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final icons = Row(
-      children: [
-        AppDockIconButton(
-          key: backKey,
-          icon: Icons.arrow_back,
-          tooltip: 'Previous',
-          onPressed: busy || !canGoBack ? null : onBack,
-        ),
-        AppDockIconButton(
-          key: createKey,
-          icon: Icons.add_card,
-          tooltip: 'Create cards',
-          onPressed: busy ? null : onCreateCards,
-        ),
-        if (onDelete != null)
-          AppDockIconButton(
-            key: deleteKey,
-            icon: Icons.delete_outline,
-            tooltip: 'Delete',
-            isDestructive: true,
-            onPressed: busy ? null : onDelete,
-          ),
-        const Spacer(),
-        AppDockIconButton(
-          key: nextKey,
-          icon: Icons.arrow_forward,
-          tooltip: 'Next',
-          onPressed: busy || !canGoNext ? null : onNext,
-        ),
-      ],
-    );
-    final save = AppPrimaryButton(
-      key: saveKey,
-      onPressed: busy ? null : onSave,
-      label: busy ? 'Saving…' : saveLabel,
-      icon: Icons.check,
-    );
-
     return AppActionDock(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 520 || textScale > 1.3;
-          if (compact) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [icons, const SizedBox(height: 6), save],
-            );
-          }
-          return Row(
-            children: [
-              AppDockIconButton(
-                key: backKey,
-                icon: Icons.arrow_back,
-                tooltip: 'Previous',
-                onPressed: busy || !canGoBack ? null : onBack,
-              ),
-              AppDockIconButton(
-                key: createKey,
-                icon: Icons.add_card,
-                tooltip: 'Create cards',
-                onPressed: busy ? null : onCreateCards,
-              ),
-              if (onDelete != null)
-                AppDockIconButton(
-                  key: deleteKey,
-                  icon: Icons.delete_outline,
-                  tooltip: 'Delete',
-                  isDestructive: true,
-                  onPressed: busy ? null : onDelete,
-                ),
-              const SizedBox(width: 8),
-              Expanded(child: save),
-              AppDockIconButton(
-                key: nextKey,
-                icon: Icons.arrow_forward,
-                tooltip: 'Next',
-                onPressed: busy || !canGoNext ? null : onNext,
-              ),
-            ],
-          );
-        },
+      child: Row(
+        children: [
+          AppDockIconButton(
+            key: backKey,
+            icon: Icons.arrow_back,
+            tooltip: 'Previous',
+            onPressed: busy || !canGoBack ? null : onBack,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: AppPrimaryButton(
+              key: saveKey,
+              onPressed: busy ? null : onSave,
+              label: busy ? 'Saving…' : saveLabel,
+              icon: Icons.check,
+            ),
+          ),
+          const SizedBox(width: 8),
+          AppDockIconButton(
+            key: nextKey,
+            icon: Icons.arrow_forward,
+            tooltip: 'Next',
+            onPressed: busy || !canGoNext ? null : onNext,
+          ),
+        ],
       ),
     );
   }

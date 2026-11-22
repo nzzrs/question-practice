@@ -5,36 +5,77 @@ import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/review/note_review_page.dart';
 import 'package:question_practice/features/review/note_review_view.dart';
+import 'package:question_practice/features/review/review_action_dock.dart';
 import 'package:question_practice/features/review/review_page.dart';
+import 'package:question_practice/features/review/review_shell.dart';
 import 'package:question_practice/features/review/skipped_question_view.dart';
 
 import '../../helpers/test_harness.dart';
 
 void main() {
-  Future<SessionStart> startSession(TestHarness harness) async {
-    final seeded = await harness.seedPractice(count: 1);
-    final sessions = SessionService(
+  SessionService sessionsFor(TestHarness harness) {
+    return SessionService(
       practices: harness.practices,
       sessions: harness.sessions,
       cards: harness.cards,
       clock: harness.clock,
     );
-    return sessions.startPractice(seeded.practiceId);
   }
 
-  testWidgets('skipped review content is selectable and uses one dock', (
+  Future<SessionStart> startSession(TestHarness harness) async {
+    final seeded = await harness.seedPractice(count: 1);
+    return sessionsFor(harness).startPractice(seeded.practiceId);
+  }
+
+  Future<List<Note>> seedTwoNotes(
+    WidgetTester tester,
+    TestHarness harness,
+  ) async {
+    final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
+    await harness.cards.createNote(
+      sessionId: null,
+      questionId: question.id,
+      text: 'first note',
+      context: question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+    harness.clock.advance(const Duration(minutes: 1));
+    await harness.cards.createNote(
+      sessionId: null,
+      questionId: question.id,
+      text: 'second note',
+      context: question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+    return (await tester.runAsync(() => harness.cards.watchNotes().first))!;
+  }
+
+  bool isEnabled(WidgetTester tester, Key key) {
+    return tester
+            .widget<M3EIconButton>(
+              find.descendant(
+                of: find.byKey(key),
+                matching: find.byType(M3EIconButton),
+              ),
+            )
+            .onPressed !=
+        null;
+  }
+
+  testWidgets('skipped review is selectable and uses one shared dock', (
     tester,
   ) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final start = await startSession(harness);
-    final sessions = SessionService(
-      practices: harness.practices,
-      sessions: harness.sessions,
-      cards: harness.cards,
-      clock: harness.clock,
-    );
-    await sessions.submitAnswer(
+    await sessionsFor(harness).submitAnswer(
       start: start,
       item: start.items.single,
       selectedIndexes: const [],
@@ -48,6 +89,8 @@ void main() {
       harness: harness,
     );
 
+    expect(find.byType(ReviewShell), findsOneWidget);
+    expect(find.byType(ReviewActionDock), findsOneWidget);
     expect(
       find.descendant(
         of: find.byType(SkippedQuestionView),
@@ -56,26 +99,42 @@ void main() {
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('review-dock-back')), findsOneWidget);
-    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
     expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
     expect(find.byKey(const ValueKey('review-dock-next')), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(ReviewActionDock),
+        matching: find.byKey(const ValueKey('review-create-fab')),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(ReviewActionDock),
+        matching: find.byKey(const ValueKey('review-dock-delete')),
+      ),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
+    final fabWidget = tester.widget<M3EFab>(
+      find.byKey(const ValueKey('review-create-fab')),
+    );
+    expect(fabWidget.tooltip, 'Create cards');
+    expect(fabWidget.icon, isA<Icon>());
     expect(find.text('Skip'), findsNothing);
     expect(find.text('Keep for later'), findsNothing);
-    expect(find.text('Finish'), findsOneWidget);
+    expect(find.text('Save and finish'), findsOneWidget);
+    expect(find.text('Finish'), findsNothing);
+    expect(isEnabled(tester, ReviewActionDock.backKey), isFalse);
+    expect(isEnabled(tester, ReviewActionDock.nextKey), isFalse);
   });
 
-  testWidgets('concept review is selectable and saves its definition', (
-    tester,
-  ) async {
+  testWidgets('concept review saves its definition and finishes on the last '
+      'item', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final start = await startSession(harness);
-    final sessions = SessionService(
-      practices: harness.practices,
-      sessions: harness.sessions,
-      cards: harness.cards,
-      clock: harness.clock,
-    );
+    final sessions = sessionsFor(harness);
     await sessions.submitAnswer(
       start: start,
       item: start.items.single,
@@ -103,8 +162,9 @@ void main() {
     expect(find.text('Complete the concept'), findsOneWidget);
     expect(find.byType(SelectionArea), findsWidgets);
     expect(find.text('VPC'), findsOneWidget);
+    expect(find.text('Save and finish'), findsOneWidget);
 
-    await tester.tap(find.text('Finish'));
+    await tester.tap(find.text('Save and finish'));
     await pumpFrames(tester);
     expect(find.text('Write a definition before saving.'), findsOneWidget);
     expect(find.text('Complete the concept'), findsOneWidget);
@@ -116,7 +176,7 @@ void main() {
       'A private network inside a cloud provider.',
     );
     await pumpFrames(tester);
-    await tester.tap(find.text('Finish'));
+    await tester.tap(find.text('Save and finish'));
     await pumpFrames(tester, frames: 24);
     expect(find.text('Review complete'), findsWidgets);
     final concepts = await tester.runAsync(
@@ -137,12 +197,7 @@ void main() {
     final question = (await harness.practices.questionsForPractice(
       seeded.practiceId,
     )).single;
-    final sessions = SessionService(
-      practices: harness.practices,
-      sessions: harness.sessions,
-      cards: harness.cards,
-      clock: harness.clock,
-    );
+    final sessions = sessionsFor(harness);
     final start = await sessions.startPractice(seeded.practiceId);
     await sessions.submitAnswer(
       start: start,
@@ -170,9 +225,11 @@ void main() {
       harness: harness,
     );
 
+    expect(find.byType(ReviewShell), findsOneWidget);
     expect(find.text('From the question'), findsNothing);
     expect(find.text('Keep for later'), findsNothing);
     expect(find.text('Delete note'), findsNothing);
+    expect(find.byKey(const ValueKey('review-dock-delete')), findsNothing);
     expect(find.text('Save and finish'), findsOneWidget);
     expect(
       find.descendant(
@@ -228,23 +285,49 @@ void main() {
     expect(find.byKey(const ValueKey('note-see-context')), findsNothing);
   });
 
-  testWidgets('the note delete action is icon-only and confirmed', (
+  testWidgets('the dock keeps back, primary, forward order at every width', (
     tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final harness = TestHarness();
     addTearDown(harness.close);
-    await harness.cards.createNote(
-      sessionId: null,
-      questionId: null,
-      text: 'delete me',
-      context: '',
-      topicName: 'Topic',
-      practiceName: 'Practice',
-      createdAt: harness.clock.now().toUtc(),
+    final notes = await seedTwoNotes(tester, harness);
+
+    tester.view.physicalSize = const Size(720, 900);
+    await pumpTestApp(
+      tester,
+      home: NoteReviewPage(notes: notes),
+      harness: harness,
     );
-    final notes = (await tester.runAsync(
-      () => harness.cards.watchNotes().first,
-    ))!;
+
+    for (final width in <double>[720, 360, 320]) {
+      tester.view.physicalSize = Size(width, 900);
+      await pumpFrames(tester);
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const ValueKey('review-dock-back')), findsOneWidget);
+      expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
+      expect(find.byKey(const ValueKey('review-dock-next')), findsOneWidget);
+      final back = tester.getCenter(
+        find.byKey(const ValueKey('review-dock-back')),
+      );
+      final save = tester.getCenter(
+        find.byKey(const ValueKey('review-dock-save')),
+      );
+      final next = tester.getCenter(
+        find.byKey(const ValueKey('review-dock-next')),
+      );
+      expect(back.dx, lessThan(save.dx));
+      expect(save.dx, lessThan(next.dx));
+      expect(back.dy, closeTo(save.dy, 1));
+      expect(save.dy, closeTo(next.dy, 1));
+    }
+  });
+
+  testWidgets('Save on an earlier note saves and advances', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final notes = await seedTwoNotes(tester, harness);
 
     await pumpTestApp(
       tester,
@@ -252,12 +335,126 @@ void main() {
       harness: harness,
     );
 
-    final delete = find.byKey(const ValueKey('review-dock-delete'));
-    expect(delete, findsOneWidget);
-    expect(find.text('Delete note'), findsNothing);
-    await tester.tap(delete);
+    expect(find.text('Item 1 of 2'), findsOneWidget);
+    expect(find.text('second note'), findsOneWidget);
+    expect(find.text('Save'), findsOneWidget);
+    expect(find.text('Save and finish'), findsNothing);
+
+    await tester.tap(find.byKey(ReviewActionDock.saveKey));
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.text('Item 2 of 2'), findsOneWidget);
+    expect(find.text('first note'), findsOneWidget);
+    final saved = await tester.runAsync(() => harness.cards.watchNotes().first);
+    expect(
+      saved!.singleWhere((note) => note.text == 'second note').isKept,
+      isTrue,
+    );
+  });
+
+  testWidgets('the create FAB fits every review layout without overlapping', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    addTearDown(tester.view.resetViewInsets);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final notes = await seedTwoNotes(tester, harness);
+
+    tester.view.physicalSize = const Size(360, 720);
+    await pumpTestApp(
+      tester,
+      home: NoteReviewPage(notes: notes),
+      harness: harness,
+    );
+
+    final dock = find.byType(ReviewActionDock);
+    final fab = find.byKey(const ValueKey('review-create-fab'));
+
+    void expectFits() {
+      expect(tester.takeException(), isNull);
+      expect(fab, findsOneWidget);
+      final fabRect = tester.getRect(fab);
+      final dockRect = tester.getRect(dock);
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      expect(fabRect.left, greaterThanOrEqualTo(0));
+      expect(fabRect.right, lessThanOrEqualTo(screen.width));
+      expect(fabRect.bottom, lessThanOrEqualTo(screen.height));
+      expect(fabRect.overlaps(dockRect), isFalse);
+    }
+
+    for (final size in const <Size>[
+      Size(320, 640),
+      Size(360, 720),
+      Size(720, 900),
+      Size(640, 320),
+    ]) {
+      tester.view.physicalSize = size;
+      await pumpFrames(tester);
+      expectFits();
+    }
+
+    tester.view.physicalSize = const Size(320, 640);
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
     await pumpFrames(tester);
-    expect(find.text('Delete note?'), findsOneWidget);
-    expect(find.text('Delete'), findsOneWidget);
+    expectFits();
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
+    expect(fab, findsNothing);
+    expect(dock, findsNothing);
+  });
+
+  testWidgets('the create FAB rises above a validation snackbar', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final start = await startSession(harness);
+    final sessions = sessionsFor(harness);
+    await sessions.submitAnswer(
+      start: start,
+      item: start.items.single,
+      selectedIndexes: const [0],
+      reasoning: '',
+      distracted: false,
+    );
+    await harness.cards.createConcept(
+      sessionId: start.session.id,
+      questionId: start.items.single.question.id,
+      term: 'VPC',
+      definition: '',
+      context: start.items.single.question.prompt,
+      topicName: 'Topic',
+      source: ConceptSource.manual,
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ReviewPage(sessionId: start.session.id),
+      harness: harness,
+    );
+
+    await tester.tap(find.byKey(ReviewActionDock.saveKey));
+    await pumpFrames(tester);
+    expect(find.text('Write a definition before saving.'), findsOneWidget);
+
+    final snack = find.byType(M3ESnackbar);
+    expect(snack, findsOneWidget);
+    final fabRect = tester.getRect(
+      find.byKey(const ValueKey('review-create-fab')),
+    );
+    final snackRect = tester.getRect(snack);
+    expect(fabRect.overlaps(snackRect), isFalse);
+    expect(tester.takeException(), isNull);
   });
 }

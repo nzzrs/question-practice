@@ -14,8 +14,8 @@ import '../lookup/lookup_actions.dart';
 ///
 /// The end-of-session review and the Cards note review render the same
 /// content: the saved note, its topic and practice, and a read-only
-/// context action. Navigation, delete and card creation live in the shared
-/// review dock, not in this view.
+/// context action. Navigation and card creation live in the shared review
+/// shell. Notes are deleted from Cards, never from a review surface.
 class NoteReviewView extends ConsumerStatefulWidget {
   const NoteReviewView({required this.note, super.key});
 

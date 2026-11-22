@@ -821,7 +821,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               title: 'Basic cards',
               detail:
                   'Basic cards come from the Contrast, Cause and effect, '
-                  'Exam tip and Steps templates. Each has a front and a back.',
+                  'Scenario and rule, and Steps templates. Each has a front '
+                  'and a back.',
             ),
             _InfoRow(
               key: ValueKey('cards-info-tags'),

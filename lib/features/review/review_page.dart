@@ -13,7 +13,7 @@ import '../feedback/domain/wrong_notes.dart';
 import '../feedback/feedback_step_header.dart';
 import 'domain/review_service.dart';
 import 'note_review_view.dart';
-import 'review_action_dock.dart';
+import 'review_shell.dart';
 import 'skipped_question_view.dart';
 
 class ReviewPage extends ConsumerStatefulWidget {
@@ -31,6 +31,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   int _index = 0;
   int _created = 0;
   int _kept = 0;
+  final _keptNoteIds = <int>{};
   bool _busy = false;
   bool _finished = false;
 
@@ -262,6 +263,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         await _requestNext();
         return;
       case ConceptDefinitionStep(:final concept):
+        if (_savedConceptIds.contains(concept.id)) break;
         setState(() => _busy = true);
         try {
           await ref
@@ -278,10 +280,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           if (mounted) setState(() => _busy = false);
         }
       case NoteReviewStep(:final note):
+        if (note.isKept || _keptNoteIds.contains(note.id)) break;
         setState(() => _busy = true);
         try {
           await ref.read(reviewServiceProvider).keepNote(note.id);
           if (!mounted) return;
+          _keptNoteIds.add(note.id);
           _kept++;
         } on Object catch (error) {
           if (mounted) await showSnack(context, 'Could not save: $error');
@@ -298,54 +302,6 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     return step is ConceptDefinitionStep &&
         !_savedConceptIds.contains(step.concept.id) &&
         _definition.text.trim().isNotEmpty;
-  }
-
-  Future<void> _deleteNote(ReviewStep step, Note note) async {
-    if (_busy) return;
-    final snapshot = _creator.snapshotFor(_itemKey(step));
-    final hasDrafts = snapshot?.hasDrafts ?? false;
-    final confirmed = await confirmDialog(
-      context,
-      title: 'Delete note?',
-      message:
-          'The saved note "${note.text}" is removed from Cards. '
-          'Cards already made from it stay.'
-          '${hasDrafts ? ' Unsaved card drafts for this note are discarded.' : ''}',
-      confirmLabel: 'Delete',
-      destructive: true,
-    );
-    if (!confirmed || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      await ref.read(cardRepositoryProvider).deleteNote(note.id);
-      if (!mounted) return;
-      _creator.forgetNote(note.id);
-      _creator.clearSnapshot(_itemKey(step));
-      _completionPending.remove(_itemKey(step));
-      final data = _data;
-      if (data == null) return;
-      data.steps.remove(step);
-      final finished = data.steps.isEmpty;
-      setState(() {
-        _creator.resetForStep();
-        if (finished) {
-          _finished = true;
-        } else {
-          if (_index >= data.steps.length) {
-            _index = data.steps.length - 1;
-          }
-          _prepareStep();
-        }
-      });
-      if (finished) ref.invalidate(homeStatsProvider);
-      _resetScroll();
-    } on Object catch (error) {
-      if (mounted) {
-        await showSnack(context, 'Could not delete the note: $error');
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   Future<void> _requestNext() async {
@@ -442,38 +398,16 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
       );
     }
     if (_finished || data.steps.isEmpty) {
-      return AppPage(
+      final changed = _created != 0 || _kept != 0;
+      return ReviewCompletionPage(
         title: 'Review complete',
-        focus: true,
-        onBack: () => Navigator.of(context).pop(true),
+        heading: changed ? 'Review complete' : 'Review closed',
+        message: changed
+            ? '${[if (_created > 0) '$_created card${_created == 1 ? '' : 's'} completed or created', if (_kept > 0) '$_kept note${_kept == 1 ? '' : 's'} kept'].join(' and ')}. You can finish missing details later in Cards.'
+            : 'No card details were saved.',
+        onDone: () => Navigator.of(context).pop(true),
         scrollController: _scroll,
-        variant: M3EAppBarVariant.small,
-        children: [
-          const SizedBox(height: 32),
-          Center(child: IconBadge(Icons.check_circle_outline, size: 72)),
-          const SizedBox(height: 16),
-          Text(
-            _created == 0 && _kept == 0 ? 'Review closed' : 'Review complete',
-            textAlign: TextAlign.center,
-            style: theme.typography.emphasized.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _created == 0 && _kept == 0
-                ? 'No card details were saved.'
-                : '${[if (_created > 0) '$_created card${_created == 1 ? '' : 's'} completed or created', if (_kept > 0) '$_kept note${_kept == 1 ? '' : 's'} kept'].join(' and ')}. You can finish missing details later in Cards.',
-            textAlign: TextAlign.center,
-            style: theme.typography.baseline.bodyMedium.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 24),
-          AppPrimaryButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            label: 'Done',
-            icon: Icons.check,
-          ),
-          const SizedBox(height: 8),
+        actions: [
           SizedBox(
             width: double.infinity,
             child: M3EButton.tonal(
@@ -493,29 +427,19 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     final step = _step!;
     final heading = _headingFor(step);
     final last = _index + 1 >= data.steps.length;
-    return AppPage(
+    return ReviewShell(
       title: 'Review',
-      showBack: true,
-      focus: true,
-      onBack: _requestClose,
+      saveLabel: last ? 'Save and finish' : 'Save',
+      onSave: _saveCurrentStep,
+      onBack: _goBack,
+      onNext: _requestNext,
+      onClose: _requestClose,
+      canGoBack: _index > 0,
+      canGoNext: !last,
+      onCreateCards: () => _openCreator(step),
+      busy: _busy,
       scrollController: _scroll,
-      variant: M3EAppBarVariant.small,
-      bottomBar: ReviewActionDock(
-        busy: _busy,
-        saveLabel: last
-            ? (step is NoteReviewStep ? 'Save and finish' : 'Finish')
-            : 'Save',
-        onSave: _saveCurrentStep,
-        onBack: _goBack,
-        onNext: _requestNext,
-        canGoBack: _index > 0,
-        canGoNext: true,
-        onCreateCards: () => _openCreator(step),
-        onDelete: step is NoteReviewStep
-            ? () => _deleteNote(step, step.note)
-            : null,
-      ),
-      children: [..._buildStep(theme, step, data, heading)],
+      children: _buildStep(theme, step, data, heading),
     );
   }
 

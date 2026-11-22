@@ -461,8 +461,8 @@ void main() {
     expect(find.text('Basic cards'), findsOneWidget);
     expect(
       find.text(
-        'Basic cards come from the Contrast, Cause and effect, Exam tip and '
-        'Steps templates. Each has a front and a back.',
+        'Basic cards come from the Contrast, Cause and effect, '
+        'Scenario and rule, and Steps templates. Each has a front and a back.',
       ),
       findsOneWidget,
     );

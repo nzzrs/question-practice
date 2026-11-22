@@ -168,35 +168,6 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
     widget.onSeedRequested();
   }
 
-  Future<void> _deleteNote(Note note) async {
-    final confirmed = await confirmDialog(
-      context,
-      title: 'Delete note?',
-      message:
-          'The saved note "${note.text}" is removed from Cards. '
-          'Cards already made from it stay.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    );
-    if (!confirmed || !mounted) return;
-    try {
-      await ref.read(cardRepositoryProvider).deleteNote(note.id);
-      if (!mounted) return;
-      widget.creator.forgetNote(note.id);
-      setState(() {
-        _notes = [
-          for (final item in _notes)
-            if (item.id != note.id) item,
-        ];
-      });
-      await showSnack(context, 'Note deleted.');
-    } on Object catch (error) {
-      if (mounted) {
-        await showSnack(context, 'Could not delete the note: $error');
-      }
-    }
-  }
-
   void _define(String term, Rect? anchor) {
     openTermLookup(
       context,
@@ -253,7 +224,6 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
             onCreateCardFromNote: _createCardFromNote,
             onDefineNote: (note) => _define(note.text, null),
             onAskNote: askAvailable ? (note) => _ask(note.text, null) : null,
-            onDeleteNote: _deleteNote,
             onTurnBulletIntoCard: _turnBulletIntoCard,
             bulletBusy: activeBulletId != null,
             activeBulletId: activeBulletId,

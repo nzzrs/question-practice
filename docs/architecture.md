@@ -98,19 +98,21 @@ of the random queue.
 2. `dueAt` is the last wrong time plus 48 hours. One active card per question is
    enforced by the partial unique index `error_cards_active_question`.
 3. The end-of-session review and Cards put every error, skipped, concept and
-   note step in one full-width reading surface with a shared `ReviewActionDock`.
-   The card icon opens `CardCreatorSheet` as a modal bottom sheet over the
-   feedback, so there is no split view. The sheet has no save action: the dock
-   owns the single Save, which writes the cached drafts through
+   note step in one full-width reading surface with a shared `ReviewShell`.
+   The floating create FAB opens `CardCreatorSheet` as a modal bottom sheet over
+   the feedback, so there is no split view. The sheet has no save action: the
+   dock owns the single Save, which writes the cached drafts through
    `saveCardCreatorDrafts`. Every item keeps a `CardCreatorSnapshot` on the
    page's `CardCreatorController`; closing or hiding the sheet stores typed
    text, template, drafts, AI ideas and seed state, and reopening the same item
-   restores them. Snapshots clear only after a successful save, note delete or
-   reviewed exit. The dock order is back, create, delete when available, Save
-   and forward; the last step labels it Finish, note review labels it Save and
-   finish, and leaving with pending work asks first. Manual entry
+   restores them. Snapshots clear only after a successful save or reviewed
+   exit. The dock order is back, Save and forward side by side; the back arrow
+   is disabled on the first item, the forward arrow on the last, and the last
+   item labels Save as Save and finish on every surface. Leaving with pending
+   work asks first, including when Save finishes the last item and another item
+   still has cached work. Manual entry
    adds cards one at a time and needs no AI. Five templates (Definition,
-   Contrast, Cause and effect, Exam tip, Steps) write the front and back;
+   Contrast, Cause and effect, Scenario and rule, Steps) write the front and back;
    Definition uses a raw cloze and becomes a Cloze concept, the other four
    become Basic `manual_cards` with the matching cognitive type. Every builder
    card, draft and AI variant carries an advisory quality badge and the
@@ -215,9 +217,9 @@ concept and session-note steps share the same dock and sheet.
 | Define (web) | Opens DuckDuckGo or Wikipedia in a Custom Tab and keeps an editable definition sheet with Save. A missing concept is saved immediately. | `LookupService.openWeb`, `WebLauncher` | `concepts`, `settings` |
 | Ask | Sends the selected passage, its question and the learner message to AI. The answer can become a concept card or a basic card; the basic front places the question context above the learner question. | `ask_sheet.dart`, `LookupService.ask`, `ReviewService.createConcept/createBasicCard` | `concepts` or `manual_cards` when saved |
 | Concept cards | Cloze text `Definition of {{c1::term}}: {{c2::definition}}`; `extra` becomes the Anki extra field. Topic and subtopic travel as tags only. Missing definitions block export. | `AnkiNoteBuilder.conceptCloze/conceptFields` | `concepts` |
-| Basic cards | Question/answer cards from skipped questions, Ask, a note or a review bullet, with optional context above the front and a cognitive type (Cause and effect, Exam tip, Contrast or Steps). | `CardRepository.createManualCard`, `card_creator_sheet.dart`, `review_service.dart` | `manual_cards` |
+| Basic cards | Question/answer cards from skipped questions, Ask, a note or a review bullet, with optional context above the front and a cognitive type (Cause and effect, Scenario and rule, Contrast or Steps). | `CardRepository.createManualCard`, `card_creator_sheet.dart`, `review_service.dart` | `manual_cards` |
 | Skipped queue | Every skipped answer, including older unknown attempts, is saved per session and question. Re-skipping reopens the same row instead of duplicating it. Unhandled rows survive session completion. | `CardRepository.saveSkippedQuestion`, `SessionService._trackSkipped` | `skipped_questions` |
-| Notes (`notes` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it is shown again whenever that question is practised. In practice, tapping a note offers Define, Ask and **Delete note**; that deletion is immediate with no confirmation. In review a note's three-dot menu offers Copy, Create card, Define, Ask when an AI key is configured, and Delete; the dock delete icon and the menu action both ask before removing the note. A note can be kept with Save or turned into cards with the dock Create cards action. Manual entry adds cards one at a time and works without AI; the template sparkle opens optional AI suggestions with up to three variants per idea, and the learner keeps any combination. Each saved variant becomes a Basic card (or a Cloze concept for a Definition idea) with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards, where tapping one opens a selectable **Note preview** with its question context; **Review** walks them one at a time through the shared view, which offers **See context** for a read-only question and attempt. The download and select-all icons in the Notes header save them as plain text or select them. They are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createNote/notesForQuestion/keepNote/markNoteConverted/deleteNotes`, `LookupService.suggestArchetypeCards`, `cards_page.dart`, `note_review_page.dart`, `note_review_view.dart`, `card_creator_sheet.dart` | `notes`, `manual_cards` |
+| Notes (`notes` table) | Selecting question, answer or explanation text offers **Save as note**. The phrase is stored with context, topic, subtopic, practice, session and question and belongs to the question, so it is shown again whenever that question is practised. In practice, tapping a note offers Define, Ask and **Delete note**; that deletion is immediate with no confirmation. In review a note's three-dot menu offers Copy, Create card, Define, and Ask when an AI key is configured; reviews offer no note delete, and notes are deleted from Cards. A note can be kept with Save or turned into cards with the create FAB above the dock. Manual entry adds cards one at a time and works without AI; the template sparkle opens optional AI suggestions with up to three variants per idea, and the learner keeps any combination. Each saved variant becomes a Basic card (or a Cloze concept for a Definition idea) with its cognitive type and subtopic, and the note is marked converted once. Kept notes remain in Cards, where tapping one opens a selectable **Note preview** with its question context; **Review** walks them one at a time through the shared view, which offers **See context** for a read-only question and attempt. The download and select-all icons in the Notes header save them as plain text or select them. They are never sent to Anki. | `selectable_linkified_text.dart`, `session_page.dart`, `CardRepository.createNote/notesForQuestion/keepNote/markNoteConverted/deleteNotes`, `LookupService.suggestArchetypeCards`, `cards_page.dart`, `note_review_page.dart`, `note_review_view.dart`, `card_creator_sheet.dart` | `notes`, `manual_cards` |
 | Note download | The download action in the Notes header writes a plain-text file through the system share sheet. | `CardsPage._downloadNotes`, `ExportService.shareNotes` | `notes` |
 
 ### Statistics and statistics export
@@ -316,9 +318,9 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   below the filters opens every pending error and skipped question.
 - Tapping a note opens a selectable **Note preview** with the saved text and its
   question context, with **Close** and **Review**. **Review** walks the notes one
-  at a time with the shared dock: **Create cards** opens the sheet, **Save and
-  finish** keeps the note,
-  and the delete icon asks first. The shared `NoteReviewView` shows the phrase,
+  at a time with the shared dock: the **Create cards** FAB opens the sheet,
+  **Save and finish** keeps the note, and reviews offer no note delete. The
+  shared `NoteReviewView` shows the phrase,
   its topic and practice pills, and **See context** for a read-only question and
   attempt; the end-of-session note step uses the same view.
 - **Export to AnkiDroid** creates missing decks and note types, bulk-adds notes,

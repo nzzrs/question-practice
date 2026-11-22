@@ -2,12 +2,24 @@ import 'dart:convert';
 
 import '../domain/models.dart';
 
+/// Prefix shared by every session undo journal in the settings table.
+const errorCardUndoKeyPrefix = 'error_card_undo_';
+
 /// Settings key that stores the undo journal for one practice session.
 ///
 /// The journal lives in the existing key-value settings table so this feature
 /// needs no schema migration. Each entry is removed when the session finishes
 /// or is discarded.
-String errorCardUndoKey(int sessionId) => 'error_card_undo_$sessionId';
+String errorCardUndoKey(int sessionId) => '$errorCardUndoKeyPrefix$sessionId';
+
+/// True for settings rows that hold a session undo journal.
+bool isErrorCardUndoKey(String key) => key.startsWith(errorCardUndoKeyPrefix);
+
+/// Session id encoded in an undo-journal key, or null when it is malformed.
+int? errorCardUndoSessionId(String key) {
+  if (!isErrorCardUndoKey(key)) return null;
+  return int.tryParse(key.substring(errorCardUndoKeyPrefix.length));
+}
 
 /// The parts of an error card that a practice session may change.
 ///

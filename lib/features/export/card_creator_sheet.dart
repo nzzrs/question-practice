@@ -44,7 +44,7 @@ class CardCreatorErrorSource {
     required this.correctAnswer,
     this.reasoning = '',
     this.explanation = '',
-    this.wrongNotes = const [],
+    this.wrongAnswerBullets = const [],
   });
 
   final ErrorCard card;
@@ -55,7 +55,7 @@ class CardCreatorErrorSource {
   final String explanation;
 
   /// The learner's read-only bullets, sent separately to the AI breakdown.
-  final List<String> wrongNotes;
+  final List<String> wrongAnswerBullets;
 }
 
 /// Everything one card-creation flow needs from its review surface.
@@ -863,7 +863,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
             explanation: error?.explanation ?? '',
             topicName: request.topicName,
             subtopic: request.subtopic,
-            otherNotes: error?.wrongNotes ?? const [],
+            otherNotes: error?.wrongAnswerBullets ?? const [],
           );
           if (!mounted || requestId != _seedRequest) return;
           final suggestion = draft != null && !_repeatsKnownCard(draft.front)
@@ -1248,7 +1248,7 @@ class _CardCreatorBodyState extends ConsumerState<CardCreatorBody> {
           topicName: widget.request.topicName,
           subtopic: widget.request.subtopic,
           mistakeKinds: error.card.mistakeKinds,
-          wrongNotes: error.wrongNotes,
+          wrongAnswerBullets: error.wrongAnswerBullets,
         );
       } else if (note != null) {
         ideas = await lookup.suggestArchetypeCards(

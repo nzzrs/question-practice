@@ -478,7 +478,7 @@ class LookupService {
     required String topicName,
     String subtopic = '',
     List<MistakeKind> mistakeKinds = const [],
-    List<String> wrongNotes = const [],
+    List<String> wrongAnswerBullets = const [],
   }) async {
     final settings = await _settings.load();
     final apiKey = await _keyStore.readApiKey();
@@ -510,7 +510,7 @@ class LookupService {
         '- Only use ideas supported by the error context. Skip trivial or '
         'duplicate ideas.';
     final mistakes = mistakeKinds.map((kind) => kind.label).join(', ');
-    final notes = wrongNotes
+    final bullets = wrongAnswerBullets
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
         .toList();
@@ -521,9 +521,9 @@ class LookupService {
       'Chosen wrong answer: $wrongAnswer',
       'Correct answer: $correctAnswer',
       'Mistake classifications: ${mistakes.isEmpty ? '(none)' : mistakes}',
-      if (notes.isNotEmpty)
+      if (bullets.isNotEmpty)
         'What went wrong (learner\'s own notes, one per line):\n'
-            '- ${notes.join('\n- ')}',
+            '- ${bullets.join('\n- ')}',
       'Learner reasoning: ${reasoning.trim().isEmpty ? '(not written)' : reasoning.trim()}',
       'Explanation: $explanation',
     ].join('\n');

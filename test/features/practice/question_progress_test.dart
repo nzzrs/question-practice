@@ -125,6 +125,131 @@ void main() {
     await expectLater(service.startMixed(), throwsA(isA<SessionException>()));
   });
 
+  test('grouped progress matches attempt history edge cases', () async {
+    final practice = await harness.seedPractice(count: 9);
+    final questions = await harness.practices.questionsForPractice(
+      practice.practiceId,
+    );
+    final now = harness.clock.now().toUtc();
+
+    Future<int> startSession(List<Question> items) async {
+      final session = await harness.sessions.startSession(
+        practiceId: practice.practiceId,
+        mode: SessionMode.practice,
+        questions: items,
+        startedAt: now,
+      );
+      return session.id;
+    }
+
+    Future<void> answer(
+      int sessionId,
+      Question question, {
+      required List<int> selected,
+      required bool correct,
+      bool unknown = false,
+    }) {
+      return harness.sessions.recordAttempt(
+        sessionId: sessionId,
+        questionId: question.id,
+        selectedIndexes: selected,
+        reasoning: '',
+        distracted: false,
+        isCorrect: correct,
+        answeredAt: now,
+        unknown: unknown,
+      );
+    }
+
+    final first = await startSession(questions.sublist(0, 4));
+    await answer(first, questions[0], selected: const [0], correct: true);
+    await answer(first, questions[1], selected: const [1], correct: false);
+    await answer(first, questions[2], selected: const [], correct: false);
+    await answer(
+      first,
+      questions[3],
+      selected: const [1],
+      correct: false,
+      unknown: true,
+    );
+
+    final second = await startSession(questions.sublist(4, 9));
+    await answer(second, questions[4], selected: const [], correct: false);
+    await answer(second, questions[6], selected: const [0], correct: true);
+    await answer(
+      second,
+      questions[7],
+      selected: const [0],
+      correct: true,
+      unknown: true,
+    );
+    await answer(second, questions[8], selected: const [1], correct: false);
+
+    final third = await startSession(questions.sublist(4, 9));
+    await answer(third, questions[4], selected: const [1], correct: false);
+    await answer(third, questions[6], selected: const [], correct: false);
+    await answer(third, questions[8], selected: const [0], correct: true);
+
+    final leftUnanswered = await startSession([questions[5]]);
+    await harness.sessions.completeSession(
+      id: leftUnanswered,
+      total: 0,
+      correct: 0,
+      skipped: 0,
+      distracted: 0,
+      finishedAt: now,
+    );
+
+    final progress = await harness.sessions.questionProgress();
+    Set<int> ids(Iterable<int> indexes) => {
+      for (final index in indexes) questions[index].id,
+    };
+
+    expect(progress.doneQuestionIds, ids([0, 1, 4, 6, 8]));
+    expect(progress.solvedQuestionIds, ids([0, 6, 7, 8]));
+    expect(progress.skippedQuestionIds, ids([2, 3, 4, 5, 6, 7]));
+  });
+
+  test('distracted attempts are done but never solved or skipped', () async {
+    final practice = await harness.seedPractice(count: 2);
+    final questions = await harness.practices.questionsForPractice(
+      practice.practiceId,
+    );
+    final now = harness.clock.now().toUtc();
+    final session = await harness.sessions.startSession(
+      practiceId: practice.practiceId,
+      mode: SessionMode.practice,
+      questions: questions,
+      startedAt: now,
+    );
+    await harness.sessions.recordAttempt(
+      sessionId: session.id,
+      questionId: questions[0].id,
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: true,
+      isCorrect: false,
+      answeredAt: now,
+    );
+    await harness.sessions.recordAttempt(
+      sessionId: session.id,
+      questionId: questions[1].id,
+      selectedIndexes: const [1],
+      reasoning: '',
+      distracted: true,
+      isCorrect: false,
+      unknown: true,
+      answeredAt: now,
+    );
+
+    final progress = await harness.sessions.questionProgress();
+    expect(progress.isDone(questions[0].id), isTrue);
+    expect(progress.isSolved(questions[0].id), isFalse);
+    expect(progress.isSkipped(questions[0].id), isFalse);
+    expect(progress.isDone(questions[1].id), isFalse);
+    expect(progress.isSkipped(questions[1].id), isTrue);
+  });
+
   test('shuffled practice reports when nothing is left to practise', () async {
     final practice = await harness.seedPractice(count: 1);
     final start = await service.startPractice(practice.practiceId);

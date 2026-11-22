@@ -17,6 +17,7 @@ void refreshDataProviders(WidgetRef ref) {
   ref.invalidate(homeTopicSortProvider);
   ref.invalidate(practiceSummariesProvider);
   ref.invalidate(topicProgressProvider);
+  ref.invalidate(topicReadinessProvider);
   ref.invalidate(topicSubtopicStatsProvider);
   ref.invalidate(homeStatsProvider);
   ref.invalidate(dueErrorsProvider);

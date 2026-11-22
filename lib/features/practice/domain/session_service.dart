@@ -244,8 +244,14 @@ class SessionService {
     }
     final questions = <SessionQuestionItem>[];
     final cards = <int, ErrorCard>{};
+    final questionsById = {
+      for (final question in await _sessions.questionsByIds(
+        due.map((card) => card.questionId),
+      ))
+        question.id: question,
+    };
     for (final card in due) {
-      final question = await _practices.questionById(card.questionId);
+      final question = questionsById[card.questionId];
       if (question == null) continue;
       questions.add(
         _itemFor(
@@ -293,10 +299,11 @@ class SessionService {
     };
     final cards = <int, ErrorCard>{};
     if (session.mode == SessionMode.pastErrors) {
-      for (final question in questions) {
-        final card = await _cards.activeErrorForQuestion(question.id);
-        if (card != null) cards[question.id] = card;
-      }
+      cards.addAll(
+        await _cards.activeErrorsForQuestions(
+          questions.map((question) => question.id),
+        ),
+      );
     }
     final progress = await _sessions.questionProgress();
     return SessionStart(

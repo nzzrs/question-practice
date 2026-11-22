@@ -30,7 +30,9 @@ class QuestionFeedbackView extends StatefulWidget {
     this.notes = const [],
     this.onCopyNote,
     this.onCreateCardFromNote,
-    this.onNoteOverflow,
+    this.onDefineNote,
+    this.onAskNote,
+    this.onDeleteNote,
     this.onTurnBulletIntoCard,
     this.bulletBusy = false,
     this.activeBulletId,
@@ -59,7 +61,9 @@ class QuestionFeedbackView extends StatefulWidget {
   final List<Note> notes;
   final ValueChanged<Note>? onCopyNote;
   final ValueChanged<Note>? onCreateCardFromNote;
-  final ValueChanged<Note>? onNoteOverflow;
+  final ValueChanged<Note>? onDefineNote;
+  final ValueChanged<Note>? onAskNote;
+  final ValueChanged<Note>? onDeleteNote;
   final void Function(String bulletId, String note)? onTurnBulletIntoCard;
   final bool bulletBusy;
   final String? activeBulletId;
@@ -197,12 +201,14 @@ class _QuestionFeedbackViewState extends State<QuestionFeedbackView> {
             activeBulletId: widget.activeBulletId,
             addedBulletIds: widget.addedBulletIds,
           ),
-          if (widget.onCopyNote != null || widget.onCreateCardFromNote != null)
+          if (widget.onCopyNote != null)
             FeedbackNotesSection(
               notes: widget.notes,
-              onCopy: widget.onCopyNote ?? (_) {},
-              onCreateCard: widget.onCreateCardFromNote ?? (_) {},
-              onOverflow: widget.onNoteOverflow,
+              onCopy: widget.onCopyNote!,
+              onCreateCard: widget.onCreateCardFromNote,
+              onDefine: widget.onDefineNote,
+              onAsk: widget.onAskNote,
+              onDelete: widget.onDeleteNote,
             ),
         ],
       ],

@@ -84,6 +84,37 @@ SkippedQuestion _skippedQuestion(
   );
 }
 
+Future<void> _openBulletMenu(WidgetTester tester, int index) async {
+  final more = find.byKey(ValueKey('wrong-note-more-$index'));
+  await tester.ensureVisible(more);
+  await pumpFrames(tester);
+  await tester.tap(more);
+  await pumpFrames(tester);
+}
+
+Finder _bulletCard(int index) => find.byKey(ValueKey('wrong-note-card-$index'));
+
+Future<void> _openNoteMenu(WidgetTester tester, int noteId) async {
+  final more = find.byKey(ValueKey('feedback-note-more-$noteId'));
+  await tester.ensureVisible(more);
+  await pumpFrames(tester);
+  await tester.tap(more);
+  await pumpFrames(tester);
+}
+
+Finder _noteCard(int noteId) =>
+    find.byKey(ValueKey('feedback-note-card-$noteId'));
+
+Future<void> _dismissMenu(WidgetTester tester) async {
+  await tester.tapAt(const Offset(2, 2));
+  await pumpFrames(tester);
+}
+
+bool _menuItemEnabled(WidgetTester tester, Finder item) {
+  final row = find.ancestor(of: item, matching: find.byType(M3ETappable));
+  return tester.widget<M3ETappable>(row).enabled;
+}
+
 String _field(WidgetTester tester, String key) {
   return tester
       .widget<M3ETextField>(find.byKey(ValueKey(key)))
@@ -228,10 +259,8 @@ void main() {
       harness: harness,
     );
 
-    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(bullet);
-    await pumpFrames(tester);
-    await tester.tap(bullet);
+    await _openBulletMenu(tester, 0);
+    await tester.tap(_bulletCard(0));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 
@@ -262,15 +291,12 @@ void main() {
       harness: harness,
     );
 
-    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(bullet);
-    await pumpFrames(tester);
-    await tester.tap(bullet);
+    await _openBulletMenu(tester, 0);
+    await tester.tap(_bulletCard(0));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     expect(find.byKey(const ValueKey('creator-seed-loading')), findsOneWidget);
-    expect(tester.widget<M3EIconButton>(bullet).onPressed, isNull);
-    expect(find.text('Turn this bullet into a card'), findsNothing);
+    expect(find.byTooltip('Turn this bullet into a card'), findsNothing);
 
     response.complete(
       _cardResponse(
@@ -304,10 +330,8 @@ void main() {
       harness: harness,
     );
 
-    final first = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(first);
-    await pumpFrames(tester);
-    await tester.tap(first);
+    await _openBulletMenu(tester, 0);
+    await tester.tap(_bulletCard(0));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     await tester.enterText(
@@ -317,10 +341,8 @@ void main() {
     await pumpFrames(tester);
     await _closeCreator(tester);
 
-    final second = find.byKey(const ValueKey('wrong-note-card-1'));
-    await tester.ensureVisible(second);
-    await pumpFrames(tester);
-    await tester.tap(second);
+    await _openBulletMenu(tester, 1);
+    await tester.tap(_bulletCard(1));
     await pumpFrames(tester);
     expect(find.text('Replace the draft you started?'), findsOneWidget);
 
@@ -333,7 +355,8 @@ void main() {
     );
     await _closeCreator(tester);
 
-    await tester.tap(second);
+    await _openBulletMenu(tester, 1);
+    await tester.tap(_bulletCard(1));
     await pumpFrames(tester);
     await tester.tap(find.text('Replace'));
     await pumpFrames(tester);
@@ -353,10 +376,8 @@ void main() {
       harness: harness,
     );
 
-    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(bullet);
-    await pumpFrames(tester);
-    await tester.tap(bullet);
+    await _openBulletMenu(tester, 0);
+    await tester.tap(_bulletCard(0));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 
@@ -371,7 +392,9 @@ void main() {
     await pumpFrames(tester);
     await _closeCreator(tester);
 
-    expect(tester.widget<M3EIconButton>(bullet).onPressed, isNull);
+    await _openBulletMenu(tester, 0);
+    expect(_menuItemEnabled(tester, _bulletCard(0)), isFalse);
+    await _dismissMenu(tester);
 
     await _openCreator(tester);
     final remove = find.byIcon(Icons.delete_outline);
@@ -381,7 +404,9 @@ void main() {
     await pumpFrames(tester);
     await _closeCreator(tester);
 
-    expect(tester.widget<M3EIconButton>(bullet).onPressed, isNotNull);
+    await _openBulletMenu(tester, 0);
+    expect(_menuItemEnabled(tester, _bulletCard(0)), isTrue);
+    await _dismissMenu(tester);
   });
 
   testWidgets('drafts stay with their item across close and step changes', (
@@ -515,10 +540,8 @@ void main() {
       harness: harness,
     );
 
-    final firstBullet = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(firstBullet);
-    await pumpFrames(tester);
-    await tester.tap(firstBullet);
+    await _openBulletMenu(tester, 0);
+    await tester.tap(_bulletCard(0));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     await tester.enterText(
@@ -534,10 +557,8 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('review-dock-back')));
     await pumpFrames(tester);
 
-    final secondBullet = find.byKey(const ValueKey('wrong-note-card-1'));
-    await tester.ensureVisible(secondBullet);
-    await pumpFrames(tester);
-    await tester.tap(secondBullet);
+    await _openBulletMenu(tester, 1);
+    await tester.tap(_bulletCard(1));
     await pumpFrames(tester);
     expect(find.text('Replace the draft you started?'), findsOneWidget);
     await tester.tap(find.text('Keep editing'));
@@ -573,10 +594,8 @@ void main() {
         harness: harness,
       );
 
-      final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
-      await tester.ensureVisible(bullet);
-      await pumpFrames(tester);
-      await tester.tap(bullet);
+      await _openBulletMenu(tester, 0);
+      await tester.tap(_bulletCard(0));
       await pumpFrames(tester);
       await expandCardCreatorSheet(tester);
       await pumpFrames(tester, frames: 24);
@@ -676,10 +695,8 @@ void main() {
       harness: harness,
     );
 
-    final create = find.byKey(ValueKey('feedback-note-card-$noteId'));
-    await tester.ensureVisible(create);
-    await pumpFrames(tester);
-    await tester.tap(create);
+    await _openNoteMenu(tester, noteId);
+    await tester.tap(_noteCard(noteId));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     expect(find.text('From this note'), findsNothing);
@@ -758,10 +775,8 @@ void main() {
       harness: harness,
     );
 
-    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(bullet);
-    await pumpFrames(tester);
-    await tester.tap(bullet);
+    await _openBulletMenu(tester, 0);
+    await tester.tap(_bulletCard(0));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     expect(find.byKey(const ValueKey('creator-seed-loading')), findsOneWidget);
@@ -791,10 +806,8 @@ void main() {
       harness: harness,
     );
 
-    final first = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(first);
-    await pumpFrames(tester);
-    await tester.tap(first);
+    await _openBulletMenu(tester, 0);
+    await tester.tap(_bulletCard(0));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     await tester.enterText(
@@ -812,10 +825,8 @@ void main() {
     );
     await pumpFrames(tester, frames: 24);
 
-    final second = find.byKey(const ValueKey('wrong-note-card-1'));
-    await tester.ensureVisible(second);
-    await pumpFrames(tester);
-    await tester.tap(second);
+    await _openBulletMenu(tester, 1);
+    await tester.tap(_bulletCard(1));
     await pumpFrames(tester);
     expect(find.text('Replace the draft you started?'), findsOneWidget);
     await tester.tap(find.text('Replace'));
@@ -952,10 +963,8 @@ void main() {
       harness: harness,
     );
 
-    final noteCard = find.byKey(ValueKey('feedback-note-card-$noteId'));
-    await tester.ensureVisible(noteCard);
-    await pumpFrames(tester);
-    await tester.tap(noteCard);
+    await _openNoteMenu(tester, noteId);
+    await tester.tap(_noteCard(noteId));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     expect(find.byKey(const ValueKey('creator-seed-composer')), findsOneWidget);
@@ -1002,18 +1011,14 @@ void main() {
       harness: harness,
     );
 
-    final noteCard = find.byKey(ValueKey('feedback-note-card-$noteId'));
-    await tester.ensureVisible(noteCard);
-    await pumpFrames(tester);
-    await tester.tap(noteCard);
+    await _openNoteMenu(tester, noteId);
+    await tester.tap(_noteCard(noteId));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     await _closeCreator(tester);
 
-    final bullet = find.byKey(const ValueKey('wrong-note-card-0'));
-    await tester.ensureVisible(bullet);
-    await pumpFrames(tester);
-    await tester.tap(bullet);
+    await _openBulletMenu(tester, 0);
+    await tester.tap(_bulletCard(0));
     await pumpFrames(tester, frames: 24);
     expect(find.text('Replace the draft you started?'), findsOneWidget);
     await tester.tap(find.text('Replace'));

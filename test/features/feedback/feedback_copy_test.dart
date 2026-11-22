@@ -1,8 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/features/feedback/feedback_actions.dart';
 import 'package:question_practice/features/feedback/feedback_snapshot.dart';
 import 'package:question_practice/features/feedback/question_feedback_view.dart';
+import 'package:question_practice/features/feedback/wrong_notes_readonly.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -97,6 +99,47 @@ void main() {
       findsOneWidget,
     );
     expect(find.text(_fullInstructions), findsNothing);
+  });
+
+  testWidgets('practice feedback never exposes review row actions', (
+    tester,
+  ) async {
+    await _pumpFeedback(tester, _snapshot(mode: FeedbackMode.practice));
+
+    expect(find.byKey(const ValueKey('feedback-notes')), findsNothing);
+    expect(find.byKey(const ValueKey('wrong-notes-list')), findsNothing);
+    expect(find.byKey(const ValueKey('wrong-note-more-0')), findsNothing);
+    expect(find.text('Copy'), findsNothing);
+    expect(find.text('Create card'), findsNothing);
+    expect(find.text('Create card with AI'), findsNothing);
+    expect(find.byKey(const ValueKey('feedback-note-more-0')), findsNothing);
+    expect(find.byKey(const ValueKey('wrong-note-more-0')), findsNothing);
+  });
+
+  testWidgets('a busy bullet disables its AI card action', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await pumpTestApp(
+      tester,
+      home: Scaffold(
+        body: WrongNotesReadonly(
+          notes: const ['I confused the layers.'],
+          actions: FeedbackActions(onDefine: (_, _) {}, onOpenUrl: (_) {}),
+          onTurnBulletIntoCard: (_, _) {},
+          bulletBusy: true,
+        ),
+      ),
+      harness: harness,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('wrong-note-more-0')));
+    await pumpFrames(tester);
+    expect(find.text('Create card with AI'), findsOneWidget);
+    final row = find.ancestor(
+      of: find.byKey(const ValueKey('wrong-note-card-0')),
+      matching: find.byType(M3ETappable),
+    );
+    expect(tester.widget<M3ETappable>(row).enabled, isFalse);
   });
 
   testWidgets('practice feedback keeps instructions while answering', (

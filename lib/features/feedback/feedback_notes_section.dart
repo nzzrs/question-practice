@@ -3,8 +3,11 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
+import 'row_action_menu.dart';
 
-/// Notes saved for the reviewed question, with Copy and card actions.
+enum _NoteRowAction { copy, createCard, define, ask, delete }
+
+/// Notes saved for the reviewed question, each with a three-dot action menu.
 ///
 /// Lives inside the feedback selection area; its rows are plain selectable
 /// text plus ordinary buttons, never a nested SelectionArea.
@@ -12,15 +15,19 @@ class FeedbackNotesSection extends StatelessWidget {
   const FeedbackNotesSection({
     required this.notes,
     required this.onCopy,
-    required this.onCreateCard,
-    this.onOverflow,
+    this.onCreateCard,
+    this.onDefine,
+    this.onAsk,
+    this.onDelete,
     super.key,
   });
 
   final List<Note> notes;
   final ValueChanged<Note> onCopy;
-  final ValueChanged<Note> onCreateCard;
-  final ValueChanged<Note>? onOverflow;
+  final ValueChanged<Note>? onCreateCard;
+  final ValueChanged<Note>? onDefine;
+  final ValueChanged<Note>? onAsk;
+  final ValueChanged<Note>? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -36,77 +43,94 @@ class FeedbackNotesSection extends StatelessWidget {
           style: theme.typography.emphasized.titleSmall,
         ),
         const SizedBox(height: 8),
-        for (var index = 0; index < notes.length; index++)
+        for (final note in notes)
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: TonalBox(
-              key: ValueKey('feedback-note-${notes[index].id}'),
+              key: ValueKey('feedback-note-${note.id}'),
               color: theme.colorScheme.surfaceContainerLow,
               radius: 16,
-              padding: const EdgeInsets.all(14),
-              child: Column(
+              padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    '“${notes[index].text.trim()}”',
-                    style: theme.typography.baseline.bodyMedium.copyWith(
-                      height: 1.45,
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Text(
+                        '“${note.text.trim()}”',
+                        style: theme.typography.baseline.bodyMedium.copyWith(
+                          height: 1.45,
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  M3ETheme(
-                    data: theme.copyWith(
-                      chipTheme: theme.chipTheme.copyWith(height: 48),
-                    ),
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        M3EChip(
-                          key: ValueKey(
-                            'feedback-note-copy-${notes[index].id}',
-                          ),
-                          type: M3EChipType.assist,
-                          leading: const Icon(Icons.copy_all_outlined),
-                          label: 'Copy',
-                          onPressed: () => onCopy(notes[index]),
-                        ),
-                        M3EChip(
-                          key: ValueKey(
-                            'feedback-note-card-${notes[index].id}',
-                          ),
-                          type: M3EChipType.assist,
-                          leading: Icon(
-                            notes[index].hasCard
-                                ? Icons.check
-                                : Icons.auto_awesome_outlined,
-                          ),
-                          label: notes[index].hasCard
-                              ? 'Card created'
-                              : 'Create card with AI',
-                          onPressed: notes[index].hasCard
-                              ? null
-                              : () => onCreateCard(notes[index]),
-                        ),
-                        if (onOverflow != null)
-                          M3EIconButton(
-                            key: ValueKey(
-                              'feedback-note-more-${notes[index].id}',
-                            ),
-                            variant: M3EIconButtonVariant.standard,
-                            icon: const Icon(Icons.more_vert),
-                            tooltip: 'Note actions',
-                            onPressed: () => onOverflow!(notes[index]),
-                          ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(width: 4),
+                  _buildMenu(note),
                 ],
               ),
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildMenu(Note note) {
+    return RowActionMenu<_NoteRowAction>(
+      menuKey: ValueKey('feedback-note-more-${note.id}'),
+      tooltip: 'Note actions',
+      items: [
+        RowActionItem(
+          value: _NoteRowAction.copy,
+          label: 'Copy',
+          icon: Icons.copy_all_outlined,
+          key: ValueKey('feedback-note-copy-${note.id}'),
+        ),
+        if (onCreateCard != null)
+          RowActionItem(
+            value: _NoteRowAction.createCard,
+            label: note.hasCard ? 'Card created' : 'Create card',
+            icon: note.hasCard ? Icons.check : Icons.auto_awesome_outlined,
+            key: ValueKey('feedback-note-card-${note.id}'),
+            enabled: !note.hasCard,
+          ),
+        if (onDefine != null)
+          RowActionItem(
+            value: _NoteRowAction.define,
+            label: 'Define',
+            icon: Icons.menu_book_outlined,
+            key: ValueKey('feedback-note-define-${note.id}'),
+          ),
+        if (onAsk != null)
+          RowActionItem(
+            value: _NoteRowAction.ask,
+            label: 'Ask',
+            icon: Icons.question_answer_outlined,
+            key: ValueKey('feedback-note-ask-${note.id}'),
+          ),
+        if (onDelete != null)
+          RowActionItem(
+            value: _NoteRowAction.delete,
+            label: 'Delete',
+            icon: Icons.delete_outline,
+            key: ValueKey('feedback-note-delete-${note.id}'),
+            destructive: true,
+          ),
+      ],
+      onSelected: (action) {
+        switch (action) {
+          case _NoteRowAction.copy:
+            onCopy(note);
+          case _NoteRowAction.createCard:
+            onCreateCard?.call(note);
+          case _NoteRowAction.define:
+            onDefine?.call(note);
+          case _NoteRowAction.ask:
+            onAsk?.call(note);
+          case _NoteRowAction.delete:
+            onDelete?.call(note);
+        }
+      },
     );
   }
 }

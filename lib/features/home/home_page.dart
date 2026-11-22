@@ -395,6 +395,15 @@ class _QuickTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final largeText = _usesLargeText(context);
+    final valueText = Text(
+      value,
+      style: theme.typography.emphasized.headlineMedium.copyWith(
+        color: tone == PillTone.error
+            ? theme.colorScheme.error
+            : theme.colorScheme.primary,
+        height: 1,
+      ),
+    );
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(26),
@@ -420,23 +429,31 @@ class _QuickTile extends StatelessWidget {
               const SizedBox(height: 14),
               // The count and its status pill stack when large text leaves the
               // row too narrow, instead of forcing the pill past the card edge.
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    value,
-                    style: theme.typography.emphasized.headlineMedium.copyWith(
-                      color: tone == PillTone.error
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.primary,
-                      height: 1,
-                    ),
-                  ),
-                  if (badge != null) Pill(badge!, tone: PillTone.error),
-                ],
-              ),
+              // At the default scale the original bottom-aligned row stays.
+              if (largeText)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    valueText,
+                    if (badge != null) Pill(badge!, tone: PillTone.error),
+                  ],
+                )
+              else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    valueText,
+                    if (badge != null) ...[
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Pill(badge!, tone: PillTone.error),
+                      ),
+                    ],
+                  ],
+                ),
               const SizedBox(height: 3),
               Text(title, style: theme.typography.baseline.titleSmall),
               const SizedBox(height: 2),

@@ -16,6 +16,8 @@ import '../../helpers/test_harness.dart';
 const _narrowPortrait = Size(320, 640);
 const _widePortrait = Size(360, 800);
 const _landscape = Size(640, 360);
+const _shortLandscape = Size(640, 320);
+const _wideRow = Size(420, 800);
 
 Future<void> _loadTestFont() async {
   final bytes = await File('test/fixtures/Roboto-Regular.ttf').readAsBytes();
@@ -103,6 +105,9 @@ void _expectTextScale(WidgetTester tester, Finder text, double expected) {
   final scaler = MediaQuery.textScalerOf(tester.element(text));
   expect(scaler.scale(16), closeTo(expected, 0.01));
 }
+
+M3EAppBarVariant _appBarVariant(WidgetTester tester) =>
+    tester.widget<M3EAppBar>(find.byType(M3EAppBar)).variant;
 
 void _expectReadable(WidgetTester tester, String label) {
   final text = find.text(label);
@@ -224,7 +229,42 @@ void main() {
       textScale: 1.3,
     );
 
+    expect(_appBarVariant(tester), M3EAppBarVariant.small);
+    expect(find.text('1 session paused'), findsOneWidget);
     expect(find.text('Session in progress'), findsOneWidget);
+    _expectNoLayoutErrors(tester);
+  });
+
+  testWidgets('home fits 320x640 at 2x text with a paused session', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Google Professional Cloud Architect',
+      practiceName: 'A very long practice name for a narrow phone',
+      count: 3,
+    );
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    await service.startPractice(seeded.practiceId);
+
+    await _pumpHome(tester, harness: harness, size: _narrowPortrait);
+
+    expect(_appBarVariant(tester), M3EAppBarVariant.small);
+    expect(find.text('1 session paused'), findsOneWidget);
+    expect(find.text('Session in progress'), findsOneWidget);
+    expect(find.text('Resume'), findsOneWidget);
+    _expectTextScale(tester, find.text('Session in progress'), 32);
+    _expectNoLayoutErrors(tester);
+
+    await _scrollTo(tester, find.text('Google Professional Cloud Architect'));
+    _expectReadable(tester, 'Google Professional Cloud Architect');
+    expect(find.text('1 practice · 3 questions'), findsOneWidget);
     _expectNoLayoutErrors(tester);
   });
 
@@ -261,6 +301,95 @@ void main() {
 
     await _scrollTo(tester, find.text('Google Professional Cloud Architect'));
     _expectReadable(tester, 'Google Professional Cloud Architect');
+    _expectNoLayoutErrors(tester);
+  });
+
+  testWidgets('home fits 640x320 landscape at 2x text', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Google Professional Cloud Architect',
+      practiceName: 'A very long practice name for a narrow phone',
+      count: 3,
+    );
+    await _seedPendingError(harness, seeded);
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    await service.startPractice(seeded.practiceId);
+
+    await _pumpHome(tester, harness: harness, size: _shortLandscape);
+
+    expect(_appBarVariant(tester), M3EAppBarVariant.small);
+    expect(find.text('1 session paused'), findsOneWidget);
+    _expectNoLayoutErrors(tester);
+
+    await _scrollTo(tester, find.text('1 pending'));
+    expect(find.text('1 pending'), findsOneWidget);
+    _expectNoLayoutErrors(tester);
+
+    await _scrollTo(tester, find.text('Google Professional Cloud Architect'));
+    _expectReadable(tester, 'Google Professional Cloud Architect');
+    expect(find.text('1 practice · 3 questions'), findsOneWidget);
+    _expectNoLayoutErrors(tester);
+  });
+
+  testWidgets('home keeps its 1x header and side-by-side quick actions', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Google Professional Cloud Architect',
+      count: 3,
+    );
+    await _seedPendingError(harness, seeded);
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    await service.startPractice(seeded.practiceId);
+
+    await _pumpHome(tester, harness: harness, size: _wideRow, textScale: 1);
+
+    expect(_appBarVariant(tester), M3EAppBarVariant.largeFlexible);
+    expect(find.text('1 session paused'), findsOneWidget);
+    expect(find.text('1 pending'), findsOneWidget);
+    final errorsY = tester.getTopLeft(find.text('Review past errors')).dy;
+    final cardsY = tester.getTopLeft(find.text('Cards')).dy;
+    expect(cardsY, closeTo(errorsY, 0.01));
+    _expectNoLayoutErrors(tester);
+  });
+
+  testWidgets('home stacks quick actions at large text', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Google Professional Cloud Architect',
+      count: 3,
+    );
+    await _seedPendingError(harness, seeded);
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    await service.startPractice(seeded.practiceId);
+
+    await _pumpHome(tester, harness: harness, size: _wideRow);
+
+    expect(_appBarVariant(tester), M3EAppBarVariant.small);
+    expect(find.text('1 session paused'), findsOneWidget);
+    expect(find.text('1 pending'), findsOneWidget);
+    final errorsY = tester.getTopLeft(find.text('Review past errors')).dy;
+    final cardsY = tester.getTopLeft(find.text('Cards')).dy;
+    expect(cardsY, greaterThan(errorsY));
     _expectNoLayoutErrors(tester);
   });
 }

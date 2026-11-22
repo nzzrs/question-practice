@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/core/ui/app_scaffold.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/review/note_review_page.dart';
 import 'package:question_practice/features/review/note_review_view.dart';
@@ -352,6 +353,92 @@ void main() {
     );
   });
 
+  testWidgets('the create FAB is a real floating action, not a bottom-bar '
+      'child', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final notes = await seedTwoNotes(tester, harness);
+
+    tester.view.physicalSize = const Size(360, 720);
+    await pumpTestApp(
+      tester,
+      home: NoteReviewPage(notes: notes),
+      harness: harness,
+    );
+
+    final fab = find.byKey(ReviewCreateFab.fabKey);
+    final slot = find.byKey(ReviewCreateFab.slotKey);
+    final dock = find.byType(ReviewActionDock);
+    final scaffold = tester.widget<Scaffold>(
+      find.byKey(const ValueKey('app-focus-page')),
+    );
+
+    expect(find.byType(ReviewCreateFab), findsOneWidget);
+    expect(scaffold.floatingActionButton, isA<ReviewCreateFab>());
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('app-dock-visible')),
+        matching: fab,
+      ),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(of: fab, matching: find.byType(AppActionDock)),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(of: fab, matching: find.byType(ReviewActionDock)),
+      findsNothing,
+    );
+    final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+    expect(tester.getSize(fab).width, lessThan(100));
+    expect(tester.getSize(slot).width, lessThan(100));
+    expect(tester.getSize(slot).width, lessThan(screen.width / 2));
+    expect(tester.getRect(fab).overlaps(tester.getRect(dock)), isFalse);
+  });
+
+  testWidgets('the create FAB sits at endFloat above the dock, icon only and '
+      'spoken', (tester) async {
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final notes = await seedTwoNotes(tester, harness);
+
+    await pumpTestApp(
+      tester,
+      home: NoteReviewPage(notes: notes),
+      harness: harness,
+    );
+
+    final fab = find.byKey(ReviewCreateFab.fabKey);
+    final dock = find.byType(ReviewActionDock);
+    final scaffold = tester.widget<Scaffold>(
+      find.byKey(const ValueKey('app-focus-page')),
+    );
+    final fabRect = tester.getRect(fab);
+    final dockRect = tester.getRect(dock);
+    final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+
+    expect(
+      scaffold.floatingActionButtonLocation,
+      FloatingActionButtonLocation.endFloat,
+    );
+    expect(fabRect.bottom, lessThanOrEqualTo(dockRect.top));
+    expect(dockRect.top - fabRect.bottom, closeTo(16, 0.5));
+    expect(screen.width - fabRect.right, closeTo(16, 0.5));
+    expect(fabRect.right, greaterThan(screen.width / 2));
+    expect(find.descendant(of: fab, matching: find.byType(Text)), findsNothing);
+    expect(
+      tester.getSemantics(find.bySemanticsLabel('Create cards')),
+      isSemantics(label: 'Create cards', isButton: true, hasTapAction: true),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('the create FAB fits every review layout without overlapping', (
     tester,
   ) async {
@@ -416,6 +503,7 @@ void main() {
     tester.platformDispatcher.textScaleFactorTestValue = 2;
     addTearDown(tester.view.reset);
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    addTearDown(() => M3ESnackbar.defaultController.dismiss(immediate: true));
     final harness = TestHarness();
     addTearDown(harness.close);
     final start = await startSession(harness);
@@ -444,17 +532,73 @@ void main() {
       harness: harness,
     );
 
+    final fab = find.byKey(ReviewCreateFab.fabKey);
+    final slot = find.byKey(ReviewCreateFab.slotKey);
+    final dock = find.byType(ReviewActionDock);
+    final fabBefore = tester.getRect(fab);
+    final slotBefore = tester.getSize(slot);
+    final dockBefore = tester.getRect(dock);
+
     await tester.tap(find.byKey(ReviewActionDock.saveKey));
     await pumpFrames(tester);
     expect(find.text('Write a definition before saving.'), findsOneWidget);
 
     final snack = find.byType(M3ESnackbar);
     expect(snack, findsOneWidget);
-    final fabRect = tester.getRect(
-      find.byKey(const ValueKey('review-create-fab')),
-    );
+    final fabRect = tester.getRect(fab);
     final snackRect = tester.getRect(snack);
     expect(fabRect.overlaps(snackRect), isFalse);
+    expect(fabRect.top, lessThan(fabBefore.top));
+    expect(tester.getSize(slot).width, slotBefore.width);
+    expect(tester.getSize(slot).width, lessThan(100));
+    expect(tester.getRect(dock), dockBefore);
+    expect(
+      find.ancestor(of: fab, matching: find.byType(AppActionDock)),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('a long snackbar never covers the create FAB or expands its '
+      'surface', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    addTearDown(() => M3ESnackbar.defaultController.dismiss(immediate: true));
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final notes = await seedTwoNotes(tester, harness);
+
+    await pumpTestApp(
+      tester,
+      home: NoteReviewPage(notes: notes),
+      harness: harness,
+    );
+
+    final fab = find.byKey(ReviewCreateFab.fabKey);
+    final slot = find.byKey(ReviewCreateFab.slotKey);
+    final dock = find.byType(ReviewActionDock);
+    final fabBefore = tester.getRect(fab);
+    final slotBefore = tester.getSize(slot);
+    final dockBefore = tester.getRect(dock);
+
+    M3ESnackbar.show(
+      tester.element(fab),
+      message:
+          'This deliberately long validation message wraps over several lines '
+          'at the smallest supported width and must never cover the create '
+          'cards action or grow a surface behind it.',
+    );
+    await pumpFrames(tester);
+
+    final snack = find.byType(M3ESnackbar);
+    expect(snack, findsOneWidget);
+    final fabAfter = tester.getRect(fab);
+    expect(fabAfter.overlaps(tester.getRect(snack)), isFalse);
+    expect(fabAfter.top, lessThan(fabBefore.top));
+    expect(tester.getSize(slot).width, slotBefore.width);
+    expect(tester.getSize(slot).width, lessThan(100));
+    expect(tester.getRect(dock), dockBefore);
     expect(tester.takeException(), isNull);
   });
 }

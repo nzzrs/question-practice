@@ -54,21 +54,18 @@ class ReviewShell extends StatelessWidget {
       scrollController: scrollController,
       variant: M3EAppBarVariant.small,
       body: body,
-      bottomBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ReviewCreateFab(onPressed: busy ? null : onCreateCards),
-          ReviewActionDock(
-            busy: busy,
-            saveLabel: saveLabel,
-            onSave: onSave,
-            onBack: onBack,
-            onNext: onNext,
-            canGoBack: canGoBack,
-            canGoNext: canGoNext,
-          ),
-        ],
+      floatingActionButton: ReviewCreateFab(
+        onPressed: busy ? null : onCreateCards,
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+      bottomBar: ReviewActionDock(
+        busy: busy,
+        saveLabel: saveLabel,
+        onSave: onSave,
+        onBack: onBack,
+        onNext: onNext,
+        canGoBack: canGoBack,
+        canGoNext: canGoNext,
       ),
       children: children,
     );
@@ -77,62 +74,50 @@ class ReviewShell extends StatelessWidget {
 
 /// The one create-cards action on every review surface.
 ///
-/// It floats above the dock, is icon-only with a tooltip and semantics, and
-/// steps up while a snackbar is showing so validation feedback never covers
-/// it. The bottom bar is hidden with the keyboard, so it can never overlap the
-/// soft keyboard either.
-class ReviewCreateFab extends StatefulWidget {
+/// It sits in [AppPage]'s floating action slot, so the framework places it at
+/// the end of the screen above the dock without any full-width bottom-bar
+/// surface behind it. It is icon-only with a tooltip and semantics.
+///
+/// The M3E snackbar is an overlay that the scaffold cannot measure, so the
+/// button steps up while a snackbar is visible; only the button moves, never a
+/// background. The whole page hides the dock and this button with the
+/// keyboard, so it can never overlap the soft keyboard either.
+class ReviewCreateFab extends StatelessWidget {
   const ReviewCreateFab({required this.onPressed, super.key});
 
   final VoidCallback? onPressed;
 
   static const fabKey = ValueKey<String>('review-create-fab');
-
-  @override
-  State<ReviewCreateFab> createState() => _ReviewCreateFabState();
-}
-
-class _ReviewCreateFabState extends State<ReviewCreateFab> {
-  bool _snackbarShowing = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _snackbarShowing = M3ESnackbar.defaultController.isShowing;
-    M3ESnackbar.defaultController.addListener(_onSnackbarChanged);
-  }
-
-  @override
-  void dispose() {
-    M3ESnackbar.defaultController.removeListener(_onSnackbarChanged);
-    super.dispose();
-  }
-
-  void _onSnackbarChanged() {
-    final showing = M3ESnackbar.defaultController.isShowing;
-    if (showing == _snackbarShowing) return;
-    setState(() => _snackbarShowing = showing);
-  }
+  static const slotKey = ValueKey<String>('review-create-fab-slot');
 
   @override
   Widget build(BuildContext context) {
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final lift = _snackbarShowing ? 24 + 48 * textScale : 0.0;
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(end: lift),
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
-      builder: (context, value, child) => Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(16, 4, 16, 8 + value),
-        child: Align(alignment: AlignmentDirectional.centerEnd, child: child),
-      ),
+    return AnimatedBuilder(
+      animation: M3ESnackbar.defaultController,
+      builder: (context, child) {
+        final textScale = MediaQuery.textScalerOf(context).scale(1);
+        final lift = M3ESnackbar.defaultController.isShowing
+            ? 24 + 48 * textScale
+            : 0.0;
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: lift),
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          builder: (context, value, child) => Padding(
+            key: slotKey,
+            padding: EdgeInsets.only(bottom: value),
+            child: child,
+          ),
+          child: child,
+        );
+      },
       child: M3EFab(
-        key: ReviewCreateFab.fabKey,
+        key: fabKey,
         icon: const Icon(Icons.add_card),
         size: M3EFabSize.regular,
         color: M3EFabColor.secondary,
         tooltip: 'Create cards',
-        onPressed: widget.onPressed,
+        onPressed: onPressed,
       ),
     );
   }

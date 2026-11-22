@@ -11,6 +11,7 @@ import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/errors/error_cards_review_page.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/review/domain/review_service.dart';
+import 'package:question_practice/features/review/review_action_dock.dart';
 import 'package:question_practice/features/review/review_shell.dart';
 import 'package:question_practice/features/feedback/question_feedback_view.dart';
 
@@ -1117,6 +1118,15 @@ void main() {
       expect(tester.takeException(), isNull);
       expect(find.byType(CardCreatorPane), findsNothing);
       expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
+      final fab = find.byKey(ReviewCreateFab.fabKey);
+      expect(fab, findsOneWidget);
+      final fabRect = tester.getRect(fab);
+      final dockRect = tester.getRect(find.byType(ReviewActionDock));
+      expect(tester.getSize(fab).width, lessThan(100));
+      expect(fabRect.left, greaterThanOrEqualTo(0));
+      expect(fabRect.right, lessThanOrEqualTo(config.size.width));
+      expect(fabRect.top, greaterThanOrEqualTo(0));
+      expect(fabRect.overlaps(dockRect), isFalse);
       await _openCreator(tester);
       expect(tester.takeException(), isNull);
       expect(find.byType(CardCreatorSheet), findsOneWidget);

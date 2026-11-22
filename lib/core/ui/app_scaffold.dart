@@ -135,11 +135,14 @@ class AppPage extends StatelessWidget {
                         )
                       : content,
                 ),
-                if (dock != null) dock,
               ],
             ),
           ),
-          floatingActionButton: floatingActionButton,
+          // The dock owns the scaffold's bottom slot so the floating action
+          // button is placed above it by the framework instead of sharing a
+          // full-width bottom bar.
+          bottomNavigationBar: dock,
+          floatingActionButton: keyboardOpen ? null : floatingActionButton,
           floatingActionButtonLocation: floatingActionButtonLocation,
         ),
       );

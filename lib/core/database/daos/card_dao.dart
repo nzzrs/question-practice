@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
+import '../../data/error_card_undo.dart';
 import '../app_database.dart';
 import '../id_batches.dart';
 import '../tables.dart';
@@ -269,6 +270,28 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
       ErrorCardsCompanion(
         status: const Value('resolved'),
         resolvedAt: Value(resolvedAt),
+      ),
+    );
+  }
+
+  /// Writes back the session-owned fields recorded before a practice session
+  /// first changed the card.
+  ///
+  /// A card deleted after the snapshot is skipped, so discarding never fails
+  /// only because the learner removed the card in the meantime.
+  Future<void> restoreErrorCardUndo(ErrorCardUndoSnapshot snapshot) {
+    return (update(
+      errorCards,
+    )..where((e) => e.id.equals(snapshot.cardId))).write(
+      ErrorCardsCompanion(
+        wrongIndexesJson: Value(jsonEncode(snapshot.wrongIndexes)),
+        reasoning: Value(snapshot.reasoning),
+        lastWrongAt: Value(snapshot.lastWrongAt),
+        dueAt: Value(snapshot.dueAt),
+        distracted: Value(snapshot.distracted),
+        exportedAt: Value(snapshot.exportedAt),
+        status: Value(snapshot.status.name),
+        resolvedAt: Value(snapshot.resolvedAt),
       ),
     );
   }

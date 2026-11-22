@@ -565,7 +565,12 @@ class _SessionPageState extends ConsumerState<SessionPage>
     );
     if (choice == null || !mounted) return;
     if (choice == _ExitChoice.discard) {
-      await ref.read(sessionServiceProvider).discard(_start.session.id);
+      try {
+        await ref.read(sessionServiceProvider).discard(_start.session.id);
+      } on SessionException catch (error) {
+        if (mounted) await showSnack(context, error.message);
+        return;
+      }
     }
     if (mounted) Navigator.of(context).pop();
   }

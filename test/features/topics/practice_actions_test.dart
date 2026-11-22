@@ -541,4 +541,88 @@ void main() {
     expect(find.textContaining('even'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('the split dialog fits 320 dp at 2x text', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await pumpTestApp(
+      tester,
+      home: const _SplitDialogHost(practiceName: 'TCP/IP', questionCount: 6),
+      harness: harness,
+    );
+    await pumpFrames(tester);
+
+    expect(find.text('Split practice?'), findsOneWidget);
+    expect(find.text('2 practices with 3 + 3 questions.'), findsOneWidget);
+    expect(find.text('Split').hitTestable(), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('split-parts-add')));
+    await pumpFrames(tester);
+    expect(
+      find.byKey(const ValueKey('split-parts-add')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('the split dialog fits a landscape window', (tester) async {
+    tester.view.physicalSize = const Size(640, 360);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await pumpTestApp(
+      tester,
+      home: const _SplitDialogHost(practiceName: 'TCP/IP', questionCount: 6),
+      harness: harness,
+    );
+    await pumpFrames(tester);
+
+    expect(find.text('Split practice?'), findsOneWidget);
+    expect(find.text('2 practices with 3 + 3 questions.'), findsOneWidget);
+    expect(find.text('Split').hitTestable(), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const ValueKey('split-parts-add')));
+    await pumpFrames(tester);
+    expect(
+      find.byKey(const ValueKey('split-parts-add')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+}
+
+class _SplitDialogHost extends StatefulWidget {
+  const _SplitDialogHost({
+    required this.practiceName,
+    required this.questionCount,
+  });
+
+  final String practiceName;
+  final int questionCount;
+
+  @override
+  State<_SplitDialogHost> createState() => _SplitDialogHostState();
+}
+
+class _SplitDialogHostState extends State<_SplitDialogHost> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showSplitPracticeDialog(
+        context,
+        practiceName: widget.practiceName,
+        questionCount: widget.questionCount,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }

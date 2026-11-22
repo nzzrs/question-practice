@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:question_practice/core/data/practice_repository.dart';
+import 'package:question_practice/features/practice/domain/session_service.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -250,4 +251,78 @@ void main() {
       hasLength(27),
     );
   });
+
+  test('split names keep the 120 character cap', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final longName = List.filled(120, 'N').join();
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: longName,
+      count: 4,
+    );
+
+    final result = await harness.practices.splitPractice(
+      seeded.practiceId,
+      random: Random(2),
+    );
+
+    expect(result.parts.map((practice) => practice.name.length), [120, 120]);
+    expect(result.parts[0].name, endsWith(' Slice A'));
+    expect(result.parts[1].name, endsWith(' Slice B'));
+  });
+
+  test(
+    'splitting removes the original sessions, answers and error cards',
+    () async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await harness.seedPractice(
+        topicName: 'Networking',
+        practiceName: 'TCP/IP',
+        count: 4,
+      );
+      final service = SessionService(
+        practices: harness.practices,
+        sessions: harness.sessions,
+        cards: harness.cards,
+        clock: harness.clock,
+      );
+      final start = await service.startPractice(seeded.practiceId);
+      await service.submitAnswer(
+        start: start,
+        item: start.items.first,
+        selectedIndexes: const [1],
+        reasoning: '',
+        distracted: false,
+      );
+      expect(
+        await harness.database.select(harness.database.errorCards).get(),
+        hasLength(1),
+      );
+
+      await harness.practices.splitPractice(
+        seeded.practiceId,
+        parts: 2,
+        random: Random(4),
+      );
+
+      expect(
+        await harness.database.select(harness.database.sessions).get(),
+        isEmpty,
+      );
+      expect(
+        await harness.database.select(harness.database.sessionQuestions).get(),
+        isEmpty,
+      );
+      expect(
+        await harness.database.select(harness.database.attempts).get(),
+        isEmpty,
+      );
+      expect(
+        await harness.database.select(harness.database.errorCards).get(),
+        isEmpty,
+      );
+    },
+  );
 }

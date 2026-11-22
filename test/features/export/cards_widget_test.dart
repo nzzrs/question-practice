@@ -680,7 +680,8 @@ void main() {
     await tester.longPress(row);
     await pumpFrames(tester);
 
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
     expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
@@ -698,7 +699,8 @@ void main() {
     await tester.longPress(row);
     await pumpFrames(tester);
 
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
     expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
@@ -716,7 +718,8 @@ void main() {
     await tester.longPress(row);
     await pumpFrames(tester);
 
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
     expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
@@ -734,7 +737,8 @@ void main() {
     await tester.longPress(row);
     await pumpFrames(tester);
 
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
     expect(find.text('1 selected · review to export'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
   });
@@ -752,7 +756,8 @@ void main() {
     await tester.longPress(row);
     await pumpFrames(tester);
 
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
     expect(find.text('1 selected'), findsOneWidget);
     expect(find.byType(M3ECheckbox), findsNothing);
     expect(find.text('Review the note'), findsNothing);
@@ -822,6 +827,9 @@ void main() {
   testWidgets('multi-selection deletes notes and keeps their cards', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);

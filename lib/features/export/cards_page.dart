@@ -46,18 +46,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _selectedSkipped.isNotEmpty ||
       _selectedNotes.isNotEmpty;
 
-  void _clearSelection() {
-    setState(() {
-      _selectionActive = false;
-      _selectedConcepts.clear();
-      _selectedErrors.clear();
-      _selectedBasic.clear();
-      _selectedSkipped.clear();
-      _selectedNotes.clear();
-    });
-    _persistSelection();
-  }
-
   /// Long-press: enter selection mode with the pressed row selected.
   void _startSelection(Set<int> selection, int id) {
     setState(() {
@@ -498,41 +486,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           ? M3EAppBarVariant.small
           : M3EAppBarVariant.largeFlexible,
       actions: [
-        if (_selectionActive)
-          M3EIconButton(
-            key: const ValueKey('clear-selection'),
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.close),
-            tooltip: 'Clear selection',
-            onPressed: _clearSelection,
-          ),
-        if (globalPendingCount > 0)
-          M3EIconButton(
-            key: const ValueKey('review-all-pending'),
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.playlist_add_check_circle_outlined),
-            tooltip: 'Review all pending',
-            semanticLabel: 'Review all pending cards',
-            onPressed: () => _reviewCards(allPendingErrors, skipped),
-          ),
-        if (!largeText)
-          M3EIconButton(
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.info_outline),
-            tooltip: 'How cards are exported',
-            onPressed: _showInfo,
-          ),
         M3EIconButton(
-          key: const ValueKey('select-all'),
+          key: const ValueKey('cards-info'),
           variant: M3EIconButtonVariant.standard,
-          icon: Icon(allVisibleSelected ? Icons.deselect : Icons.select_all),
-          tooltip: allVisibleSelected ? 'Deselect all' : 'Select all',
-          semanticLabel: allVisibleSelected
-              ? 'Deselect all visible items'
-              : 'Select all visible items',
-          onPressed: visibleEntryCount == 0
-              ? null
-              : () => _toggleVisibleSelection(visibleGroups),
+          icon: const Icon(Icons.help_outline),
+          tooltip: 'What exports to Anki',
+          semanticLabel: 'What exports to Anki',
+          onPressed: _showInfo,
         ),
       ],
       bottomBar: AppActionDock(
@@ -569,7 +529,39 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           onFilter: (value) => setState(() => _filter = value),
           onShowExported: () => setState(() => _showExported = !_showExported),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 4),
+        _ActionRow(
+          children: [
+            if (globalPendingCount > 0)
+              M3EButton.icon(
+                key: const ValueKey('review-all-pending'),
+                style: M3EButtonStyle.text,
+                icon: const Icon(Icons.playlist_add_check_circle_outlined),
+                label: const Text('Review all pending'),
+                tooltip: 'Review all pending cards',
+                semanticLabel: 'Review all pending cards',
+                onPressed: () => _reviewCards(allPendingErrors, skipped),
+              ),
+            M3EButton.icon(
+              key: const ValueKey('select-all'),
+              style: M3EButtonStyle.text,
+              icon: Icon(
+                allVisibleSelected ? Icons.deselect : Icons.select_all,
+              ),
+              label: Text(allVisibleSelected ? 'Deselect all' : 'Select all'),
+              tooltip: allVisibleSelected
+                  ? 'Deselect all visible items'
+                  : 'Select all visible items',
+              semanticLabel: allVisibleSelected
+                  ? 'Deselect all visible items'
+                  : 'Select all visible items',
+              onPressed: visibleEntryCount == 0
+                  ? null
+                  : () => _toggleVisibleSelection(visibleGroups),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
         if (largeText) ...[
           Text(
             subtitle,
@@ -802,20 +794,48 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       context,
       dialog: M3EDialog(
         title: 'What goes to Anki',
-        content: const Text(
-          'Concepts become Anki Cloze cards. Facts, heuristics and contrasts '
-          'become Anki Basic cards with a front and a back. '
-          'Cards carry question-practice, topic::<topic> and '
-          'subtopic::<subtopic> tags. '
-          'Tags travel in the third column. Map it to Tags when importing. '
-          'Topic and subtopic are never written inside card text. '
-          'Errors are not exported directly: Create cards turns them into '
-          'atomic cards, by hand or with optional AI suggestions. Skipped '
-          'questions stay in Cards until you create cards from them. '
-          'Notes are never sent to AnkiDroid; use the download action in the '
-          'Notes header to save them as plain text. '
-          'Each topic uses its own deck; topics without one use the default '
-          'deck from Settings.',
+        content: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _InfoRow(
+              key: ValueKey('cards-info-cloze'),
+              icon: Icons.style_outlined,
+              title: 'Cloze cards',
+              detail: 'Concepts. The term becomes a fill-in-the-blank.',
+            ),
+            _InfoRow(
+              key: ValueKey('cards-info-basic'),
+              icon: Icons.quiz_outlined,
+              title: 'Basic cards',
+              detail: 'Facts, heuristics and contrasts. Each has a front and a back.',
+            ),
+            _InfoRow(
+              key: ValueKey('cards-info-tags'),
+              icon: Icons.sell_outlined,
+              title: 'Tags',
+              detail:
+                  'Topic and subtopic are added as tags, never inside the card. '
+                  'Import them as Tags in AnkiDroid.',
+            ),
+            _InfoRow(
+              key: ValueKey('cards-info-decks'),
+              icon: Icons.layers_outlined,
+              title: 'Decks',
+              detail:
+                  'A topic can use its own deck. Others use the default deck '
+                  'from Settings.',
+            ),
+            _InfoRow(
+              key: ValueKey('cards-info-stays'),
+              icon: Icons.block_outlined,
+              title: 'Stays in Question Practice',
+              detail:
+                  'Errors and skipped questions export only after you create '
+                  'cards from them. Notes are never sent; download them as '
+                  'text.',
+            ),
+          ],
         ),
         actions: [
           M3EButton.filled(
@@ -1016,7 +1036,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   Future<void> _previewConcept(Concept concept) {
     return _previewDialog('Concept preview', [
       _previewMeta([
-        const Pill('Concept', tone: PillTone.primary),
         Pill(concept.topicName),
         if (concept.subtopic.trim().isNotEmpty)
           Pill('subtopic: ${concept.subtopic.trim()}'),
@@ -1024,7 +1043,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           'deck: ${_deckForTopic(concept.topicName)}',
           tone: PillTone.primary,
         ),
-        Pill(concept.source.name),
       ]),
       const SizedBox(height: 14),
       TonalBox(
@@ -1055,10 +1073,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         _PreviewNote(label: 'Stands for', text: concept.extra),
       ],
       const SizedBox(height: 10),
-      _PreviewNote(
-        label: 'Anki note',
-        text: 'Cloze card · ${concept.source.name}',
-      ),
+      const _PreviewNote(label: 'Anki note', text: 'Cloze card'),
     ], onComplete: concept.isExportable ? null : () => _editConcept(concept));
   }
 
@@ -1150,11 +1165,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final theme = M3ETheme.of(context);
     return _previewDialog('Note preview', [
       _previewMeta([
-        const Pill('Note', tone: PillTone.primary),
         if (note.topicName.trim().isNotEmpty) Pill(note.topicName),
         if (note.subtopic.trim().isNotEmpty)
           Pill('subtopic: ${note.subtopic.trim()}'),
-        if (note.practiceName.trim().isNotEmpty) Pill(note.practiceName),
         if (note.isKept) const Pill('Kept', tone: PillTone.success),
         if (note.hasCard) const Pill('Card made', tone: PillTone.success),
       ]),
@@ -1408,6 +1421,94 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
+/// Page-level card actions, directly under the filters and aligned right.
+///
+/// The row stays short. When labels grow with the text scale, the content
+/// scrolls horizontally and starts at the right edge, so the last action is
+/// never clipped by an overflow.
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          key: const ValueKey('cards-action-row'),
+          scrollDirection: Axis.horizontal,
+          reverse: true,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minWidth: constraints.maxWidth),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                for (var index = 0; index < children.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 4),
+                  children[index],
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExcludeSemantics(
+            child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.typography.baseline.titleSmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionSelectAll extends StatelessWidget {
   const _SectionSelectAll({
     required this.label,
@@ -1422,7 +1523,7 @@ class _SectionSelectAll extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final action = allSelected ? 'Clear' : 'Select all';
+    final action = allSelected ? 'Deselect all' : 'Select all';
     return M3EIconButton(
       variant: M3EIconButtonVariant.standard,
       icon: Icon(allSelected ? Icons.deselect : Icons.select_all),

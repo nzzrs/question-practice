@@ -57,11 +57,6 @@ class CardRepository {
     return rows.map(conceptFromRow).toList();
   }
 
-  Future<List<Concept>> conceptsMissingDefinition(int sessionId) async {
-    final rows = await _db.cardDao.conceptsMissingDefinition(sessionId);
-    return rows.map(conceptFromRow).toList();
-  }
-
   Future<ErrorCard?> activeErrorForQuestion(int questionId) async {
     final row = await _db.cardDao.activeErrorCardForQuestion(questionId);
     return row == null ? null : errorCardFromRow(row);
@@ -120,10 +115,6 @@ class CardRepository {
 
   Future<void> updateConceptDefinition(int id, String definition) {
     return _db.cardDao.updateConceptDefinition(id, definition);
-  }
-
-  Future<void> updateConceptExtra(int id, String extra) {
-    return _db.cardDao.updateConceptExtra(id, extra);
   }
 
   Future<int> createErrorCard({
@@ -190,34 +181,8 @@ class CardRepository {
     return _db.cardDao.completeErrorCardDetails(id, completedAt);
   }
 
-  Future<void> updateErrorCardContent({
-    required int id,
-    required String question,
-    required List<String> alternatives,
-    required String explanation,
-    required List<String> alternativeExplanations,
-  }) {
-    return _db.cardDao.updateErrorCardContent(
-      id,
-      question: question,
-      alternatives: alternatives,
-      explanation: explanation,
-      alternativeExplanations: alternativeExplanations,
-    );
-  }
-
   Future<void> updateErrorCardReasoning(int id, String reasoning) {
     return _db.cardDao.updateErrorCardReasoning(id, reasoning);
-  }
-
-  Future<void> updateErrorCardMistakeKinds(
-    int id,
-    List<MistakeKind> mistakeKinds,
-  ) {
-    return _db.cardDao.updateErrorCardMistakeKinds(
-      id,
-      mistakeKindsToJson(mistakeKinds),
-    );
   }
 
   Future<void> setErrorCardDistracted(int id, bool distracted) {

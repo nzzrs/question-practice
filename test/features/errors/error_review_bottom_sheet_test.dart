@@ -8,10 +8,10 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/providers.dart';
 import 'package:question_practice/core/domain/models.dart';
-import 'package:question_practice/core/ui/adaptive_split_view.dart';
 import 'package:question_practice/features/errors/error_cards_review_page.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/review/domain/review_service.dart';
+import 'package:question_practice/features/review/review_shell.dart';
 import 'package:question_practice/features/feedback/question_feedback_view.dart';
 
 import '../../helpers/test_harness.dart';
@@ -213,7 +213,7 @@ void main() {
       harness: harness,
     );
 
-    expect(find.byType(AdaptiveSplitView), findsNothing);
+    expect(find.byType(ReviewShell), findsOneWidget);
     expect(find.byType(CardCreatorPane), findsNothing);
     expect(find.byType(CardCreatorSheet), findsNothing);
     expect(find.byType(QuestionFeedbackView), findsOneWidget);
@@ -756,7 +756,7 @@ void main() {
       harness: harness,
     );
 
-    expect(find.byType(AdaptiveSplitView), findsNothing);
+    expect(find.byType(ReviewShell), findsOneWidget);
     expect(find.text('Review the skipped question'), findsOneWidget);
     expect(find.text('What was missing?'), findsNothing);
     expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
@@ -1115,7 +1115,6 @@ void main() {
       );
 
       expect(tester.takeException(), isNull);
-      expect(find.byType(AdaptiveSplitView), findsNothing);
       expect(find.byType(CardCreatorPane), findsNothing);
       expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
       await _openCreator(tester);

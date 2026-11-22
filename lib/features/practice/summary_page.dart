@@ -196,8 +196,8 @@ class _SummaryPageState extends ConsumerState<SummaryPage> {
                 const SizedBox(height: 14),
                 AppPrimaryButton(
                   onPressed: () => _openReview(summary),
-                  label: summary.errorCardsNeedingNotes > 0
-                      ? 'Start error review (${summary.errorCardsNeedingNotes})'
+                  label: summary.errorCardsNeedingReview > 0
+                      ? 'Start error review (${summary.errorCardsNeedingReview})'
                       : 'Start review',
                   icon: Icons.arrow_forward,
                 ),

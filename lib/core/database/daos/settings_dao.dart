@@ -45,8 +45,4 @@ class SettingsDao extends DatabaseAccessor<AppDatabase>
   Future<void> removeValue(String key) {
     return (delete(settings)..where((s) => s.key.equals(key))).go();
   }
-
-  Future<void> clear() {
-    return delete(settings).go();
-  }
 }

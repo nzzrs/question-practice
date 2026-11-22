@@ -57,15 +57,6 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
         .get();
   }
 
-  Future<List<ConceptRow>> conceptsMissingDefinition(int sessionId) {
-    return (select(concepts)
-          ..where(
-            (c) => c.sessionId.equals(sessionId) & c.definition.equals(''),
-          )
-          ..orderBy([(c) => OrderingTerm.asc(c.id)]))
-        .get();
-  }
-
   Future<int> insertConcept(ConceptsCompanion concept) {
     return into(concepts).insert(concept);
   }
@@ -91,12 +82,6 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   Future<void> updateConceptDefinition(int id, String definition) {
     return (update(concepts)..where((c) => c.id.equals(id))).write(
       ConceptsCompanion(definition: Value(definition)),
-    );
-  }
-
-  Future<void> updateConceptExtra(int id, String extra) {
-    return (update(concepts)..where((c) => c.id.equals(id))).write(
-      ConceptsCompanion(extra: Value(extra)),
     );
   }
 
@@ -245,32 +230,9 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     );
   }
 
-  Future<void> updateErrorCardContent(
-    int id, {
-    required String question,
-    required List<String> alternatives,
-    required String explanation,
-    required List<String> alternativeExplanations,
-  }) {
-    return (update(errorCards)..where((e) => e.id.equals(id))).write(
-      ErrorCardsCompanion(
-        question: Value(question),
-        alternativesJson: Value(jsonEncode(alternatives)),
-        explanation: Value(explanation),
-        alternativeExplanationsJson: Value(jsonEncode(alternativeExplanations)),
-      ),
-    );
-  }
-
   Future<void> updateErrorCardReasoning(int id, String reasoning) {
     return (update(errorCards)..where((e) => e.id.equals(id))).write(
       ErrorCardsCompanion(reasoning: Value(reasoning)),
-    );
-  }
-
-  Future<void> updateErrorCardMistakeKinds(int id, String mistakeKindsJson) {
-    return (update(errorCards)..where((e) => e.id.equals(id))).write(
-      ErrorCardsCompanion(mistakeKindsJson: Value(mistakeKindsJson)),
     );
   }
 

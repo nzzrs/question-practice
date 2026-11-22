@@ -13,8 +13,6 @@ import '../feedback/question_feedback_view.dart';
 import '../lookup/ask_sheet.dart';
 import '../lookup/lookup_actions.dart';
 
-export 'error_card_content.dart';
-
 /// Shared error-card study view used by session review and the Cards screen.
 ///
 /// The same feedback surface as practice renders the question, alternatives,

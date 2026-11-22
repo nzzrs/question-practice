@@ -43,12 +43,6 @@ class SessionRepository {
     return row == null ? null : sessionFromRow(row);
   }
 
-  Stream<PracticeSession?> watchLatestInProgress() {
-    return _db.sessionDao.watchLatestInProgressSession().map(
-      (row) => row == null ? null : sessionFromRow(row),
-    );
-  }
-
   Stream<List<PracticeSession>> watchInProgress() {
     return _db.sessionDao.watchInProgressSessions().map(
       (rows) => rows.map(sessionFromInProgressRow).toList(),
@@ -132,10 +126,6 @@ class SessionRepository {
 
   Future<void> updateAttemptReasoning(int id, String reasoning) {
     return _db.sessionDao.updateAttemptReasoning(id, reasoning);
-  }
-
-  Future<void> updateAttemptMistakeKinds(int id, String mistakeKindsJson) {
-    return _db.sessionDao.updateAttemptMistakeKinds(id, mistakeKindsJson);
   }
 
   Future<void> completeSession({

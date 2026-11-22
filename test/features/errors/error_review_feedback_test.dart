@@ -3,7 +3,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
-import 'package:question_practice/core/ui/adaptive_split_view.dart';
 import 'package:question_practice/features/errors/error_cards_review_page.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/feedback/feedback_option_card.dart';
@@ -231,7 +230,6 @@ void main() {
 
     expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);
     expect(find.text('Edit card content'), findsNothing);
-    expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorPane), findsNothing);
     expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
   });
@@ -492,7 +490,6 @@ void main() {
       harness: harness,
     );
     expect(tester.takeException(), isNull);
-    expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorPane), findsNothing);
     expect(
       find.byKey(const ValueKey('wrong-answer-bullets-list')),

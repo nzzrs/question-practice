@@ -1,7 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:question_practice/core/ui/adaptive_split_view.dart';
 import 'package:question_practice/features/export/card_creator_sheet.dart';
 import 'package:question_practice/features/practice/domain/session_service.dart';
 import 'package:question_practice/features/practice/summary_page.dart';
@@ -265,7 +264,6 @@ void main() {
     );
 
     expect(find.text('Analyse the error'), findsOneWidget);
-    expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorSheet), findsNothing);
     expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
     expect(find.text('Save and finish'), findsOneWidget);

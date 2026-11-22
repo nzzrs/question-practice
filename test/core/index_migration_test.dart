@@ -138,6 +138,90 @@ void main() {
     expect(indexes, containsAll(_schemaFifteenIndexes));
     expect(indexes.intersection(_supersededIndexes.toSet()), isEmpty);
   });
+
+  test('a partial database without indexed columns still upgrades', () async {
+    final sqlite = sqlite3.openInMemory();
+    // A hand-built or recovery database can miss whole tables and single
+    // columns. Each guard has to check every column of its index, so
+    // `sessions` has `finished_at` but no `status`, `error_cards` has
+    // `last_wrong_at` but no `status`, and `skipped_questions` has
+    // `created_at` but no `handled_at`.
+    sqlite.execute('''
+      CREATE TABLE questions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        practice_id INTEGER NOT NULL,
+        prompt TEXT NOT NULL
+      )
+    ''');
+    sqlite.execute('''
+      CREATE TABLE sessions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        finished_at INTEGER NULL
+      )
+    ''');
+    sqlite.execute('''
+      CREATE TABLE error_cards (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        last_wrong_at INTEGER NOT NULL
+      )
+    ''');
+    sqlite.execute('''
+      CREATE TABLE skipped_questions (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        created_at INTEGER NOT NULL
+      )
+    ''');
+    sqlite.execute(
+      'CREATE INDEX questions_practice ON questions (practice_id)',
+    );
+    sqlite.execute('''
+      INSERT INTO questions (id, practice_id, prompt)
+      VALUES (1, 2, 'Kept partial question?')
+    ''');
+    sqlite.execute(
+      'INSERT INTO sessions (id, finished_at) VALUES (1, 1700000100)',
+    );
+    sqlite.execute(
+      'INSERT INTO error_cards (id, last_wrong_at) VALUES (1, 1700000200)',
+    );
+    sqlite.execute(
+      'INSERT INTO skipped_questions (id, created_at) VALUES (1, 1700000600)',
+    );
+    sqlite.execute('PRAGMA user_version = 14');
+
+    final database = AppDatabase(NativeDatabase.opened(sqlite));
+    addTearDown(database.close);
+
+    expect(database.schemaVersion, 15);
+
+    final indexes = await _indexNames(database);
+    // Indexes whose guard columns are missing are skipped...
+    expect(indexes, isNot(contains('questions_practice_position')));
+    expect(indexes, isNot(contains('sessions_status_finished')));
+    expect(indexes, isNot(contains('sessions_status_started')));
+    expect(indexes, isNot(contains('error_cards_last_wrong')));
+    expect(indexes, isNot(contains('skipped_questions_handled_created')));
+    expect(indexes, isNot(contains('concepts_created')));
+    expect(indexes, isNot(contains('manual_cards_created')));
+    expect(indexes, isNot(contains('notes_created')));
+    expect(indexes, isNot(contains('error_cards_created')));
+    // ...and a superseded single index is kept when its replacement could
+    // not be built, so the partial database does not lose coverage.
+    expect(indexes, contains('questions_practice'));
+
+    final question = await database
+        .customSelect('SELECT prompt FROM questions')
+        .getSingle();
+    expect(question.read<String>('prompt'), 'Kept partial question?');
+    final session = await database
+        .customSelect('SELECT finished_at FROM sessions')
+        .getSingle();
+    expect(session.read<int>('finished_at'), 1700000100);
+    final skipped = await database
+        .customSelect('SELECT created_at FROM skipped_questions')
+        .getSingle();
+    expect(skipped.read<int>('created_at'), 1700000600);
+  });
 }
 
 Future<Set<String>> _indexNames(AppDatabase database) async {

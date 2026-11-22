@@ -21,7 +21,7 @@ land without regenerated documentation.
 ## Tables, columns and indexes
 
 <!-- BEGIN GENERATED: database -->
-Current schema version: **15** (`AppDatabase.schemaVersion`).
+Current schema version: **16** (`AppDatabase.schemaVersion`).
 
 Table names below are the SQL names Drift creates. Every column, default, reference, cascade, primary key, unique key and index is read from `lib/core/database/tables.dart` and `app_database.dart`; the feature/model/repository notes come from the documented mapping in `tool/docs/update_docs.dart`.
 
@@ -251,13 +251,13 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 - Partial unique index `error_cards_active_question`: (`question_id`) WHERE `status = 'active'`
 - The partial unique index above enforces at most one `active` error card per question; resolved history rows are unrestricted.
 
-#### `manual_cards`
+#### `basic_cards`
 
-**Drift class:** `ManualCards` · **Row class:** `ManualCardRow`
+**Drift class:** `BasicCards` · **Row class:** `BasicCardRow`
 
 **Feature use:** Basic question/answer cards from skipped questions, Ask, notes or review bullets.
 
-**Domain model:** `ManualCard` · **Repository:** `CardRepository` · **DAO:** `CardDao`, `StatsDao`
+**Domain model:** `BasicCard` · **Repository:** `CardRepository` · **DAO:** `CardDao`, `StatsDao`
 
 | Column | Type | Null | Default | Constraints | References |
 |---|---|---|---|---|---|
@@ -276,8 +276,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `manual_cards_exported`: (`exported_at`)
-- Index `manual_cards_created`: (`created_at`)
+- Index `basic_cards_exported`: (`exported_at`)
+- Index `basic_cards_created`: (`created_at`)
 
 #### `skipped_questions`
 
@@ -332,7 +332,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 | `kept_at` | INTEGER (DateTime) | NULL | — | — | — |
 | `card_created_at` | INTEGER (DateTime) | NULL | — | — | — |
-| `manual_card_id` | INTEGER | NULL | — | — | `manual_cards.id` ON DELETE SET NULL |
+| `basic_card_id` | INTEGER | NULL | — | — | `basic_cards.id` ON DELETE SET NULL |
 
 **Keys and indexes**
 
@@ -378,8 +378,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `error_cards_session` | `error_cards` | `session_id` | INDEX | — |
 | `error_cards_created` | `error_cards` | `created_at` | INDEX | — |
 | `error_cards_last_wrong` | `error_cards` | `status`, `last_wrong_at` | INDEX | — |
-| `manual_cards_exported` | `manual_cards` | `exported_at` | INDEX | — |
-| `manual_cards_created` | `manual_cards` | `created_at` | INDEX | — |
+| `basic_cards_exported` | `basic_cards` | `exported_at` | INDEX | — |
+| `basic_cards_created` | `basic_cards` | `created_at` | INDEX | — |
 | `skipped_questions_handled_created` | `skipped_questions` | `handled_at`, `created_at` | INDEX | — |
 | `skipped_questions_session` | `skipped_questions` | `session_id` | INDEX | — |
 | `notes_session` | `notes` | `session_id` | INDEX | — |
@@ -427,12 +427,12 @@ keeps the single-column index.
   those rows, plus cards, concepts, skipped questions and notes that
   captured that session. Resolved error history tied to the session is removed
   too; error cards are history for a question, not an independent archive.
-- `concepts`, `manual_cards`, `skipped_questions` and `notes` reference a
+- `concepts`, `basic_cards`, `skipped_questions` and `notes` reference a
   question only while it exists. When a question is deleted, concepts, basic
   cards and notes keep their snapshot and their `question_id` becomes
   `NULL` (`ON DELETE SET NULL`). Skipped-question and error-card rows are
   deleted with the question (`ON DELETE CASCADE`).
-- `notes.manual_card_id` becomes `NULL` if the basic card made from the
+- `notes.basic_card_id` becomes `NULL` if the basic card made from the
   note is deleted; the note itself remains.
 - The partial unique index `error_cards_active_question` allows at most one
   `active` error card per question while leaving any number of resolved rows.
@@ -504,7 +504,7 @@ The AI API key is not in this table. It lives in Android secure storage through
 ## Migration history
 
 <!-- BEGIN GENERATED: migrations -->
-Current schema version: **15**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
+Current schema version: **16**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
 
 | Version | Changes |
 |---|---|
@@ -514,7 +514,7 @@ Current schema version: **15**. Migration steps are read from `AppDatabase.migra
 | 4 | Added `explanation` to `error_cards`. Added `alternative_explanations_json` to `error_cards`. |
 | 5 | Added `is_done` to `practices`. |
 | 6 | Added `unknown` to `attempts`. Added `extra` to `concepts`. |
-| 7 | Added `question_id` to `manual_cards`. Added `context` to `manual_cards`. Created table `skipped_questions`. |
+| 7 | Created table `skipped_questions`. Added `question_id` to `manual_cards`. Added `context` to `manual_cards`. |
 | 8 | Created table `highlights`. |
 | 9 | Added `archived` to `topics`. |
 | 10 | Added `subtopic` to `questions`. |
@@ -523,8 +523,9 @@ Current schema version: **15**. Migration steps are read from `AppDatabase.migra
 | 13 | Added `distracted` to `error_cards`. |
 | 14 | Custom SQL backfilled `error_cards`. |
 | 15 | Created index `questions_practice_position`, `sessions_status_finished`, `sessions_status_started`, `concepts_created`, `manual_cards_created`, `notes_created`, `error_cards_created`, `error_cards_last_wrong`, `skipped_questions_handled_created`. Dropped index `questions_practice`, `sessions_status`, `skipped_questions_handled`. |
+| 16 | Renamed table `manual_cards` to `basic_cards`. Renamed column `manual_card_id` to `basic_card_id` in `notes`. Created index `basic_cards_exported`, `basic_cards_created`. Dropped index `manual_cards_exported`, `manual_cards_created`. |
 
-The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 15.
+The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 16.
 <!-- END GENERATED: migrations -->
 
 ## Backup coverage
@@ -537,7 +538,7 @@ Backup format **v3**; minimum readable format **v1**. Files record app version *
 | Required in every backup | `topics`, `practices`, `questions`, `sessions`, `sessionQuestions`, `attempts`, `concepts`, `errorCards`, `manualCards`, `settings` |
 | Optional for older files | `skippedQuestions`, `notes` |
 
-The required and optional sets together cover every database table exactly once. `settings` stores preferences as key/value rows; the AI API key is in Android secure storage and is never exported.
+The required and optional sets together cover every database table exactly once. `settings` stores preferences as key/value rows; the AI API key is in Android secure storage and is never exported. Logical keys stay frozen across schema changes: `manualCards` is the backup key for the `basic_cards` table, and notes rows keep `manualCardId`.
 <!-- END GENERATED: backup -->
 
 ## Backup format and restore rules

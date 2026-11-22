@@ -99,8 +99,8 @@ bracketed `[Topic / Subtopic]` prefix.
 
 ## What is sent
 
-Only selected, complete cards are sent. Concepts need a definition. Manual
-cards built from any Basic template are always exportable Basic cards.
+Only selected, complete cards are sent. Concepts need a definition. Cards
+built from any Basic template are always exportable Basic cards.
 Error records and skipped questions are not exported directly: turn an error
 into atomic cards with **Create cards** first and convert a skipped question
 into a concept or basic card. The Cards screen previews every card and lets you

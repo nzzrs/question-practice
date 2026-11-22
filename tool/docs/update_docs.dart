@@ -383,7 +383,7 @@ TableSchema _parseTable(_ClassBlock classBlock) {
     );
   }
   final indexRegex = RegExp(
-    r"@TableIndex\(\s*name:\s*'([^']+)'\s*,\s*columns:\s*\{([^}]*)\}\s*\)",
+    r"@TableIndex\(\s*name:\s*'([^']+)'\s*,\s*columns:\s*\{([^}]*)\}\s*,?\s*\)",
   );
   for (final match in indexRegex.allMatches(classBlock.prefix)) {
     final columns = [

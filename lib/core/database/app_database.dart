@@ -30,7 +30,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -167,11 +167,108 @@ class AppDatabase extends _$AppDatabase {
           ''');
         }
       }
+      if (from < 15) {
+        // Indexes for the current query patterns: ordered question lists per
+        // practice, session history by status, newest card and note lists,
+        // the due/needs-details review queues and the skipped-question queue.
+        // Each statement is guarded on every indexed column so a hand-built
+        // or partial database, lacking that table or any one column, still
+        // upgrades; IF NOT EXISTS keeps a database that already has the
+        // index, or a retried upgrade, at rest.
+        if (await _hasColumns('questions', const ['practice_id', 'position'])) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS questions_practice_position '
+            'ON questions (practice_id, position)',
+          );
+          // The single-column index is a prefix of the composite above, so
+          // keeping both would only add write cost. It is dropped only once
+          // its replacement exists.
+          await customStatement('DROP INDEX IF EXISTS questions_practice');
+        }
+        final sessionsHaveFinishedAt = await _hasColumns('sessions', const [
+          'status',
+          'finished_at',
+        ]);
+        final sessionsHaveStartedAt = await _hasColumns('sessions', const [
+          'status',
+          'started_at',
+        ]);
+        if (sessionsHaveFinishedAt) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS sessions_status_finished '
+            'ON sessions (status, finished_at)',
+          );
+        }
+        if (sessionsHaveStartedAt) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS sessions_status_started '
+            'ON sessions (status, started_at)',
+          );
+        }
+        if (sessionsHaveFinishedAt || sessionsHaveStartedAt) {
+          await customStatement('DROP INDEX IF EXISTS sessions_status');
+        }
+        if (await _hasColumns('concepts', const ['created_at'])) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS concepts_created '
+            'ON concepts (created_at)',
+          );
+        }
+        if (await _hasColumns('manual_cards', const ['created_at'])) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS manual_cards_created '
+            'ON manual_cards (created_at)',
+          );
+        }
+        if (await _hasColumns('notes', const ['created_at'])) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS notes_created ON notes (created_at)',
+          );
+        }
+        if (await _hasColumns('error_cards', const ['created_at'])) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS error_cards_created '
+            'ON error_cards (created_at)',
+          );
+        }
+        if (await _hasColumns('error_cards', const [
+          'status',
+          'last_wrong_at',
+        ])) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS error_cards_last_wrong '
+            'ON error_cards (status, last_wrong_at)',
+          );
+        }
+        if (await _hasColumns('skipped_questions', const [
+          'handled_at',
+          'created_at',
+        ])) {
+          await customStatement(
+            'CREATE INDEX IF NOT EXISTS skipped_questions_handled_created '
+            'ON skipped_questions (handled_at, created_at)',
+          );
+          await customStatement(
+            'DROP INDEX IF EXISTS skipped_questions_handled',
+          );
+        }
+      }
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON');
     },
   );
+
+  /// Whether [table] exists and holds every column in [columns].
+  ///
+  /// Older, partial or hand-built databases used by recovery and tests may
+  /// lack parts of the current schema; upgrade steps use this to skip an
+  /// index instead of failing the whole migration.
+  Future<bool> _hasColumns(String table, List<String> columns) async {
+    final rows = await customSelect('PRAGMA table_info($table)').get();
+    final names = {for (final row in rows) row.read<String>('name')};
+    return columns.every(names.contains);
+  }
 
   Future<void> clearAll() {
     return transaction(() async {

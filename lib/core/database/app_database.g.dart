@@ -7710,13 +7710,17 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'practices_topic',
     'CREATE INDEX practices_topic ON practices (topic_id)',
   );
-  late final Index questionsPractice = Index(
-    'questions_practice',
-    'CREATE INDEX questions_practice ON questions (practice_id)',
+  late final Index questionsPracticePosition = Index(
+    'questions_practice_position',
+    'CREATE INDEX questions_practice_position ON questions (practice_id, position)',
   );
-  late final Index sessionsStatus = Index(
-    'sessions_status',
-    'CREATE INDEX sessions_status ON sessions (status)',
+  late final Index sessionsStatusFinished = Index(
+    'sessions_status_finished',
+    'CREATE INDEX sessions_status_finished ON sessions (status, finished_at)',
+  );
+  late final Index sessionsStatusStarted = Index(
+    'sessions_status_started',
+    'CREATE INDEX sessions_status_started ON sessions (status, started_at)',
   );
   late final Index sessionQuestionsQuestion = Index(
     'session_questions_question',
@@ -7738,6 +7742,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'concepts_exported',
     'CREATE INDEX concepts_exported ON concepts (exported_at)',
   );
+  late final Index conceptsCreated = Index(
+    'concepts_created',
+    'CREATE INDEX concepts_created ON concepts (created_at)',
+  );
   late final Index errorCardsDue = Index(
     'error_cards_due',
     'CREATE INDEX error_cards_due ON error_cards (status, due_at)',
@@ -7750,13 +7758,25 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'error_cards_session',
     'CREATE INDEX error_cards_session ON error_cards (session_id)',
   );
+  late final Index errorCardsCreated = Index(
+    'error_cards_created',
+    'CREATE INDEX error_cards_created ON error_cards (created_at)',
+  );
+  late final Index errorCardsLastWrong = Index(
+    'error_cards_last_wrong',
+    'CREATE INDEX error_cards_last_wrong ON error_cards (status, last_wrong_at)',
+  );
   late final Index manualCardsExported = Index(
     'manual_cards_exported',
     'CREATE INDEX manual_cards_exported ON manual_cards (exported_at)',
   );
-  late final Index skippedQuestionsHandled = Index(
-    'skipped_questions_handled',
-    'CREATE INDEX skipped_questions_handled ON skipped_questions (handled_at)',
+  late final Index manualCardsCreated = Index(
+    'manual_cards_created',
+    'CREATE INDEX manual_cards_created ON manual_cards (created_at)',
+  );
+  late final Index skippedQuestionsHandledCreated = Index(
+    'skipped_questions_handled_created',
+    'CREATE INDEX skipped_questions_handled_created ON skipped_questions (handled_at, created_at)',
   );
   late final Index skippedQuestionsSession = Index(
     'skipped_questions_session',
@@ -7769,6 +7789,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final Index notesQuestion = Index(
     'notes_question',
     'CREATE INDEX notes_question ON notes (question_id)',
+  );
+  late final Index notesCreated = Index(
+    'notes_created',
+    'CREATE INDEX notes_created ON notes (created_at)',
   );
   late final TopicDao topicDao = TopicDao(this as AppDatabase);
   late final SessionDao sessionDao = SessionDao(this as AppDatabase);
@@ -7793,21 +7817,27 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     notes,
     settings,
     practicesTopic,
-    questionsPractice,
-    sessionsStatus,
+    questionsPracticePosition,
+    sessionsStatusFinished,
+    sessionsStatusStarted,
     sessionQuestionsQuestion,
     attemptsSession,
     attemptsQuestion,
     conceptsSession,
     conceptsExported,
+    conceptsCreated,
     errorCardsDue,
     errorCardsQuestion,
     errorCardsSession,
+    errorCardsCreated,
+    errorCardsLastWrong,
     manualCardsExported,
-    skippedQuestionsHandled,
+    manualCardsCreated,
+    skippedQuestionsHandledCreated,
     skippedQuestionsSession,
     notesSession,
     notesQuestion,
+    notesCreated,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([

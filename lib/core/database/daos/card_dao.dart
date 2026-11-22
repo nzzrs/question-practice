@@ -19,7 +19,10 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     if (!includeExported) {
       query.where((c) => c.exportedAt.isNull());
     }
-    query.orderBy([(c) => OrderingTerm.desc(c.createdAt)]);
+    query.orderBy([
+      (c) => OrderingTerm.desc(c.createdAt),
+      (c) => OrderingTerm.asc(c.id),
+    ]);
     return query.watch();
   }
 
@@ -28,7 +31,10 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     if (!includeExported) {
       query.where((e) => e.exportedAt.isNull());
     }
-    query.orderBy([(e) => OrderingTerm.desc(e.createdAt)]);
+    query.orderBy([
+      (e) => OrderingTerm.desc(e.createdAt),
+      (e) => OrderingTerm.asc(e.id),
+    ]);
     return query.watch();
   }
 
@@ -37,7 +43,10 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     if (!includeExported) {
       query.where((m) => m.exportedAt.isNull());
     }
-    query.orderBy([(m) => OrderingTerm.desc(m.createdAt)]);
+    query.orderBy([
+      (m) => OrderingTerm.desc(m.createdAt),
+      (m) => OrderingTerm.asc(m.id),
+    ]);
     return query.watch();
   }
 
@@ -151,7 +160,10 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
                 (e.detailsCompletedAt.isNull() |
                     e.lastWrongAt.isBiggerThan(e.detailsCompletedAt)),
           )
-          ..orderBy([(e) => OrderingTerm.desc(e.lastWrongAt)]))
+          ..orderBy([
+            (e) => OrderingTerm.desc(e.lastWrongAt),
+            (e) => OrderingTerm.asc(e.id),
+          ]))
         .watch();
   }
 
@@ -321,7 +333,10 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   Stream<List<SkippedQuestionRow>> watchUnhandledSkippedQuestions() {
     return (select(skippedQuestions)
           ..where((s) => s.handledAt.isNull())
-          ..orderBy([(s) => OrderingTerm.desc(s.createdAt)]))
+          ..orderBy([
+            (s) => OrderingTerm.desc(s.createdAt),
+            (s) => OrderingTerm.asc(s.id),
+          ]))
         .watch();
   }
 
@@ -394,9 +409,11 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   }
 
   Stream<List<NoteRow>> watchNotes() {
-    return (select(
-      notes,
-    )..orderBy([(n) => OrderingTerm.desc(n.createdAt)])).watch();
+    return (select(notes)..orderBy([
+          (n) => OrderingTerm.desc(n.createdAt),
+          (n) => OrderingTerm.asc(n.id),
+        ]))
+        .watch();
   }
 
   Future<List<NoteRow>> notesForSession(int sessionId) {

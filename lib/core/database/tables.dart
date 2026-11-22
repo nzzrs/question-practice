@@ -31,7 +31,10 @@ class Practices extends Table {
 }
 
 @DataClassName('QuestionRow')
-@TableIndex(name: 'questions_practice', columns: {#practiceId})
+@TableIndex(
+  name: 'questions_practice_position',
+  columns: {#practiceId, #position},
+)
 class Questions extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get practiceId =>
@@ -49,7 +52,8 @@ class Questions extends Table {
 }
 
 @DataClassName('SessionRow')
-@TableIndex(name: 'sessions_status', columns: {#status})
+@TableIndex(name: 'sessions_status_finished', columns: {#status, #finishedAt})
+@TableIndex(name: 'sessions_status_started', columns: {#status, #startedAt})
 class Sessions extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get practiceId => integer().nullable().references(
@@ -109,6 +113,7 @@ class Attempts extends Table {
 @DataClassName('ConceptRow')
 @TableIndex(name: 'concepts_session', columns: {#sessionId})
 @TableIndex(name: 'concepts_exported', columns: {#exportedAt})
+@TableIndex(name: 'concepts_created', columns: {#createdAt})
 class Concepts extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get sessionId => integer().nullable().references(
@@ -138,6 +143,8 @@ class Concepts extends Table {
 @TableIndex(name: 'error_cards_due', columns: {#status, #dueAt})
 @TableIndex(name: 'error_cards_question', columns: {#questionId})
 @TableIndex(name: 'error_cards_session', columns: {#sessionId})
+@TableIndex(name: 'error_cards_created', columns: {#createdAt})
+@TableIndex(name: 'error_cards_last_wrong', columns: {#status, #lastWrongAt})
 class ErrorCards extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get questionId =>
@@ -187,6 +194,7 @@ class ErrorCards extends Table {
 
 @DataClassName('ManualCardRow')
 @TableIndex(name: 'manual_cards_exported', columns: {#exportedAt})
+@TableIndex(name: 'manual_cards_created', columns: {#createdAt})
 class ManualCards extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get sessionId => integer().nullable().references(
@@ -216,7 +224,10 @@ class ManualCards extends Table {
 }
 
 @DataClassName('SkippedQuestionRow')
-@TableIndex(name: 'skipped_questions_handled', columns: {#handledAt})
+@TableIndex(
+  name: 'skipped_questions_handled_created',
+  columns: {#handledAt, #createdAt},
+)
 @TableIndex(name: 'skipped_questions_session', columns: {#sessionId})
 class SkippedQuestions extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -247,6 +258,7 @@ class SkippedQuestions extends Table {
 @DataClassName('NoteRow')
 @TableIndex(name: 'notes_session', columns: {#sessionId})
 @TableIndex(name: 'notes_question', columns: {#questionId})
+@TableIndex(name: 'notes_created', columns: {#createdAt})
 class Notes extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get sessionId => integer().nullable().references(

@@ -21,7 +21,7 @@ land without regenerated documentation.
 ## Tables, columns and indexes
 
 <!-- BEGIN GENERATED: database -->
-Current schema version: **14** (`AppDatabase.schemaVersion`).
+Current schema version: **15** (`AppDatabase.schemaVersion`).
 
 Table names below are the SQL names Drift creates. Every column, default, reference, cascade, primary key, unique key and index is read from `lib/core/database/tables.dart` and `app_database.dart`; the feature/model/repository notes come from the documented mapping in `tool/docs/update_docs.dart`.
 
@@ -98,7 +98,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `questions_practice`: (`practice_id`)
+- Index `questions_practice_position`: (`practice_id`, `position`)
 
 #### `sessions`
 
@@ -124,7 +124,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `sessions_status`: (`status`)
+- Index `sessions_status_finished`: (`status`, `finished_at`)
+- Index `sessions_status_started`: (`status`, `started_at`)
 
 #### `session_questions`
 
@@ -201,6 +202,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 - Primary key: `id` (auto-increment)
 - Index `concepts_session`: (`session_id`)
 - Index `concepts_exported`: (`exported_at`)
+- Index `concepts_created`: (`created_at`)
 
 #### `error_cards`
 
@@ -244,6 +246,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 - Index `error_cards_due`: (`status`, `due_at`)
 - Index `error_cards_question`: (`question_id`)
 - Index `error_cards_session`: (`session_id`)
+- Index `error_cards_created`: (`created_at`)
+- Index `error_cards_last_wrong`: (`status`, `last_wrong_at`)
 - Partial unique index `error_cards_active_question`: (`question_id`) WHERE `status = 'active'`
 - The partial unique index above enforces at most one `active` error card per question; resolved history rows are unrestricted.
 
@@ -273,6 +277,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 
 - Primary key: `id` (auto-increment)
 - Index `manual_cards_exported`: (`exported_at`)
+- Index `manual_cards_created`: (`created_at`)
 
 #### `skipped_questions`
 
@@ -303,7 +308,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `skipped_questions_handled`: (`handled_at`)
+- Index `skipped_questions_handled_created`: (`handled_at`, `created_at`)
 - Index `skipped_questions_session`: (`session_id`)
 
 #### `notes`
@@ -334,6 +339,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 - Primary key: `id` (auto-increment)
 - Index `notes_session`: (`session_id`)
 - Index `notes_question`: (`question_id`)
+- Index `notes_created`: (`created_at`)
 
 #### `settings`
 
@@ -358,23 +364,55 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | Index | Table | Columns | Kind | Condition |
 |---|---|---|---|---|
 | `practices_topic` | `practices` | `topic_id` | INDEX | — |
-| `questions_practice` | `questions` | `practice_id` | INDEX | — |
-| `sessions_status` | `sessions` | `status` | INDEX | — |
+| `questions_practice_position` | `questions` | `practice_id`, `position` | INDEX | — |
+| `sessions_status_finished` | `sessions` | `status`, `finished_at` | INDEX | — |
+| `sessions_status_started` | `sessions` | `status`, `started_at` | INDEX | — |
 | `session_questions_question` | `session_questions` | `question_id` | INDEX | — |
 | `attempts_session` | `attempts` | `session_id` | INDEX | — |
 | `attempts_question` | `attempts` | `question_id` | INDEX | — |
 | `concepts_session` | `concepts` | `session_id` | INDEX | — |
 | `concepts_exported` | `concepts` | `exported_at` | INDEX | — |
+| `concepts_created` | `concepts` | `created_at` | INDEX | — |
 | `error_cards_due` | `error_cards` | `status`, `due_at` | INDEX | — |
 | `error_cards_question` | `error_cards` | `question_id` | INDEX | — |
 | `error_cards_session` | `error_cards` | `session_id` | INDEX | — |
+| `error_cards_created` | `error_cards` | `created_at` | INDEX | — |
+| `error_cards_last_wrong` | `error_cards` | `status`, `last_wrong_at` | INDEX | — |
 | `manual_cards_exported` | `manual_cards` | `exported_at` | INDEX | — |
-| `skipped_questions_handled` | `skipped_questions` | `handled_at` | INDEX | — |
+| `manual_cards_created` | `manual_cards` | `created_at` | INDEX | — |
+| `skipped_questions_handled_created` | `skipped_questions` | `handled_at`, `created_at` | INDEX | — |
 | `skipped_questions_session` | `skipped_questions` | `session_id` | INDEX | — |
 | `notes_session` | `notes` | `session_id` | INDEX | — |
 | `notes_question` | `notes` | `question_id` | INDEX | — |
+| `notes_created` | `notes` | `created_at` | INDEX | — |
 | `error_cards_active_question` | `error_cards` | `question_id` | UNIQUE | `status = 'active'` |
 <!-- END GENERATED: database -->
+
+## Indexes and query plans
+
+The indexes above match the query patterns in `lib/core/database/daos/`. The
+composites put the equality filter first and the leading sort column second:
+`questions_practice_position` serves `WHERE practice_id = ? ORDER BY position`,
+`sessions_status_started` serves the in-progress queries
+(`ORDER BY started_at DESC, id DESC`), and the `created_at` indexes serve the
+card, note and concept lists.
+
+The recency and history lists also end with `id ASC` so rows sharing a
+timestamp keep a stable order. When the leading sort column is descending, that tie-break runs
+in the opposite direction, so the index alone cannot produce the full order:
+SQLite still uses it for the equality filter and the leading term, then adds a
+temp B-tree for the trailing `id` term (`USE TEMP B-TREE FOR LAST TERM OF
+ORDER BY`). That is a sort of the rows the index already narrowed, not a full
+table sort. Without the tie-break the same query is served entirely from the
+index, but tied rows come back in an unspecified order. The
+`error_cards_last_wrong` index behaves the same way: `status` equality comes
+from the index and `ORDER BY last_wrong_at DESC, id ASC` sorts the match.
+
+Every index is maintained on insert, update and delete of its table. The three
+single-column indexes replaced by a composite (`questions_practice`,
+`sessions_status`, `skipped_questions_handled`) are dropped in the version 15
+upgrade so no table carries both; a database that cannot build the replacement
+keeps the single-column index.
 
 ## Relationships and deletion behaviour
 
@@ -466,7 +504,7 @@ The AI API key is not in this table. It lives in Android secure storage through
 ## Migration history
 
 <!-- BEGIN GENERATED: migrations -->
-Current schema version: **14**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
+Current schema version: **15**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
 
 | Version | Changes |
 |---|---|
@@ -484,8 +522,9 @@ Current schema version: **14**. Migration steps are read from `AppDatabase.migra
 | 12 | Renamed table `highlights` to `notes`. Renamed column `phrase` to `text` in `notes`. Created index `notes_session`, `notes_question`. Dropped index `highlights_session`, `highlights_question`. |
 | 13 | Added `distracted` to `error_cards`. |
 | 14 | Custom SQL backfilled `error_cards`. |
+| 15 | Created index `questions_practice_position`, `sessions_status_finished`, `sessions_status_started`, `concepts_created`, `manual_cards_created`, `notes_created`, `error_cards_created`, `error_cards_last_wrong`, `skipped_questions_handled_created`. Dropped index `questions_practice`, `sessions_status`, `skipped_questions_handled`. |
 
-The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 14.
+The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 15.
 <!-- END GENERATED: migrations -->
 
 ## Backup coverage

@@ -9,8 +9,10 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/data/error_card_undo.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/domain/models.dart';
+import '../../../core/domain/plural.dart';
 
 /// Raised when a backup file cannot be read or applied.
 class BackupException implements Exception {
@@ -33,9 +35,9 @@ class BackupInfo {
     required this.attempts,
     required this.concepts,
     required this.errorCards,
-    required this.manualCards,
+    required this.basicCards,
     this.skippedQuestions = 0,
-    this.highlights = 0,
+    this.notes = 0,
     this.archivedTopics = 0,
     this.formatVersion = 1,
     this.appVersion,
@@ -52,9 +54,9 @@ class BackupInfo {
   final int attempts;
   final int concepts;
   final int errorCards;
-  final int manualCards;
+  final int basicCards;
   final int skippedQuestions;
-  final int highlights;
+  final int notes;
   final int archivedTopics;
 
   /// Format of the file this information came from.
@@ -70,19 +72,25 @@ class BackupInfo {
   /// Rows per table as recorded by the backup, empty when the file has none.
   final Map<String, int> tableCounts;
 
-  int get cards => concepts + errorCards + manualCards;
+  int get cards => concepts + errorCards + basicCards;
 
   String get description {
-    final archived = archivedTopics > 0 ? ' ($archivedTopics archived)' : '';
+    final archived = archivedTopics > 0
+        ? ' (${formatCount(archivedTopics, 'archived topic')})'
+        : '';
     final buffer = StringBuffer(
-      '$topics topics$archived, $practices practices, $questions questions, '
-      '$sessions sessions, $attempts answers and $cards cards',
+      '${formatCount(topics, 'topic')}$archived, '
+      '${formatCount(practices, 'practice')}, '
+      '${formatCount(questions, 'question')}, '
+      '${formatCount(sessions, 'session')}, '
+      '${formatCount(attempts, 'answer')} and '
+      '${formatCount(cards, 'card')}',
     );
     if (skippedQuestions > 0) {
-      buffer.write(', $skippedQuestions skipped questions');
+      buffer.write(', ${formatCount(skippedQuestions, 'skipped question')}');
     }
-    if (highlights > 0) {
-      buffer.write(', $highlights highlights');
+    if (notes > 0) {
+      buffer.write(', ${formatCount(notes, 'note')}');
     }
     return buffer.toString();
   }
@@ -105,7 +113,7 @@ class BackupService {
       _clock = clock;
 
   /// Format written by this version of the app.
-  static const formatVersion = 2;
+  static const formatVersion = 3;
 
   /// Oldest format this app can still read.
   static const minimumFormatVersion = 1;
@@ -114,13 +122,17 @@ class BackupService {
   ///
   /// Kept in sync with `pubspec.yaml` and the About section. The backup format
   /// must not depend on platform plugins just to read its own version.
-  static const appVersion = '0.9.11';
-  static const buildNumber = 12;
+  static const appVersion = '0.10.0';
+  static const buildNumber = 13;
 
   static const appId = 'question_practice';
   static const maxImportBytes = 50 * 1024 * 1024;
 
   /// Tables that must be present in every supported backup.
+  ///
+  /// These are logical JSON keys, not SQL table names. `manualCards` stays
+  /// frozen so v1-v3 files keep restoring and current files stay readable by
+  /// older app builds, even though the table is now `basic_cards`.
   static const requiredTables = <String>{
     'topics',
     'practices',
@@ -135,7 +147,7 @@ class BackupService {
   };
 
   /// Tables added after the first backup format.
-  static const optionalTables = <String>{'skippedQuestions', 'highlights'};
+  static const optionalTables = <String>{'skippedQuestions', 'notes'};
 
   final AppDatabase _db;
   final Clock _clock;
@@ -187,6 +199,11 @@ class BackupService {
   /// itself is atomic, so an invalid backup leaves the current data untouched.
   Future<BackupInfo> restoreText(String text) async {
     final backup = _parse(text);
+    final inProgressSessionIds = _inProgressSessionIds(backup.sessions);
+    final settings = [
+      for (final row in backup.settings)
+        if (_keepUndoJournal(row.key, row.value, inProgressSessionIds)) row,
+    ];
     try {
       await _db.transaction(() async {
         await _db.clearAll();
@@ -215,17 +232,17 @@ class BackupService {
           batch.insertAll(_db.errorCards, [
             for (final row in backup.errorCards) row.toCompanion(false),
           ]);
-          batch.insertAll(_db.manualCards, [
-            for (final row in backup.manualCards) row.toCompanion(false),
+          batch.insertAll(_db.basicCards, [
+            for (final row in backup.basicCards) row.toCompanion(false),
           ]);
           batch.insertAll(_db.skippedQuestions, [
             for (final row in backup.skippedQuestions) row.toCompanion(false),
           ]);
-          batch.insertAll(_db.highlights, [
-            for (final row in backup.highlights) row.toCompanion(false),
+          batch.insertAll(_db.notes, [
+            for (final row in backup.notes) row.toCompanion(false),
           ]);
           batch.insertAll(_db.settings, [
-            for (final row in backup.settings) row.toCompanion(false),
+            for (final row in settings) row.toCompanion(false),
           ]);
         });
       });
@@ -275,10 +292,15 @@ class BackupService {
     final attempts = await _db.select(_db.attempts).get();
     final concepts = await _db.select(_db.concepts).get();
     final errorCards = await _db.select(_db.errorCards).get();
-    final manualCards = await _db.select(_db.manualCards).get();
+    final basicCards = await _db.select(_db.basicCards).get();
     final skippedQuestions = await _db.select(_db.skippedQuestions).get();
-    final highlights = await _db.select(_db.highlights).get();
-    final settings = await _db.select(_db.settings).get();
+    final notes = await _db.select(_db.notes).get();
+    final settingsRows = await _db.select(_db.settings).get();
+    final inProgressSessionIds = _inProgressSessionIds(sessions);
+    final settings = [
+      for (final row in settingsRows)
+        if (_keepUndoJournal(row.key, row.value, inProgressSessionIds)) row,
+    ];
 
     return <String, dynamic>{
       'topics': [for (final row in topics) row.toJson()],
@@ -289,11 +311,31 @@ class BackupService {
       'attempts': [for (final row in attempts) row.toJson()],
       'concepts': [for (final row in concepts) row.toJson()],
       'errorCards': [for (final row in errorCards) row.toJson()],
-      'manualCards': [for (final row in manualCards) row.toJson()],
+      // Frozen logical key for the `basic_cards` table.
+      'manualCards': [for (final row in basicCards) row.toJson()],
       'skippedQuestions': [for (final row in skippedQuestions) row.toJson()],
-      'highlights': [for (final row in highlights) row.toJson()],
+      'notes': [for (final row in notes) row.toJson()],
       'settings': [for (final row in settings) row.toJson()],
     };
+  }
+
+  Set<int> _inProgressSessionIds(Iterable<SessionRow> sessions) {
+    return {
+      for (final row in sessions)
+        if (row.status == SessionStatus.inProgress.name) row.id,
+    };
+  }
+
+  /// Keeps an undo journal only while its session is unfinished.
+  ///
+  /// A journal belongs to a live in-progress session. Shipping stale keys, or
+  /// a damaged journal, would let a restored backup reuse a session id and
+  /// roll back unrelated cards, so both are dropped at the backup boundary.
+  bool _keepUndoJournal(String key, String value, Set<int> sessionIds) {
+    if (!isErrorCardUndoKey(key)) return true;
+    final sessionId = errorCardUndoSessionId(key);
+    if (sessionId == null || !sessionIds.contains(sessionId)) return false;
+    return tryDecodeErrorCardUndo(value) != null;
   }
 
   String _decodeBytes(Uint8List bytes) {
@@ -358,9 +400,9 @@ class BackupService {
       attempts: content.attempts.length,
       concepts: content.concepts.length,
       errorCards: content.errorCards.length,
-      manualCards: content.manualCards.length,
+      basicCards: content.basicCards.length,
       skippedQuestions: content.skippedQuestions.length,
-      highlights: content.highlights.length,
+      notes: content.notes.length,
       archivedTopics: content.topics.where((row) => row.archived).length,
       formatVersion: version,
       appVersion: _stringOrNull(metadata['appVersion']),
@@ -424,6 +466,13 @@ class BackupService {
     }
   }
 
+  /// New files store notes under `notes`; v1 and v2 files used `highlights`.
+  String _noteTableKey(Map<String, dynamic> tables) {
+    if (tables.containsKey('notes')) return 'notes';
+    if (tables.containsKey('highlights')) return 'highlights';
+    return 'notes';
+  }
+
   _BackupContent _readContent(Map<String, dynamic> tables) {
     for (final key in requiredTables) {
       if (!tables.containsKey(key)) {
@@ -484,10 +533,10 @@ class BackupService {
         parse: _errorCard,
         identities: (row) => ['id ${row.id}'],
       ),
-      manualCards: _readRows<ManualCardRow>(
+      basicCards: _readRows<BasicCardRow>(
         tables,
         'manualCards',
-        parse: _manualCard,
+        parse: _basicCard,
         identities: (row) => ['id ${row.id}'],
       ),
       skippedQuestions: _readRows<SkippedQuestionRow>(
@@ -497,11 +546,11 @@ class BackupService {
         parse: _skippedQuestion,
         identities: (row) => ['id ${row.id}'],
       ),
-      highlights: _readRows<HighlightRow>(
+      notes: _readRows<NoteRow>(
         tables,
-        'highlights',
+        _noteTableKey(tables),
         optional: true,
-        parse: _highlight,
+        parse: _note,
         identities: (row) => ['id ${row.id}'],
       ),
       settings: _readRows<SettingRow>(
@@ -565,11 +614,9 @@ class BackupService {
     final recorded = _readCounts(metadata['tableCounts']);
     if (recorded == null) return;
     for (final entry in recorded.entries) {
-      final known =
-          requiredTables.contains(entry.key) ||
-          optionalTables.contains(entry.key);
-      if (!known) continue;
-      final raw = tables[entry.key];
+      final key = _countKey(entry.key, tables);
+      if (key == null) continue;
+      final raw = tables[key];
       final actual = raw is List ? raw.length : 0;
       if (actual != entry.value) {
         throw BackupException(
@@ -578,6 +625,21 @@ class BackupService {
         );
       }
     }
+  }
+
+  /// Maps a recorded count key to the table it numbers.
+  ///
+  /// v1 and v2 files count notes under `highlights`, so that key is checked
+  /// against the legacy table when no `notes` table is present.
+  String? _countKey(String recorded, Map<String, dynamic> tables) {
+    if (recorded == 'highlights') {
+      return tables.containsKey('notes') ? null : 'highlights';
+    }
+    if (requiredTables.contains(recorded) ||
+        optionalTables.contains(recorded)) {
+      return recorded;
+    }
+    return null;
   }
 
   Map<String, int>? _readCounts(Object? value) {
@@ -603,7 +665,7 @@ class BackupService {
     final practiceIds = {for (final row in content.practices) row.id};
     final questionIds = {for (final row in content.questions) row.id};
     final sessionIds = {for (final row in content.sessions) row.id};
-    final manualCardIds = {for (final row in content.manualCards) row.id};
+    final basicCardIds = {for (final row in content.basicCards) row.id};
 
     for (final row in content.practices) {
       _requireReference('practices', row.id, 'topic', row.topicId, topicIds);
@@ -696,7 +758,7 @@ class BackupService {
         );
       }
     }
-    for (final row in content.manualCards) {
+    for (final row in content.basicCards) {
       final sessionId = row.sessionId;
       final questionId = row.questionId;
       if (sessionId != null) {
@@ -737,35 +799,23 @@ class BackupService {
         );
       }
     }
-    for (final row in content.highlights) {
+    for (final row in content.notes) {
       final sessionId = row.sessionId;
       final questionId = row.questionId;
-      final manualCardId = row.manualCardId;
+      final basicCardId = row.basicCardId;
       if (sessionId != null) {
-        _requireReference(
-          'highlights',
-          row.id,
-          'session',
-          sessionId,
-          sessionIds,
-        );
+        _requireReference('notes', row.id, 'session', sessionId, sessionIds);
       }
       if (questionId != null) {
-        _requireReference(
-          'highlights',
-          row.id,
-          'question',
-          questionId,
-          questionIds,
-        );
+        _requireReference('notes', row.id, 'question', questionId, questionIds);
       }
-      if (manualCardId != null) {
+      if (basicCardId != null) {
         _requireReference(
-          'highlights',
+          'notes',
           row.id,
-          'manual card',
-          manualCardId,
-          manualCardIds,
+          'basic card',
+          basicCardId,
+          basicCardIds,
         );
       }
     }
@@ -806,6 +856,8 @@ class BackupService {
       // Older exports used the SQL column spelling, so accept both.
       ankiDeck: row.optionalStringAny(const ['ankiDeck', 'anki_deck', 'deck']),
       createdAt: row.requireDate('createdAt'),
+      minimumScore: row.intOr('minimumScore', 70),
+      targetScore: row.intOr('targetScore', 80),
       archived: row.boolOr('archived', false),
     );
   }
@@ -871,6 +923,7 @@ class BackupService {
       reasoning: row.stringOr('reasoning', ''),
       distracted: row.boolOr('distracted', false),
       unknown: row.boolOr('unknown', false),
+      mistakeKindsJson: row.stringOr('mistakeKindsJson', '[]'),
       isCorrect: row.requireBool('isCorrect'),
       answeredAt: row.requireDate('answeredAt'),
     );
@@ -886,6 +939,7 @@ class BackupService {
       extra: row.stringOr('extra', ''),
       context: row.stringOr('context', ''),
       topicName: row.stringOr('topicName', ''),
+      subtopic: row.stringOr('subtopic', ''),
       source: row.requireEnum('source', ConceptSource.values),
       createdAt: row.requireDate('createdAt'),
       exportedAt: row.optionalDate('exportedAt'),
@@ -911,6 +965,10 @@ class BackupService {
       vaccine: row.stringOr('vaccine', ''),
       topicName: row.stringOr('topicName', ''),
       practiceName: row.stringOr('practiceName', ''),
+      cognitiveType: row.stringOr('cognitiveType', 'contrast'),
+      subtopic: row.stringOr('subtopic', ''),
+      mistakeKindsJson: row.stringOr('mistakeKindsJson', '[]'),
+      distracted: row.boolOr('distracted', false),
       status: row.requireEnum('status', ErrorCardStatus.values),
       createdAt: row.requireDate('createdAt'),
       lastWrongAt: row.requireDate('lastWrongAt'),
@@ -921,8 +979,8 @@ class BackupService {
     );
   }
 
-  ManualCardRow _manualCard(_Row row) {
-    return ManualCardRow(
+  BasicCardRow _basicCard(_Row row) {
+    return BasicCardRow(
       id: row.requireInt('id'),
       sessionId: row.optionalInt('sessionId'),
       questionId: row.optionalInt('questionId'),
@@ -930,6 +988,8 @@ class BackupService {
       answer: row.requireString('answer'),
       context: row.stringOr('context', ''),
       topicName: row.stringOr('topicName', ''),
+      cognitiveType: row.stringOr('cognitiveType', 'fact'),
+      subtopic: row.stringOr('subtopic', ''),
       createdAt: row.requireDate('createdAt'),
       exportedAt: row.optionalDate('exportedAt'),
     );
@@ -958,19 +1018,20 @@ class BackupService {
     );
   }
 
-  HighlightRow _highlight(_Row row) {
-    return HighlightRow(
+  NoteRow _note(_Row row) {
+    return NoteRow(
       id: row.requireInt('id'),
       sessionId: row.optionalInt('sessionId'),
       questionId: row.optionalInt('questionId'),
-      phrase: row.requireString('phrase'),
+      noteText: row.requireStringAny(const ['text', 'phrase']),
       context: row.stringOr('context', ''),
       topicName: row.stringOr('topicName', ''),
+      subtopic: row.stringOr('subtopic', ''),
       practiceName: row.stringOr('practiceName', ''),
       createdAt: row.requireDate('createdAt'),
       keptAt: row.optionalDate('keptAt'),
       cardCreatedAt: row.optionalDate('cardCreatedAt'),
-      manualCardId: row.optionalInt('manualCardId'),
+      basicCardId: row.optionalInt('manualCardId'),
     );
   }
 
@@ -1017,6 +1078,15 @@ class _Row {
     final value = _json[field];
     if (value is! String) _fail(field, 'a string');
     return value;
+  }
+
+  /// Reads the first field present, used where older files used another name.
+  String requireStringAny(List<String> fields) {
+    for (final field in fields) {
+      if (!_json.containsKey(field)) continue;
+      return requireString(field);
+    }
+    _fail(fields.last, 'a string');
   }
 
   String stringOr(String field, String fallback) {
@@ -1153,9 +1223,9 @@ class _BackupTables {
   List<AttemptRow> get attempts => content.attempts;
   List<ConceptRow> get concepts => content.concepts;
   List<ErrorCardRow> get errorCards => content.errorCards;
-  List<ManualCardRow> get manualCards => content.manualCards;
+  List<BasicCardRow> get basicCards => content.basicCards;
   List<SkippedQuestionRow> get skippedQuestions => content.skippedQuestions;
-  List<HighlightRow> get highlights => content.highlights;
+  List<NoteRow> get notes => content.notes;
   List<SettingRow> get settings => content.settings;
 }
 
@@ -1169,9 +1239,9 @@ class _BackupContent {
     required this.attempts,
     required this.concepts,
     required this.errorCards,
-    required this.manualCards,
+    required this.basicCards,
     required this.skippedQuestions,
-    required this.highlights,
+    required this.notes,
     required this.settings,
   });
 
@@ -1183,8 +1253,8 @@ class _BackupContent {
   final List<AttemptRow> attempts;
   final List<ConceptRow> concepts;
   final List<ErrorCardRow> errorCards;
-  final List<ManualCardRow> manualCards;
+  final List<BasicCardRow> basicCards;
   final List<SkippedQuestionRow> skippedQuestions;
-  final List<HighlightRow> highlights;
+  final List<NoteRow> notes;
   final List<SettingRow> settings;
 }

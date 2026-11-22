@@ -89,7 +89,7 @@ void main() {
     expect(find.textContaining('Progress over time'), findsOneWidget);
     expect(find.text('Latest'), findsOneWidget);
     expect(find.text('100%'), findsWidgets);
-    expect(find.text('weighted by questions'), findsOneWidget);
+    expect(find.textContaining('weighted by questions'), findsOneWidget);
     expect(find.textContaining('weighted average'), findsOneWidget);
   });
 
@@ -465,7 +465,7 @@ void main() {
     expect(find.text('Delete sessions?'), findsOneWidget);
     expect(find.textContaining('also removes its answers'), findsOneWidget);
     expect(
-      find.textContaining('cards, highlights and skipped records'),
+      find.textContaining('cards, notes and skipped records'),
       findsOneWidget,
     );
     await tester.tap(find.text('Delete'));

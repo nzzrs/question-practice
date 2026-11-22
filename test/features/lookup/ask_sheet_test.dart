@@ -48,6 +48,7 @@ void main() {
           practiceName: 'Core',
           sessionId: null,
           questionId: null,
+          subtopic: 'Networking',
         ),
       ),
       harness: harness,
@@ -64,7 +65,32 @@ void main() {
       find.text('It spreads traffic across several servers.'),
       findsOneWidget,
     );
-    expect(find.text('Turn into a card'), findsOneWidget);
+    expect(find.text('Create cards'), findsOneWidget);
     expect(find.text('Ask another'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('ask-create-cards')));
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
+    expect(find.byKey(const ValueKey('creator-front')), findsOneWidget);
+    expect(
+      find.text('It spreads traffic across several servers.'),
+      findsWidgets,
+    );
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-save')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-save')));
+    await pumpFrames(tester, frames: 24);
+
+    final basics = await tester.runAsync(
+      () => harness.cards.watchBasicCards().first,
+    );
+    expect(basics, hasLength(1));
+    expect(basics!.single.subtopic, 'Networking');
+    expect(basics.single.cognitiveType, CognitiveType.fact);
+    expect(basics.single.answer, 'It spreads traffic across several servers.');
   });
 }

@@ -122,7 +122,101 @@ void main() {
       answer: 'A range of IP addresses.',
       topicName: 'Networking',
     );
-    final cards = await harness.cards.watchManualCards().first;
+    final cards = await harness.cards.watchBasicCards().first;
     expect(cards.single.question, 'What is a subnet?');
+  });
+
+  test('creates atomic breakdown cards and completes the error', () async {
+    final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
+    final id = await harness.cards.createErrorCard(
+      questionId: question.id,
+      sessionId: null,
+      question: question.prompt,
+      alternatives: question.alternatives,
+      correctIndexes: question.correctIndexes,
+      wrongIndexes: const [1],
+      reasoning: '',
+      explanation: question.explanation,
+      alternativeExplanations: question.alternativeExplanations,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      subtopic: 'Layer',
+      lastWrongAt: harness.clock.now().toUtc(),
+      dueAfter: const Duration(hours: 48),
+    );
+    final card = (await harness.cards.errorCardById(id))!;
+
+    final added = await review.createErrorBreakdownCards(
+      card: card,
+      cards: const [
+        SuggestedCard(
+          front: 'Which layer owns IP addresses?',
+          back: 'The network layer.',
+          template: CardTemplate.contrast,
+        ),
+        SuggestedCard(
+          front: 'Given requirement X with restriction Y, what rule applies?',
+          back: 'Match the layer to its addressing job.',
+          template: CardTemplate.heuristic,
+        ),
+      ],
+    );
+
+    expect(added, 2);
+    final cards = await harness.cards.watchBasicCards().first;
+    expect(cards, hasLength(2));
+    expect(
+      cards.map((item) => item.cognitiveType),
+      containsAll([CognitiveType.contrast, CognitiveType.heuristic]),
+    );
+    expect(cards.every((item) => item.subtopic == 'Layer'), isTrue);
+    expect(cards.every((item) => item.topicName == 'Topic'), isTrue);
+    final saved = await harness.cards.errorCardById(card.id);
+    expect(saved!.needsDetails, isFalse);
+    expect(saved.detailsCompletedAt, isNotNull);
+    expect(saved.bias, card.bias);
+    expect(saved.vaccine, card.vaccine);
+  });
+
+  test('completing details keeps existing bias and vaccine notes', () async {
+    final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
+    final id = await harness.cards.createErrorCard(
+      questionId: question.id,
+      sessionId: null,
+      question: question.prompt,
+      alternatives: question.alternatives,
+      correctIndexes: question.correctIndexes,
+      wrongIndexes: const [1],
+      reasoning: '',
+      explanation: question.explanation,
+      alternativeExplanations: question.alternativeExplanations,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      lastWrongAt: harness.clock.now().toUtc(),
+      dueAfter: const Duration(hours: 48),
+    );
+    await harness.cards.updateErrorCardDetails(
+      id: id,
+      bias: 'Old bias',
+      vaccine: 'Old rule',
+      completedAt: harness.clock.now().toUtc(),
+    );
+    await harness.database.customStatement(
+      'UPDATE error_cards SET details_completed_at = NULL WHERE id = ?',
+      [id],
+    );
+
+    await review.completeErrorDetails(id);
+
+    final saved = await harness.cards.errorCardById(id);
+    expect(saved!.needsDetails, isFalse);
+    expect(saved.bias, 'Old bias');
+    expect(saved.vaccine, 'Old rule');
   });
 }

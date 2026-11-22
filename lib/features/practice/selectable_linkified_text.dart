@@ -4,17 +4,19 @@ import 'package:flutter/gestures.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// Selectable text with Define and Highlight actions, plus tappable links.
+/// Selectable text with Define and Save as note actions, plus tappable links.
 class SelectableLinkifiedText extends StatefulWidget {
   const SelectableLinkifiedText({
     required this.text,
     required this.style,
     required this.onDefine,
     required this.onOpenUrl,
-    this.onHighlight,
+    this.onNote,
     this.onAsk,
-    this.highlights = const [],
+    this.onNoteTap,
+    this.notes = const [],
     this.selectable = true,
+    this.useSelectionArea = true,
     super.key,
   });
 
@@ -23,15 +25,21 @@ class SelectableLinkifiedText extends StatefulWidget {
   final void Function(String selection, Rect? anchor) onDefine;
   final ValueChanged<String> onOpenUrl;
 
-  /// Saves the selected phrase as a highlight.
-  final Future<void> Function(String selection, Rect? anchor)? onHighlight;
+  /// Saves the selected phrase as a note.
+  final Future<void> Function(String selection, Rect? anchor)? onNote;
 
   /// Asks the configured AI about the selected phrase.
   final Future<void> Function(String selection, Rect? anchor)? onAsk;
 
-  /// Phrases painted with a highlight background inside [text].
-  final List<String> highlights;
+  /// Called with the saved phrase when a note is tapped.
+  final ValueChanged<String>? onNoteTap;
+
+  /// Phrases shown with a note tint inside [text].
+  final List<String> notes;
   final bool selectable;
+
+  /// When false the host owns one [SelectionArea] around several widgets.
+  final bool useSelectionArea;
 
   @override
   State<SelectableLinkifiedText> createState() =>
@@ -40,7 +48,8 @@ class SelectableLinkifiedText extends StatefulWidget {
 
 class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   static final _urlPattern = RegExp(r'https?://[^\s<>"`]+');
-  final _recognizers = <TapGestureRecognizer>[];
+  final _urlRecognizers = <TapGestureRecognizer>[];
+  final _noteHits = <_NoteHit>[];
   String _selectedText = '';
 
   @override
@@ -52,7 +61,11 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   @override
   void didUpdateWidget(SelectableLinkifiedText oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.text != widget.text) _syncRecognizers();
+    if (oldWidget.text != widget.text ||
+        !_sameNotes(oldWidget.notes, widget.notes) ||
+        oldWidget.onNoteTap != widget.onNoteTap) {
+      _syncRecognizers();
+    }
   }
 
   @override
@@ -62,10 +75,14 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
   }
 
   void _disposeRecognizers() {
-    for (final recognizer in _recognizers) {
+    for (final recognizer in _urlRecognizers) {
       recognizer.dispose();
     }
-    _recognizers.clear();
+    _urlRecognizers.clear();
+    for (final hit in _noteHits) {
+      hit.recognizer?.dispose();
+    }
+    _noteHits.clear();
   }
 
   void _syncRecognizers() {
@@ -74,8 +91,36 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
       final url = match.group(0)!;
       final recognizer = TapGestureRecognizer()
         ..onTap = () => widget.onOpenUrl(url);
-      _recognizers.add(recognizer);
+      _urlRecognizers.add(recognizer);
     }
+    final onTap = widget.onNoteTap;
+    final haystack = widget.text.toLowerCase();
+    for (final note in widget.notes) {
+      final needle = note.trim().toLowerCase();
+      if (needle.isEmpty) continue;
+      var from = 0;
+      while (from < haystack.length) {
+        final index = haystack.indexOf(needle, from);
+        if (index < 0) break;
+        final end = index + needle.length;
+        TapGestureRecognizer? recognizer;
+        if (onTap != null) {
+          final phrase = widget.text.substring(index, end);
+          recognizer = TapGestureRecognizer()..onTap = () => onTap(phrase);
+        }
+        _noteHits.add(_NoteHit(index, end, recognizer));
+        from = end;
+      }
+    }
+  }
+
+  static bool _sameNotes(List<String> a, List<String> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var index = 0; index < a.length; index++) {
+      if (a[index] != b[index]) return false;
+    }
+    return true;
   }
 
   @override
@@ -83,13 +128,13 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
     final theme = M3ETheme.of(context);
     final text = widget.text;
     final urlMatches = _urlPattern.allMatches(text).toList();
-    final highlightRanges = _highlightRanges();
+    final noteRanges = _noteRanges();
     final urlRanges = [
       for (final match in urlMatches) (match.start, match.end),
     ];
 
     final cuts = <int>{0, text.length};
-    for (final (start, end) in [...urlRanges, ...highlightRanges]) {
+    for (final (start, end) in [...urlRanges, ...noteRanges]) {
       if (start > 0 && start < text.length) cuts.add(start);
       if (end > 0 && end < text.length) cuts.add(end);
     }
@@ -104,9 +149,10 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
       final urlIndex = urlRanges.indexWhere(
         (range) => range.$1 <= start && end <= range.$2,
       );
-      final highlighted = highlightRanges.any(
-        (range) => range.$1 <= start && end <= range.$2,
+      final noteIndex = _noteHits.indexWhere(
+        (hit) => hit.start <= start && end <= hit.end,
       );
+      final isNote = noteIndex >= 0;
       TextStyle? style;
       if (urlIndex >= 0) {
         style = widget.style.copyWith(
@@ -115,27 +161,24 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
           decorationColor: theme.colorScheme.primary,
         );
       }
-      if (highlighted) {
+      if (isNote) {
         style = (style ?? widget.style).copyWith(
           backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.18),
         );
       }
-      spans.add(
-        TextSpan(
-          text: chunk,
-          style: style,
-          recognizer: urlIndex >= 0 && urlIndex < _recognizers.length
-              ? _recognizers[urlIndex]
-              : null,
-        ),
-      );
+      final TapGestureRecognizer? recognizer = urlIndex >= 0
+          ? (urlIndex < _urlRecognizers.length
+                ? _urlRecognizers[urlIndex]
+                : null)
+          : (noteIndex >= 0 ? _noteHits[noteIndex].recognizer : null);
+      spans.add(TextSpan(text: chunk, style: style, recognizer: recognizer));
     }
 
     final textWidget = Text.rich(
       TextSpan(children: spans),
       style: widget.style,
     );
-    if (!widget.selectable) return textWidget;
+    if (!widget.selectable || !widget.useSelectionArea) return textWidget;
 
     return SelectionArea(
       onSelectionChanged: (content) {
@@ -181,13 +224,13 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
                   );
                 },
               ),
-            if (selected.isNotEmpty && widget.onHighlight != null)
+            if (selected.isNotEmpty && widget.onNote != null)
               ContextMenuButtonItem(
-                label: 'Highlight',
+                label: 'Save as note',
                 onPressed: () {
                   state.hideToolbar();
                   unawaited(
-                    widget.onHighlight!(
+                    widget.onNote!(
                       selected,
                       Rect.fromLTWH(
                         state.contextMenuAnchors.primaryAnchor.dx,
@@ -206,20 +249,10 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
     );
   }
 
-  List<(int, int)> _highlightRanges() {
-    final haystack = widget.text.toLowerCase();
-    final ranges = <(int, int)>[];
-    for (final highlight in widget.highlights) {
-      final needle = highlight.trim().toLowerCase();
-      if (needle.isEmpty) continue;
-      var from = 0;
-      while (from < haystack.length) {
-        final index = haystack.indexOf(needle, from);
-        if (index < 0) break;
-        ranges.add((index, index + needle.length));
-        from = index + needle.length;
-      }
-    }
+  List<(int, int)> _noteRanges() {
+    final ranges = <(int, int)>[
+      for (final hit in _noteHits) (hit.start, hit.end),
+    ];
     ranges.sort((a, b) => a.$1.compareTo(b.$1));
     final merged = <(int, int)>[];
     for (final range in ranges) {
@@ -231,4 +264,12 @@ class _SelectableLinkifiedTextState extends State<SelectableLinkifiedText> {
     }
     return merged;
   }
+}
+
+class _NoteHit {
+  const _NoteHit(this.start, this.end, this.recognizer);
+
+  final int start;
+  final int end;
+  final TapGestureRecognizer? recognizer;
 }

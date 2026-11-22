@@ -166,6 +166,8 @@ void main() {
     await pumpFrames(tester);
     expect(find.text('Edit topic'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('AnkiDroid deck'));
+    await pumpFrames(tester);
     await tester.tap(find.text('AnkiDroid deck'));
     await pumpFrames(tester);
     await tester.scrollUntilVisible(

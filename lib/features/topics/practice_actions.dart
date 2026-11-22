@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
 import '../../core/domain/models.dart';
+import '../../core/domain/plural.dart';
 import '../../core/ui/widgets.dart';
 import '../import/domain/import_models.dart';
 import '../practice_edit/domain/practice_edit_service.dart';
@@ -285,7 +286,7 @@ class _PracticeOptionsSheet extends StatelessWidget {
             _SheetHeader(
               title: practice.name,
               subtitle:
-                  '${summary.questionCount} questions · '
+                  '${formatCount(summary.questionCount, 'question')} · '
                   '${practice.isDone ? 'Marked as done' : 'Active'}',
             ),
             OptionTile(
@@ -310,10 +311,10 @@ class _PracticeOptionsSheet extends StatelessWidget {
             ),
             OptionTile(
               icon: Icons.call_split,
-              title: 'Split into two',
-              subtitle: summary.questionCount.isEven
-                  ? 'Create Slice A and Slice B with half the questions each'
-                  : 'Needs an even number of questions',
+              title: 'Split',
+              subtitle: summary.questionCount < 2
+                  ? 'Needs at least two questions'
+                  : 'Create two or more practices with a random mix of questions',
               onTap: () => Navigator.of(context).pop(PracticeAction.split),
             ),
             OptionTile(

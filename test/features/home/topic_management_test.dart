@@ -34,6 +34,8 @@ void main() {
     await pumpFrames(tester);
     expect(find.byType(OptionTile), findsNWidgets(3));
     expect(find.text('Edit topic'), findsOneWidget);
+    expect(find.text('Download topic JSON'), findsNothing);
+    expect(find.text('Update topic JSON'), findsNothing);
     expect(find.text('Archive topic'), findsOneWidget);
     expect(find.text('Delete topic'), findsOneWidget);
 
@@ -82,14 +84,22 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Edit topic'), findsOneWidget);
-    expect(find.byType(OptionTile), findsNWidgets(4));
+    expect(find.byType(OptionTile), findsNWidgets(8));
     expect(find.text('AnkiDroid deck'), findsOneWidget);
+    expect(find.text('Download topic JSON'), findsOneWidget);
+    expect(find.text('Update topic JSON'), findsOneWidget);
     expect(find.text('Browse decks'), findsNothing);
+    await tester.ensureVisible(find.text('AnkiDroid deck'));
+    await pumpFrames(tester);
     await tester.tap(find.text('AnkiDroid deck'));
     await pumpFrames(tester);
     expect(find.text('Browse decks'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
+    await tester.tap(find.text('AnkiDroid deck'));
     await pumpFrames(tester);
+    expect(find.text('Browse decks'), findsNothing);
+    await tester.binding.handlePopRoute();
+    await pumpFrames(tester);
+    expect(find.text('Edit topic'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 

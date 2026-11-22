@@ -8,7 +8,7 @@ const String appName = 'Questions';
 /// `pubspec.yaml` is the single source of truth. Update this constant whenever
 /// the version there changes; `app_build_info_test.dart` fails when they drift
 /// apart.
-const String appVersion = '0.9.11';
+const String appVersion = '0.10.0';
 
 /// Human-readable build type for the running binary.
 String get appBuildTypeLabel => describeBuildType(

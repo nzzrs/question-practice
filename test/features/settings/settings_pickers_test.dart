@@ -1,0 +1,454 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:material_3_expressive/material_3_expressive.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:question_practice/core/domain/models.dart';
+import 'package:question_practice/core/platform/anki_gateway.dart';
+import 'package:question_practice/features/settings/settings_page.dart';
+import 'package:question_practice/features/settings/settings_pickers.dart';
+
+import '../../helpers/test_harness.dart';
+
+class _CountingAnkiGateway extends FakeAnkiGateway {
+  int statusCalls = 0;
+
+  @override
+  Future<AnkiStatus> status() async {
+    statusCalls++;
+    return super.status();
+  }
+}
+
+void main() {
+  Future<void> pumpSettings(
+    WidgetTester tester,
+    TestHarness harness, {
+    required AppSettings settings,
+  }) async {
+    await harness.settings.save(settings);
+    tester.view.physicalSize = const Size(420, 1500);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await pumpTestApp(tester, home: const SettingsPage(), harness: harness);
+  }
+
+  testWidgets('AnkiDroid has no open action and refresh reloads the status', (
+    tester,
+  ) async {
+    final gateway = _CountingAnkiGateway();
+    final harness = TestHarness(anki: gateway);
+    addTearDown(harness.close);
+    await pumpSettings(tester, harness, settings: const AppSettings());
+
+    expect(find.text('Open AnkiDroid'), findsNothing);
+
+    final refresh = find.byKey(const ValueKey('anki-check-again'));
+    await tester.scrollUntilVisible(
+      refresh,
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
+
+    final button = tester.widget<M3EIconButton>(refresh);
+    expect(button.tooltip, 'Check again');
+    expect(button.semanticLabel, 'Check again');
+    expect(
+      tester.getSemantics(refresh),
+      isSemantics(label: 'Check again', isButton: true, hasTapAction: true),
+    );
+    expect(
+      find.descendant(of: refresh, matching: find.byIcon(Icons.refresh)),
+      findsOneWidget,
+    );
+
+    final callsBefore = gateway.statusCalls;
+    await tester.tap(refresh);
+    await pumpFrames(tester);
+
+    expect(gateway.statusCalls, callsBefore + 1);
+    expect(find.text('Open AnkiDroid'), findsNothing);
+  });
+
+  testWidgets('provider picker has one solid choice and persists another', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await pumpSettings(
+      tester,
+      harness,
+      settings: const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiProvider: AiProvider.openai,
+        aiModel: 'gpt-test',
+      ),
+    );
+
+    final field = find.byKey(const ValueKey('ai-provider-field'));
+    await tester.ensureVisible(field);
+    await pumpFrames(tester);
+    expect(find.text('OpenAI'), findsOneWidget);
+
+    await tester.tap(field);
+    await pumpFrames(tester);
+
+    final rows = <String, Finder>{
+      for (final provider in AiProvider.values)
+        provider.name: find.byKey(
+          ValueKey('ai-provider-option-${provider.name}'),
+        ),
+    };
+    for (final row in rows.values) {
+      expect(row, findsOneWidget);
+    }
+
+    expect(
+      tester.getSemantics(rows['openai']!),
+      isSemantics(
+        label: 'OpenAI',
+        hasCheckedState: true,
+        isChecked: true,
+        isInMutuallyExclusiveGroup: true,
+        hasTapAction: true,
+      ),
+    );
+    expect(
+      tester.getSemantics(rows['groq']!),
+      isSemantics(
+        label: 'Groq',
+        hasCheckedState: true,
+        isChecked: false,
+        isInMutuallyExclusiveGroup: true,
+        hasTapAction: true,
+      ),
+    );
+
+    final scheme = M3ETheme.of(tester.element(rows['openai']!)).colorScheme;
+    final materials = [
+      for (final row in rows.values)
+        tester.widget<Material>(
+          find.descendant(of: row, matching: find.byType(Material)).first,
+        ),
+    ];
+    expect(
+      materials.where((material) => material.color == scheme.primaryContainer),
+      hasLength(1),
+    );
+    expect(
+      find.descendant(of: rows['openai']!, matching: find.byIcon(Icons.check)),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(M3EDialog),
+        matching: find.byIcon(Icons.check),
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(rows['groq']!);
+    await pumpFrames(tester);
+
+    expect(rows['groq'], findsNothing);
+    expect(find.text('Groq'), findsOneWidget);
+    expect((await harness.settings.load()).aiProvider, AiProvider.groq);
+  });
+
+  testWidgets('model search stays filtered after scrolling and selects', (
+    tester,
+  ) async {
+    final models = [
+      for (var index = 1; index <= 30; index++) 'gpt-$index',
+      'llama-3',
+      'claude-3',
+    ];
+    final client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'data': [
+            for (final model in models) {'id': model},
+          ],
+        }),
+        200,
+      );
+    });
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await harness.settings.saveApiKey('sk-test');
+    await pumpSettings(
+      tester,
+      harness,
+      settings: const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiProvider: AiProvider.openai,
+        aiModel: 'claude-3',
+      ),
+    );
+
+    final field = find.byKey(const ValueKey('ai-model-field'));
+    await tester.ensureVisible(field);
+    await pumpFrames(tester);
+    expect(find.text('claude-3'), findsOneWidget);
+
+    await tester.tap(field);
+    await pumpFrames(tester);
+
+    final search = find.byKey(const ValueKey('ai-model-search'));
+    expect(search, findsOneWidget);
+
+    final selectedRow = find.byKey(const ValueKey('ai-model-option-claude-3'));
+    expect(selectedRow, findsOneWidget);
+    final scheme = M3ETheme.of(tester.element(selectedRow)).colorScheme;
+    expect(
+      tester
+          .widget<Material>(
+            find
+                .descendant(of: selectedRow, matching: find.byType(Material))
+                .first,
+          )
+          .color,
+      scheme.primaryContainer,
+    );
+
+    await tester.enterText(search, 'gpt');
+    await pumpFrames(tester);
+
+    expect(find.byKey(const ValueKey('ai-model-option-llama-3')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('ai-model-option-claude-3')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('ai-model-option-gpt-1')), findsOneWidget);
+
+    final target = find.byKey(const ValueKey('ai-model-option-gpt-20'));
+    await tester.scrollUntilVisible(
+      target,
+      120,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('ai-model-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await pumpFrames(tester);
+
+    final searchField = tester.widget<M3ETextField>(search);
+    expect(searchField.controller!.text, 'gpt');
+    expect(find.byKey(const ValueKey('ai-model-option-llama-3')), findsNothing);
+
+    await tester.tap(target);
+    await pumpFrames(tester);
+
+    expect(search, findsNothing);
+    expect(find.text('gpt-20'), findsOneWidget);
+    expect((await harness.settings.load()).aiModel, 'gpt-20');
+  });
+
+  testWidgets('a loaded model keeps the closed field in sync', (tester) async {
+    final client = MockClient((request) async {
+      return http.Response(
+        jsonEncode({
+          'data': [
+            {'id': 'zeta-model'},
+            {'id': 'alpha-model'},
+          ],
+        }),
+        200,
+      );
+    });
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await harness.settings.saveApiKey('sk-test');
+    await pumpSettings(
+      tester,
+      harness,
+      settings: const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiProvider: AiProvider.openai,
+      ),
+    );
+
+    final field = find.byKey(const ValueKey('ai-model-field'));
+    await tester.ensureVisible(field);
+    await pumpFrames(tester);
+    expect(find.text('Choose a model'), findsOneWidget);
+    expect(
+      tester.getSemantics(field),
+      isSemantics(
+        label: 'Model',
+        value: 'Choose a model',
+        isButton: true,
+        hasTapAction: true,
+      ),
+    );
+
+    await tester.tap(field);
+    await pumpFrames(tester);
+
+    expect(find.byType(M3EDialog), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('ai-model-option-alpha-model')),
+      findsOneWidget,
+    );
+    // The field behind the open dialog already shows the auto-selected model.
+    expect(find.text('alpha-model'), findsNWidgets(2));
+
+    await tester.tap(find.text('Cancel'));
+    await pumpFrames(tester);
+
+    expect(find.text('alpha-model'), findsOneWidget);
+    expect((await harness.settings.load()).aiModel, 'alpha-model');
+  });
+
+  testWidgets(
+    'model picker fits a 360 dp phone at 2.0 text scale with the keyboard open',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+      final catalog = ValueNotifier<ModelCatalogState>(
+        ModelCatalogState(
+          models: [for (var index = 1; index <= 12; index++) 'model-$index'],
+          selected: 'model-1',
+          loaded: true,
+        ),
+      );
+      addTearDown(catalog.dispose);
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      await pumpTestApp(
+        tester,
+        harness: harness,
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: M3EButton.filled(
+                onPressed: () async {
+                  await showSettingsModelPicker(context, catalog: catalog);
+                },
+                label: const Text('Open models'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open models'));
+      await pumpFrames(tester);
+      expect(tester.takeException(), isNull);
+      expect(find.byType(M3EFullScreenDialog), findsOneWidget);
+      expect(find.byKey(const ValueKey('ai-model-search')), findsOneWidget);
+
+      final target = find.byKey(const ValueKey('ai-model-option-model-12'));
+      await tester.scrollUntilVisible(
+        target,
+        120,
+        scrollable: find.descendant(
+          of: find.byKey(const ValueKey('ai-model-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await pumpFrames(tester);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(target);
+      await pumpFrames(tester);
+      expect(find.byKey(const ValueKey('ai-model-search')), findsNothing);
+    },
+  );
+
+  testWidgets('switching provider discards an older model request', (
+    tester,
+  ) async {
+    final pendingOpenAi = Completer<http.Response>();
+    final openAiStarted = Completer<void>();
+    final client = MockClient((request) async {
+      if (request.url.host == 'api.openai.com') {
+        if (!openAiStarted.isCompleted) openAiStarted.complete();
+        return pendingOpenAi.future;
+      }
+      if (request.url.host == 'api.groq.com') {
+        return http.Response(
+          jsonEncode({
+            'data': [
+              {'id': 'groq-model'},
+            ],
+          }),
+          200,
+        );
+      }
+      return http.Response('{}', 404);
+    });
+    final harness = TestHarness(httpClient: client);
+    addTearDown(harness.close);
+    await harness.settings.saveApiKey('sk-test');
+    await pumpSettings(
+      tester,
+      harness,
+      settings: const AppSettings(
+        lookupMode: LookupMode.ai,
+        aiProvider: AiProvider.openai,
+      ),
+    );
+
+    final modelField = find.byKey(const ValueKey('ai-model-field'));
+    await tester.ensureVisible(modelField);
+    await tester.tap(modelField);
+    await pumpFrames(tester);
+    expect(openAiStarted.isCompleted, isTrue);
+
+    await tester.tap(find.text('Cancel'));
+    await pumpFrames(tester);
+
+    final providerField = find.byKey(const ValueKey('ai-provider-field'));
+    await tester.ensureVisible(providerField);
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 120));
+    await pumpFrames(tester);
+    await tester.tap(providerField);
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('ai-provider-option-groq')));
+    await pumpFrames(tester);
+
+    await tester.ensureVisible(modelField);
+    await tester.tap(modelField);
+    await pumpFrames(tester);
+    expect(
+      find.byKey(const ValueKey('ai-model-option-groq-model')),
+      findsOneWidget,
+    );
+
+    pendingOpenAi.complete(
+      http.Response(
+        jsonEncode({
+          'data': [
+            {'id': 'openai-model'},
+          ],
+        }),
+        200,
+      ),
+    );
+    await pumpFrames(tester);
+
+    expect(
+      find.byKey(const ValueKey('ai-model-option-openai-model')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('ai-model-option-groq-model')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Cancel'));
+    await pumpFrames(tester);
+    expect(find.text('groq-model'), findsOneWidget);
+    expect((await harness.settings.load()).aiModel, 'groq-model');
+  });
+}

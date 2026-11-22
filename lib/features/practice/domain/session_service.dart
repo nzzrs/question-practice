@@ -7,6 +7,7 @@ import '../../../core/data/practice_repository.dart';
 import '../../../core/data/session_repository.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/domain/question_progress.dart';
+import '../../feedback/domain/wrong_answer_bullets.dart';
 
 const errorReviewDelay = Duration(hours: 48);
 
@@ -126,6 +127,15 @@ class SessionService {
   final Clock _clock;
   final Random _random;
 
+  /// Keeps the card's pre-session state for Discard.
+  ///
+  /// Cards created by this session are deleted with it, so only a card that
+  /// already existed before the session needs a snapshot.
+  Future<void> _snapshotBeforeChange(int sessionId, ErrorCard card) async {
+    if (card.sessionId == sessionId) return;
+    await _cards.recordErrorCardUndo(sessionId: sessionId, cardId: card.id);
+  }
+
   SessionQuestionItem _itemFor(
     Question question, {
     required String topicName,
@@ -243,8 +253,14 @@ class SessionService {
     }
     final questions = <SessionQuestionItem>[];
     final cards = <int, ErrorCard>{};
+    final questionsById = {
+      for (final question in await _sessions.questionsByIds(
+        due.map((card) => card.questionId),
+      ))
+        question.id: question,
+    };
     for (final card in due) {
-      final question = await _practices.questionById(card.questionId);
+      final question = questionsById[card.questionId];
       if (question == null) continue;
       questions.add(
         _itemFor(
@@ -292,10 +308,11 @@ class SessionService {
     };
     final cards = <int, ErrorCard>{};
     if (session.mode == SessionMode.pastErrors) {
-      for (final question in questions) {
-        final card = await _cards.activeErrorForQuestion(question.id);
-        if (card != null) cards[question.id] = card;
-      }
+      cards.addAll(
+        await _cards.activeErrorsForQuestions(
+          questions.map((question) => question.id),
+        ),
+      );
     }
     final progress = await _sessions.questionProgress();
     return SessionStart(
@@ -351,9 +368,13 @@ class SessionService {
           start.errorCards[item.question.id] ??
           await _cards.activeErrorForQuestion(item.question.id);
       if (card != null) {
+        await _snapshotBeforeChange(session.id, card);
         if (isCorrect) {
           await _cards.resolveError(card.id, now);
-        } else if (!wasDistracted && selected.isNotEmpty) {
+        } else if (wasDistracted) {
+          // A distracted re-test keeps the earlier card due and records why.
+          await _cards.setErrorCardDistracted(card.id, true);
+        } else if (selected.isNotEmpty) {
           await _cards.touchWrongError(
             id: card.id,
             wrongIndexes: selected,
@@ -363,7 +384,13 @@ class SessionService {
           );
         }
       }
-    } else if (!isCorrect && !wasDistracted && selected.isNotEmpty) {
+    } else if (wasDistracted) {
+      final active = await _cards.activeErrorForQuestion(item.question.id);
+      if (active != null && active.sessionId != session.id) {
+        await _snapshotBeforeChange(session.id, active);
+        await _cards.setErrorCardDistracted(active.id, true);
+      }
+    } else if (!isCorrect && selected.isNotEmpty) {
       final active = await _cards.activeErrorForQuestion(item.question.id);
       if (active == null) {
         await _cards.createErrorCard(
@@ -378,10 +405,12 @@ class SessionService {
           alternativeExplanations: item.question.alternativeExplanations,
           topicName: item.topicName,
           practiceName: item.practiceName,
+          subtopic: item.question.subtopic,
           lastWrongAt: now,
           dueAfter: errorReviewDelay,
         );
       } else {
+        await _snapshotBeforeChange(session.id, active);
         await _cards.touchWrongError(
           id: active.id,
           wrongIndexes: selected,
@@ -424,14 +453,17 @@ class SessionService {
     );
   }
 
-  /// Updates the note left on an answered question.
+  /// Replaces the learner's "What went wrong?" bullets for an answered
+  /// question.
   ///
-  /// The error card created from the same answer is kept in sync with the
-  /// attempt, so late notes appear during review too.
-  Future<Attempt> updateReasoning({
+  /// The canonical one-line-per-bullet text is stored on the attempt and on
+  /// the active error card for the question, even when that card came from an
+  /// earlier session. Editing an old card in practice therefore writes through
+  /// to the card the review shows.
+  Future<Attempt> setWrongAnswerBullets({
     required SessionStart start,
     required SessionQuestionItem item,
-    required String reasoning,
+    required List<String> bullets,
   }) async {
     final attempt = await _sessions.attemptForQuestion(
       start.session.id,
@@ -440,17 +472,21 @@ class SessionService {
     if (attempt == null) {
       throw const SessionException('This question has no answer to update.');
     }
-    final trimmed = reasoning.trim();
-    if (trimmed == attempt.reasoning) return attempt;
-    await _sessions.updateAttemptReasoning(attempt.id, trimmed);
+    final canonical = WrongAnswerBullets.format(bullets);
+    // Each target is written only when it differs, so a retry after a partial
+    // failure can still repair the card instead of returning early.
+    if (canonical != attempt.reasoning) {
+      await _sessions.updateAttemptReasoning(attempt.id, canonical);
+    }
     final card = await _cards.activeErrorForQuestion(item.question.id);
-    if (card != null && card.sessionId == start.session.id) {
-      await _cards.updateErrorCardReasoning(card.id, trimmed);
+    if (card != null && card.reasoning != canonical) {
+      await _snapshotBeforeChange(start.session.id, card);
+      await _cards.updateErrorCardReasoning(card.id, canonical);
     }
     await _cards.updateSkippedReasoning(
       start.session.id,
       item.question.id,
-      trimmed,
+      canonical,
     );
     final updated = await _sessions.attemptForQuestion(
       start.session.id,
@@ -487,6 +523,11 @@ class SessionService {
     if (effective) {
       if (card != null && card.sessionId == session.id) {
         await _cards.deleteErrorCard(card.id);
+      } else if (card != null) {
+        // A re-test of an earlier error stays due, but the review warns that
+        // this attempt was distracted instead of counting as a new mistake.
+        await _snapshotBeforeChange(session.id, card);
+        await _cards.setErrorCardDistracted(card.id, true);
       }
     } else if (!attempt.isCorrect && !attempt.isSkipped) {
       final now = _clock.now().toUtc();
@@ -503,10 +544,12 @@ class SessionService {
           alternativeExplanations: item.question.alternativeExplanations,
           topicName: item.topicName,
           practiceName: item.practiceName,
+          subtopic: item.question.subtopic,
           lastWrongAt: now,
           dueAfter: errorReviewDelay,
         );
       } else {
+        await _snapshotBeforeChange(session.id, card);
         await _cards.touchWrongError(
           id: card.id,
           wrongIndexes: attempt.selectedIndexes,
@@ -558,7 +601,9 @@ class SessionService {
       if (card != null && card.sessionId == session.id) {
         await _cards.deleteErrorCard(card.id);
       }
-    } else if (!attempt.isCorrect && attempt.selectedIndexes.isNotEmpty) {
+    } else if (!attempt.isCorrect &&
+        attempt.selectedIndexes.isNotEmpty &&
+        !attempt.distracted) {
       final now = _clock.now().toUtc();
       if (card == null) {
         await _cards.createErrorCard(
@@ -573,10 +618,12 @@ class SessionService {
           alternativeExplanations: item.question.alternativeExplanations,
           topicName: item.topicName,
           practiceName: item.practiceName,
+          subtopic: item.question.subtopic,
           lastWrongAt: now,
           dueAfter: errorReviewDelay,
         );
       } else {
+        await _snapshotBeforeChange(session.id, card);
         await _cards.touchWrongError(
           id: card.id,
           wrongIndexes: attempt.selectedIndexes,
@@ -683,16 +730,28 @@ class SessionService {
     }
     final lookupCount = await _sessions.lookupCountForSession(sessionId);
     final conceptCount = await _sessions.conceptCountForSession(sessionId);
-    final needingNotes = await _cards.countErrorCardsNeedingDetailsForSession(
+    final needingReview = await _cards.countErrorCardsNeedingDetailsForSession(
       sessionId,
     );
     return SessionSummary(
       session: session,
       lookupCount: lookupCount,
       conceptCount: conceptCount,
-      errorCardsNeedingNotes: needingNotes,
+      errorCardsNeedingReview: needingReview,
     );
   }
 
-  Future<void> discard(int sessionId) => _sessions.discardSession(sessionId);
+  /// Deletes an unfinished session and undoes the error cards it changed.
+  ///
+  /// The journal is read before the transaction so a restart can restore the
+  /// state recorded by an earlier run. Restore, delete and journal cleanup are
+  /// one transaction in [SessionRepository.discardSession].
+  Future<void> discard(int sessionId) async {
+    try {
+      final snapshots = await _cards.errorCardUndoForSession(sessionId);
+      await _sessions.discardSession(sessionId, restore: snapshots);
+    } on Object catch (error) {
+      throw SessionException('Could not discard this session: $error');
+    }
+  }
 }

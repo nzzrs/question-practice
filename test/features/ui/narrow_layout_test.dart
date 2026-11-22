@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/theme.dart';
+import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/core/ui/immersive_review.dart';
 import 'package:question_practice/features/errors/past_errors_page.dart';
 import 'package:question_practice/features/export/cards_page.dart';
@@ -178,17 +179,10 @@ void main() {
       home: ReviewPage(sessionId: start.session.id),
       harness: harness,
     );
-    await tester.drag(find.byType(CustomScrollView), const Offset(0, -700));
-    await pumpFrames(tester);
     expect(tester.takeException(), isNull);
-    expect(
-      find.text('What was the flawed assumption in your reasoning?'),
-      findsOneWidget,
-    );
-    expect(
-      find.text('What do you need to know to prevent that error?'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
+    expect(find.text('What went wrong?'), findsOneWidget);
+    expect(find.text('Check with AI'), findsNothing);
   });
 
   testWidgets('session page fits 320', (tester) async {
@@ -215,10 +209,42 @@ void main() {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
     await _seedErrorCard(harness, seeded, complete: true);
+    await harness.cards.createBasicCard(
+      sessionId: null,
+      questionId: question.id,
+      question: 'A heuristic card with a fairly long front for a narrow row',
+      answer: 'A short answer.',
+      context: question.prompt,
+      topicName: 'Topic',
+      cognitiveType: CognitiveType.heuristic,
+      subtopic: 'Networking',
+      createdAt: harness.clock.now().toUtc(),
+    );
+    await harness.cards.createConcept(
+      sessionId: null,
+      questionId: question.id,
+      term: 'VPC',
+      definition: 'A private network.',
+      context: question.prompt,
+      topicName: 'Topic',
+      subtopic: 'Networking',
+      source: ConceptSource.manual,
+      createdAt: harness.clock.now().toUtc(),
+    );
     await _pumpNarrow(tester, home: const CardsPage(), harness: harness);
+    expect(tester.takeException(), isNull);
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
-    expect(find.text('Review all'), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-filter-cards')), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('cards-filter-errors')));
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.byKey(const ValueKey('cards-filter-all')));
+    await pumpFrames(tester);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('cards page with long tags fits 320', (tester) async {
@@ -236,7 +262,7 @@ void main() {
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
   });
 
-  testWidgets('card editor fits 360 with option explanations open', (
+  testWidgets('error review fits 360 with option explanations open', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -245,22 +271,20 @@ void main() {
       topicName: 'A very long topic name that keeps going for a while',
       count: 1,
     );
-    await _seedErrorCard(harness, seeded, complete: true);
+    await _seedErrorCard(harness, seeded);
     await _pumpNarrow(
       tester,
       home: const CardsPage(),
       harness: harness,
       size: const Size(360, 640),
     );
-    await tester.tap(find.text('Review all'));
+    await tester.tap(find.byKey(const ValueKey('review-all-pending')));
     await pumpFrames(tester);
-    await tester.tap(find.byKey(const ValueKey('error-card-edit-content')));
-    await pumpFrames(tester);
-    expect(find.text('Edit card content'), findsOneWidget);
+    expect(find.byKey(const ValueKey('error-card-edit-content')), findsNothing);
     expect(tester.takeException(), isNull);
 
     final toggle = find.byKey(
-      const ValueKey('edit-error-option-0-explanation-toggle'),
+      const ValueKey('alternative-explanation-0-toggle'),
     );
     await tester.ensureVisible(toggle);
     await pumpFrames(tester);
@@ -268,7 +292,7 @@ void main() {
     await pumpFrames(tester);
     expect(tester.takeException(), isNull);
     expect(
-      find.byKey(const ValueKey('edit-error-option-0-explanation')),
+      find.byKey(const ValueKey('alternative-explanation-0-toggle')),
       findsOneWidget,
     );
   });

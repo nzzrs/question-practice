@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:meta/meta.dart';
 
 enum SessionMode { practice, mixed, pastErrors }
@@ -14,6 +16,97 @@ enum WebEngine { duckDuckGo, wikipedia }
 
 enum AiProvider { openai, groq, openRouter, gemini, custom }
 
+/// The cognitive shape a card tests.
+enum CognitiveType {
+  fact('Fact'),
+  heuristic('Scenario and rule'),
+  procedure('Steps'),
+  contrast('Contrast'),
+  concept('Concept');
+
+  const CognitiveType(this.label);
+
+  final String label;
+
+  static CognitiveType fromName(String? value) {
+    for (final type in values) {
+      if (type.name == value) return type;
+    }
+    return CognitiveType.fact;
+  }
+}
+
+/// The authoring shape a card is written in inside the card creator.
+///
+/// A template codes how the front and back are phrased. The exact template is
+/// not stored: after saving, [cognitiveType] carries the pedagogical shape and
+/// the Definition template becomes a [Concept].
+enum CardTemplate {
+  definition('Definition', 'Definition', CognitiveType.concept),
+  contrast('Contrast', 'Contrast', CognitiveType.contrast),
+  mechanism('Cause and effect', 'Cause and effect', CognitiveType.fact),
+  heuristic('Scenario and rule', 'Scenario and rule', CognitiveType.heuristic),
+  procedure('Steps', 'Steps', CognitiveType.procedure);
+
+  const CardTemplate(this.label, this.chipLabel, this.cognitiveType);
+
+  /// Short name for quality rows and group headers.
+  final String label;
+
+  /// Name shown in the template picker and AI suggestion rows.
+  final String chipLabel;
+
+  /// The stored shape after the card is saved.
+  final CognitiveType cognitiveType;
+}
+
+/// A one-tap classification of why an answer was wrong.
+///
+/// Legacy data only: practice now keeps free-form wrong-answer bullets. The
+/// enum and its columns remain so older backups and cards still render.
+enum MistakeKind {
+  forgottenFact('Forgotten fact'),
+  confusion('Confusion between 2 options'),
+  misinterpretation('Misinterpretation'),
+  distraction('Distraction');
+
+  const MistakeKind(this.label);
+
+  final String label;
+
+  static MistakeKind? fromName(String? value) {
+    for (final kind in values) {
+      if (kind.name == value) return kind;
+    }
+    return null;
+  }
+}
+
+/// Why a mistake happened, in a stable order.
+List<MistakeKind> mistakeKindsFromJson(String value) {
+  final parsed = <MistakeKind>[];
+  try {
+    final decoded = jsonDecode(value);
+    if (decoded is List) {
+      for (final item in decoded) {
+        final kind = item is String ? MistakeKind.fromName(item) : null;
+        if (kind != null && !parsed.contains(kind)) parsed.add(kind);
+      }
+    }
+  } on FormatException {
+    return parsed;
+  }
+  return parsed;
+}
+
+String mistakeKindsToJson(Iterable<MistakeKind> kinds) {
+  final values = <String>[
+    for (final kind in MistakeKind.values)
+      if (kinds.contains(kind)) kind.name,
+  ];
+  return jsonEncode(values);
+}
+
 @immutable
 class Topic {
   const Topic({
@@ -23,6 +116,8 @@ class Topic {
     required this.priority,
     required this.ankiDeck,
     required this.createdAt,
+    this.minimumScore = 70,
+    this.targetScore = 80,
     this.archived = false,
   });
 
@@ -33,6 +128,12 @@ class Topic {
   final String? ankiDeck;
   final DateTime createdAt;
 
+  /// Percentage below which a score counts as failing this topic.
+  final int minimumScore;
+
+  /// Percentage at which a score counts as meeting the topic goal.
+  final int targetScore;
+
   /// Archived topics keep all their data but stay out of the normal list.
   final bool archived;
 
@@ -41,6 +142,8 @@ class Topic {
     String? description,
     int? priority,
     String? ankiDeck,
+    int? minimumScore,
+    int? targetScore,
     bool? archived,
     bool clearPriority = false,
     bool clearAnkiDeck = false,
@@ -52,6 +155,8 @@ class Topic {
       priority: clearPriority ? null : (priority ?? this.priority),
       ankiDeck: clearAnkiDeck ? null : (ankiDeck ?? this.ankiDeck),
       createdAt: createdAt,
+      minimumScore: minimumScore ?? this.minimumScore,
+      targetScore: targetScore ?? this.targetScore,
       archived: archived ?? this.archived,
     );
   }
@@ -144,6 +249,33 @@ class QuestionDraft {
   final String sourceId;
 }
 
+/// One practice from a topic update file and how it maps to stored rows.
+@immutable
+class TopicPracticeUpdate {
+  const TopicPracticeUpdate({
+    required this.name,
+    required this.description,
+    required this.questions,
+    required this.deletedQuestionIds,
+    required this.contentHash,
+    this.existingPracticeId,
+    this.changed = true,
+  });
+
+  /// The stored practice this row updates, or null for a new practice.
+  final int? existingPracticeId;
+  final String name;
+  final String description;
+  final List<PracticeQuestionUpdate> questions;
+  final List<int> deletedQuestionIds;
+  final String contentHash;
+
+  /// Whether an existing practice needs any write; new practices always do.
+  final bool changed;
+
+  bool get isNew => existingPracticeId == null;
+}
+
 /// One question from an update file, at its new position in the practice.
 @immutable
 class PracticeQuestionUpdate {
@@ -215,6 +347,7 @@ class Attempt {
     required this.unknown,
     required this.isCorrect,
     required this.answeredAt,
+    this.mistakeKinds = const [],
   });
 
   final int id;
@@ -230,6 +363,9 @@ class Attempt {
   final bool unknown;
   final bool isCorrect;
   final DateTime answeredAt;
+
+  /// Legacy one-tap classifications chosen after a wrong answer.
+  final List<MistakeKind> mistakeKinds;
 
   bool get isSkipped => selectedIndexes.isEmpty || unknown;
   int? get selectedIndex =>
@@ -389,6 +525,7 @@ class Concept {
     required this.source,
     required this.createdAt,
     required this.exportedAt,
+    this.subtopic = '',
   });
 
   final int id;
@@ -401,6 +538,9 @@ class Concept {
   final String extra;
   final String context;
   final String topicName;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
   final ConceptSource source;
   final DateTime createdAt;
   final DateTime? exportedAt;
@@ -418,6 +558,7 @@ class Concept {
       extra: extra ?? this.extra,
       context: context,
       topicName: topicName,
+      subtopic: subtopic,
       source: source,
       createdAt: createdAt,
       exportedAt: exportedAt ?? this.exportedAt,
@@ -449,6 +590,10 @@ class ErrorCard {
     required this.detailsCompletedAt,
     required this.resolvedAt,
     required this.exportedAt,
+    this.cognitiveType = CognitiveType.contrast,
+    this.subtopic = '',
+    this.mistakeKinds = const [],
+    this.distracted = false,
   });
 
   final int id;
@@ -473,8 +618,35 @@ class ErrorCard {
   final DateTime? resolvedAt;
   final DateTime? exportedAt;
 
+  /// Cognitive shape of the card generated from this error.
+  final CognitiveType cognitiveType;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
+
+  /// Legacy quick classifications chosen after the wrong answer.
+  final List<MistakeKind> mistakeKinds;
+
+  /// A distracted re-test kept this card due instead of counting a new error.
+  final bool distracted;
+
   bool get isResolved => status == ErrorCardStatus.resolved;
-  bool get needsDetails => detailsCompletedAt == null;
+
+  /// Whether the learner has completed the card's details at least once.
+  bool get hasCompletedDetails => detailsCompletedAt != null;
+
+  /// Whether the card needs the learner's review again.
+  ///
+  /// A card is pending when its details were never completed, or when the
+  /// question was missed again after the last completed review. Exporting a
+  /// card does not clear or set this state. The field name is kept for the
+  /// existing Cards flow, which uses it for the review badge and selection.
+  bool get needsDetails =>
+      detailsCompletedAt == null || lastWrongAt.isAfter(detailsCompletedAt!);
+
+  /// Alias that names the pending state without implying missing notes.
+  bool get needsReview => needsDetails;
+
   bool isDueAt(DateTime now) => !isResolved && !now.isBefore(dueAt);
 
   int? get correctIndex => correctIndexes.isEmpty ? null : correctIndexes.first;
@@ -494,8 +666,8 @@ class ErrorCard {
 }
 
 @immutable
-class ManualCard {
-  const ManualCard({
+class BasicCard {
+  const BasicCard({
     required this.id,
     required this.sessionId,
     required this.question,
@@ -505,6 +677,8 @@ class ManualCard {
     required this.exportedAt,
     this.questionId,
     this.context = '',
+    this.cognitiveType = CognitiveType.fact,
+    this.subtopic = '',
   });
 
   final int id;
@@ -518,6 +692,13 @@ class ManualCard {
   final String topicName;
   final DateTime createdAt;
   final DateTime? exportedAt;
+
+  /// Cognitive shape of the card: fact, scenario and rule, steps, contrast or
+  /// concept.
+  final CognitiveType cognitiveType;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
 }
 
 @immutable
@@ -566,9 +747,10 @@ class SkippedQuestion {
   String get correctAnswer => correctAnswers.join('; ');
 }
 
+/// A passage the learner saved from a question.
 @immutable
-class StudyHighlight {
-  const StudyHighlight({
+class Note {
+  const Note({
     required this.id,
     required this.sessionId,
     required this.questionId,
@@ -579,7 +761,8 @@ class StudyHighlight {
     required this.createdAt,
     required this.keptAt,
     required this.cardCreatedAt,
-    required this.manualCardId,
+    required this.basicCardId,
+    this.subtopic = '',
   });
 
   final int id;
@@ -592,20 +775,43 @@ class StudyHighlight {
   final DateTime createdAt;
   final DateTime? keptAt;
   final DateTime? cardCreatedAt;
-  final int? manualCardId;
+  final int? basicCardId;
+
+  /// Optional grouping inside the topic, copied from the source question.
+  final String subtopic;
 
   bool get isKept => keptAt != null;
   bool get hasCard => cardCreatedAt != null;
   bool get needsReview => !isKept && !hasCard;
 }
 
-/// One atomic front/back card proposed by the AI for a saved highlight.
+/// One atomic front/back variant proposed by the AI.
 @immutable
 class SuggestedCard {
-  const SuggestedCard({required this.front, required this.back});
+  const SuggestedCard({
+    required this.front,
+    required this.back,
+    required this.template,
+    this.variantIndex = 0,
+  });
 
   final String front;
   final String back;
+  final CardTemplate template;
+
+  /// Zero-based position of this variant inside its idea.
+  final int variantIndex;
+
+  CognitiveType get cognitiveType => template.cognitiveType;
+}
+
+/// One AI idea with one to three wording variants of the same fact.
+@immutable
+class SuggestedCardIdea {
+  const SuggestedCardIdea({required this.template, required this.variants});
+
+  final CardTemplate template;
+  final List<SuggestedCard> variants;
 }
 
 @immutable
@@ -614,17 +820,22 @@ class SessionSummary {
     required this.session,
     required this.lookupCount,
     required this.conceptCount,
-    required this.errorCardsNeedingNotes,
+    required this.errorCardsNeedingReview,
   });
 
   final PracticeSession session;
   final int lookupCount;
   final int conceptCount;
-  final int errorCardsNeedingNotes;
+
+  /// Error cards missed in this session that still need review.
+  ///
+  /// Derived from this session's wrong attempts, not from the session that
+  /// originally created each card, so a repeated error is counted here.
+  final int errorCardsNeedingReview;
 
   int get wrongCount => session.total - session.correct - session.skipped;
   bool get hasReviewableIssues =>
-      errorCardsNeedingNotes > 0 || session.skipped > 0;
+      errorCardsNeedingReview > 0 || session.skipped > 0;
 }
 
 @immutable

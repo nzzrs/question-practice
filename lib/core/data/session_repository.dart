@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import '../database/app_database.dart';
 import '../domain/models.dart';
 import '../domain/question_progress.dart';
+import 'error_card_undo.dart';
 import 'mappers.dart';
 
 class SessionRepository {
@@ -43,12 +44,6 @@ class SessionRepository {
     return row == null ? null : sessionFromRow(row);
   }
 
-  Stream<PracticeSession?> watchLatestInProgress() {
-    return _db.sessionDao.watchLatestInProgressSession().map(
-      (row) => row == null ? null : sessionFromRow(row),
-    );
-  }
-
   Stream<List<PracticeSession>> watchInProgress() {
     return _db.sessionDao.watchInProgressSessions().map(
       (rows) => rows.map(sessionFromInProgressRow).toList(),
@@ -70,21 +65,24 @@ class SessionRepository {
     return row == null ? null : attemptFromRow(row);
   }
 
+  /// Question rows for [ids] in batched queries. The result order is
+  /// unspecified.
+  Future<List<Question>> questionsByIds(Iterable<int> ids) async {
+    final rows = await _db.topicDao.questionsByIds(ids);
+    return rows.map(questionFromRow).toList();
+  }
+
   /// History for every question, derived from its attempts across sessions.
   Future<QuestionProgress> questionProgress() async {
-    final rows = await _db.sessionDao.allAttempts();
+    final flags = await _db.sessionDao.questionProgressFlags();
     final leftUnanswered = await _db.sessionDao.questionsLeftUnanswered();
     final done = <int>{};
     final solved = <int>{};
     final skipped = <int>{...leftUnanswered};
-    for (final row in rows) {
-      final attempt = attemptFromRow(row);
-      if (attempt.isSkipped) {
-        skipped.add(attempt.questionId);
-      } else {
-        done.add(attempt.questionId);
-      }
-      if (attempt.isCorrect) solved.add(attempt.questionId);
+    for (final flag in flags) {
+      if (flag.done) done.add(flag.questionId);
+      if (flag.solved) solved.add(flag.questionId);
+      if (flag.skipped) skipped.add(flag.questionId);
     }
     return QuestionProgress(
       doneQuestionIds: done,
@@ -131,6 +129,11 @@ class SessionRepository {
     return _db.sessionDao.updateAttemptReasoning(id, reasoning);
   }
 
+  /// Completes a session and drops its undo journal in one transaction.
+  ///
+  /// Finishing keeps every error-card change the session made. Clearing the
+  /// journal here means a later history cleanup can never roll those changes
+  /// back.
   Future<void> completeSession({
     required int id,
     required int total,
@@ -139,24 +142,49 @@ class SessionRepository {
     required int distracted,
     required DateTime finishedAt,
   }) {
-    return _db.sessionDao.completeSession(
-      id: id,
-      total: total,
-      correct: correct,
-      skipped: skipped,
-      distracted: distracted,
-      finishedAt: finishedAt,
-    );
+    return _db.transaction(() async {
+      await _db.sessionDao.completeSession(
+        id: id,
+        total: total,
+        correct: correct,
+        skipped: skipped,
+        distracted: distracted,
+        finishedAt: finishedAt,
+      );
+      await _db.settingsDao.removeValue(errorCardUndoKey(id));
+    });
   }
 
   Future<void> abandonSession(int id) => _db.sessionDao.abandonSession(id);
 
-  Future<void> discardSession(int id) => _db.sessionDao.deleteSession(id);
+  /// Deletes a session after restoring the earlier cards it changed.
+  ///
+  /// The restore, the session delete and the journal removal share one
+  /// transaction. Any failure leaves the session and its journal intact and
+  /// surfaces the error, so the flow never hides a partial rollback.
+  /// Missing cards are skipped by the restore itself.
+  Future<void> discardSession(
+    int id, {
+    List<ErrorCardUndoSnapshot> restore = const [],
+  }) {
+    return _db.transaction(() async {
+      final session = await _db.sessionDao.sessionById(id);
+      if (session == null) {
+        await _db.settingsDao.removeValue(errorCardUndoKey(id));
+        return;
+      }
+      for (final snapshot in restore) {
+        await _db.cardDao.restoreErrorCardUndo(snapshot);
+      }
+      await _db.sessionDao.deleteSession(id);
+      await _db.settingsDao.removeValue(errorCardUndoKey(id));
+    });
+  }
 
   /// Deletes the given completed sessions in one transaction.
   ///
   /// Attempts, session questions, error cards, skipped records, concepts,
-  /// highlights and basic cards linked to those sessions cascade with them.
+  /// notes and basic cards linked to those sessions cascade with them.
   /// Rows belonging to in-progress or abandoned sessions are kept.
   Future<int> deleteSessions(Iterable<int> ids) {
     final values = ids.toSet();

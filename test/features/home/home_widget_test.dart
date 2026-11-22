@@ -86,7 +86,7 @@ void main() {
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
     expect(find.text('Cloud'), findsOneWidget);
-    expect(find.text('1 practices · 3 questions'), findsOneWidget);
+    expect(find.text('1 practice · 3 questions'), findsOneWidget);
 
     await tester.tap(find.text('Cloud'));
     await pumpFrames(tester);
@@ -145,7 +145,7 @@ void main() {
     await service.finishEarly(start: start, markSkipped: false);
 
     await pumpTestApp(tester, home: const HomePage(), harness: harness);
-    expect(find.text('1 practices · 1 questions'), findsOneWidget);
+    expect(find.text('1 practice · 1 question'), findsOneWidget);
   });
 
   testWidgets('session gives in-place feedback, explanation and score', (
@@ -179,22 +179,28 @@ void main() {
     await pumpFrames(tester);
 
     expect(
-      find.text('Not quite. The error card will ask what went wrong.'),
+      find.text('Not quite. Write what went wrong, then turn it into cards.'),
       findsOneWidget,
     );
     await tester.scrollUntilVisible(
       find.textContaining('Wrong: 1 is a distractor.'),
       120,
+      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     expect(find.textContaining('Wrong: 1 is a distractor.'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Why this answer'), 120);
+    await tester.scrollUntilVisible(
+      find.text('Why this answer'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
     await pumpFrames(tester);
     expect(find.text('Why this answer'), findsOneWidget);
     expect(find.text('Because 1 is correct.'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.text('I was distracted or read too fast'),
       120,
+      scrollable: find.byType(Scrollable).first,
     );
     await pumpFrames(tester);
     expect(find.text('I was distracted or read too fast'), findsOneWidget);
@@ -248,6 +254,76 @@ void main() {
     expect(find.text('Resume'), findsNWidgets(2));
     expect(find.text('Practice'), findsNWidgets(2));
     expect(find.text('Topic · 0/1 answered'), findsNWidgets(2));
+  });
+
+  testWidgets('a failed discard keeps the paused session and shows the error', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 2);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).first;
+    final baselineId = await harness.cards.createErrorCard(
+      questionId: question.id,
+      sessionId: null,
+      question: question.prompt,
+      alternatives: question.alternatives,
+      correctIndexes: question.correctIndexes,
+      wrongIndexes: const [1],
+      reasoning: 'Original reasoning',
+      explanation: question.explanation,
+      alternativeExplanations: question.alternativeExplanations,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      lastWrongAt: DateTime.utc(2025, 12, 1, 8),
+      dueAfter: const Duration(hours: 48),
+    );
+    final service = SessionService(
+      practices: harness.practices,
+      sessions: harness.sessions,
+      cards: harness.cards,
+      clock: harness.clock,
+    );
+    final start = await service.startPractice(seeded.practiceId);
+    await service.submitAnswer(
+      start: start,
+      item: start.items.first,
+      selectedIndexes: const [1],
+      reasoning: 'Changed before the conflict',
+      distracted: false,
+    );
+    await harness.cards.resolveError(baselineId, harness.clock.now().toUtc());
+    await harness.cards.createErrorCard(
+      questionId: question.id,
+      sessionId: null,
+      question: question.prompt,
+      alternatives: question.alternatives,
+      correctIndexes: question.correctIndexes,
+      wrongIndexes: const [1],
+      reasoning: 'Conflicting active card',
+      explanation: question.explanation,
+      alternativeExplanations: question.alternativeExplanations,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      lastWrongAt: DateTime.utc(2025, 12, 1, 9),
+      dueAfter: const Duration(hours: 48),
+    );
+
+    await pumpTestApp(tester, home: const HomePage(), harness: harness);
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    await pumpFrames(tester);
+    await tester.tap(find.text('Discard'));
+    await pumpFrames(tester);
+
+    expect(
+      find.textContaining('Could not discard this session'),
+      findsOneWidget,
+    );
+    expect(find.text('Session in progress'), findsOneWidget);
+    expect(await harness.sessions.sessionById(start.session.id), isNotNull);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('five-minute reminder is a floating toast, not a countdown', (

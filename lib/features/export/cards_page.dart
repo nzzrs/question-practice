@@ -1,56 +1,55 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
+import '../../core/data/settings_repository.dart';
 import '../../core/domain/models.dart';
-import '../../core/domain/reading_time.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/error_cards_review_page.dart';
 import '../lookup/lookup_actions.dart';
 import '../practice/selectable_linkified_text.dart';
-import '../review/highlight_review_page.dart';
+import '../review/note_review_page.dart';
 import '../review/skipped_question_view.dart';
 import 'domain/anki_note_builder.dart';
 
-enum _Filter { all, concepts, review, basic, highlights }
+enum CardsFilter { all, cards, errors, notes }
 
 class CardsPage extends ConsumerStatefulWidget {
-  const CardsPage({super.key});
+  const CardsPage({super.key, this.viewCache});
+
+  /// Test seam for counting derivations; production builds a fresh cache.
+  @visibleForTesting
+  final CardsViewCache? viewCache;
 
   @override
   ConsumerState<CardsPage> createState() => _CardsPageState();
 }
 
 class _CardsPageState extends ConsumerState<CardsPage> {
+  late final CardsViewCache _viewCache = widget.viewCache ?? CardsViewCache();
   final _selectedConcepts = <int>{};
   final _selectedErrors = <int>{};
   final _selectedBasic = <int>{};
   final _selectedSkipped = <int>{};
-  final _selectedHighlights = <int>{};
+  final _selectedNotes = <int>{};
   bool _selectionActive = false;
-  bool _initialized = false;
+  bool _restoreStarted = false;
+  bool _restored = false;
+  int _selectionRevision = 0;
+  bool _pruneScheduled = false;
   bool _busy = false;
   bool _showExported = false;
-  _Filter _filter = _Filter.all;
+  CardsFilter _filter = CardsFilter.all;
 
   bool get _hasSelection =>
       _selectedConcepts.isNotEmpty ||
       _selectedErrors.isNotEmpty ||
       _selectedBasic.isNotEmpty ||
       _selectedSkipped.isNotEmpty ||
-      _selectedHighlights.isNotEmpty;
-
-  void _clearSelection() {
-    setState(() {
-      _selectionActive = false;
-      _selectedConcepts.clear();
-      _selectedErrors.clear();
-      _selectedBasic.clear();
-      _selectedSkipped.clear();
-      _selectedHighlights.clear();
-    });
-  }
+      _selectedNotes.isNotEmpty;
 
   /// Long-press: enter selection mode with the pressed row selected.
   void _startSelection(Set<int> selection, int id) {
@@ -58,6 +57,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _selectionActive = true;
       selection.add(id);
     });
+    _persistSelection();
   }
 
   /// Tap while selection mode is active: toggle this row without moving others.
@@ -66,6 +66,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       if (!selection.remove(id)) selection.add(id);
       if (!_hasSelection) _selectionActive = false;
     });
+    _persistSelection();
   }
 
   void _handleRowTap(
@@ -89,31 +90,208 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     if (selectable) _startSelection(selection, id);
   }
 
-  ExportSelection _selection({
-    required List<Concept> concepts,
-    required List<ErrorCard> errors,
-    required List<ManualCard> manuals,
-  }) {
-    return ExportSelection(
-      concepts: concepts
-          .where((item) => _selectedConcepts.contains(item.id))
-          .toList(),
-      errorCards: errors
-          .where((item) => _selectedErrors.contains(item.id))
-          .toList(),
-      manualCards: manuals
-          .where((item) => _selectedBasic.contains(item.id))
-          .toList(),
+  CardsSelection get _currentSelection {
+    return CardsSelection(
+      concepts: Set.of(_selectedConcepts),
+      basic: Set.of(_selectedBasic),
+      errors: Set.of(_selectedErrors),
+      skipped: Set.of(_selectedSkipped),
+      notes: Set.of(_selectedNotes),
     );
+  }
+
+  void _replaceSelection(CardsSelection selection) {
+    _selectedConcepts
+      ..clear()
+      ..addAll(selection.concepts);
+    _selectedBasic
+      ..clear()
+      ..addAll(selection.basic);
+    _selectedErrors
+      ..clear()
+      ..addAll(selection.errors);
+    _selectedSkipped
+      ..clear()
+      ..addAll(selection.skipped);
+    _selectedNotes
+      ..clear()
+      ..addAll(selection.notes);
+    if (!_hasSelection) _selectionActive = false;
+  }
+
+  void _persistSelection() {
+    _selectionRevision++;
+    unawaited(
+      ref
+          .read(settingsRepositoryProvider)
+          .saveCardsSelection(_currentSelection),
+    );
+  }
+
+  /// Drops ids that no longer match a selectable loaded row.
+  CardsSelection _validSelection(
+    CardsSelection selection, {
+    required Set<int> concepts,
+    required Set<int> basic,
+    required Set<int> errors,
+    required Set<int> skipped,
+    required Set<int> notes,
+  }) {
+    return CardsSelection(
+      concepts: selection.concepts.intersection(concepts),
+      basic: selection.basic.intersection(basic),
+      errors: selection.errors.intersection(errors),
+      skipped: selection.skipped.intersection(skipped),
+      notes: selection.notes.intersection(notes),
+    );
+  }
+
+  Future<void> _restoreSelection({
+    required Set<int> concepts,
+    required Set<int> basic,
+    required Set<int> errors,
+    required Set<int> skipped,
+    required Set<int> notes,
+  }) async {
+    final revision = _selectionRevision;
+    final stored = await ref
+        .read(settingsRepositoryProvider)
+        .loadCardsSelection();
+    if (!mounted) return;
+    if (revision != _selectionRevision) {
+      // The learner acted while the stored selection loaded. Their fresh
+      // selection wins, and overwriting the key drops the stale value.
+      setState(() => _restored = true);
+      _persistSelection();
+      return;
+    }
+    final valid = _validSelection(
+      stored ?? CardsSelection.empty,
+      concepts: concepts,
+      basic: basic,
+      errors: errors,
+      skipped: skipped,
+      notes: notes,
+    );
+    setState(() {
+      _replaceSelection(valid);
+      _selectionActive = _hasSelection;
+      _restored = true;
+    });
+    // The restored ids change the selection without a user action, so the
+    // selection revision must advance for the view cache.
+    _selectionRevision++;
+    if (stored != null && stored != valid) {
+      await ref.read(settingsRepositoryProvider).saveCardsSelection(valid);
+    }
+  }
+
+  /// Removes rows that were exported or deleted while the page was open.
+  ///
+  /// The page can receive new stream values without a user action, so repair
+  /// runs after the frame and never mutates state during build.
+  void _scheduleStalePrune({
+    required Set<int> concepts,
+    required Set<int> basic,
+    required Set<int> errors,
+    required Set<int> skipped,
+    required Set<int> notes,
+  }) {
+    if (!_restored || _pruneScheduled) return;
+    final current = _currentSelection;
+    final valid = _validSelection(
+      current,
+      concepts: concepts,
+      basic: basic,
+      errors: errors,
+      skipped: skipped,
+      notes: notes,
+    );
+    if (current == valid) return;
+    _pruneScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pruneScheduled = false;
+      if (!mounted) return;
+      final latest = _currentSelection;
+      final pruned = _validSelection(
+        latest,
+        concepts: concepts,
+        basic: basic,
+        errors: errors,
+        skipped: skipped,
+        notes: notes,
+      );
+      if (latest == pruned) return;
+      setState(() => _replaceSelection(pruned));
+      _persistSelection();
+    });
+  }
+
+  void _toggleIds(Set<int> selection, Iterable<int> ids) {
+    final values = ids.toList();
+    if (values.isEmpty) return;
+    setState(() {
+      if (values.every(selection.contains)) {
+        selection.removeAll(values);
+      } else {
+        selection.addAll(values);
+        _selectionActive = true;
+      }
+      if (!_hasSelection) _selectionActive = false;
+    });
+    _persistSelection();
+  }
+
+  void _toggleErrorIds(Iterable<int> errors, Iterable<int> skipped) {
+    final errorIds = errors.toList();
+    final skippedIds = skipped.toList();
+    if (errorIds.isEmpty && skippedIds.isEmpty) return;
+    final allSelected =
+        errorIds.every(_selectedErrors.contains) &&
+        skippedIds.every(_selectedSkipped.contains);
+    setState(() {
+      if (allSelected) {
+        _selectedErrors.removeAll(errorIds);
+        _selectedSkipped.removeAll(skippedIds);
+      } else {
+        _selectedErrors.addAll(errorIds);
+        _selectedSkipped.addAll(skippedIds);
+        _selectionActive = true;
+      }
+      if (!_hasSelection) _selectionActive = false;
+    });
+    _persistSelection();
+  }
+
+  void _toggleVisibleSelection(List<(Set<int>, List<int>)> groups) {
+    final entries = [
+      for (final group in groups)
+        if (group.$2.isNotEmpty) group,
+    ];
+    if (entries.isEmpty) return;
+    final allSelected = entries.every(
+      (group) => group.$2.every(group.$1.contains),
+    );
+    setState(() {
+      for (final (selection, ids) in entries) {
+        if (allSelected) {
+          selection.removeAll(ids);
+        } else {
+          selection.addAll(ids);
+        }
+      }
+      _selectionActive = _hasSelection;
+    });
+    _persistSelection();
   }
 
   @override
   Widget build(BuildContext context) {
     final conceptsAsync = ref.watch(allConceptsProvider);
     final errorsAsync = ref.watch(allErrorCardsProvider);
-    final manualsAsync = ref.watch(allManualCardsProvider);
+    final basicsAsync = ref.watch(allBasicCardsProvider);
     final skippedAsync = ref.watch(skippedQuestionsProvider);
-    final highlightsAsync = ref.watch(highlightsProvider);
+    final notesAsync = ref.watch(notesProvider);
     final topicSummaries = ref.watch(topicSummariesProvider).value ?? const [];
     final defaultDeck =
         ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
@@ -132,92 +310,127 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
     final allConcepts = conceptsAsync.value ?? const <Concept>[];
     final allErrors = errorsAsync.value ?? const <ErrorCard>[];
-    final allManuals = manualsAsync.value ?? const <ManualCard>[];
+    final allBasics = basicsAsync.value ?? const <BasicCard>[];
     final skipped = skippedAsync.value ?? const <SkippedQuestion>[];
-    final highlights = highlightsAsync.value ?? const <StudyHighlight>[];
-    final concepts = _showExported
-        ? allConcepts
-        : allConcepts.where((item) => item.exportedAt == null).toList();
-    final errors = _showExported
-        ? allErrors
-        : allErrors.where((item) => item.exportedAt == null).toList();
-    final manuals = _showExported
-        ? allManuals
-        : allManuals.where((item) => item.exportedAt == null).toList();
+    final notes = notesAsync.value ?? const <Note>[];
 
-    if (!_initialized &&
+    final data = _viewCache.data(
+      concepts: allConcepts,
+      errors: allErrors,
+      basics: allBasics,
+      skipped: skipped,
+      notes: notes,
+      showExported: _showExported,
+    );
+    final view = _viewCache.view(
+      data: data,
+      filter: _filter,
+      selectionRevision: _selectionRevision,
+      selectedConcepts: _selectedConcepts,
+      selectedBasic: _selectedBasic,
+      selectedErrors: _selectedErrors,
+      selectedSkipped: _selectedSkipped,
+      selectedNotes: _selectedNotes,
+    );
+
+    if (!_restoreStarted &&
         conceptsAsync.hasValue &&
         errorsAsync.hasValue &&
-        manualsAsync.hasValue) {
-      _initialized = true;
-      _selectedConcepts.addAll(
-        concepts
-            .where((item) => item.isExportable && item.exportedAt == null)
-            .map((item) => item.id),
-      );
-      _selectedErrors.addAll(
-        errors
-            .where((item) => !item.needsDetails && item.exportedAt == null)
-            .map((item) => item.id),
-      );
-      _selectedBasic.addAll(
-        manuals.where((item) => item.exportedAt == null).map((item) => item.id),
+        basicsAsync.hasValue &&
+        skippedAsync.hasValue &&
+        notesAsync.hasValue) {
+      _restoreStarted = true;
+      unawaited(
+        _restoreSelection(
+          concepts: data.conceptSelectableIdSet,
+          basic: data.basicSelectableIdSet,
+          errors: data.errorSelectableIdSet,
+          skipped: data.skippedSelectableIdSet,
+          notes: data.noteSelectableIdSet,
+        ),
       );
     }
 
-    final selection = _selection(
-      concepts: concepts,
-      errors: errors,
-      manuals: manuals,
-    );
+    if (_restored) {
+      _scheduleStalePrune(
+        concepts: data.conceptSelectableIdSet,
+        basic: data.basicSelectableIdSet,
+        errors: data.errorSelectableIdSet,
+        skipped: data.skippedSelectableIdSet,
+        notes: data.noteSelectableIdSet,
+      );
+    }
+
+    final concepts = data.concepts;
+    final errors = data.errors;
+    final basics = data.basics;
+    final visibleBasics = basics;
+    final showCards = view.showCards;
+    final showErrors = view.showErrors;
+    final showNotes = view.showNotes;
+    final selection = view.exportSelection;
     final loading =
         conceptsAsync.isLoading ||
         errorsAsync.isLoading ||
-        manualsAsync.isLoading ||
+        basicsAsync.isLoading ||
         skippedAsync.isLoading ||
-        highlightsAsync.isLoading;
-    final selectedErrorCards = errors
-        .where((card) => _selectedErrors.contains(card.id))
-        .toList();
-    final selectedSkipped = skipped
-        .where((question) => _selectedSkipped.contains(question.id))
-        .toList();
-    final selectedHighlights = highlights
-        .where((highlight) => _selectedHighlights.contains(highlight.id))
-        .toList();
-    final selectableErrors = errors
-        .where((card) => card.exportedAt == null)
-        .toList();
-    final allReviewSelected =
-        selectableErrors.every((card) => _selectedErrors.contains(card.id)) &&
-        skipped.every((question) => _selectedSkipped.contains(question.id));
-    final hasIncompleteSelected = selectedErrorCards.any(
-      (card) => card.needsDetails,
-    );
-    final hasReviewSelection =
-        selectedErrorCards.isNotEmpty || selectedSkipped.isNotEmpty;
-    final selectedCount =
-        selection.total + selectedSkipped.length + selectedHighlights.length;
+        notesAsync.isLoading;
+    final selectedSkipped = view.selectedSkipped;
+    final pendingSelectedErrors = view.pendingSelectedErrors;
+    final selectedPendingCount = view.selectedPendingCount;
+    final allPendingErrors = data.pendingErrors;
+    final globalPendingCount = data.globalPendingCount;
+    final selectedCount = view.selectedCount;
+    final conceptSelectableIds = data.conceptSelectableIds;
+    final basicSelectableIds = data.basicSelectableIds;
+    final errorSelectableIds = data.errorSelectableIds;
+    final skippedSelectableIds = data.skippedSelectableIds;
+    final noteSelectableIds = data.noteSelectableIds;
+    final visibleGroups = view.visibleGroups;
+    final visibleEntryCount = view.visibleEntryCount;
+    final allVisibleSelected = view.allVisibleSelected;
+    final hasVisibleRows = view.hasVisibleRows;
+    final hasAnyRows = data.hasAnyRows;
+    final subtitle = selectedCount == 0
+        ? 'Ready for AnkiDroid'
+        : selectedPendingCount > 0
+        ? '$selectedCount selected · review to export'
+        : '$selectedCount selected';
+
+    final reviewPendingLabel = selectedPendingCount > 0;
+    final exportReady = selection.total > 0;
+    final primaryLabel = _busy
+        ? 'Exporting…'
+        : reviewPendingLabel
+        ? 'Review pending'
+        : 'Export to AnkiDroid';
+    final VoidCallback? primaryAction = _busy
+        ? null
+        : reviewPendingLabel
+        ? () => _reviewCards(pendingSelectedErrors, selectedSkipped)
+        : exportReady
+        ? () => _export(selection)
+        : null;
+
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    // The large flexible app bar cannot fit the title and the status line on
+    // the narrowest phones, even at the default text scale.
+    final compactHeader = largeText || MediaQuery.sizeOf(context).width < 360;
 
     return AppPage(
       title: 'Cards',
-      subtitle: selectedCount == 0
-          ? 'Ready for AnkiDroid'
-          : '$selectedCount card${selectedCount == 1 ? '' : 's'} selected',
+      subtitle: compactHeader ? null : subtitle,
       showBack: true,
+      variant: compactHeader
+          ? M3EAppBarVariant.small
+          : M3EAppBarVariant.largeFlexible,
       actions: [
-        if (_selectionActive)
-          M3EIconButton(
-            key: const ValueKey('clear-selection'),
-            variant: M3EIconButtonVariant.standard,
-            icon: const Icon(Icons.close),
-            tooltip: 'Clear selection',
-            onPressed: _clearSelection,
-          ),
         M3EIconButton(
+          key: const ValueKey('cards-info'),
           variant: M3EIconButtonVariant.standard,
-          icon: const Icon(Icons.info_outline),
-          tooltip: 'How cards are exported',
+          icon: const Icon(Icons.help_outline),
+          tooltip: 'What exports to Anki',
+          semanticLabel: 'What exports to Anki',
           onPressed: _showInfo,
         ),
       ],
@@ -226,21 +439,18 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           children: [
             Expanded(
               child: AppPrimaryButton(
-                onPressed:
-                    _busy || selection.total == 0 || hasIncompleteSelected
-                    ? null
-                    : () => _export(selection),
-                label: _busy ? 'Exporting…' : 'Export to AnkiDroid',
-                icon: Icons.upload_outlined,
+                onPressed: primaryAction,
+                label: primaryLabel,
+                icon: reviewPendingLabel
+                    ? Icons.fact_check_outlined
+                    : Icons.upload_outlined,
               ),
             ),
             const SizedBox(width: 6),
             AppDockIconButton(
               icon: Icons.ios_share,
               tooltip: 'Share as files',
-              onPressed: _busy || selection.total == 0 || hasIncompleteSelected
-                  ? null
-                  : () => _share(selection),
+              onPressed: _busy || !exportReady ? null : () => _share(selection),
             ),
             AppDockIconButton(
               icon: Icons.delete_outline,
@@ -258,43 +468,76 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           onFilter: (value) => setState(() => _filter = value),
           onShowExported: () => setState(() => _showExported = !_showExported),
         ),
-        const SizedBox(height: 20),
-        if (loading &&
-            allConcepts.isEmpty &&
-            allErrors.isEmpty &&
-            allManuals.isEmpty &&
-            skipped.isEmpty &&
-            highlights.isEmpty)
+        const SizedBox(height: 4),
+        _ActionRow(
+          children: [
+            if (globalPendingCount > 0)
+              M3EButton.icon(
+                key: const ValueKey('review-all-pending'),
+                style: M3EButtonStyle.text,
+                icon: const Icon(Icons.playlist_add_check_circle_outlined),
+                label: const Text(
+                  'Review all pending',
+                  maxLines: 3,
+                  textWidthBasis: TextWidthBasis.longestLine,
+                ),
+                tooltip: 'Review all pending cards',
+                semanticLabel: 'Review all pending cards',
+                onPressed: () => _reviewCards(allPendingErrors, skipped),
+              ),
+            M3EButton.icon(
+              key: const ValueKey('select-all'),
+              style: M3EButtonStyle.text,
+              icon: Icon(
+                allVisibleSelected ? Icons.deselect : Icons.select_all,
+              ),
+              label: Text(
+                allVisibleSelected ? 'Deselect all' : 'Select all',
+                maxLines: 2,
+                textWidthBasis: TextWidthBasis.longestLine,
+              ),
+              tooltip: allVisibleSelected
+                  ? 'Deselect all visible items'
+                  : 'Select all visible items',
+              semanticLabel: allVisibleSelected
+                  ? 'Deselect all visible items'
+                  : 'Select all visible items',
+              onPressed: visibleEntryCount == 0
+                  ? null
+                  : () => _toggleVisibleSelection(visibleGroups),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        if (compactHeader) ...[
+          Text(
+            subtitle,
+            key: const ValueKey('cards-status'),
+            style: M3ETheme.of(context).typography.baseline.labelLarge.copyWith(
+              color: M3ETheme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (loading && !data.hasAnyData)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 64),
             child: Center(child: M3ELoadingIndicator()),
           )
         else ...[
-          if ((_filter == _Filter.all || _filter == _Filter.concepts) &&
-              concepts.isNotEmpty) ...[
+          if (showCards && concepts.isNotEmpty) ...[
             SectionTitle(
               'Concepts',
               count: concepts.length,
-              trailing: _SelectAllButton(
-                allSelected: concepts
-                    .where(
-                      (item) => item.isExportable && item.exportedAt == null,
-                    )
-                    .every((item) => _selectedConcepts.contains(item.id)),
-                onPressed: () => setState(() {
-                  final selectable = concepts
-                      .where(
-                        (item) => item.isExportable && item.exportedAt == null,
-                      )
-                      .map((item) => item.id);
-                  if (selectable.every(_selectedConcepts.contains)) {
-                    _selectedConcepts.removeAll(selectable);
-                    if (!_hasSelection) _selectionActive = false;
-                  } else {
-                    _selectedConcepts.addAll(selectable);
-                    _selectionActive = true;
-                  }
-                }),
+              trailing: _SectionSelectAll(
+                key: const ValueKey('concepts-select-all'),
+                label: 'concepts',
+                allSelected:
+                    conceptSelectableIds.isNotEmpty &&
+                    conceptSelectableIds.every(_selectedConcepts.contains),
+                onPressed: conceptSelectableIds.isEmpty
+                    ? null
+                    : () => _toggleIds(_selectedConcepts, conceptSelectableIds),
               ),
             ),
             AppGroup(
@@ -318,61 +561,32 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                       selectable:
                           concept.isExportable && concept.exportedAt == null,
                     ),
-                    onComplete: concept.isExportable
-                        ? null
-                        : () => _editConcept(concept),
                   ),
               ],
             ),
             const SizedBox(height: 28),
           ],
-          if ((_filter == _Filter.all || _filter == _Filter.review) &&
-              (errors.isNotEmpty || skipped.isNotEmpty)) ...[
+          if (showErrors && (errors.isNotEmpty || skipped.isNotEmpty)) ...[
             SectionTitle(
               'Error and skipped',
               count: errors.length + skipped.length,
-              trailing: _SelectAllButton(
-                allSelected: allReviewSelected,
-                onPressed: () => setState(() {
-                  if (allReviewSelected) {
-                    _selectedErrors.removeAll(
-                      selectableErrors.map((card) => card.id),
-                    );
-                    _selectedSkipped.removeAll(
-                      skipped.map((question) => question.id),
-                    );
-                    if (!_hasSelection) _selectionActive = false;
-                  } else {
-                    _selectedErrors.addAll(
-                      selectableErrors.map((card) => card.id),
-                    );
-                    _selectedSkipped.addAll(
-                      skipped.map((question) => question.id),
-                    );
-                    _selectionActive = true;
-                  }
-                }),
+              trailing: _SectionSelectAll(
+                key: const ValueKey('errors-select-all'),
+                label: 'error and skipped items',
+                allSelected:
+                    (errorSelectableIds.isNotEmpty ||
+                        skippedSelectableIds.isNotEmpty) &&
+                    errorSelectableIds.every(_selectedErrors.contains) &&
+                    skippedSelectableIds.every(_selectedSkipped.contains),
+                onPressed:
+                    errorSelectableIds.isEmpty && skippedSelectableIds.isEmpty
+                    ? null
+                    : () => _toggleErrorIds(
+                        errorSelectableIds,
+                        skippedSelectableIds,
+                      ),
               ),
             ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                M3EButton.tonal(
-                  onPressed: () => _reviewCards(errors, skipped),
-                  icon: const Icon(Icons.rate_review_outlined),
-                  label: const Text('Review all'),
-                ),
-                if (hasReviewSelection)
-                  M3EButton.filled(
-                    onPressed: () =>
-                        _reviewCards(selectedErrorCards, selectedSkipped),
-                    icon: const Icon(Icons.fact_check_outlined),
-                    label: const Text('Review selected'),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 12),
             AppGroup(
               children: [
                 for (final card in errors)
@@ -392,9 +606,6 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                       card.id,
                       selectable: card.exportedAt == null,
                     ),
-                    onComplete: card.needsDetails
-                        ? () => _reviewCards([card], const [])
-                        : null,
                   ),
                 for (final question in skipped)
                   _SkippedRow(
@@ -408,39 +619,30 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     ),
                     onLongPress: () =>
                         _handleRowLongPress(_selectedSkipped, question.id),
-                    onReview: () => _reviewCards(const [], [question]),
                   ),
               ],
             ),
             const SizedBox(height: 28),
           ],
-          if ((_filter == _Filter.all || _filter == _Filter.basic) &&
-              manuals.isNotEmpty) ...[
+          if (showCards && visibleBasics.isNotEmpty) ...[
             SectionTitle(
               'Basic cards',
-              count: manuals.length,
-              trailing: _SelectAllButton(
-                allSelected: manuals
-                    .where((item) => item.exportedAt == null)
-                    .every((item) => _selectedBasic.contains(item.id)),
-                onPressed: () => setState(() {
-                  final selectable = manuals
-                      .where((item) => item.exportedAt == null)
-                      .map((item) => item.id);
-                  if (selectable.every(_selectedBasic.contains)) {
-                    _selectedBasic.removeAll(selectable);
-                    if (!_hasSelection) _selectionActive = false;
-                  } else {
-                    _selectedBasic.addAll(selectable);
-                    _selectionActive = true;
-                  }
-                }),
+              count: visibleBasics.length,
+              trailing: _SectionSelectAll(
+                key: const ValueKey('basic-select-all'),
+                label: 'basic cards',
+                allSelected:
+                    basicSelectableIds.isNotEmpty &&
+                    basicSelectableIds.every(_selectedBasic.contains),
+                onPressed: basicSelectableIds.isEmpty
+                    ? null
+                    : () => _toggleIds(_selectedBasic, basicSelectableIds),
               ),
             ),
             AppGroup(
               children: [
-                for (final card in manuals)
-                  _ManualRow(
+                for (final card in visibleBasics)
+                  _BasicRow(
                     key: ValueKey('basic-row-${card.id}'),
                     card: card,
                     deckName: deckFor(card.topicName),
@@ -448,7 +650,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     onTap: () => _handleRowTap(
                       _selectedBasic,
                       card.id,
-                      () => _previewManual(card),
+                      () => _previewBasic(card),
                       selectable: card.exportedAt == null,
                     ),
                     onLongPress: () => _handleRowLongPress(
@@ -461,70 +663,63 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             const SizedBox(height: 28),
           ],
-          if ((_filter == _Filter.all || _filter == _Filter.highlights) &&
-              highlights.isNotEmpty) ...[
+          if (showNotes && notes.isNotEmpty) ...[
             SectionTitle(
-              'Highlights',
-              count: highlights.length,
-              supporting:
-                  'Plain text only. Highlights are never sent to AnkiDroid.',
-              trailing: M3EButton.text(
-                onPressed: _busy ? null : () => _downloadHighlights(highlights),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.download_outlined, size: 18),
-                    SizedBox(width: 6),
-                    Text('Download all'),
-                  ],
-                ),
+              'Notes',
+              count: notes.length,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  M3EIconButton(
+                    key: const ValueKey('notes-download'),
+                    variant: M3EIconButtonVariant.standard,
+                    icon: const Icon(Icons.download_outlined),
+                    tooltip: 'Download all notes',
+                    onPressed: _busy ? null : () => _downloadNotes(notes),
+                  ),
+                  const SizedBox(width: 4),
+                  _SectionSelectAll(
+                    key: const ValueKey('notes-select-all'),
+                    label: 'notes',
+                    allSelected:
+                        noteSelectableIds.isNotEmpty &&
+                        noteSelectableIds.every(_selectedNotes.contains),
+                    onPressed: () =>
+                        _toggleIds(_selectedNotes, noteSelectableIds),
+                  ),
+                ],
               ),
             ),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                M3EButton.tonal(
-                  key: const ValueKey('review-highlights'),
-                  onPressed: () => _reviewHighlights(highlights),
-                  icon: const Icon(Icons.rate_review_outlined),
-                  label: const Text('Review highlights'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
             AppGroup(
               children: [
-                for (final highlight in highlights)
-                  _HighlightRow(
-                    key: ValueKey('highlight-row-${highlight.id}'),
-                    highlight: highlight,
-                    selected: _selectedHighlights.contains(highlight.id),
+                for (final note in notes)
+                  _NoteRow(
+                    key: ValueKey('note-row-${note.id}'),
+                    note: note,
+                    selected: _selectedNotes.contains(note.id),
                     onTap: () => _handleRowTap(
-                      _selectedHighlights,
-                      highlight.id,
-                      () => _reviewHighlights(
-                        highlights,
-                        initialHighlightId: highlight.id,
-                      ),
+                      _selectedNotes,
+                      note.id,
+                      () => _previewNote(note, notes),
                     ),
                     onLongPress: () =>
-                        _handleRowLongPress(_selectedHighlights, highlight.id),
+                        _handleRowLongPress(_selectedNotes, note.id),
                   ),
               ],
             ),
             const SizedBox(height: 28),
           ],
-          if (!loading &&
-              concepts.isEmpty &&
-              errors.isEmpty &&
-              manuals.isEmpty &&
-              skipped.isEmpty &&
-              highlights.isEmpty)
+          if (!loading && !hasAnyRows)
             const EmptyState(
               icon: Icons.style_outlined,
-              title: 'No cards to export',
-              message: 'Review a session to create error cards, or define a term to save a concept.',
+              title: 'No cards yet',
+              message: 'Review a session to save cards, or define a term.',
+            )
+          else if (!loading && !hasVisibleRows)
+            const EmptyState(
+              icon: Icons.filter_alt_off_outlined,
+              title: 'Nothing in this filter',
+              message: 'Choose All to see every card again.',
             ),
           if (loading)
             const Padding(
@@ -541,11 +736,51 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       context,
       dialog: M3EDialog(
         title: 'What goes to Anki',
-        content: const Text(
-          'Concepts become cloze cards, error cards have six fields, and basic cards are front/back. '
-          'Skipped questions stay here until you make a card from them. '
-          'Highlights are never sent to AnkiDroid; use Download all in the Highlights section to save them as plain text. '
-          'Each topic uses its own deck; topics without one use the default deck from Settings.',
+        content: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _InfoRow(
+              key: ValueKey('cards-info-cloze'),
+              icon: Icons.style_outlined,
+              title: 'Cloze cards',
+              detail: 'Concepts. The term becomes a fill-in-the-blank.',
+            ),
+            _InfoRow(
+              key: ValueKey('cards-info-basic'),
+              icon: Icons.quiz_outlined,
+              title: 'Basic cards',
+              detail:
+                  'Basic cards come from the Contrast, Cause and effect, '
+                  'Scenario and rule, and Steps templates. Each has a front '
+                  'and a back.',
+            ),
+            _InfoRow(
+              key: ValueKey('cards-info-tags'),
+              icon: Icons.sell_outlined,
+              title: 'Tags',
+              detail:
+                  'Topic and subtopic are added as tags, never inside the card. '
+                  'Import them as Tags in AnkiDroid.',
+            ),
+            _InfoRow(
+              key: ValueKey('cards-info-decks'),
+              icon: Icons.layers_outlined,
+              title: 'Decks',
+              detail:
+                  'A topic can use its own deck. Others use the default deck '
+                  'from Settings.',
+            ),
+            _InfoRow(
+              key: ValueKey('cards-info-stays'),
+              icon: Icons.block_outlined,
+              title: 'Stays in Question Practice',
+              detail:
+                  'Errors and skipped questions export only after you create '
+                  'cards from them. Notes are never sent; download them as '
+                  'text.',
+            ),
+          ],
         ),
         actions: [
           M3EButton.filled(
@@ -571,7 +806,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       if (mounted) {
         await _statusDialog(
           title: 'AnkiDroid API is off',
-          message: 'Open AnkiDroid, go to Settings → Advanced, and enable the AnkiDroid API. Then try again.',
+          message: 'In AnkiDroid, open Settings → Advanced, and enable the AnkiDroid API. Then try again.',
         );
       }
       return;
@@ -589,7 +824,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       if (mounted) {
         await _statusDialog(
           title: 'Cloze note type missing',
-          message: 'AnkiDroid has no Cloze note type. Create one in AnkiDroid, then retry. Error and basic note types are created automatically.',
+          message: 'AnkiDroid has no Cloze note type. Create one in AnkiDroid, then retry. The Basic note type is created automatically.',
         );
       }
       return;
@@ -604,10 +839,13 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       if (!mounted) return;
       if (outcome.success) {
         setState(() {
-          _selectedConcepts.clear();
-          _selectedErrors.clear();
-          _selectedBasic.clear();
+          _selectedConcepts.removeAll(
+            selection.concepts.map((concept) => concept.id),
+          );
+          _selectedBasic.removeAll(selection.basicCards.map((card) => card.id));
+          if (!_hasSelection) _selectionActive = false;
         });
+        _persistSelection();
       }
       await showSnack(context, outcome.message);
     } finally {
@@ -634,7 +872,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           'Concepts and basic cards are removed permanently. Deleting an '
           'active error card also removes it from the 48-hour review queue. '
           'Skipped questions are removed from the skipped queue; their '
-          'questions stay in the practice. Highlights are removed from this '
+          'questions stay in the practice. Notes are removed from this '
           'list; cards already made from them stay.',
       confirmLabel: 'Delete',
       destructive: true,
@@ -645,9 +883,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         .deleteCards(
           conceptIds: _selectedConcepts.toList(),
           errorCardIds: _selectedErrors.toList(),
-          manualCardIds: _selectedBasic.toList(),
+          basicCardIds: _selectedBasic.toList(),
           skippedQuestionIds: _selectedSkipped.toList(),
-          highlightIds: _selectedHighlights.toList(),
+          noteIds: _selectedNotes.toList(),
         );
     setState(() {
       _selectionActive = false;
@@ -655,8 +893,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       _selectedErrors.clear();
       _selectedBasic.clear();
       _selectedSkipped.clear();
-      _selectedHighlights.clear();
+      _selectedNotes.clear();
     });
+    _persistSelection();
     if (mounted) await showSnack(context, 'Cards deleted.');
   }
 
@@ -696,6 +935,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           .updateConceptDefinition(concept.id, controller.text.trim());
       if (!mounted) return;
       setState(() => _selectedConcepts.add(concept.id));
+      _persistSelection();
     }
     controller.dispose();
   }
@@ -716,7 +956,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     setState(() {
       _selectedErrors.removeAll(cards.map((card) => card.id));
       _selectedSkipped.removeAll(skipped.map((question) => question.id));
+      if (!_hasSelection) _selectionActive = false;
     });
+    _persistSelection();
   }
 
   void _defineTerm(String term, Rect? anchor, ErrorCard card) {
@@ -729,6 +971,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       practiceName: card.practiceName,
       sessionId: card.sessionId,
       questionId: card.questionId,
+      subtopic: card.subtopic,
       anchor: anchor,
     );
   }
@@ -737,11 +980,12 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     return _previewDialog('Concept preview', [
       _previewMeta([
         Pill(concept.topicName),
+        if (concept.subtopic.trim().isNotEmpty)
+          Pill('subtopic: ${concept.subtopic.trim()}'),
         Pill(
           'deck: ${_deckForTopic(concept.topicName)}',
           tone: PillTone.primary,
         ),
-        Pill(concept.source.name),
       ]),
       const SizedBox(height: 14),
       TonalBox(
@@ -772,31 +1016,19 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         _PreviewNote(label: 'Stands for', text: concept.extra),
       ],
       const SizedBox(height: 10),
-      _PreviewNote(
-        label: 'Anki note',
-        text: 'Cloze card · ${concept.source.name}',
-      ),
-    ]);
+      const _PreviewNote(label: 'Anki note', text: 'Cloze card'),
+    ], onComplete: concept.isExportable ? null : () => _editConcept(concept));
   }
 
   Future<void> _previewError(ErrorCard card) {
     void define(String term, Rect? anchor) => _defineTerm(term, anchor, card);
     void openUrl(String value) => openStudyUrl(context, ref, value);
-    return _previewDialog('Error card preview', [
+    return _previewDialog('Error preview', [
       _previewMeta([
         Pill(card.topicName),
         Pill('deck: ${_deckForTopic(card.topicName)}', tone: PillTone.primary),
-        Tooltip(
-          message: 'Estimated time to read the front',
-          child: Pill(
-            readingTimeLabel(
-              '${card.question} ${card.wrongAnswer} ${card.correctAnswer}',
-            ),
-            icon: Icons.schedule,
-          ),
-        ),
         Pill(
-          card.needsDetails ? 'Needs notes' : 'Ready',
+          card.needsDetails ? 'Needs review' : 'Reviewed',
           tone: card.needsDetails ? PillTone.error : PillTone.success,
         ),
       ]),
@@ -838,21 +1070,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         const SizedBox(height: 10),
         _PreviewNote(label: 'Your reasoning', text: card.reasoning),
       ],
-      const SizedBox(height: 10),
-      _PreviewNote(
-        label: 'Flawed assumption',
-        text: card.bias.isEmpty ? '— needs notes —' : card.bias,
-      ),
-      const SizedBox(height: 8),
-      _PreviewNote(
-        label: 'Vaccine',
-        text: card.vaccine.isEmpty ? '— needs notes —' : card.vaccine,
-      ),
       if (card.explanation.trim().isNotEmpty) ...[
         const SizedBox(height: 8),
         _PreviewNote(label: 'Why this answer', text: card.explanation),
       ],
-    ]);
+    ], onReview: () => _reviewCards([card], const []));
   }
 
   Future<void> _previewSkipped(SkippedQuestion question) {
@@ -879,46 +1101,85 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         unknown: question.unknown,
         showStatus: false,
       ),
-    ]);
+    ], onReview: () => _reviewCards(const [], [question]));
+  }
+
+  Future<void> _previewNote(Note note, List<Note> notes) {
+    final theme = M3ETheme.of(context);
+    return _previewDialog('Note preview', [
+      _previewMeta([
+        if (note.topicName.trim().isNotEmpty) Pill(note.topicName),
+        if (note.subtopic.trim().isNotEmpty)
+          Pill('subtopic: ${note.subtopic.trim()}'),
+        if (note.practiceName.trim().isNotEmpty) Pill(note.practiceName),
+        if (note.isKept) const Pill('Kept', tone: PillTone.success),
+        if (note.hasCard) const Pill('Card made', tone: PillTone.success),
+      ]),
+      const SizedBox(height: 14),
+      TonalBox(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _PreviewLabel('Saved note'),
+            const SizedBox(height: 4),
+            SelectableText(
+              note.text,
+              key: const ValueKey('note-preview-text'),
+              style: theme.typography.baseline.titleMedium.copyWith(
+                height: 1.4,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+      if (note.context.trim().isNotEmpty) ...[
+        const SizedBox(height: 10),
+        _PreviewNote(
+          label: 'From the question',
+          text: note.context,
+          selectable: true,
+        ),
+      ],
+    ], onReview: () => _reviewNotes(notes, initialNoteId: note.id));
   }
 
   Widget _previewMeta(List<Widget> children) {
     return Wrap(spacing: 6, runSpacing: 4, children: children);
   }
 
-  Future<void> _reviewHighlights(
-    List<StudyHighlight> highlights, {
-    int? initialHighlightId,
-  }) async {
-    if (highlights.isEmpty) return;
+  Future<void> _reviewNotes(List<Note> notes, {int? initialNoteId}) async {
+    if (notes.isEmpty) return;
     await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         fullscreenDialog: true,
-        builder: (context) => HighlightReviewPage(
-          highlights: highlights,
-          initialHighlightId: initialHighlightId,
-        ),
+        builder: (context) =>
+            NoteReviewPage(notes: notes, initialNoteId: initialNoteId),
       ),
     );
   }
 
-  Future<void> _downloadHighlights(List<StudyHighlight> highlights) async {
+  Future<void> _downloadNotes(List<Note> notes) async {
     setState(() => _busy = true);
     try {
-      await ref.read(exportServiceProvider).shareHighlights(highlights);
+      await ref.read(exportServiceProvider).shareNotes(notes);
     } on Object catch (error) {
       if (mounted) {
-        await showSnack(context, 'Could not share highlights: $error');
+        await showSnack(context, 'Could not share notes: $error');
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _previewManual(ManualCard card) {
-    return _previewDialog('Basic card preview', [
+  Future<void> _previewBasic(BasicCard card) {
+    return _previewDialog('Card preview', [
       _previewMeta([
+        Pill(card.cognitiveType.label, tone: PillTone.secondary),
         Pill(card.topicName),
+        if (card.subtopic.trim().isNotEmpty)
+          Pill('subtopic: ${card.subtopic.trim()}'),
         Pill('deck: ${_deckForTopic(card.topicName)}', tone: PillTone.primary),
       ]),
       const SizedBox(height: 14),
@@ -964,7 +1225,20 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     return defaultDeck;
   }
 
-  Future<void> _previewDialog(String title, List<Widget> children) {
+  Future<void> _previewDialog(
+    String title,
+    List<Widget> children, {
+    VoidCallback? onReview,
+    VoidCallback? onComplete,
+  }) {
+    M3EButton action(String label, VoidCallback callback) {
+      return M3EButton.filled(
+        onPressed: () => _closeDialogThen(callback),
+        child: Text(label),
+      );
+    }
+
+    final hasExtraAction = onReview != null || onComplete != null;
     return M3EDialog.show<void>(
       context,
       dialog: M3EDialog(
@@ -979,13 +1253,28 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           ),
         ),
         actions: [
-          M3EButton.filled(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
+          if (hasExtraAction)
+            M3EButton.text(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            )
+          else
+            M3EButton.filled(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Close'),
+            ),
+          if (onComplete != null) action('Complete', onComplete),
+          if (onReview != null) action('Review', onReview),
         ],
       ),
     );
+  }
+
+  void _closeDialogThen(VoidCallback action) {
+    Navigator.of(context).pop();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) action();
+    });
   }
 
   Future<void> _statusDialog({required String title, required String message}) {
@@ -1004,11 +1293,386 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               Navigator.of(context).pop();
               await ref.read(ankiGatewayProvider).openAnkiDroid();
             },
-            child: const Text('Open AnkiDroid'),
+            child: const Text('Open in AnkiDroid'),
           ),
         ],
       ),
     );
+  }
+}
+
+/// Immutable Cards data derived in one pass over each stream list.
+///
+/// The visible rows respect the exported toggle. Selectable ids always exclude
+/// rows that cannot be selected, so the restore and prune paths share them.
+@immutable
+class CardsDerivedData {
+  const CardsDerivedData._({
+    required this.concepts,
+    required this.errors,
+    required this.basics,
+    required this.skipped,
+    required this.notes,
+    required this.conceptSelectableIds,
+    required this.conceptSelectableIdSet,
+    required this.basicSelectableIds,
+    required this.basicSelectableIdSet,
+    required this.errorSelectableIds,
+    required this.errorSelectableIdSet,
+    required this.skippedSelectableIds,
+    required this.skippedSelectableIdSet,
+    required this.noteSelectableIds,
+    required this.noteSelectableIdSet,
+    required this.pendingErrors,
+    required this.globalPendingCount,
+    required this.hasAnyRows,
+    required this.hasAnyData,
+  });
+
+  factory CardsDerivedData._derive({
+    required List<Concept> allConcepts,
+    required List<ErrorCard> allErrors,
+    required List<BasicCard> allBasics,
+    required List<SkippedQuestion> allSkipped,
+    required List<Note> allNotes,
+    required bool showExported,
+  }) {
+    final concepts = <Concept>[];
+    final conceptSelectableIds = <int>[];
+    final conceptSelectableIdSet = <int>{};
+    for (final concept in allConcepts) {
+      if (showExported || concept.exportedAt == null) {
+        concepts.add(concept);
+      }
+      if (concept.isExportable && concept.exportedAt == null) {
+        conceptSelectableIds.add(concept.id);
+        conceptSelectableIdSet.add(concept.id);
+      }
+    }
+
+    final errors = <ErrorCard>[];
+    final errorSelectableIds = <int>[];
+    final errorSelectableIdSet = <int>{};
+    final pendingErrors = <ErrorCard>[];
+    for (final card in allErrors) {
+      if (showExported || card.exportedAt == null) {
+        errors.add(card);
+      }
+      if (card.exportedAt == null) {
+        errorSelectableIds.add(card.id);
+        errorSelectableIdSet.add(card.id);
+        if (card.needsDetails) pendingErrors.add(card);
+      }
+    }
+
+    final basics = <BasicCard>[];
+    final basicSelectableIds = <int>[];
+    final basicSelectableIdSet = <int>{};
+    for (final card in allBasics) {
+      if (showExported || card.exportedAt == null) {
+        basics.add(card);
+      }
+      if (card.exportedAt == null) {
+        basicSelectableIds.add(card.id);
+        basicSelectableIdSet.add(card.id);
+      }
+    }
+
+    final skippedSelectableIds = <int>[];
+    final skippedSelectableIdSet = <int>{};
+    for (final question in allSkipped) {
+      skippedSelectableIds.add(question.id);
+      skippedSelectableIdSet.add(question.id);
+    }
+    final noteSelectableIds = <int>[];
+    final noteSelectableIdSet = <int>{};
+    for (final note in allNotes) {
+      noteSelectableIds.add(note.id);
+      noteSelectableIdSet.add(note.id);
+    }
+
+    final hasAnyRows =
+        concepts.isNotEmpty ||
+        errors.isNotEmpty ||
+        basics.isNotEmpty ||
+        allSkipped.isNotEmpty ||
+        allNotes.isNotEmpty;
+
+    return CardsDerivedData._(
+      concepts: List.unmodifiable(concepts),
+      errors: List.unmodifiable(errors),
+      basics: List.unmodifiable(basics),
+      skipped: List.unmodifiable(allSkipped),
+      notes: List.unmodifiable(allNotes),
+      conceptSelectableIds: List.unmodifiable(conceptSelectableIds),
+      conceptSelectableIdSet: Set.unmodifiable(conceptSelectableIdSet),
+      basicSelectableIds: List.unmodifiable(basicSelectableIds),
+      basicSelectableIdSet: Set.unmodifiable(basicSelectableIdSet),
+      errorSelectableIds: List.unmodifiable(errorSelectableIds),
+      errorSelectableIdSet: Set.unmodifiable(errorSelectableIdSet),
+      skippedSelectableIds: List.unmodifiable(skippedSelectableIds),
+      skippedSelectableIdSet: Set.unmodifiable(skippedSelectableIdSet),
+      noteSelectableIds: List.unmodifiable(noteSelectableIds),
+      noteSelectableIdSet: Set.unmodifiable(noteSelectableIdSet),
+      pendingErrors: List.unmodifiable(pendingErrors),
+      globalPendingCount: pendingErrors.length + allSkipped.length,
+      hasAnyRows: hasAnyRows,
+      hasAnyData:
+          allConcepts.isNotEmpty ||
+          allErrors.isNotEmpty ||
+          allBasics.isNotEmpty ||
+          allSkipped.isNotEmpty ||
+          allNotes.isNotEmpty,
+    );
+  }
+
+  final List<Concept> concepts;
+  final List<ErrorCard> errors;
+  final List<BasicCard> basics;
+  final List<SkippedQuestion> skipped;
+  final List<Note> notes;
+  final List<int> conceptSelectableIds;
+  final Set<int> conceptSelectableIdSet;
+  final List<int> basicSelectableIds;
+  final Set<int> basicSelectableIdSet;
+  final List<int> errorSelectableIds;
+  final Set<int> errorSelectableIdSet;
+  final List<int> skippedSelectableIds;
+  final Set<int> skippedSelectableIdSet;
+  final List<int> noteSelectableIds;
+  final Set<int> noteSelectableIdSet;
+  final List<ErrorCard> pendingErrors;
+  final int globalPendingCount;
+
+  /// Whether any row is visible with the current exported toggle.
+  final bool hasAnyRows;
+
+  /// Whether any stream holds a row, including filtered-out exported rows.
+  final bool hasAnyData;
+}
+
+/// Immutable filter and selection view over one [CardsDerivedData].
+@immutable
+class CardsPageView {
+  const CardsPageView._({
+    required this.filter,
+    required this.showCards,
+    required this.showErrors,
+    required this.showNotes,
+    required this.exportSelection,
+    required this.selectedErrors,
+    required this.selectedSkipped,
+    required this.selectedNotes,
+    required this.pendingSelectedErrors,
+    required this.selectedPendingCount,
+    required this.selectedCount,
+    required this.visibleGroups,
+    required this.visibleEntryCount,
+    required this.allVisibleSelected,
+    required this.hasVisibleRows,
+  });
+
+  factory CardsPageView._derive({
+    required CardsDerivedData data,
+    required CardsFilter filter,
+    required Set<int> selectedConcepts,
+    required Set<int> selectedBasic,
+    required Set<int> selectedErrors,
+    required Set<int> selectedSkipped,
+    required Set<int> selectedNotes,
+  }) {
+    final showCards = filter == CardsFilter.all || filter == CardsFilter.cards;
+    final showErrors =
+        filter == CardsFilter.all || filter == CardsFilter.errors;
+    final showNotes = filter == CardsFilter.all || filter == CardsFilter.notes;
+
+    final exportConcepts = <Concept>[];
+    for (final concept in data.concepts) {
+      if (concept.isExportable &&
+          concept.exportedAt == null &&
+          selectedConcepts.contains(concept.id)) {
+        exportConcepts.add(concept);
+      }
+    }
+    final exportBasics = <BasicCard>[];
+    for (final card in data.basics) {
+      if (card.exportedAt == null && selectedBasic.contains(card.id)) {
+        exportBasics.add(card);
+      }
+    }
+    final exportSelection = ExportSelection(
+      concepts: exportConcepts,
+      basicCards: exportBasics,
+    );
+
+    final selectedErrorCards = <ErrorCard>[];
+    final pendingSelectedErrors = <ErrorCard>[];
+    for (final card in data.errors) {
+      if (!selectedErrors.contains(card.id)) continue;
+      selectedErrorCards.add(card);
+      if (card.needsDetails) pendingSelectedErrors.add(card);
+    }
+    final selectedSkippedQuestions = <SkippedQuestion>[
+      for (final question in data.skipped)
+        if (selectedSkipped.contains(question.id)) question,
+    ];
+    final selectedNoteCards = <Note>[
+      for (final note in data.notes)
+        if (selectedNotes.contains(note.id)) note,
+    ];
+
+    final visibleGroups = <(Set<int>, List<int>)>[
+      if (showCards) (selectedConcepts, data.conceptSelectableIds),
+      if (showCards) (selectedBasic, data.basicSelectableIds),
+      if (showErrors) (selectedErrors, data.errorSelectableIds),
+      if (showErrors) (selectedSkipped, data.skippedSelectableIds),
+      if (showNotes) (selectedNotes, data.noteSelectableIds),
+    ];
+    final visibleEntryCount = visibleGroups.fold<int>(
+      0,
+      (count, group) => count + group.$2.length,
+    );
+    final hasVisibleRows =
+        (showCards && (data.concepts.isNotEmpty || data.basics.isNotEmpty)) ||
+        (showErrors && (data.errors.isNotEmpty || data.skipped.isNotEmpty)) ||
+        (showNotes && data.notes.isNotEmpty);
+
+    return CardsPageView._(
+      filter: filter,
+      showCards: showCards,
+      showErrors: showErrors,
+      showNotes: showNotes,
+      exportSelection: exportSelection,
+      selectedErrors: List.unmodifiable(selectedErrorCards),
+      selectedSkipped: List.unmodifiable(selectedSkippedQuestions),
+      selectedNotes: List.unmodifiable(selectedNoteCards),
+      pendingSelectedErrors: List.unmodifiable(pendingSelectedErrors),
+      selectedPendingCount:
+          pendingSelectedErrors.length + selectedSkippedQuestions.length,
+      selectedCount:
+          exportSelection.total +
+          selectedErrorCards.length +
+          selectedSkippedQuestions.length +
+          selectedNoteCards.length,
+      visibleGroups: List.unmodifiable(visibleGroups),
+      visibleEntryCount: visibleEntryCount,
+      allVisibleSelected:
+          visibleEntryCount > 0 &&
+          visibleGroups.every((group) => group.$2.every(group.$1.contains)),
+      hasVisibleRows: hasVisibleRows,
+    );
+  }
+
+  final CardsFilter filter;
+  final bool showCards;
+  final bool showErrors;
+  final bool showNotes;
+  final ExportSelection exportSelection;
+  final List<ErrorCard> selectedErrors;
+  final List<SkippedQuestion> selectedSkipped;
+  final List<Note> selectedNotes;
+  final List<ErrorCard> pendingSelectedErrors;
+  final int selectedPendingCount;
+  final int selectedCount;
+  final List<(Set<int>, List<int>)> visibleGroups;
+  final int visibleEntryCount;
+  final bool allVisibleSelected;
+  final bool hasVisibleRows;
+}
+
+/// Memoizes Cards derivation across builds.
+///
+/// Data is rebuilt only when a stream list changes identity or the exported
+/// toggle flips. The page view is rebuilt only when that data, the filter or
+/// the selection revision changes. Selection mutation sites bump the revision
+/// through `_persistSelection`; the restore path bumps it explicitly.
+@visibleForTesting
+class CardsViewCache {
+  int dataBuilds = 0;
+  int viewBuilds = 0;
+
+  List<Concept>? _sourceConcepts;
+  List<ErrorCard>? _sourceErrors;
+  List<BasicCard>? _sourceBasics;
+  List<SkippedQuestion>? _sourceSkipped;
+  List<Note>? _sourceNotes;
+  bool? _sourceShowExported;
+  CardsDerivedData? _data;
+
+  CardsDerivedData? _viewData;
+  CardsFilter? _viewFilter;
+  int? _viewSelectionRevision;
+  CardsPageView? _view;
+
+  CardsDerivedData data({
+    required List<Concept> concepts,
+    required List<ErrorCard> errors,
+    required List<BasicCard> basics,
+    required List<SkippedQuestion> skipped,
+    required List<Note> notes,
+    required bool showExported,
+  }) {
+    final cached = _data;
+    if (cached != null &&
+        identical(_sourceConcepts, concepts) &&
+        identical(_sourceErrors, errors) &&
+        identical(_sourceBasics, basics) &&
+        identical(_sourceSkipped, skipped) &&
+        identical(_sourceNotes, notes) &&
+        _sourceShowExported == showExported) {
+      return cached;
+    }
+    _sourceConcepts = concepts;
+    _sourceErrors = errors;
+    _sourceBasics = basics;
+    _sourceSkipped = skipped;
+    _sourceNotes = notes;
+    _sourceShowExported = showExported;
+    final derived = CardsDerivedData._derive(
+      allConcepts: concepts,
+      allErrors: errors,
+      allBasics: basics,
+      allSkipped: skipped,
+      allNotes: notes,
+      showExported: showExported,
+    );
+    _data = derived;
+    dataBuilds++;
+    return derived;
+  }
+
+  CardsPageView view({
+    required CardsDerivedData data,
+    required CardsFilter filter,
+    required int selectionRevision,
+    required Set<int> selectedConcepts,
+    required Set<int> selectedBasic,
+    required Set<int> selectedErrors,
+    required Set<int> selectedSkipped,
+    required Set<int> selectedNotes,
+  }) {
+    final cached = _view;
+    if (cached != null &&
+        identical(_viewData, data) &&
+        _viewFilter == filter &&
+        _viewSelectionRevision == selectionRevision) {
+      return cached;
+    }
+    _viewData = data;
+    _viewFilter = filter;
+    _viewSelectionRevision = selectionRevision;
+    final derived = CardsPageView._derive(
+      data: data,
+      filter: filter,
+      selectedConcepts: selectedConcepts,
+      selectedBasic: selectedBasic,
+      selectedErrors: selectedErrors,
+      selectedSkipped: selectedSkipped,
+      selectedNotes: selectedNotes,
+    );
+    _view = derived;
+    viewBuilds++;
+    return derived;
   }
 }
 
@@ -1020,34 +1684,55 @@ class _FilterBar extends StatelessWidget {
     required this.onShowExported,
   });
 
-  final _Filter filter;
+  final CardsFilter filter;
   final bool showExported;
-  final ValueChanged<_Filter> onFilter;
+  final ValueChanged<CardsFilter> onFilter;
   final VoidCallback onShowExported;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    return Row(
       children: [
-        for (final entry in const [
-          (_Filter.all, 'All'),
-          (_Filter.concepts, 'Concepts'),
-          (_Filter.review, 'Errors & skipped'),
-          (_Filter.basic, 'Basic'),
-          (_Filter.highlights, 'Highlights'),
-        ])
-          M3EChip(
-            type: M3EChipType.filter,
-            label: entry.$2,
-            selected: filter == entry.$1,
-            onPressed: () => onFilter(entry.$1),
+        Expanded(
+          child: SingleChildScrollView(
+            key: const ValueKey('cards-filter-bar'),
+            scrollDirection: Axis.horizontal,
+            child: M3EChipGroup(
+              groupLabel: 'Card filters',
+              child: Row(
+                children: [
+                  for (final entry in const [
+                    (CardsFilter.all, 'All', 'all'),
+                    (CardsFilter.cards, 'Cards', 'cards'),
+                    (CardsFilter.errors, 'Errors', 'errors'),
+                    (CardsFilter.notes, 'Notes', 'notes'),
+                  ]) ...[
+                    M3EChip(
+                      key: ValueKey('cards-filter-${entry.$3}'),
+                      type: M3EChipType.filter,
+                      label: entry.$2,
+                      selected: filter == entry.$1,
+                      onPressed: () => onFilter(entry.$1),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ],
+              ),
+            ),
           ),
-        M3EChip(
-          type: M3EChipType.filter,
-          label: showExported ? 'Hide exported' : 'Show exported',
-          selected: showExported,
+        ),
+        M3EIconButton(
+          key: const ValueKey('cards-filter-show-exported'),
+          variant: showExported
+              ? M3EIconButtonVariant.filled
+              : M3EIconButtonVariant.standard,
+          icon: Icon(
+            showExported ? Icons.visibility : Icons.visibility_off_outlined,
+          ),
+          tooltip: showExported ? 'Hide exported' : 'Show exported',
+          semanticLabel: showExported
+              ? 'Hide exported cards'
+              : 'Show exported cards',
           onPressed: onShowExported,
         ),
       ],
@@ -1055,17 +1740,104 @@ class _FilterBar extends StatelessWidget {
   }
 }
 
-class _SelectAllButton extends StatelessWidget {
-  const _SelectAllButton({required this.allSelected, required this.onPressed});
+/// Page-level card actions, directly under the filters and aligned right.
+///
+/// The actions stay on one line when they fit. At a narrow width or a large
+/// text scale they wrap into right-aligned lines instead of scrolling, so no
+/// action is hidden beside the screen edge.
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({required this.children});
 
-  final bool allSelected;
-  final VoidCallback onPressed;
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return M3EButton.text(
+    return Align(
+      key: const ValueKey('cards-action-row'),
+      alignment: Alignment.centerRight,
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 4,
+        runSpacing: 4,
+        children: children,
+      ),
+    );
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.title,
+    required this.detail,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExcludeSemantics(
+            child: Icon(icon, size: 20, color: theme.colorScheme.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.typography.baseline.titleSmall.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  detail,
+                  style: theme.typography.baseline.bodySmall.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionSelectAll extends StatelessWidget {
+  const _SectionSelectAll({
+    required this.label,
+    required this.allSelected,
+    required this.onPressed,
+    super.key,
+  });
+
+  final String label;
+  final bool allSelected;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = allSelected ? 'Deselect all' : 'Select all';
+    return M3EIconButton(
+      variant: M3EIconButtonVariant.standard,
+      icon: Icon(allSelected ? Icons.deselect : Icons.select_all),
+      tooltip: '$action $label',
+      semanticLabel: '$action $label',
       onPressed: onPressed,
-      child: Text(allSelected ? 'Clear' : 'Select all'),
     );
   }
 }
@@ -1083,14 +1855,12 @@ class _SelectableRow extends StatelessWidget {
     required this.onTap,
     required this.onLongPress,
     required this.child,
-    this.trailing,
   });
 
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
   final Widget child;
-  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -1110,7 +1880,6 @@ class _SelectableRow extends StatelessWidget {
               Expanded(child: child),
               const SizedBox(width: 8),
               _SelectionMark(selected: selected),
-              if (trailing != null) ...[const SizedBox(width: 2), trailing!],
             ],
           ),
         ),
@@ -1146,7 +1915,6 @@ class _ConceptRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onLongPress,
-    this.onComplete,
     super.key,
   });
 
@@ -1155,7 +1923,6 @@ class _ConceptRow extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  final VoidCallback? onComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -1164,14 +1931,6 @@ class _ConceptRow extends StatelessWidget {
       selected: selected,
       onTap: onTap,
       onLongPress: onLongPress,
-      trailing: onComplete == null
-          ? null
-          : M3EIconButton(
-              variant: M3EIconButtonVariant.standard,
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Complete',
-              onPressed: onComplete,
-            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1210,7 +1969,10 @@ class _ConceptRow extends StatelessWidget {
             spacing: 6,
             runSpacing: 4,
             children: [
+              const Pill('Concept', tone: PillTone.primary),
               Pill(concept.topicName),
+              if (concept.subtopic.trim().isNotEmpty)
+                Pill('subtopic: ${concept.subtopic.trim()}'),
               Pill('deck: $deckName'),
               if (concept.exportedAt != null)
                 const Pill('Exported', tone: PillTone.success),
@@ -1229,7 +1991,6 @@ class _ErrorRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onLongPress,
-    this.onComplete,
     super.key,
   });
 
@@ -1238,7 +1999,6 @@ class _ErrorRow extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  final VoidCallback? onComplete;
 
   @override
   Widget build(BuildContext context) {
@@ -1247,14 +2007,6 @@ class _ErrorRow extends StatelessWidget {
       selected: selected,
       onTap: onTap,
       onLongPress: onLongPress,
-      trailing: onComplete == null
-          ? null
-          : M3EIconButton(
-              variant: M3EIconButtonVariant.standard,
-              icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Complete',
-              onPressed: onComplete,
-            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1267,7 +2019,7 @@ class _ErrorRow extends StatelessWidget {
           const SizedBox(height: 2),
           Text(
             card.needsDetails
-                ? 'Needs bias and vaccine before export.'
+                ? 'Needs review. Create cards to export.'
                 : 'You: ${card.wrongAnswer} · Correct: ${card.correctAnswer}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -1295,8 +2047,8 @@ class _ErrorRow extends StatelessWidget {
   }
 }
 
-class _ManualRow extends StatelessWidget {
-  const _ManualRow({
+class _BasicRow extends StatelessWidget {
+  const _BasicRow({
     required this.card,
     required this.deckName,
     required this.selected,
@@ -1305,7 +2057,7 @@ class _ManualRow extends StatelessWidget {
     super.key,
   });
 
-  final ManualCard card;
+  final BasicCard card;
   final String deckName;
   final bool selected;
   final VoidCallback onTap;
@@ -1341,7 +2093,10 @@ class _ManualRow extends StatelessWidget {
             spacing: 6,
             runSpacing: 4,
             children: [
+              Pill(card.cognitiveType.label, tone: PillTone.secondary),
               Pill(card.topicName),
+              if (card.subtopic.trim().isNotEmpty)
+                Pill('subtopic: ${card.subtopic.trim()}'),
               Pill('deck: $deckName'),
               if (card.exportedAt != null) const Pill('Exported'),
             ],
@@ -1352,16 +2107,16 @@ class _ManualRow extends StatelessWidget {
   }
 }
 
-class _HighlightRow extends StatelessWidget {
-  const _HighlightRow({
-    required this.highlight,
+class _NoteRow extends StatelessWidget {
+  const _NoteRow({
+    required this.note,
     required this.selected,
     required this.onTap,
     required this.onLongPress,
     super.key,
   });
 
-  final StudyHighlight highlight;
+  final Note note;
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
@@ -1383,7 +2138,7 @@ class _HighlightRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              highlight.text,
+              note.text,
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: theme.typography.baseline.titleSmall.copyWith(
@@ -1391,10 +2146,10 @@ class _HighlightRow extends StatelessWidget {
               ),
             ),
           ),
-          if (highlight.context.trim().isNotEmpty) ...[
+          if (note.context.trim().isNotEmpty) ...[
             const SizedBox(height: 5),
             Text(
-              highlight.context,
+              note.context,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: theme.typography.baseline.bodySmall.copyWith(
@@ -1407,12 +2162,10 @@ class _HighlightRow extends StatelessWidget {
             spacing: 6,
             runSpacing: 4,
             children: [
-              const Pill('Highlight', tone: PillTone.primary),
-              if (highlight.topicName.trim().isNotEmpty)
-                Pill(highlight.topicName),
-              if (highlight.isKept) const Pill('Kept', tone: PillTone.success),
-              if (highlight.hasCard)
-                const Pill('Card made', tone: PillTone.success),
+              const Pill('Note', tone: PillTone.primary),
+              if (note.topicName.trim().isNotEmpty) Pill(note.topicName),
+              if (note.isKept) const Pill('Kept', tone: PillTone.success),
+              if (note.hasCard) const Pill('Card made', tone: PillTone.success),
             ],
           ),
         ],
@@ -1427,7 +2180,6 @@ class _SkippedRow extends StatelessWidget {
     required this.selected,
     required this.onTap,
     required this.onLongPress,
-    required this.onReview,
     super.key,
   });
 
@@ -1435,7 +2187,6 @@ class _SkippedRow extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
-  final VoidCallback onReview;
 
   @override
   Widget build(BuildContext context) {
@@ -1444,12 +2195,6 @@ class _SkippedRow extends StatelessWidget {
       selected: selected,
       onTap: onTap,
       onLongPress: onLongPress,
-      trailing: M3EIconButton(
-        variant: M3EIconButtonVariant.standard,
-        icon: const Icon(Icons.edit_outlined),
-        tooltip: 'Review skipped question',
-        onPressed: onReview,
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1609,10 +2354,15 @@ class _PreviewAnswer extends StatelessWidget {
 }
 
 class _PreviewNote extends StatelessWidget {
-  const _PreviewNote({required this.label, required this.text});
+  const _PreviewNote({
+    required this.label,
+    required this.text,
+    this.selectable = false,
+  });
 
   final String label;
   final String text;
+  final bool selectable;
 
   @override
   Widget build(BuildContext context) {
@@ -1629,10 +2379,16 @@ class _PreviewNote extends StatelessWidget {
         children: [
           _PreviewLabel(label),
           const SizedBox(height: 3),
-          Text(
-            text,
-            style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
-          ),
+          if (selectable)
+            SelectableText(
+              text,
+              style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
+            )
+          else
+            Text(
+              text,
+              style: theme.typography.baseline.bodySmall.copyWith(height: 1.45),
+            ),
         ],
       ),
     );

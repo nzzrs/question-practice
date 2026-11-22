@@ -43,10 +43,10 @@ class ConceptDefinitionStep extends ReviewStep {
   final Concept concept;
 }
 
-class HighlightReviewStep extends ReviewStep {
-  const HighlightReviewStep(this.highlight);
+class NoteReviewStep extends ReviewStep {
+  const NoteReviewStep(this.note);
 
-  final StudyHighlight highlight;
+  final Note note;
 }
 
 class ReviewData {
@@ -83,7 +83,7 @@ class ReviewService {
     final questions = await _sessions.questionsForSession(sessionId);
     final attempts = await _sessions.attemptsForSession(sessionId);
     final concepts = await _cards.conceptsForSession(sessionId);
-    final highlights = await _cards.highlightsForSession(sessionId);
+    final notes = await _cards.notesForSession(sessionId);
     final skippedRecords = await _cards.skippedQuestionsForSession(sessionId);
     final skippedByQuestion = {
       for (final record in skippedRecords) record.questionId: record,
@@ -98,7 +98,15 @@ class ReviewService {
     };
     final topicNames = {for (final topic in topics) topic.id: topic.name};
 
+    final wrongQuestionIds = [
+      for (final attempt in attempts)
+        if (!attempt.isSkipped && !attempt.isCorrect && !attempt.distracted)
+          attempt.questionId,
+    ];
+    final activeCards = await _cards.activeErrorsForQuestions(wrongQuestionIds);
+
     final steps = <ReviewStep>[];
+    final addedErrorCardIds = <int>{};
     for (final attempt in attempts) {
       if (attempt.isSkipped) {
         final question = questionsById[attempt.questionId];
@@ -119,8 +127,10 @@ class ReviewService {
           ),
         );
       } else if (!attempt.isCorrect && !attempt.distracted) {
-        final card = await _cards.activeErrorForQuestion(attempt.questionId);
-        if (card != null && card.needsDetails && card.exportedAt == null) {
+        final card = activeCards[attempt.questionId];
+        if (card != null &&
+            card.needsReview &&
+            addedErrorCardIds.add(card.id)) {
           steps.add(ErrorReviewStep(card));
         }
       }
@@ -130,8 +140,8 @@ class ReviewService {
       steps.add(ConceptDefinitionStep(concept));
     }
 
-    for (final highlight in highlights.where((item) => item.needsReview)) {
-      steps.add(HighlightReviewStep(highlight));
+    for (final note in notes.where((item) => item.needsReview)) {
+      steps.add(NoteReviewStep(note));
     }
 
     return ReviewData(
@@ -154,40 +164,50 @@ class ReviewService {
     );
   }
 
-  /// Saves a shortened question, its options and their explanations without
-  /// changing the card's link to the original practice question or its
-  /// correct/wrong indexes.
-  Future<void> saveErrorContent({
-    required int cardId,
-    required String question,
-    required List<String> alternatives,
-    String explanation = '',
-    List<String> alternativeExplanations = const [],
-  }) {
-    return _cards.updateErrorCardContent(
-      id: cardId,
-      question: question.trim(),
-      alternatives: [for (final value in alternatives) value.trim()],
-      explanation: explanation.trim(),
-      alternativeExplanations: [
-        for (final value in alternativeExplanations) value.trim(),
-      ],
-    );
+  /// Marks the card's details step complete, leaving the old bias and vaccine
+  /// notes untouched for cards created before atomic breakdowns.
+  Future<void> completeErrorDetails(int cardId) {
+    return _cards.completeErrorCardDetails(cardId, _clock.now().toUtc());
+  }
+
+  /// Creates the selected atomic cards for [card] and completes its details.
+  ///
+  /// Each [SuggestedCard] becomes one Basic card carrying the error's topic,
+  /// subtopic and cognitive type. Returns the number of cards created.
+  Future<int> createErrorBreakdownCards({
+    required ErrorCard card,
+    required Iterable<SuggestedCard> cards,
+  }) async {
+    var added = 0;
+    for (final suggestion in cards) {
+      await createBasicCard(
+        sessionId: card.sessionId,
+        questionId: card.questionId,
+        question: suggestion.front,
+        answer: suggestion.back,
+        topicName: card.topicName,
+        subtopic: card.subtopic,
+        cognitiveType: suggestion.cognitiveType,
+      );
+      added++;
+    }
+    await completeErrorDetails(card.id);
+    return added;
   }
 
   Future<void> saveConceptDefinition(int conceptId, String definition) {
     return _cards.updateConceptDefinition(conceptId, definition.trim());
   }
 
-  Future<void> keepHighlight(int highlightId) {
-    return _cards.keepHighlight(highlightId, _clock.now().toUtc());
+  Future<void> keepNote(int noteId) {
+    return _cards.keepNote(noteId, _clock.now().toUtc());
   }
 
-  Future<void> markHighlightConverted(int highlightId, {int? manualCardId}) {
-    return _cards.markHighlightConverted(
-      highlightId,
+  Future<void> markNoteConverted(int noteId, {int? basicCardId}) {
+    return _cards.markNoteConverted(
+      noteId,
       cardCreatedAt: _clock.now().toUtc(),
-      manualCardId: manualCardId,
+      basicCardId: basicCardId,
     );
   }
 
@@ -201,6 +221,7 @@ class ReviewService {
     required String topicName,
     required ConceptSource source,
     int? skippedQuestionId,
+    String subtopic = '',
   }) async {
     final id = await _cards.createConcept(
       sessionId: sessionId,
@@ -210,6 +231,7 @@ class ReviewService {
       extra: extra.trim(),
       context: context,
       topicName: topicName,
+      subtopic: subtopic,
       source: source,
       createdAt: _clock.now().toUtc(),
     );
@@ -231,14 +253,18 @@ class ReviewService {
     int? questionId,
     String context = '',
     int? skippedQuestionId,
+    String subtopic = '',
+    CognitiveType cognitiveType = CognitiveType.fact,
   }) async {
-    final id = await _cards.createManualCard(
+    final id = await _cards.createBasicCard(
       sessionId: sessionId,
       questionId: questionId,
       question: question.trim(),
       answer: answer.trim(),
       context: context.trim(),
       topicName: topicName,
+      subtopic: subtopic,
+      cognitiveType: cognitiveType,
       createdAt: _clock.now().toUtc(),
     );
     if (skippedQuestionId != null) {

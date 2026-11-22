@@ -15,7 +15,7 @@ part 'stats_dao.g.dart';
     Attempts,
     ErrorCards,
     Concepts,
-    ManualCards,
+    BasicCards,
   ],
 )
 class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
@@ -27,18 +27,24 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
       SELECT
         (SELECT COUNT(*) FROM error_cards WHERE status = 'active') AS active_errors,
         (SELECT COUNT(*) FROM error_cards WHERE status = 'active' AND due_at <= ?) AS due_errors,
-        (SELECT COUNT(*) FROM error_cards WHERE status = 'active' AND details_completed_at IS NULL) AS incomplete_error_cards,
+        (
+          SELECT COUNT(*) FROM error_cards
+          WHERE status = 'active'
+            AND (
+              details_completed_at IS NULL
+              OR last_wrong_at > details_completed_at
+            )
+        ) AS incomplete_error_cards,
         (
           (SELECT COUNT(*) FROM concepts WHERE exported_at IS NULL AND definition <> '')
-          + (SELECT COUNT(*) FROM error_cards WHERE exported_at IS NULL AND details_completed_at IS NOT NULL)
-          + (SELECT COUNT(*) FROM manual_cards WHERE exported_at IS NULL)
+          + (SELECT COUNT(*) FROM basic_cards WHERE exported_at IS NULL)
         ) AS unexported_cards,
         (SELECT id FROM sessions WHERE status = 'inProgress' ORDER BY started_at DESC LIMIT 1) AS in_progress_session_id,
         (SELECT mode FROM sessions WHERE status = 'inProgress' ORDER BY started_at DESC LIMIT 1) AS in_progress_session_mode,
         (SELECT total FROM sessions WHERE status = 'inProgress' ORDER BY started_at DESC LIMIT 1) AS in_progress_session_total
       ''',
       variables: [Variable.withDateTime(now)],
-      readsFrom: {errorCards, concepts, manualCards, sessions},
+      readsFrom: {errorCards, concepts, basicCards, sessions},
     );
     return query.watchSingle().map(
       (row) => HomeStatsRow(
@@ -53,13 +59,11 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
     );
   }
 
-  Stream<List<TopicSummaryRow>> watchTopicSummaries(
-    DateTime now, {
-    bool includeArchived = false,
-  }) {
-    final archivedFilter = includeArchived ? '' : 'WHERE t.archived = 0';
-    final query = customSelect(
-      '''
+  /// Topic columns and counts, ending at the topics table.
+  ///
+  /// Callers append their own filter, so archived, active and single-topic
+  /// summaries share one definition and compute only the rows they return.
+  static const _topicSummarySelect = '''
       SELECT
         t.id AS topic_id,
         t.name AS topic_name,
@@ -67,6 +71,8 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         t.priority AS topic_priority,
         t.anki_deck AS topic_anki_deck,
         t.created_at AS topic_created_at,
+        t.minimum_score AS topic_minimum_score,
+        t.target_score AS topic_target_score,
         t.archived AS topic_archived,
         (SELECT COUNT(*) FROM practices p WHERE p.topic_id = t.id) AS practice_count,
         (
@@ -144,10 +150,52 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
           WHERE p.topic_id = t.id AND s.status = 'completed'
         ) AS last_practiced_at
       FROM topics t
-      $archivedFilter
-      ORDER BY (t.priority IS NULL) ASC, t.priority ASC, t.name COLLATE NOCASE ASC
-      ''',
-      variables: [Variable.withDateTime(now)],
+      ''';
+
+  static const _topicSummaryOrder =
+      'ORDER BY (t.priority IS NULL) ASC, t.priority ASC, '
+      't.name COLLATE NOCASE ASC';
+
+  /// Summaries of active topics, or of every topic when [includeArchived].
+  Stream<List<TopicSummaryRow>> watchTopicSummaries(
+    DateTime now, {
+    bool includeArchived = false,
+  }) {
+    return _watchTopicSummaries(now, archived: includeArchived ? null : false);
+  }
+
+  /// Summaries of archived topics only.
+  Stream<List<TopicSummaryRow>> watchArchivedTopicSummaries(DateTime now) {
+    return _watchTopicSummaries(now, archived: true);
+  }
+
+  /// Summary of [topicId], archived or not, or null when it does not exist.
+  Stream<TopicSummaryRow?> watchTopicSummary(DateTime now, int topicId) {
+    return _watchTopicSummaries(
+      now,
+      archived: null,
+      topicId: topicId,
+    ).map((rows) => rows.isEmpty ? null : rows.first);
+  }
+
+  Stream<List<TopicSummaryRow>> _watchTopicSummaries(
+    DateTime now, {
+    required bool? archived,
+    int? topicId,
+  }) {
+    final conditions = [
+      if (topicId != null) 't.id = ?',
+      if (archived != null) 't.archived = ${archived ? 1 : 0}',
+    ];
+    final filter = conditions.isEmpty
+        ? ''
+        : 'WHERE ${conditions.join(' AND ')}';
+    final query = customSelect(
+      '$_topicSummarySelect\n$filter\n$_topicSummaryOrder',
+      variables: [
+        Variable.withDateTime(now),
+        if (topicId != null) Variable.withInt(topicId),
+      ],
       readsFrom: {
         topics,
         practices,
@@ -272,16 +320,8 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         p.imported_at AS practice_imported_at,
         p.is_done AS practice_is_done,
         COUNT(q.id) AS question_count,
-        (
-          SELECT s.correct FROM sessions s
-          WHERE s.practice_id = p.id AND s.status = 'completed'
-          ORDER BY s.finished_at DESC LIMIT 1
-        ) AS last_correct,
-        (
-          SELECT s.total FROM sessions s
-          WHERE s.practice_id = p.id AND s.status = 'completed'
-          ORDER BY s.finished_at DESC LIMIT 1
-        ) AS last_total,
+        last_session.correct AS last_correct,
+        last_session.total AS last_total,
         (
           SELECT s.id FROM sessions s
           WHERE s.practice_id = p.id AND s.status = 'inProgress'
@@ -289,6 +329,11 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         ) AS in_progress_session_id
       FROM practices p
       LEFT JOIN questions q ON q.practice_id = p.id
+      LEFT JOIN sessions last_session ON last_session.id = (
+        SELECT s.id FROM sessions s
+        WHERE s.practice_id = p.id AND s.status = 'completed'
+        ORDER BY s.finished_at DESC LIMIT 1
+      )
       WHERE p.topic_id = ?
       GROUP BY p.id
       ORDER BY p.id ASC
@@ -330,6 +375,8 @@ class TopicSummaryRow {
     required this.topicPriority,
     required this.topicAnkiDeck,
     required this.topicCreatedAt,
+    required this.topicMinimumScore,
+    required this.topicTargetScore,
     required this.topicArchived,
     required this.practiceCount,
     required this.questionCount,
@@ -352,6 +399,8 @@ class TopicSummaryRow {
       topicPriority: row.read<int?>('topic_priority'),
       topicAnkiDeck: row.read<String?>('topic_anki_deck'),
       topicCreatedAt: row.read<DateTime>('topic_created_at').toUtc(),
+      topicMinimumScore: row.read<int>('topic_minimum_score'),
+      topicTargetScore: row.read<int>('topic_target_score'),
       topicArchived: row.read<bool>('topic_archived'),
       practiceCount: row.read<int>('practice_count'),
       questionCount: row.read<int>('question_count'),
@@ -373,6 +422,8 @@ class TopicSummaryRow {
   final int? topicPriority;
   final String? topicAnkiDeck;
   final DateTime topicCreatedAt;
+  final int topicMinimumScore;
+  final int topicTargetScore;
   final bool topicArchived;
   final int practiceCount;
   final int questionCount;

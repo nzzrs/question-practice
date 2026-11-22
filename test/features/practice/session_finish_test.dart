@@ -100,14 +100,13 @@ void main() {
     );
     await harness.cards.markExported(
       conceptIds: const [],
-      errorCardIds: [card.id],
-      manualCardIds: const [],
+      basicCardIds: const [],
       exportedAt: harness.clock.now().toUtc(),
     );
 
     final data = await review.load(start.session.id);
     expect(data!.steps.whereType<ErrorReviewStep>(), isEmpty);
     final summary = await sessions.summaryFor(start.session.id);
-    expect(summary.errorCardsNeedingNotes, 0);
+    expect(summary.errorCardsNeedingReview, 0);
   });
 }

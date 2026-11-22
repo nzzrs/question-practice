@@ -17,19 +17,15 @@ void refreshDataProviders(WidgetRef ref) {
   ref.invalidate(homeTopicSortProvider);
   ref.invalidate(practiceSummariesProvider);
   ref.invalidate(topicProgressProvider);
+  ref.invalidate(topicReadinessProvider);
   ref.invalidate(topicSubtopicStatsProvider);
   ref.invalidate(homeStatsProvider);
   ref.invalidate(dueErrorsProvider);
   ref.invalidate(resolvedErrorsProvider);
-  ref.invalidate(errorsNeedingDetailsProvider);
-  ref.invalidate(conceptsProvider);
   ref.invalidate(allConceptsProvider);
-  ref.invalidate(errorCardsProvider);
   ref.invalidate(allErrorCardsProvider);
-  ref.invalidate(manualCardsProvider);
-  ref.invalidate(allManualCardsProvider);
+  ref.invalidate(allBasicCardsProvider);
   ref.invalidate(skippedQuestionsProvider);
-  ref.invalidate(highlightsProvider);
-  ref.invalidate(inProgressSessionProvider);
+  ref.invalidate(notesProvider);
   ref.invalidate(inProgressSessionsProvider);
 }

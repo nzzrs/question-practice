@@ -2,11 +2,67 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:question_practice/core/data/practice_repository.dart';
+import 'package:question_practice/features/practice/domain/session_service.dart';
 
 import '../../helpers/test_harness.dart';
 
 void main() {
-  test('splitting creates two evenly sized practices', () async {
+  test('splitting 10 questions into 3 parts gives 4, 3 and 3', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 10,
+    );
+    final original = await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    );
+
+    final result = await harness.practices.splitPractice(
+      seeded.practiceId,
+      parts: 3,
+      random: Random(7),
+    );
+
+    expect(result.parts.map((practice) => practice.name), [
+      'TCP/IP Slice A',
+      'TCP/IP Slice B',
+      'TCP/IP Slice C',
+    ]);
+    final slices = <List<String>>[];
+    for (final part in result.parts) {
+      final questions = await harness.practices.questionsForPractice(part.id);
+      expect(
+        questions.map((question) => question.position),
+        List<int>.generate(questions.length, (index) => index),
+      );
+      slices.add([for (final question in questions) question.prompt]);
+    }
+    expect(slices.map((slice) => slice.length), [4, 3, 3]);
+
+    final prompts = [for (final slice in slices) ...slice];
+    expect(prompts, hasLength(original.length));
+    expect(prompts.toSet(), hasLength(original.length));
+    expect(
+      prompts,
+      unorderedEquals(original.map((question) => question.prompt)),
+    );
+    expect(
+      prompts,
+      isNot(original.map((question) => question.prompt).toList()),
+      reason: 'questions are dealt from a shuffled list',
+    );
+
+    final practices = await harness.practices.allPractices();
+    expect(
+      practices.map((practice) => practice.name),
+      unorderedEquals(['TCP/IP Slice A', 'TCP/IP Slice B', 'TCP/IP Slice C']),
+    );
+    expect(await harness.practices.practiceById(seeded.practiceId), isNull);
+  });
+
+  test('splitting 6 questions into 2 parts keeps the old behavior', () async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(
@@ -23,19 +79,15 @@ void main() {
       random: Random(7),
     );
 
-    expect(result.sliceA.name, 'TCP/IP Slice A');
-    expect(result.sliceB.name, 'TCP/IP Slice B');
-    final practices = await harness.practices.allPractices();
-    expect(
-      practices.map((practice) => practice.name),
-      unorderedEquals(['TCP/IP Slice A', 'TCP/IP Slice B']),
-    );
-
+    expect(result.parts.map((practice) => practice.name), [
+      'TCP/IP Slice A',
+      'TCP/IP Slice B',
+    ]);
     final sliceA = await harness.practices.questionsForPractice(
-      result.sliceA.id,
+      result.parts[0].id,
     );
     final sliceB = await harness.practices.questionsForPractice(
-      result.sliceB.id,
+      result.parts[1].id,
     );
     expect(sliceA, hasLength(3));
     expect(sliceB, hasLength(3));
@@ -45,15 +97,91 @@ void main() {
       [...sliceA, ...sliceB].map((question) => question.prompt),
       unorderedEquals(original.map((question) => question.prompt)),
     );
+    expect(
+      (await harness.practices.allPractices()).map((practice) => practice.name),
+      unorderedEquals(['TCP/IP Slice A', 'TCP/IP Slice B']),
+    );
   });
 
-  test('splitting needs an even number of questions', () async {
+  test('splitting 7 questions into 3 parts gives 3, 2 and 2', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 7,
+    );
+
+    final result = await harness.practices.splitPractice(
+      seeded.practiceId,
+      parts: 3,
+      random: Random(11),
+    );
+
+    final sizes = <int>[];
+    final prompts = <String>[];
+    for (final part in result.parts) {
+      final questions = await harness.practices.questionsForPractice(part.id);
+      sizes.add(questions.length);
+      prompts.addAll(questions.map((question) => question.prompt));
+    }
+    expect(sizes, [3, 2, 2]);
+    expect(prompts.toSet(), hasLength(7));
+  });
+
+  test('splitting works with an odd number of questions', () async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(
       topicName: 'Networking',
       practiceName: 'TCP/IP',
       count: 5,
+    );
+
+    final result = await harness.practices.splitPractice(
+      seeded.practiceId,
+      random: Random(3),
+    );
+
+    final sizes = <int>[];
+    for (final part in result.parts) {
+      sizes.add((await harness.practices.questionsForPractice(part.id)).length);
+    }
+    expect(sizes, [3, 2]);
+  });
+
+  test('invalid part counts are blocked without changing data', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 7,
+    );
+
+    for (final parts in [0, 1, -2, 8]) {
+      await expectLater(
+        harness.practices.splitPractice(seeded.practiceId, parts: parts),
+        throwsA(isA<PracticeSplitException>()),
+      );
+      expect(
+        (await harness.practices.allPractices()).single.id,
+        seeded.practiceId,
+      );
+      expect(
+        await harness.practices.questionsForPractice(seeded.practiceId),
+        hasLength(7),
+      );
+    }
+  });
+
+  test('splitting needs at least two questions', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 1,
     );
 
     await expectLater(
@@ -64,7 +192,7 @@ void main() {
     expect(practices.single.id, seeded.practiceId);
     expect(
       await harness.practices.questionsForPractice(seeded.practiceId),
-      hasLength(5),
+      hasLength(1),
     );
   });
 
@@ -74,19 +202,127 @@ void main() {
     final seeded = await harness.seedPractice(
       topicName: 'Networking',
       practiceName: 'TCP/IP',
-      count: 2,
+      count: 9,
     );
-    await harness.practices.createPractice(
-      topicId: seeded.topicId,
-      name: 'TCP/IP Slice A',
-      description: '',
-      contentHash: 'existing-slice',
-      importedAt: harness.clock.now().toUtc(),
+    for (final name in const ['TCP/IP Slice B', 'TCP/IP Slice B 2']) {
+      await harness.practices.createPractice(
+        topicId: seeded.topicId,
+        name: name,
+        description: '',
+        contentHash: 'existing-$name',
+        importedAt: harness.clock.now().toUtc(),
+      );
+    }
+
+    final result = await harness.practices.splitPractice(
+      seeded.practiceId,
+      parts: 3,
+      random: Random(5),
     );
 
-    final result = await harness.practices.splitPractice(seeded.practiceId);
-
-    expect(result.sliceA.name, 'TCP/IP Slice A 2');
-    expect(result.sliceB.name, 'TCP/IP Slice B');
+    expect(result.parts.map((practice) => practice.name), [
+      'TCP/IP Slice A',
+      'TCP/IP Slice B 3',
+      'TCP/IP Slice C',
+    ]);
   });
+
+  test('parts past Z use a numeric slice name', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: 'TCP/IP',
+      count: 27,
+    );
+
+    final result = await harness.practices.splitPractice(
+      seeded.practiceId,
+      parts: 27,
+      random: Random(1),
+    );
+
+    expect(result.parts, hasLength(27));
+    expect(result.parts[0].name, 'TCP/IP Slice A');
+    expect(result.parts[25].name, 'TCP/IP Slice Z');
+    expect(result.parts[26].name, 'TCP/IP Slice 27');
+    expect(
+      result.parts.map((practice) => practice.name).toSet(),
+      hasLength(27),
+    );
+  });
+
+  test('split names keep the 120 character cap', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final longName = List.filled(120, 'N').join();
+    final seeded = await harness.seedPractice(
+      topicName: 'Networking',
+      practiceName: longName,
+      count: 4,
+    );
+
+    final result = await harness.practices.splitPractice(
+      seeded.practiceId,
+      random: Random(2),
+    );
+
+    expect(result.parts.map((practice) => practice.name.length), [120, 120]);
+    expect(result.parts[0].name, endsWith(' Slice A'));
+    expect(result.parts[1].name, endsWith(' Slice B'));
+  });
+
+  test(
+    'splitting removes the original sessions, answers and error cards',
+    () async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await harness.seedPractice(
+        topicName: 'Networking',
+        practiceName: 'TCP/IP',
+        count: 4,
+      );
+      final service = SessionService(
+        practices: harness.practices,
+        sessions: harness.sessions,
+        cards: harness.cards,
+        clock: harness.clock,
+      );
+      final start = await service.startPractice(seeded.practiceId);
+      await service.submitAnswer(
+        start: start,
+        item: start.items.first,
+        selectedIndexes: const [1],
+        reasoning: '',
+        distracted: false,
+      );
+      expect(
+        await harness.database.select(harness.database.errorCards).get(),
+        hasLength(1),
+      );
+
+      await harness.practices.splitPractice(
+        seeded.practiceId,
+        parts: 2,
+        random: Random(4),
+      );
+
+      expect(
+        await harness.database.select(harness.database.sessions).get(),
+        isEmpty,
+      );
+      expect(
+        await harness.database.select(harness.database.sessionQuestions).get(),
+        isEmpty,
+      );
+      expect(
+        await harness.database.select(harness.database.attempts).get(),
+        isEmpty,
+      );
+      expect(
+        await harness.database.select(harness.database.errorCards).get(),
+        isEmpty,
+      );
+    },
+  );
 }

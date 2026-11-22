@@ -20,6 +20,7 @@ class AppPage extends StatelessWidget {
     this.maxWidth = 720,
     this.focus = false,
     this.scrollController,
+    this.body,
     super.key,
   });
 
@@ -47,6 +48,12 @@ class AppPage extends StatelessWidget {
   /// return to the top when the learner moves to another card.
   final ScrollController? scrollController;
 
+  /// Replaces the scrolling [children] in focus mode.
+  ///
+  /// Review steps with their own split panes use this instead of a page scroll
+  /// view. The widget is given the full body height above the bottom bar.
+  final Widget? body;
+
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
@@ -69,15 +76,39 @@ class AppPage extends StatelessWidget {
             tablet ? 24 : 12,
             bottomInset,
           );
-      final content = CustomScrollView(
-        controller: scrollController,
-        slivers: [
-          SliverPadding(
-            padding: focusPadding,
-            sliver: SliverList.list(children: children),
-          ),
-        ],
-      );
+      final content = body == null
+          ? CustomScrollView(
+              controller: scrollController,
+              slivers: [
+                SliverPadding(
+                  padding: focusPadding,
+                  sliver: SliverList.list(children: children),
+                ),
+              ],
+            )
+          : Padding(padding: focusPadding, child: body);
+      final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+      final dockDuration = MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : Duration(milliseconds: keyboardOpen ? 200 : 250);
+      final dock = bottomBar == null
+          ? null
+          : AnimatedSwitcher(
+              duration: dockDuration,
+              switchInCurve: Curves.easeIn,
+              switchOutCurve: Curves.easeOut,
+              transitionBuilder: (child, animation) => SizeTransition(
+                sizeFactor: animation,
+                alignment: Alignment.bottomCenter,
+                child: child,
+              ),
+              child: keyboardOpen
+                  ? const SizedBox.shrink(key: ValueKey('app-dock-hidden'))
+                  : KeyedSubtree(
+                      key: const ValueKey('app-dock-visible'),
+                      child: bottomBar!,
+                    ),
+            );
       return PopScope(
         // Keep the system back gesture aligned with the visible close control,
         // including on the completion screen where closing reports success.
@@ -104,11 +135,14 @@ class AppPage extends StatelessWidget {
                         )
                       : content,
                 ),
-                if (bottomBar != null) bottomBar!,
               ],
             ),
           ),
-          floatingActionButton: floatingActionButton,
+          // The dock owns the scaffold's bottom slot so the floating action
+          // button is placed above it by the framework instead of sharing a
+          // full-width bottom bar.
+          bottomNavigationBar: dock,
+          floatingActionButton: keyboardOpen ? null : floatingActionButton,
           floatingActionButtonLocation: floatingActionButtonLocation,
         ),
       );
@@ -123,21 +157,24 @@ class AppPage extends StatelessWidget {
           child: CustomScrollView(
             controller: scrollController,
             slivers: [
-              M3EAppBar.sliver(
-                title: titleWidget,
-                titleText: titleWidget == null ? title : null,
-                subtitleText: subtitle,
-                variant: variant,
-                leading: showBack
-                    ? M3EIconButton(
-                        variant: M3EIconButtonVariant.standard,
-                        icon: const Icon(M3EIcons.arrow_back),
-                        tooltip: 'Back',
-                        onPressed:
-                            onBack ?? () => Navigator.of(context).maybePop(),
-                      )
-                    : null,
-                actions: actions,
+              _RouteAwareAppBar(
+                builder: (context) => M3EAppBar.sliver(
+                  title: titleWidget,
+                  titleText: titleWidget == null ? title : null,
+                  subtitleText: subtitle,
+                  variant: variant,
+                  leading: showBack
+                      ? M3EIconButton(
+                          key: const ValueKey('app-page-back'),
+                          variant: M3EIconButtonVariant.standard,
+                          icon: const Icon(M3EIcons.arrow_back),
+                          tooltip: 'Back',
+                          onPressed:
+                              onBack ?? () => Navigator.of(context).maybePop(),
+                        )
+                      : null,
+                  actions: actions,
+                ),
               ),
               SliverPadding(
                 padding: contentPadding,
@@ -152,6 +189,62 @@ class AppPage extends StatelessWidget {
       floatingActionButtonLocation: floatingActionButtonLocation,
     );
   }
+}
+
+/// Rebuilds the app bar when the page's route finishes entering or leaving.
+///
+/// [M3EAppBar] decides on its own whether to show a back button by asking
+/// `Navigator.canPop()` while it builds. A page below a route that is being
+/// popped can rebuild mid-transition, see `canPop == true`, and then keep the
+/// stale arrow because nothing rebuilds once the pop completes. Listening to
+/// the route animations rebuilds the bar at the settled state, so the root
+/// page never keeps a back control.
+class _RouteAwareAppBar extends StatefulWidget {
+  const _RouteAwareAppBar({required this.builder});
+
+  final WidgetBuilder builder;
+
+  @override
+  State<_RouteAwareAppBar> createState() => _RouteAwareAppBarState();
+}
+
+class _RouteAwareAppBarState extends State<_RouteAwareAppBar> {
+  ModalRoute<Object?>? _route;
+  Animation<double>? _animation;
+  Animation<double>? _secondaryAnimation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route == _route) return;
+    _detach();
+    _route = route;
+    _animation = route?.animation;
+    _secondaryAnimation = route?.secondaryAnimation;
+    _animation?.addStatusListener(_onStatusChanged);
+    _secondaryAnimation?.addStatusListener(_onStatusChanged);
+  }
+
+  void _onStatusChanged(AnimationStatus status) {
+    if (mounted) setState(() {});
+  }
+
+  void _detach() {
+    _animation?.removeStatusListener(_onStatusChanged);
+    _secondaryAnimation?.removeStatusListener(_onStatusChanged);
+    _animation = null;
+    _secondaryAnimation = null;
+  }
+
+  @override
+  void dispose() {
+    _detach();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context);
 }
 
 /// Slim top row used by [AppPage] focus mode: one clear exit and the title.

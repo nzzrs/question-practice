@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:question_practice/core/data/error_card_undo.dart';
 import 'package:question_practice/core/domain/list_sort.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/backup/domain/backup_service.dart';
@@ -10,7 +12,7 @@ import 'package:question_practice/features/backup/domain/backup_service.dart';
 import '../../helpers/test_harness.dart';
 
 void main() {
-  test('a v2 backup records metadata and every table', () async {
+  test('a v3 backup records metadata and every table', () async {
     final harness = TestHarness();
     addTearDown(harness.close);
     await _seedAllData(harness);
@@ -21,8 +23,8 @@ void main() {
     final metadata = payload['metadata'] as Map<String, dynamic>;
 
     expect(payload['formatVersion'], BackupService.formatVersion);
-    expect(BackupService.formatVersion, 2);
-    expect(metadata['formatVersion'], 2);
+    expect(BackupService.formatVersion, 3);
+    expect(metadata['formatVersion'], 3);
     expect(metadata['appVersion'], BackupService.appVersion);
     expect(metadata['buildNumber'], BackupService.buildNumber);
     expect(metadata['schemaVersion'], harness.database.schemaVersion);
@@ -32,6 +34,15 @@ void main() {
     final counts = metadata['tableCounts'] as Map<String, dynamic>;
     expect(counts.keys, containsAll(BackupService.requiredTables));
     expect(counts.keys, containsAll(BackupService.optionalTables));
+    expect(tables.keys, contains('notes'));
+    expect(tables.keys, isNot(contains('highlights')));
+    // Logical backup keys stay frozen even though the table is basic_cards.
+    expect(tables.keys, contains('manualCards'));
+    expect(tables.keys, isNot(contains('basicCards')));
+    final backupNotes = tables['notes'] as List<dynamic>;
+    final backupNote = backupNotes.single as Map<String, dynamic>;
+    expect(backupNote.keys, contains('manualCardId'));
+    expect(backupNote.keys, isNot(contains('basicCardId')));
     for (final entry in counts.entries) {
       expect(
         entry.value,
@@ -41,7 +52,7 @@ void main() {
     }
   });
 
-  test('a v2 round trip restores every table and every deck', () async {
+  test('a v3 round trip restores every table and every deck', () async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await _seedAllData(harness);
@@ -64,7 +75,7 @@ void main() {
     expect(await harness.practices.allQuestions(), isEmpty);
 
     final info = await service.restoreText(encoded);
-    expect(info.formatVersion, 2);
+    expect(info.formatVersion, 3);
     expect(info.topics, 2);
     expect(info.practices, 2);
     expect(info.questions, 5);
@@ -72,9 +83,9 @@ void main() {
     expect(info.attempts, 1);
     expect(info.concepts, 1);
     expect(info.errorCards, 1);
-    expect(info.manualCards, 1);
+    expect(info.basicCards, 1);
     expect(info.skippedQuestions, 1);
-    expect(info.highlights, 1);
+    expect(info.notes, 1);
     expect(info.archivedTopics, 1);
 
     final topics = await harness.practices.allTopics();
@@ -112,19 +123,19 @@ void main() {
         .select(harness.database.errorCards)
         .get();
     expect(errors.single.question, question.prompt);
-    final manuals = await harness.database
-        .select(harness.database.manualCards)
+    expect(errors.single.distracted, isTrue);
+    expect(errors.single.reasoning, 'I misread the prompt.');
+    final basics = await harness.database
+        .select(harness.database.basicCards)
         .get();
-    expect(manuals.single.answer, 'A container for objects.');
+    expect(basics.single.answer, 'A container for objects.');
     final skipped = await harness.database
         .select(harness.database.skippedQuestions)
         .get();
     expect(skipped.single.reasoning, 'Skipped this one.');
-    final highlights = await harness.database
-        .select(harness.database.highlights)
-        .get();
-    expect(highlights.single.phrase, 'object storage');
-    expect(highlights.single.context, 'Cloud storage');
+    final notes = await harness.database.select(harness.database.notes).get();
+    expect(notes.single.noteText, 'object storage');
+    expect(notes.single.context, 'Cloud storage');
 
     final settings = await harness.settings.load();
     expect(settings.ankiDeck, 'Saved deck');
@@ -133,6 +144,121 @@ void main() {
     expect(settings.lookupMode, LookupMode.ai);
     // The AI key lives in secure storage, outside the database and the backup.
     expect(await harness.settings.hasApiKey(), isTrue);
+  });
+
+  test(
+    'a backup keeps only undo journals owned by unfinished sessions',
+    () async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await harness.seedPractice(count: 1);
+      final question = (await harness.practices.questionsForPractice(
+        seeded.practiceId,
+      )).single;
+      final live = await harness.sessions.startSession(
+        practiceId: seeded.practiceId,
+        mode: SessionMode.practice,
+        questions: [question],
+        startedAt: harness.clock.now().toUtc(),
+      );
+      final abandoned = await harness.sessions.startSession(
+        practiceId: seeded.practiceId,
+        mode: SessionMode.practice,
+        questions: [question],
+        startedAt: harness.clock.now().toUtc(),
+      );
+      final cardId = await _seedUndoCard(harness, question);
+      await harness.cards.recordErrorCardUndo(
+        sessionId: live.id,
+        cardId: cardId,
+      );
+      await harness.cards.recordErrorCardUndo(
+        sessionId: abandoned.id,
+        cardId: cardId,
+      );
+      await harness.sessions.abandonSession(abandoned.id);
+      await harness.database.settingsDao.setValue(
+        errorCardUndoKey(999999),
+        encodeErrorCardUndo(const []),
+      );
+
+      final service = _service(harness);
+      final payload = _payload(await service.encode());
+      final tables = payload['tables'] as Map<String, dynamic>;
+      final settings = tables['settings'] as List<dynamic>;
+      final keys = [
+        for (final item in settings) (item as Map<String, dynamic>)['key'],
+      ];
+
+      expect(keys, contains(errorCardUndoKey(live.id)));
+      expect(keys, isNot(contains(errorCardUndoKey(abandoned.id))));
+      expect(keys, isNot(contains(errorCardUndoKey(999999))));
+    },
+  );
+
+  test('a restore drops stale and damaged undo journals', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = (await harness.practices.questionsForPractice(
+      seeded.practiceId,
+    )).single;
+    final first = await harness.sessions.startSession(
+      practiceId: seeded.practiceId,
+      mode: SessionMode.practice,
+      questions: [question],
+      startedAt: harness.clock.now().toUtc(),
+    );
+    final second = await harness.sessions.startSession(
+      practiceId: seeded.practiceId,
+      mode: SessionMode.practice,
+      questions: [question],
+      startedAt: harness.clock.now().toUtc(),
+    );
+    final cardId = await _seedUndoCard(harness, question);
+    await harness.cards.recordErrorCardUndo(
+      sessionId: first.id,
+      cardId: cardId,
+    );
+    await harness.cards.recordErrorCardUndo(
+      sessionId: second.id,
+      cardId: cardId,
+    );
+
+    final service = _service(harness);
+    final payload = _payload(await service.encode());
+    final tables = payload['tables'] as Map<String, dynamic>;
+    final settings = tables['settings'] as List<dynamic>;
+    final firstRow = settings.firstWhere(
+      (item) =>
+          (item as Map<String, dynamic>)['key'] == errorCardUndoKey(first.id),
+    ) as Map<String, dynamic>;
+    final secondRow = settings.firstWhere(
+      (item) =>
+          (item as Map<String, dynamic>)['key'] == errorCardUndoKey(second.id),
+    ) as Map<String, dynamic>;
+    secondRow['value'] = '{damaged journal';
+    settings.add({'key': errorCardUndoKey(999999), 'value': firstRow['value']});
+    final metadata = payload['metadata'] as Map<String, dynamic>;
+    final counts = metadata['tableCounts'] as Map<String, dynamic>;
+    counts['settings'] = settings.length;
+    _resign(payload);
+
+    await harness.database.clearAll();
+    await service.restoreText(jsonEncode(payload));
+
+    expect(
+      await harness.database.settingsDao.getValue(errorCardUndoKey(first.id)),
+      isNotNull,
+    );
+    expect(
+      await harness.database.settingsDao.getValue(errorCardUndoKey(second.id)),
+      isNull,
+    );
+    expect(
+      await harness.database.settingsDao.getValue(errorCardUndoKey(999999)),
+      isNull,
+    );
   });
 
   test('a v1 backup still restores its topic deck', () async {
@@ -195,6 +321,139 @@ void main() {
     );
   });
 
+  test(
+    'a legacy error card without distracted restores as not distracted',
+    () async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      await _seedAllData(harness);
+
+      final service = _service(harness);
+      final payload = _payload(await service.encode());
+      final tables = payload['tables'] as Map<String, dynamic>;
+      final card = (tables['errorCards'] as List<dynamic>).single;
+      (card as Map<String, dynamic>).remove('distracted');
+      _resign(payload);
+
+      await harness.database.clearAll();
+      await service.restoreText(jsonEncode(payload));
+
+      final restored = await harness.database
+          .select(harness.database.errorCards)
+          .get();
+      expect(restored.single.distracted, isFalse);
+      expect(restored.single.reasoning, 'I misread the prompt.');
+    },
+  );
+
+  for (final version in [1, 2]) {
+    test(
+      'a legacy v$version backup with a highlights table restores notes',
+      () async {
+        final harness = TestHarness();
+        addTearDown(harness.close);
+        await _seedAllData(harness);
+
+        final service = _service(harness);
+        final payload = _legacyHighlightsBackup(
+          _payload(await service.encode()),
+          version: version,
+        );
+        await harness.database.clearAll();
+
+        final info = await service.restoreText(jsonEncode(payload));
+        expect(info.formatVersion, version);
+        expect(info.notes, 1);
+        final restored = await harness.database
+            .select(harness.database.notes)
+            .get();
+        expect(restored.single.noteText, 'object storage');
+        expect(restored.single.context, 'Cloud storage');
+      },
+    );
+  }
+
+  test('a real v2 backup with highlights and phrase restores notes', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final service = _service(harness);
+
+    final fixture = await File('test/fixtures/backup_v2_legacy.json')
+        .readAsString();
+    final info = await service.restoreText(fixture);
+
+    expect(info.formatVersion, 2);
+    expect(info.schemaVersion, 11);
+    expect(info.appVersion, '0.9.8');
+    expect(info.notes, 1);
+    expect(info.basicCards, 1);
+
+    final notes = await harness.database.select(harness.database.notes).get();
+    expect(notes.single.noteText, 'object storage');
+    expect(notes.single.context, 'What is object storage?');
+    expect(notes.single.topicName, 'Cloud');
+    expect(notes.single.subtopic, 'Storage');
+    expect(notes.single.practiceName, 'Core');
+    expect(notes.single.sessionId, 1);
+    expect(notes.single.questionId, 1);
+    expect(notes.single.basicCardId, 1);
+    expect(notes.single.keptAt?.toUtc(), DateTime.utc(2025, 6, 1, 9, 15));
+    expect(
+      notes.single.cardCreatedAt?.toUtc(),
+      DateTime.utc(2025, 6, 1, 9, 30),
+    );
+  });
+
+  test('a legacy highlights table is still checked for references', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final service = _service(harness);
+    final payload = jsonDecode(
+      await File('test/fixtures/backup_v2_legacy.json').readAsString(),
+    ) as Map<String, dynamic>;
+    final tables = payload['tables'] as Map<String, dynamic>;
+    final note = (tables['highlights'] as List<dynamic>).single;
+    (note as Map<String, dynamic>)['questionId'] = 99;
+    _resign(payload);
+
+    await expectLater(
+      service.restoreText(jsonEncode(payload)),
+      throwsA(
+        isA<BackupException>().having(
+          (error) => error.message,
+          'message',
+          allOf(contains('notes row 1'), contains('missing question 99')),
+        ),
+      ),
+    );
+    expect(
+      await harness.database.select(harness.database.notes).get(),
+      isEmpty,
+    );
+  });
+
+  test('legacy highlight row counts are verified', () async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final service = _service(harness);
+    final payload = jsonDecode(
+      await File('test/fixtures/backup_v2_legacy.json').readAsString(),
+    ) as Map<String, dynamic>;
+    final metadata = payload['metadata'] as Map<String, dynamic>;
+    (metadata['tableCounts'] as Map<String, dynamic>)['highlights'] = 2;
+
+    await expectLater(
+      service.restoreText(jsonEncode(payload)),
+      throwsA(
+        isA<BackupException>().having(
+          (error) => error.message,
+          'message',
+          allOf(contains('"highlights"'), contains('has 2 rows')),
+        ),
+      ),
+    );
+  });
+
   test('unknown future tables are ignored', () async {
     final harness = TestHarness();
     addTearDown(harness.close);
@@ -222,7 +481,7 @@ void main() {
     final payload = _payload(await service.encode());
     final tables = payload['tables'] as Map<String, dynamic>;
     tables.remove('skippedQuestions');
-    tables.remove('highlights');
+    tables.remove('notes');
     _resign(payload);
 
     await service.restoreText(jsonEncode(payload));
@@ -325,7 +584,7 @@ void main() {
         isA<BackupException>().having(
           (error) => error.message,
           'message',
-          allOf(contains('format version 99'), contains('supports up to 2')),
+          allOf(contains('format version 99'), contains('supports up to 3')),
         ),
       ),
     );
@@ -566,6 +825,44 @@ Map<String, dynamic> _payload(String encoded) {
   return jsonDecode(encoded) as Map<String, dynamic>;
 }
 
+/// Rewrites a current payload the way v1 and v2 files stored notes.
+Map<String, dynamic> _legacyHighlightsBackup(
+  Map<String, dynamic> payload, {
+  required int version,
+}) {
+  final copy = Map<String, dynamic>.from(payload)..['formatVersion'] = version;
+  if (version == 1) {
+    copy.remove('metadata');
+  }
+  final tables = Map<String, dynamic>.from(
+    copy['tables'] as Map<String, dynamic>,
+  );
+  final notes = tables.remove('notes') as List<dynamic>;
+  tables['highlights'] = [
+    for (final item in notes)
+      () {
+        final row = Map<String, dynamic>.from(item as Map);
+        row['phrase'] = row.remove('text');
+        return row;
+      }(),
+  ];
+  copy['tables'] = tables;
+
+  final metadata = copy['metadata'];
+  if (metadata is Map<String, dynamic>) {
+    metadata['formatVersion'] = version;
+    metadata['schemaVersion'] = 11;
+    final counts = Map<String, dynamic>.from(
+      metadata['tableCounts'] as Map<String, dynamic>,
+    );
+    counts.remove('notes');
+    counts['highlights'] = notes.length;
+    metadata['tableCounts'] = counts;
+  }
+  _resign(copy);
+  return copy;
+}
+
 Map<String, dynamic> _asV1(Map<String, dynamic> payload) {
   final copy = Map<String, dynamic>.from(payload)
     ..['formatVersion'] = 1
@@ -575,6 +872,24 @@ Map<String, dynamic> _asV1(Map<String, dynamic> payload) {
 
 void _resign(Map<String, dynamic> payload) {
   payload['checksum'] = _checksum(payload['tables'] as Map<String, dynamic>);
+}
+
+Future<int> _seedUndoCard(TestHarness harness, Question question) {
+  return harness.cards.createErrorCard(
+    questionId: question.id,
+    sessionId: null,
+    question: question.prompt,
+    alternatives: question.alternatives,
+    correctIndexes: question.correctIndexes,
+    wrongIndexes: const [1],
+    reasoning: 'Original reasoning',
+    explanation: question.explanation,
+    alternativeExplanations: question.alternativeExplanations,
+    topicName: 'Topic',
+    practiceName: 'Practice',
+    lastWrongAt: DateTime.utc(2025, 12, 1, 8),
+    dueAfter: const Duration(hours: 48),
+  );
 }
 
 /// Seeds two topics, one practice with four questions, a completed session, all
@@ -645,8 +960,9 @@ Future<SeededPractice> _seedAllData(TestHarness harness) async {
     practiceName: 'Core',
     lastWrongAt: harness.clock.now().toUtc(),
     dueAfter: const Duration(hours: 48),
+    distracted: true,
   );
-  await harness.cards.createManualCard(
+  await harness.cards.createBasicCard(
     sessionId: session.id,
     question: 'What is a bucket?',
     answer: 'A container for objects.',
@@ -667,7 +983,7 @@ Future<SeededPractice> _seedAllData(TestHarness harness) async {
     unknown: false,
     createdAt: harness.clock.now().toUtc(),
   );
-  await harness.cards.createHighlight(
+  await harness.cards.createNote(
     sessionId: session.id,
     questionId: questions.first.id,
     text: 'object storage',

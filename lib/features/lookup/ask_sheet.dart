@@ -3,9 +3,8 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
-import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
-import '../export/new_card_dialog.dart';
+import '../export/card_creator_sheet.dart';
 import 'domain/lookup_service.dart';
 
 /// Opens a sheet that asks the configured AI about the selected passage.
@@ -17,6 +16,7 @@ Future<void> showAskAboutSelection(
   required String practiceName,
   required int? sessionId,
   required int? questionId,
+  String subtopic = '',
 }) {
   return M3EBottomSheet.show<void>(
     context,
@@ -28,6 +28,7 @@ Future<void> showAskAboutSelection(
       practiceName: practiceName,
       sessionId: sessionId,
       questionId: questionId,
+      subtopic: subtopic,
     ),
   );
 }
@@ -40,6 +41,7 @@ class AskSheet extends ConsumerStatefulWidget {
     required this.practiceName,
     required this.sessionId,
     required this.questionId,
+    this.subtopic = '',
     super.key,
   });
 
@@ -49,6 +51,7 @@ class AskSheet extends ConsumerStatefulWidget {
   final String practiceName;
   final int? sessionId;
   final int? questionId;
+  final String subtopic;
 
   @override
   ConsumerState<AskSheet> createState() => _AskSheetState();
@@ -96,51 +99,26 @@ class _AskSheetState extends ConsumerState<AskSheet> {
     }
   }
 
-  Future<void> _makeCard() async {
+  Future<void> _createCards() async {
     final answer = _answer;
     if (answer == null) return;
-    final draft = await showNewCardDialog(
+    final message = _message.text.trim();
+    final created = await showCardCreator(
       context,
-      title: 'Turn this into a card',
-      contextText: widget.question,
-      initialTerm: widget.selection,
-      initialQuestion: _message.text.trim(),
-      initialAnswer: answer,
-      initialKind: NewCardKind.basic,
+      request: CardCreatorRequest(
+        title: 'Create cards',
+        sessionId: widget.sessionId,
+        questionId: widget.questionId,
+        questionContext: widget.question,
+        topicName: widget.topicName,
+        subtopic: widget.subtopic,
+        initialFront: message.isEmpty ? widget.selection : message,
+        initialBack: answer,
+        existingFronts: ref.read(existingCardTextsProvider),
+      ),
     );
-    if (draft == null || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      final service = ref.read(reviewServiceProvider);
-      if (draft.kind == NewCardKind.concept) {
-        await service.createConcept(
-          sessionId: widget.sessionId,
-          questionId: widget.questionId,
-          term: draft.term,
-          definition: draft.definition,
-          context: widget.question,
-          topicName: widget.topicName,
-          source: ConceptSource.manual,
-        );
-      } else {
-        await service.createBasicCard(
-          sessionId: widget.sessionId,
-          questionId: widget.questionId,
-          question: draft.question,
-          answer: draft.answer,
-          context: widget.question,
-          topicName: widget.topicName,
-        );
-      }
-      if (!mounted) return;
-      Navigator.of(context).pop();
-    } on Object catch (error) {
-      if (mounted) {
-        await showSnack(context, 'Could not create the card: $error');
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    if (!mounted || created == 0) return;
+    Navigator.of(context).pop();
   }
 
   @override
@@ -239,9 +217,10 @@ class _AskSheetState extends ConsumerState<AskSheet> {
                     label: const Text('Ask another'),
                   ),
                   M3EButton.filled(
-                    onPressed: _busy ? null : _makeCard,
-                    icon: const Icon(Icons.style_outlined),
-                    label: const Text('Turn into a card'),
+                    key: const ValueKey('ask-create-cards'),
+                    onPressed: _busy ? null : _createCards,
+                    icon: const Icon(Icons.add_card),
+                    label: const Text('Create cards'),
                   ),
                 ],
               ),

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:clock/clock.dart';
-import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart' show Value;
 
@@ -20,12 +19,43 @@ class PracticeSplitException implements Exception {
   String toString() => message;
 }
 
-/// The two practices produced by splitting one practice.
+/// The practices produced by splitting one practice.
 class SplitPracticeResult {
-  const SplitPracticeResult({required this.sliceA, required this.sliceB});
+  const SplitPracticeResult({required this.parts});
 
-  final Practice sliceA;
-  final Practice sliceB;
+  /// New practices in slice order: A, B, C, and so on.
+  final List<Practice> parts;
+
+  /// First practice of a two-part split.
+  Practice get sliceA => parts[0];
+
+  /// Second practice of a two-part split.
+  Practice get sliceB => parts[1];
+}
+
+/// Sizes of the parts for a split, in slice order.
+///
+/// Each part gets the same number of questions; when the count is not
+/// divisible, the first parts get one extra question, so sizes differ by at
+/// most one. For example, 10 questions in 3 parts gives `[4, 3, 3]`.
+List<int> splitPartSizes(int questionCount, int parts) {
+  if (questionCount < 2) {
+    throw const PracticeSplitException('A split needs at least two questions.');
+  }
+  if (parts < 2) {
+    throw const PracticeSplitException('A split needs at least two parts.');
+  }
+  if (parts > questionCount) {
+    throw PracticeSplitException(
+      'A split cannot have more parts than questions. '
+      'This practice has $questionCount.',
+    );
+  }
+  final base = questionCount ~/ parts;
+  final extra = questionCount % parts;
+  return List<int>.unmodifiable([
+    for (var index = 0; index < parts; index++) base + (index < extra ? 1 : 0),
+  ]);
 }
 
 class PracticeRepository {
@@ -52,14 +82,15 @@ class PracticeRepository {
   }
 
   Stream<List<TopicSummary>> watchArchivedTopicSummaries() {
-    return watchTopicSummaries(includeArchived: true)
-        .map((rows) => rows.where((row) => row.topic.archived).toList());
+    return _db.statsDao
+        .watchArchivedTopicSummaries(_clock.now().toUtc())
+        .map((rows) => rows.map(topicSummaryFromRow).toList());
   }
 
   Stream<TopicSummary?> watchTopicSummary(int topicId) {
-    return watchTopicSummaries(
-      includeArchived: true,
-    ).map((rows) => rows.where((row) => row.topic.id == topicId).firstOrNull);
+    return _db.statsDao
+        .watchTopicSummary(_clock.now().toUtc(), topicId)
+        .map((row) => row == null ? null : topicSummaryFromRow(row));
   }
 
   Stream<List<PracticeSummary>> watchPracticeSummaries(int topicId) {
@@ -127,6 +158,11 @@ class PracticeRepository {
     return rows.map(practiceFromRow).toList();
   }
 
+  Future<List<Practice>> practicesForTopic(int topicId) async {
+    final rows = await _db.topicDao.practicesForTopic(topicId);
+    return rows.map(practiceFromRow).toList();
+  }
+
   Future<Question?> questionById(int id) async {
     final row = await _db.topicDao.questionById(id);
     return row == null ? null : questionFromRow(row);
@@ -162,6 +198,8 @@ class PracticeRepository {
     required String description,
     required int? priority,
     String? ankiDeck,
+    int minimumScore = 70,
+    int targetScore = 80,
     required DateTime createdAt,
   }) {
     return _db.topicDao.insertTopic(
@@ -169,6 +207,8 @@ class PracticeRepository {
       description: description,
       priority: priority,
       ankiDeck: ankiDeck,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
       createdAt: createdAt,
     );
   }
@@ -291,54 +331,155 @@ class PracticeRepository {
     required String contentHash,
     required DateTime importedAt,
   }) {
-    return _db.transaction(() async {
-      final practice = await _db.topicDao.practiceById(practiceId);
-      if (practice == null) {
-        throw StateError('This practice no longer exists.');
-      }
-      for (final id in deletedQuestionIds) {
-        await _db.topicDao.deleteQuestion(id);
-      }
-      final inserted = <QuestionsCompanion>[];
-      for (final update in questions) {
-        final question = update.question;
-        final existingId = update.existingQuestionId;
-        if (existingId == null) {
-          inserted.add(
-            QuestionsCompanion.insert(
-              practiceId: practiceId,
-              prompt: question.prompt,
-              alternativesJson: encodeStringList(question.alternatives),
-              correctIndexesJson: Value(encodeIntList(question.correctIndexes)),
-              explanation: question.explanation,
-              alternativeExplanationsJson: encodeStringList(
-                question.alternativeExplanations,
-              ),
-              position: update.position,
-              subtopic: Value(_normalizeSubtopic(question.subtopic)),
-            ),
-          );
-          continue;
-        }
-        await _db.topicDao.updateQuestion(
-          id: existingId,
-          prompt: question.prompt,
-          alternatives: question.alternatives,
-          correctIndexes: question.correctIndexes,
-          explanation: question.explanation,
-          alternativeExplanations: question.alternativeExplanations,
-          position: update.position,
-          subtopic: _normalizeSubtopic(question.subtopic),
-        );
-      }
-      if (inserted.isNotEmpty) {
-        await _db.topicDao.insertQuestions(inserted);
-      }
-      await _db.topicDao.updatePracticeContent(
-        id: practiceId,
+    return _db.transaction(
+      () => _applyPracticeUpdate(
+        practiceId: practiceId,
+        questions: questions,
+        deletedQuestionIds: deletedQuestionIds,
         contentHash: contentHash,
         importedAt: importedAt,
+        description: null,
+      ),
+    );
+  }
+
+  Future<void> _applyPracticeUpdate({
+    required int practiceId,
+    required List<PracticeQuestionUpdate> questions,
+    required List<int> deletedQuestionIds,
+    required String contentHash,
+    required DateTime importedAt,
+    String? description,
+  }) async {
+    final practice = await _db.topicDao.practiceById(practiceId);
+    if (practice == null) {
+      throw StateError('This practice no longer exists.');
+    }
+    for (final id in deletedQuestionIds) {
+      await _db.topicDao.deleteQuestion(id);
+    }
+    final inserted = <QuestionsCompanion>[];
+    for (final update in questions) {
+      final question = update.question;
+      final existingId = update.existingQuestionId;
+      if (existingId == null) {
+        inserted.add(
+          QuestionsCompanion.insert(
+            practiceId: practiceId,
+            prompt: question.prompt,
+            alternativesJson: encodeStringList(question.alternatives),
+            correctIndexesJson: Value(encodeIntList(question.correctIndexes)),
+            explanation: question.explanation,
+            alternativeExplanationsJson: encodeStringList(
+              question.alternativeExplanations,
+            ),
+            position: update.position,
+            subtopic: Value(_normalizeSubtopic(question.subtopic)),
+          ),
+        );
+        continue;
+      }
+      await _db.topicDao.updateQuestion(
+        id: existingId,
+        prompt: question.prompt,
+        alternatives: question.alternatives,
+        correctIndexes: question.correctIndexes,
+        explanation: question.explanation,
+        alternativeExplanations: question.alternativeExplanations,
+        position: update.position,
+        subtopic: _normalizeSubtopic(question.subtopic),
       );
+    }
+    if (inserted.isNotEmpty) {
+      await _db.topicDao.insertQuestions(inserted);
+    }
+    if (description != null && description != practice.description) {
+      await _db.topicDao.updatePracticeDescription(practiceId, description);
+    }
+    await _db.topicDao.updatePracticeContent(
+      id: practiceId,
+      contentHash: contentHash,
+      importedAt: importedAt,
+    );
+  }
+
+  /// Applies a whole topic update in one transaction.
+  ///
+  /// Practices absent from the file are never touched. Existing practices keep
+  /// the ids of matched questions; new practices and questions are inserted.
+  Future<void> applyTopicUpdate({
+    required int topicId,
+    required String? description,
+    required bool updatePriority,
+    required int? priority,
+    required int? minimumScore,
+    required int? targetScore,
+    required List<TopicPracticeUpdate> practices,
+    required DateTime importedAt,
+  }) {
+    return _db.transaction(() async {
+      final topic = await _db.topicDao.topicById(topicId);
+      if (topic == null) {
+        throw StateError('This topic no longer exists.');
+      }
+      await _db.topicDao.updateTopicDetails(
+        id: topicId,
+        description: description == null
+            ? const Value.absent()
+            : Value(description),
+        priority: updatePriority ? Value(priority) : const Value.absent(),
+        minimumScore: minimumScore == null
+            ? const Value.absent()
+            : Value(minimumScore),
+        targetScore: targetScore == null
+            ? const Value.absent()
+            : Value(targetScore),
+      );
+      for (final update in practices) {
+        final existingId = update.existingPracticeId;
+        if (existingId == null) {
+          final practiceId = await _db.topicDao.insertPractice(
+            topicId: topicId,
+            name: update.name,
+            description: update.description,
+            contentHash: update.contentHash,
+            importedAt: importedAt,
+          );
+          await _db.topicDao.insertQuestions([
+            for (var index = 0; index < update.questions.length; index++)
+              QuestionsCompanion.insert(
+                practiceId: practiceId,
+                prompt: update.questions[index].question.prompt,
+                alternativesJson: encodeStringList(
+                  update.questions[index].question.alternatives,
+                ),
+                correctIndexesJson: Value(
+                  encodeIntList(
+                    update.questions[index].question.correctIndexes,
+                  ),
+                ),
+                explanation: update.questions[index].question.explanation,
+                alternativeExplanationsJson: encodeStringList(
+                  update.questions[index].question.alternativeExplanations,
+                ),
+                position: update.questions[index].position,
+                subtopic: Value(
+                  _normalizeSubtopic(update.questions[index].question.subtopic),
+                ),
+              ),
+          ]);
+          continue;
+        }
+        if (!update.changed) continue;
+        await _applyPracticeUpdate(
+          practiceId: existingId,
+          questions: update.questions,
+          deletedQuestionIds: update.deletedQuestionIds,
+          contentHash: update.contentHash,
+          importedAt: importedAt,
+          description: update.description,
+        );
+      }
     });
   }
 
@@ -350,67 +491,63 @@ class PracticeRepository {
     return _db.topicDao.deletePractice(id);
   }
 
-  Future<SplitPracticeResult> splitPractice(int id, {Random? random}) {
+  /// Splits one practice into [parts] new practices in one transaction.
+  ///
+  /// Questions are shuffled before they are dealt, so every part gets a
+  /// random mix. Sizes differ by at most one. The original practice is deleted
+  /// together with its sessions, answers and error cards.
+  Future<SplitPracticeResult> splitPractice(
+    int id, {
+    int parts = 2,
+    Random? random,
+  }) {
     return _db.transaction(() async {
       final practice = await _db.topicDao.practiceById(id);
       if (practice == null) {
         throw const PracticeSplitException('This practice no longer exists.');
       }
       final questions = await _db.topicDao.questionsForPractice(id);
-      if (questions.length < 2) {
-        throw const PracticeSplitException(
-          'A split needs at least two questions.',
-        );
-      }
-      if (questions.length.isOdd) {
-        throw PracticeSplitException(
-          'A split needs an even number of questions. '
-          'This practice has ${questions.length}.',
-        );
-      }
+      final sizes = splitPartSizes(questions.length, parts);
 
       final shuffled = List<QuestionRow>.of(questions)
         ..shuffle(random ?? Random());
-      final half = shuffled.length ~/ 2;
-      final sliceAQuestions = shuffled.sublist(0, half);
-      final sliceBQuestions = shuffled.sublist(half);
-      final nameA = await _uniqueSplitName(
-        practice.topicId,
-        practice.name,
-        'A',
-      );
-      final nameB = await _uniqueSplitName(
-        practice.topicId,
-        practice.name,
-        'B',
-      );
       final now = _clock.now().toUtc();
-
-      final sliceAId = await _db.topicDao.insertPractice(
-        topicId: practice.topicId,
-        name: nameA,
-        description: practice.description,
-        contentHash: _splitHash(practice.contentHash, 'a', sliceAQuestions),
-        importedAt: now,
-      );
-      await _copyQuestions(sliceAId, sliceAQuestions);
-      final sliceBId = await _db.topicDao.insertPractice(
-        topicId: practice.topicId,
-        name: nameB,
-        description: practice.description,
-        contentHash: _splitHash(practice.contentHash, 'b', sliceBQuestions),
-        importedAt: now,
-      );
-      await _copyQuestions(sliceBId, sliceBQuestions);
+      final created = <Practice>[];
+      var offset = 0;
+      for (var index = 0; index < sizes.length; index++) {
+        final partQuestions = shuffled.sublist(offset, offset + sizes[index]);
+        offset += sizes[index];
+        final label = _sliceLabel(index);
+        final name = await _uniqueSplitName(
+          practice.topicId,
+          practice.name,
+          label,
+        );
+        final partId = await _db.topicDao.insertPractice(
+          topicId: practice.topicId,
+          name: name,
+          description: practice.description,
+          contentHash: _splitHash(
+            practice.contentHash,
+            label.toLowerCase(),
+            partQuestions,
+          ),
+          importedAt: now,
+        );
+        await _copyQuestions(partId, partQuestions);
+        final row = await _db.topicDao.practiceById(partId);
+        created.add(practiceFromRow(row!));
+      }
       await _db.topicDao.deletePractice(id);
 
-      final sliceARow = await _db.topicDao.practiceById(sliceAId);
-      final sliceBRow = await _db.topicDao.practiceById(sliceBId);
-      return SplitPracticeResult(
-        sliceA: practiceFromRow(sliceARow!),
-        sliceB: practiceFromRow(sliceBRow!),
-      );
+      return SplitPracticeResult(parts: List<Practice>.unmodifiable(created));
     });
+  }
+
+  /// Slice labels run A–Z, then fall back to the 1-based part number.
+  String _sliceLabel(int index) {
+    if (index < 26) return String.fromCharCode(65 + index);
+    return '${index + 1}';
   }
 
   Future<String> _uniqueSplitName(
@@ -482,6 +619,8 @@ class PracticeRepository {
     required String description,
     required int? priority,
     String? ankiDeck,
+    int minimumScore = 70,
+    int targetScore = 80,
   }) {
     return _db.topicDao.updateTopic(
       id: id,
@@ -489,6 +628,8 @@ class PracticeRepository {
       description: description,
       priority: priority,
       ankiDeck: ankiDeck,
+      minimumScore: minimumScore,
+      targetScore: targetScore,
     );
   }
 

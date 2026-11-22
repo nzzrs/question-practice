@@ -10,10 +10,10 @@ mixin _$CardDaoMixin on DatabaseAccessor<AppDatabase> {
   $QuestionsTable get questions => attachedDatabase.questions;
   $ConceptsTable get concepts => attachedDatabase.concepts;
   $ErrorCardsTable get errorCards => attachedDatabase.errorCards;
-  $ManualCardsTable get manualCards => attachedDatabase.manualCards;
+  $BasicCardsTable get basicCards => attachedDatabase.basicCards;
   $SkippedQuestionsTable get skippedQuestions =>
       attachedDatabase.skippedQuestions;
-  $HighlightsTable get highlights => attachedDatabase.highlights;
+  $NotesTable get notes => attachedDatabase.notes;
   CardDaoManager get managers => CardDaoManager(this);
 }
 
@@ -32,13 +32,13 @@ class CardDaoManager {
       $$ConceptsTableTableManager(_db.attachedDatabase, _db.concepts);
   $$ErrorCardsTableTableManager get errorCards =>
       $$ErrorCardsTableTableManager(_db.attachedDatabase, _db.errorCards);
-  $$ManualCardsTableTableManager get manualCards =>
-      $$ManualCardsTableTableManager(_db.attachedDatabase, _db.manualCards);
+  $$BasicCardsTableTableManager get basicCards =>
+      $$BasicCardsTableTableManager(_db.attachedDatabase, _db.basicCards);
   $$SkippedQuestionsTableTableManager get skippedQuestions =>
       $$SkippedQuestionsTableTableManager(
         _db.attachedDatabase,
         _db.skippedQuestions,
       );
-  $$HighlightsTableTableManager get highlights =>
-      $$HighlightsTableTableManager(_db.attachedDatabase, _db.highlights);
+  $$NotesTableTableManager get notes =>
+      $$NotesTableTableManager(_db.attachedDatabase, _db.notes);
 }

@@ -7,7 +7,6 @@ class AnkiStatus {
     required this.permissionGranted,
     required this.deckExists,
     required this.conceptModelAvailable,
-    required this.errorModelAvailable,
     required this.basicModelAvailable,
   });
 
@@ -17,7 +16,6 @@ class AnkiStatus {
       permissionGranted = false,
       deckExists = false,
       conceptModelAvailable = false,
-      errorModelAvailable = false,
       basicModelAvailable = false;
 
   final bool installed;
@@ -25,14 +23,12 @@ class AnkiStatus {
   final bool permissionGranted;
   final bool deckExists;
   final bool conceptModelAvailable;
-  final bool errorModelAvailable;
   final bool basicModelAvailable;
 
   bool get ready =>
       apiAvailable &&
       permissionGranted &&
       conceptModelAvailable &&
-      errorModelAvailable &&
       basicModelAvailable;
 
   factory AnkiStatus.fromMap(Map<Object?, Object?> map) {
@@ -43,13 +39,12 @@ class AnkiStatus {
       permissionGranted: read('permissionGranted'),
       deckExists: read('deckExists'),
       conceptModelAvailable: read('conceptModelAvailable'),
-      errorModelAvailable: read('errorModelAvailable'),
       basicModelAvailable: read('basicModelAvailable'),
     );
   }
 }
 
-enum AnkiModel { concept, error, basic }
+enum AnkiModel { concept, basic }
 
 class AnkiNote {
   const AnkiNote({
@@ -220,7 +215,6 @@ class FakeAnkiGateway implements AnkiGateway {
       permissionGranted: true,
       deckExists: false,
       conceptModelAvailable: true,
-      errorModelAvailable: true,
       basicModelAvailable: true,
     ),
     this.importResult = const AnkiImportResult(

@@ -35,6 +35,7 @@ rejected as a whole; there is no partial import and no partial update.
 file
 └── topics[]
     ├── name, description, priority
+    ├── minimumScore, targetScore
     └── practices[]
         ├── name, description
         └── questions[]
@@ -188,6 +189,8 @@ The first alternative is index `0`.
 | `topics[].name` | yes | string | 1–120 characters. Trimmed; must not be blank after trimming. Must be unique in the file, case-insensitive. |
 | `topics[].description` | no | string | Up to 2,000 characters. Trimmed. Defaults to an empty string. |
 | `topics[].priority` | no | integer or null | `1`–`5`; `1` is highest. Missing or `null` means unprioritised. |
+| `topics[].minimumScore` | no | integer or null | `0`–`100`. Percentage below which a score counts as failing the topic. Missing or `null` means `70`. |
+| `topics[].targetScore` | no | integer or null | `0`–`100`. Percentage at which a score meets the topic goal. Missing or `null` means `80`. Must be at least `minimumScore`. |
 | `topics[].practices` | yes | array | At least one practice. No upper limit in the schema. |
 | `practices[].name` | yes | string | 1–120 characters. Trimmed; must not be blank after trimming. Must be unique inside its topic, case-insensitive. |
 | `practices[].description` | no | string | Up to 2,000 characters. Trimmed. Defaults to an empty string. |
@@ -336,7 +339,7 @@ What is preserved on update:
 - A new question starts with no history.
 - A deleted question loses its attempts, session-question links, error cards and
   skipped-question records through the database cascade. Concept cards, basic
-  cards and highlights that referenced it remain, but their question link is
+  cards and notes that referenced it remain, but their question link is
   cleared. Statistics for its attempts disappear with them.
 - The practice stays in the same topic and keeps its done flag, while the
   practice content hash and import time are refreshed.
@@ -347,6 +350,24 @@ What is preserved on update:
 If the file's topic or practice name does not match the selected practice, the
 update is rejected. Download the practice again and edit that file if the names
 have changed.
+
+### Downloading and updating a topic
+
+Long-press a topic and choose **Edit topic → Download topic JSON**. The file contains one topic with every practice in it, using the same
+format above plus the topic's `minimumScore` and `targetScore`. **Update topic
+JSON**, next to the download action, validates the whole file first, then:
+
+- a practice whose name matches a stored practice is updated question by
+  question with the same `sourceId` then prompt matching used by a practice
+  update;
+- a practice name that does not match is created;
+- a stored practice missing from the file is left untouched;
+- the topic's description, priority and score thresholds are updated when the
+  file names them.
+
+Question matching keeps the stored ids and history. Matched practices also take
+the file's description. If the file does not contain the topic's name, the
+update is rejected.
 
 ## Import behaviour
 

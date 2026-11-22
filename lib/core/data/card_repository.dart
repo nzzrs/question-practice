@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 
 import '../database/app_database.dart';
 import '../domain/models.dart';
+import 'error_card_undo.dart';
 import 'mappers.dart';
 
 class CardRepository {
@@ -23,10 +24,10 @@ class CardRepository {
         .map((rows) => rows.map(errorCardFromRow).toList());
   }
 
-  Stream<List<ManualCard>> watchManualCards({bool includeExported = false}) {
+  Stream<List<BasicCard>> watchBasicCards({bool includeExported = false}) {
     return _db.cardDao
-        .watchManualCards(includeExported: includeExported)
-        .map((rows) => rows.map(manualCardFromRow).toList());
+        .watchBasicCards(includeExported: includeExported)
+        .map((rows) => rows.map(basicCardFromRow).toList());
   }
 
   Stream<List<ErrorCard>> watchDueErrors() {
@@ -57,19 +58,66 @@ class CardRepository {
     return rows.map(conceptFromRow).toList();
   }
 
-  Future<List<Concept>> conceptsMissingDefinition(int sessionId) async {
-    final rows = await _db.cardDao.conceptsMissingDefinition(sessionId);
-    return rows.map(conceptFromRow).toList();
-  }
-
   Future<ErrorCard?> activeErrorForQuestion(int questionId) async {
     final row = await _db.cardDao.activeErrorCardForQuestion(questionId);
     return row == null ? null : errorCardFromRow(row);
   }
 
+  /// Active cards for [questionIds], keyed by question, in batched queries.
+  Future<Map<int, ErrorCard>> activeErrorsForQuestions(
+    Iterable<int> questionIds,
+  ) async {
+    final rows = await _db.cardDao.activeErrorCardsForQuestions(questionIds);
+    return {for (final row in rows) row.questionId: errorCardFromRow(row)};
+  }
+
   Future<ErrorCard?> errorCardById(int id) async {
     final row = await _db.cardDao.errorCardById(id);
     return row == null ? null : errorCardFromRow(row);
+  }
+
+  /// Records the original state of an existing card before this session
+  /// changes it.
+  ///
+  /// Only the first write per card and session is recorded. Later wrong
+  /// answers and toggles therefore still undo to the state the learner had
+  /// before the session, not to an intermediate answer. Cards created by the
+  /// session are left out: they cascade away when the session is deleted.
+  Future<void> recordErrorCardUndo({
+    required int sessionId,
+    required int cardId,
+  }) {
+    return _db.transaction(() async {
+      final key = errorCardUndoKey(sessionId);
+      final raw = await _db.settingsDao.getValue(key);
+      final stored = tryDecodeErrorCardUndo(raw);
+      final snapshots = stored == null
+          ? <ErrorCardUndoSnapshot>[]
+          : List<ErrorCardUndoSnapshot>.of(stored);
+      if (snapshots.any((snapshot) => snapshot.cardId == cardId)) return;
+      final row = await _db.cardDao.errorCardById(cardId);
+      if (row == null || row.sessionId == sessionId) return;
+      snapshots.add(ErrorCardUndoSnapshot.fromCard(errorCardFromRow(row)));
+      await _db.settingsDao.setValue(key, encodeErrorCardUndo(snapshots));
+    });
+  }
+
+  /// Snapshots kept for [sessionId], oldest card first.
+  ///
+  /// A damaged journal is treated as empty so a discard still deletes the
+  /// session instead of trapping the learner. The journal is removed only when
+  /// the discard transaction commits.
+  Future<List<ErrorCardUndoSnapshot>> errorCardUndoForSession(
+    int sessionId,
+  ) async {
+    final raw = await _db.settingsDao.getValue(errorCardUndoKey(sessionId));
+    return tryDecodeErrorCardUndo(raw) ?? const [];
+  }
+
+  /// Newest saved concept with [term], ignoring case and empty definitions.
+  Future<Concept?> latestConceptForTerm(String term) async {
+    final row = await _db.cardDao.latestConceptForTerm(term);
+    return row == null ? null : conceptFromRow(row);
   }
 
   Future<int> countErrorCardsNeedingDetailsForSession(int sessionId) {
@@ -86,6 +134,7 @@ class CardRepository {
     required String topicName,
     required ConceptSource source,
     required DateTime createdAt,
+    String subtopic = '',
   }) {
     return _db.cardDao.insertConcept(
       ConceptsCompanion.insert(
@@ -96,6 +145,7 @@ class CardRepository {
         extra: Value(extra),
         context: Value(context),
         topicName: Value(topicName),
+        subtopic: Value(subtopic),
         source: source.name,
         createdAt: createdAt,
       ),
@@ -104,10 +154,6 @@ class CardRepository {
 
   Future<void> updateConceptDefinition(int id, String definition) {
     return _db.cardDao.updateConceptDefinition(id, definition);
-  }
-
-  Future<void> updateConceptExtra(int id, String extra) {
-    return _db.cardDao.updateConceptExtra(id, extra);
   }
 
   Future<int> createErrorCard({
@@ -124,6 +170,10 @@ class CardRepository {
     required String practiceName,
     required DateTime lastWrongAt,
     required Duration dueAfter,
+    String subtopic = '',
+    CognitiveType cognitiveType = CognitiveType.contrast,
+    List<MistakeKind> mistakeKinds = const [],
+    bool distracted = false,
   }) {
     return _db.cardDao.insertErrorCard(
       ErrorCardsCompanion.insert(
@@ -140,6 +190,10 @@ class CardRepository {
         ),
         topicName: Value(topicName),
         practiceName: Value(practiceName),
+        cognitiveType: Value(cognitiveType.name),
+        subtopic: Value(subtopic),
+        mistakeKindsJson: Value(mistakeKindsToJson(mistakeKinds)),
+        distracted: Value(distracted),
         status: ErrorCardStatus.active.name,
         createdAt: lastWrongAt,
         lastWrongAt: lastWrongAt,
@@ -162,24 +216,16 @@ class CardRepository {
     );
   }
 
-  Future<void> updateErrorCardContent({
-    required int id,
-    required String question,
-    required List<String> alternatives,
-    required String explanation,
-    required List<String> alternativeExplanations,
-  }) {
-    return _db.cardDao.updateErrorCardContent(
-      id,
-      question: question,
-      alternatives: alternatives,
-      explanation: explanation,
-      alternativeExplanations: alternativeExplanations,
-    );
+  Future<void> completeErrorCardDetails(int id, DateTime completedAt) {
+    return _db.cardDao.completeErrorCardDetails(id, completedAt);
   }
 
   Future<void> updateErrorCardReasoning(int id, String reasoning) {
     return _db.cardDao.updateErrorCardReasoning(id, reasoning);
+  }
+
+  Future<void> setErrorCardDistracted(int id, bool distracted) {
+    return _db.cardDao.updateErrorCardDistracted(id, distracted);
   }
 
   Future<void> touchWrongError({
@@ -188,13 +234,23 @@ class CardRepository {
     required String reasoning,
     required DateTime wrongAt,
     required Duration dueAfter,
-  }) {
+  }) async {
+    // A mistake recorded at the exact instant the details were completed must
+    // still reopen the card. Without the nudge `needsDetails` would compare
+    // equal timestamps and silently keep the repeated error reviewed. A full
+    // second is used because date-time columns round to whole seconds.
+    var effectiveWrongAt = wrongAt;
+    final existing = await _db.cardDao.errorCardById(id);
+    final completedAt = existing?.detailsCompletedAt;
+    if (completedAt != null && !effectiveWrongAt.isAfter(completedAt)) {
+      effectiveWrongAt = completedAt.add(const Duration(seconds: 1));
+    }
     return _db.cardDao.touchWrongError(
       id: id,
       wrongIndexes: wrongIndexes,
       reasoning: reasoning,
-      wrongAt: wrongAt,
-      dueAt: wrongAt.add(dueAfter),
+      wrongAt: effectiveWrongAt,
+      dueAt: effectiveWrongAt.add(dueAfter),
     );
   }
 
@@ -206,7 +262,7 @@ class CardRepository {
     return _db.cardDao.resolveError(id, resolvedAt);
   }
 
-  Future<int> createManualCard({
+  Future<int> createBasicCard({
     required int? sessionId,
     required String question,
     required String answer,
@@ -214,15 +270,19 @@ class CardRepository {
     required DateTime createdAt,
     int? questionId,
     String context = '',
+    String subtopic = '',
+    CognitiveType cognitiveType = CognitiveType.fact,
   }) {
-    return _db.cardDao.insertManualCard(
-      ManualCardsCompanion.insert(
+    return _db.cardDao.insertBasicCard(
+      BasicCardsCompanion.insert(
         sessionId: Value(sessionId),
         questionId: Value(questionId),
         question: question,
         answer: answer,
         context: Value(context),
         topicName: Value(topicName),
+        cognitiveType: Value(cognitiveType.name),
+        subtopic: Value(subtopic),
         createdAt: createdAt,
       ),
     );
@@ -325,7 +385,7 @@ class CardRepository {
     await _db.cardDao.deleteSkippedQuestion(existing.id);
   }
 
-  Future<int> createHighlight({
+  Future<int> createNote({
     required int? sessionId,
     required int? questionId,
     required String text,
@@ -333,81 +393,87 @@ class CardRepository {
     required String topicName,
     required String practiceName,
     required DateTime createdAt,
+    String subtopic = '',
   }) {
-    return _db.cardDao.insertHighlight(
-      HighlightsCompanion.insert(
+    return _db.cardDao.insertNote(
+      NotesCompanion.insert(
         sessionId: Value(sessionId),
         questionId: Value(questionId),
-        phrase: text,
+        noteText: text,
         context: Value(context),
         topicName: Value(topicName),
+        subtopic: Value(subtopic),
         practiceName: Value(practiceName),
         createdAt: createdAt,
       ),
     );
   }
 
-  Stream<List<StudyHighlight>> watchHighlights() {
-    return _db.cardDao.watchHighlights().map(
-      (rows) => rows.map(highlightFromRow).toList(),
+  Stream<List<Note>> watchNotes() {
+    return _db.cardDao.watchNotes().map(
+      (rows) => rows.map(noteFromRow).toList(),
     );
   }
 
-  Future<List<StudyHighlight>> highlightsForSession(int sessionId) async {
-    final rows = await _db.cardDao.highlightsForSession(sessionId);
-    return rows.map(highlightFromRow).toList();
+  Future<List<Note>> notesForSession(int sessionId) async {
+    final rows = await _db.cardDao.notesForSession(sessionId);
+    return rows.map(noteFromRow).toList();
   }
 
-  Future<void> keepHighlight(int id, DateTime keptAt) {
-    return _db.cardDao.markHighlightKept(id, keptAt);
+  /// Notes saved for a question in any session.
+  Future<List<Note>> notesForQuestion(int questionId) async {
+    final rows = await _db.cardDao.notesForQuestion(questionId);
+    return rows.map(noteFromRow).toList();
   }
 
-  Future<void> markHighlightConverted(
+  Future<void> keepNote(int id, DateTime keptAt) {
+    return _db.cardDao.markNoteKept(id, keptAt);
+  }
+
+  Future<void> markNoteConverted(
     int id, {
     required DateTime cardCreatedAt,
-    int? manualCardId,
+    int? basicCardId,
   }) {
-    return _db.cardDao.markHighlightConverted(
+    return _db.cardDao.markNoteConverted(
       id,
       cardCreatedAt: cardCreatedAt,
-      manualCardId: manualCardId,
+      basicCardId: basicCardId,
     );
   }
 
-  Future<void> deleteHighlight(int id) {
-    return _db.cardDao.deleteHighlight(id);
+  Future<void> deleteNote(int id) {
+    return _db.cardDao.deleteNote(id);
   }
 
-  Future<void> deleteHighlights(List<int> ids) {
-    return _db.cardDao.deleteHighlights(ids);
+  Future<void> deleteNotes(List<int> ids) {
+    return _db.cardDao.deleteNotes(ids);
   }
 
   Future<void> markExported({
     required List<int> conceptIds,
-    required List<int> errorCardIds,
-    required List<int> manualCardIds,
+    required List<int> basicCardIds,
     required DateTime exportedAt,
   }) {
     return _db.transaction(() async {
       await _db.cardDao.markConceptsExported(conceptIds, exportedAt);
-      await _db.cardDao.markErrorCardsExported(errorCardIds, exportedAt);
-      await _db.cardDao.markManualCardsExported(manualCardIds, exportedAt);
+      await _db.cardDao.markBasicCardsExported(basicCardIds, exportedAt);
     });
   }
 
   Future<void> deleteCards({
     required List<int> conceptIds,
     required List<int> errorCardIds,
-    required List<int> manualCardIds,
+    required List<int> basicCardIds,
     List<int> skippedQuestionIds = const [],
-    List<int> highlightIds = const [],
+    List<int> noteIds = const [],
   }) {
     return _db.transaction(() async {
       await _db.cardDao.deleteConcepts(conceptIds);
       await _db.cardDao.deleteErrorCards(errorCardIds);
-      await _db.cardDao.deleteManualCards(manualCardIds);
+      await _db.cardDao.deleteBasicCards(basicCardIds);
       await _db.cardDao.deleteSkippedQuestions(skippedQuestionIds);
-      await _db.cardDao.deleteHighlights(highlightIds);
+      await _db.cardDao.deleteNotes(noteIds);
     });
   }
 }

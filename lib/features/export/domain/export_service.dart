@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/data/card_repository.dart';
 import '../../../core/data/practice_repository.dart';
 import '../../../core/domain/models.dart';
+import '../../../core/domain/plural.dart';
 import '../../../core/platform/anki_gateway.dart';
 import 'anki_note_builder.dart';
 
@@ -33,17 +34,20 @@ class ExportService {
     required PracticeRepository practices,
     required Clock clock,
     AnkiNoteBuilder builder = const AnkiNoteBuilder(),
+    Future<Directory> Function()? temporaryDirectory,
   }) : _gateway = gateway,
        _cards = cards,
        _practices = practices,
        _clock = clock,
-       _builder = builder;
+       _builder = builder,
+       _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
 
   final AnkiGateway _gateway;
   final CardRepository _cards;
   final PracticeRepository _practices;
   final Clock _clock;
   final AnkiNoteBuilder _builder;
+  final Future<Directory> Function() _temporaryDirectory;
 
   AnkiNoteBuilder get builder => _builder;
 
@@ -57,14 +61,6 @@ class ExportService {
         added: 0,
         failed: 0,
         message: 'Select at least one card.',
-      );
-    }
-    if (selection.errorCards.any((card) => card.needsDetails)) {
-      return const ExportOutcome(
-        success: false,
-        added: 0,
-        failed: 0,
-        message: 'Complete the selected error cards before export.',
       );
     }
     final status = await _gateway.status();
@@ -120,8 +116,7 @@ class ExportService {
     if (success) {
       await _cards.markExported(
         conceptIds: selection.conceptIds.toList(),
-        errorCardIds: selection.errorCardIds.toList(),
-        manualCardIds: selection.manualCardIds.toList(),
+        basicCardIds: selection.basicCardIds.toList(),
         exportedAt: _clock.now().toUtc(),
       );
       await _gateway.triggerSync();
@@ -132,14 +127,14 @@ class ExportService {
       failed: result.failed,
       message: result.message.isEmpty
           ? success
-                ? '${result.added} cards sent to AnkiDroid.'
+                ? '${formatCount(result.added, 'card')} sent to AnkiDroid.'
                 : 'AnkiDroid rejected some cards.'
           : result.message,
     );
   }
 
   Future<List<File>> writeFiles(ExportSelection selection) async {
-    final directory = await getTemporaryDirectory();
+    final directory = await _temporaryDirectory();
     final stamp = DateFormat('yyyyMMdd-HHmm').format(_clock.now());
     final files = _builder.files(selection);
     final result = <File>[];
@@ -148,13 +143,6 @@ class ExportService {
         p.join(directory.path, 'question-practice-concepts-$stamp.txt'),
       );
       await file.writeAsString(files.concepts);
-      result.add(file);
-    }
-    if (files.hasErrors) {
-      final file = File(
-        p.join(directory.path, 'question-practice-errors-$stamp.tsv'),
-      );
-      await file.writeAsString(files.errors);
       result.add(file);
     }
     if (files.hasBasic) {
@@ -179,24 +167,22 @@ class ExportService {
     );
   }
 
-  /// Serializes saved highlights as human-readable plain text.
-  String highlightsText(List<StudyHighlight> highlights) {
-    final buffer = StringBuffer('Question Practice highlights\n');
-    buffer.writeln(
-      '${highlights.length} highlight${highlights.length == 1 ? '' : 's'}',
-    );
-    for (final highlight in highlights) {
+  /// Serializes saved notes as human-readable plain text.
+  String notesText(List<Note> notes) {
+    final buffer = StringBuffer('Question Practice notes\n');
+    buffer.writeln('${notes.length} note${notes.length == 1 ? '' : 's'}');
+    for (final note in notes) {
       buffer.writeln();
       buffer.writeln('---');
-      final topic = highlight.topicName.trim();
+      final topic = note.topicName.trim();
       if (topic.isNotEmpty) buffer.writeln('# $topic');
-      buffer.writeln(highlight.text.trim());
-      if (highlight.context.trim().isNotEmpty) {
-        buffer.writeln('Context: ${highlight.context.trim()}');
+      buffer.writeln(note.text.trim());
+      if (note.context.trim().isNotEmpty) {
+        buffer.writeln('Context: ${note.context.trim()}');
       }
-      final status = highlight.hasCard
+      final status = note.hasCard
           ? 'Card made'
-          : highlight.isKept
+          : note.isKept
           ? 'Kept'
           : 'In review';
       buffer.writeln('Status: $status');
@@ -204,19 +190,19 @@ class ExportService {
     return buffer.toString();
   }
 
-  /// Writes all highlights to a text file and opens the share sheet.
-  Future<void> shareHighlights(List<StudyHighlight> highlights) async {
-    if (highlights.isEmpty) return;
-    final directory = await getTemporaryDirectory();
+  /// Writes all notes to a text file and opens the share sheet.
+  Future<void> shareNotes(List<Note> notes) async {
+    if (notes.isEmpty) return;
+    final directory = await _temporaryDirectory();
     final stamp = DateFormat('yyyyMMdd-HHmm').format(_clock.now());
     final file = File(
-      p.join(directory.path, 'question-practice-highlights-$stamp.txt'),
+      p.join(directory.path, 'question-practice-notes-$stamp.txt'),
     );
-    await file.writeAsString(highlightsText(highlights));
+    await file.writeAsString(notesText(notes));
     await SharePlus.instance.share(
       ShareParams(
-        subject: 'Question Practice highlights',
-        text: 'Saved highlights from Question Practice.',
+        subject: 'Question Practice notes',
+        text: 'Saved notes from Question Practice.',
         files: [XFile(file.path)],
       ),
     );

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
+import '../id_batches.dart';
 import '../tables.dart';
 
 part 'topic_dao.g.dart';
@@ -66,6 +67,19 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     return (select(questions)..where((q) => q.id.equals(id))).getSingleOrNull();
   }
 
+  /// Question rows for [ids] in batched queries.
+  ///
+  /// The result order is unspecified. Empty sets issue no query.
+  Future<List<QuestionRow>> questionsByIds(Iterable<int> ids) async {
+    final rows = <QuestionRow>[];
+    for (final batch in idBatches(ids)) {
+      rows.addAll(
+        await (select(questions)..where((q) => q.id.isIn(batch))).get(),
+      );
+    }
+    return rows;
+  }
+
   Future<TopicRow?> topicById(int id) {
     return (select(topics)..where((t) => t.id.equals(id))).getSingleOrNull();
   }
@@ -110,6 +124,8 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     required String description,
     required int? priority,
     String? ankiDeck,
+    int minimumScore = 70,
+    int targetScore = 80,
     required DateTime createdAt,
   }) {
     return into(topics).insert(
@@ -118,6 +134,8 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
         description: Value(description),
         priority: Value(priority),
         ankiDeck: Value(ankiDeck),
+        minimumScore: Value(minimumScore),
+        targetScore: Value(targetScore),
         createdAt: createdAt,
       ),
     );
@@ -257,12 +275,32 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
     await (delete(topics)..where((t) => t.id.equals(id))).go();
   }
 
+  /// Writes only the topic fields supplied by an update file.
+  Future<void> updateTopicDetails({
+    required int id,
+    Value<String> description = const Value.absent(),
+    Value<int?> priority = const Value.absent(),
+    Value<int> minimumScore = const Value.absent(),
+    Value<int> targetScore = const Value.absent(),
+  }) {
+    return (update(topics)..where((t) => t.id.equals(id))).write(
+      TopicsCompanion(
+        description: description,
+        priority: priority,
+        minimumScore: minimumScore,
+        targetScore: targetScore,
+      ),
+    );
+  }
+
   Future<void> updateTopic({
     required int id,
     required String name,
     required String description,
     required int? priority,
     required String? ankiDeck,
+    required int minimumScore,
+    required int targetScore,
   }) {
     return (update(topics)..where((t) => t.id.equals(id))).write(
       TopicsCompanion(
@@ -270,6 +308,8 @@ class TopicDao extends DatabaseAccessor<AppDatabase> with _$TopicDaoMixin {
         description: Value(description),
         priority: Value(priority),
         ankiDeck: Value(ankiDeck),
+        minimumScore: Value(minimumScore),
+        targetScore: Value(targetScore),
       ),
     );
   }

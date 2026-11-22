@@ -45,7 +45,7 @@ void main() {
         'Feedback and error cards',
         'Past errors',
         'Cards',
-        'Highlights',
+        'Notes',
         'AnkiDroid export',
         'Practice JSON',
         'Subtopics and statistics',
@@ -54,11 +54,111 @@ void main() {
         'Shuffled practice',
         'JSON example',
         'Copy JSON example',
-        'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection.',
+        'Long-press a card to select it. While selection is active, a tap toggles that card. Tap the selected rows again to clear the selection; there is no separate clear action. Rows have no checkboxes or action icons.',
       ]),
     );
-    expect(texts.any((text) => text.contains('Review highlights')), isTrue);
+    expect(
+      texts.any((text) => text.contains('close icon in the app bar')),
+      isFalse,
+    );
+    expect(
+      texts.any((text) => text.contains('Select all in the app bar')),
+      isFalse,
+    );
+    expect(
+      texts.any((text) => text.contains('Tap a note to open Note preview')),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'Long-press a practice to edit, split or delete it. Split asks for '
+          'a part count, mixes the questions and names the parts Slice A, '
+          'Slice B and so on.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'Valid topic edits save automatically; closing with an invalid value '
+          'or a failed save offers Discard changes.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'In practice the bullets stay editable and have no Copy or Create '
+          'card menu.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'The ? icon opens a short guide to Cloze and Basic cards, tags, '
+          'decks and what stays in Question Practice.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains('The dock has no Create or Delete button.'),
+      ),
+      isTrue,
+    );
+    expect(texts.any((text) => text.contains('Clear selection')), isFalse);
+    expect(texts.any((text) => text.contains('Review selected')), isFalse);
+    expect(texts.any((text) => text.contains('Split into two')), isFalse);
+    expect(texts.any((text) => text.contains('WrongNotes')), isFalse);
+    expect(texts.any((text) => text.contains('AdaptiveSplitView')), isFalse);
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'Review all pending sits beside Select all on the right. It '
+          'opens every pending error and skipped question, even ones not '
+          'selected.',
+        ),
+      ),
+      isTrue,
+    );
+    expect(
+      texts.any((text) => text.contains('without changing the selection')),
+      isFalse,
+    );
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'Contrast, Cause and effect, Scenario and rule, and Steps cards use '
+          'the Basic note type',
+        ),
+      ),
+      isTrue,
+    );
+    expect(texts.any((text) => text.contains('Error v2')), isFalse);
     expect(texts.any((text) => text.contains('shuffle button')), isFalse);
+    expect(
+      texts.any(
+        (text) => text.contains(
+          'Definition, Contrast, Cause and effect, Scenario and rule, and '
+          'Steps',
+        ),
+      ),
+      isTrue,
+    );
+    expect(texts.any((text) => text.contains('Exam tip')), isFalse);
+    expect(texts.any((text) => text.contains('Exam heuristic')), isFalse);
+    expect(texts.any((text) => text.contains('Phase transition')), isFalse);
+    expect(
+      texts.any((text) => text.contains('Mechanism / cause-effect')),
+      isFalse,
+    );
+    expect(texts.any((text) => text.contains('card creator')), isFalse);
     expect(
       texts.any((text) => text.contains('A quiet loop for practice')),
       isFalse,
@@ -67,6 +167,10 @@ void main() {
     expect(texts.any((text) => text.contains('chat completions')), isFalse);
     expect(texts.any((text) => text.contains('native API')), isFalse);
     expect(texts.any((text) => text.contains('database')), isFalse);
+    expect(texts.any((text) => text.contains("I didn't know this")), isFalse);
+    expect(texts.any((text) => text.contains('Facts, heuristics')), isFalse);
+    expect(texts.any((text) => text.contains('Review notes')), isFalse);
+    expect(texts.any((text) => text.contains('Keep for later')), isFalse);
   });
 
   testWidgets('copy example puts valid JSON with every format feature on the '

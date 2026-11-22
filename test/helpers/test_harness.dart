@@ -1,4 +1,5 @@
 import 'package:clock/clock.dart';
+import 'package:drift/drift.dart' show QueryExecutor;
 import 'package:drift/native.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -42,8 +43,9 @@ class TestHarness {
     AnkiGateway? anki,
     PracticeSoundPlayer? soundPlayer,
     http.Client? httpClient,
+    QueryExecutor? executor,
   }) : clock = TestClock(now ?? DateTime.utc(2026, 1, 1, 12)),
-       database = AppDatabase(NativeDatabase.memory()),
+       database = AppDatabase(executor ?? NativeDatabase.memory()),
        keyStore = keyStore ?? InMemorySecureKeyStore(),
        webLauncher = webLauncher ?? RecordingWebLauncher(),
        anki = anki ?? FakeAnkiGateway(),
@@ -210,6 +212,17 @@ Future<void> pumpFrames(WidgetTester tester, {int frames = 12}) async {
   for (var index = 0; index < frames; index++) {
     await tester.pump(const Duration(milliseconds: 50));
   }
+}
+
+/// Expands the card creator sheet from its collapsed starting height.
+///
+/// The creator opens at half height so the review behind it stays readable.
+/// A drag on the handle gives the content its full height for interactions.
+Future<void> expandCardCreatorSheet(WidgetTester tester) async {
+  final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+  final start = Offset(size.width / 2, size.height / 2 + 20);
+  await tester.dragFrom(start, Offset(0, -(size.height * 0.55)));
+  await pumpFrames(tester);
 }
 
 Future<void> pumpTestApp(

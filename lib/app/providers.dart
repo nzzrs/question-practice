@@ -22,6 +22,7 @@ import '../features/practice/domain/session_service.dart';
 import '../features/practice_edit/domain/practice_edit_service.dart';
 import '../features/review/domain/review_service.dart';
 import '../features/topics/domain/statistics_export_service.dart';
+import '../features/topics/domain/topic_edit_service.dart';
 
 final databaseProvider = Provider<AppDatabase>(
   (ref) => throw UnimplementedError('databaseProvider must be overridden'),
@@ -111,10 +112,6 @@ final topicSubtopicStatsProvider =
           ref.watch(topicRepositoryProvider).watchSubtopicStats(topicId),
     );
 
-final inProgressSessionProvider = StreamProvider<PracticeSession?>(
-  (ref) => ref.watch(sessionRepositoryProvider).watchLatestInProgress(),
-);
-
 final inProgressSessionsProvider = StreamProvider<List<PracticeSession>>(
   (ref) => ref.watch(sessionRepositoryProvider).watchInProgress(),
 );
@@ -127,21 +124,9 @@ final resolvedErrorsProvider = StreamProvider<List<ErrorCard>>(
   (ref) => ref.watch(cardRepositoryProvider).watchResolvedErrors(),
 );
 
-final errorsNeedingDetailsProvider = StreamProvider<List<ErrorCard>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchErrorsNeedingDetails(),
-);
-
-final conceptsProvider = StreamProvider<List<Concept>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchConcepts(),
-);
-
 final allConceptsProvider = StreamProvider<List<Concept>>(
   (ref) =>
       ref.watch(cardRepositoryProvider).watchConcepts(includeExported: true),
-);
-
-final errorCardsProvider = StreamProvider<List<ErrorCard>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchErrorCards(),
 );
 
 final allErrorCardsProvider = StreamProvider<List<ErrorCard>>(
@@ -149,21 +134,30 @@ final allErrorCardsProvider = StreamProvider<List<ErrorCard>>(
       ref.watch(cardRepositoryProvider).watchErrorCards(includeExported: true),
 );
 
-final manualCardsProvider = StreamProvider<List<ManualCard>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchManualCards(),
-);
-
-final allManualCardsProvider = StreamProvider<List<ManualCard>>(
+final allBasicCardsProvider = StreamProvider<List<BasicCard>>(
   (ref) =>
-      ref.watch(cardRepositoryProvider).watchManualCards(includeExported: true),
+      ref.watch(cardRepositoryProvider).watchBasicCards(includeExported: true),
 );
 
 final skippedQuestionsProvider = StreamProvider<List<SkippedQuestion>>(
   (ref) => ref.watch(cardRepositoryProvider).watchUnhandledSkippedQuestions(),
 );
 
-final highlightsProvider = StreamProvider<List<StudyHighlight>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchHighlights(),
+/// Fronts and terms of saved cards, used to keep AI suggestions from
+/// repeating a card the learner already has.
+final existingCardTextsProvider = Provider<List<String>>((ref) {
+  final basics = ref.watch(allBasicCardsProvider).value ?? const <BasicCard>[];
+  final concepts = ref.watch(allConceptsProvider).value ?? const <Concept>[];
+  return [
+    for (final card in basics)
+      if (card.question.trim().isNotEmpty) card.question,
+    for (final concept in concepts)
+      if (concept.term.trim().isNotEmpty) concept.term,
+  ];
+});
+
+final notesProvider = StreamProvider<List<Note>>(
+  (ref) => ref.watch(cardRepositoryProvider).watchNotes(),
 );
 
 final httpClientProvider = Provider<http.Client>((ref) {
@@ -241,6 +235,14 @@ final exportServiceProvider = Provider<ExportService>(
 
 final practiceEditServiceProvider = Provider<PracticeEditService>(
   (ref) => PracticeEditService(
+    practices: ref.watch(topicRepositoryProvider),
+    importService: ref.watch(importServiceProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final topicEditServiceProvider = Provider<TopicEditService>(
+  (ref) => TopicEditService(
     practices: ref.watch(topicRepositoryProvider),
     importService: ref.watch(importServiceProvider),
     clock: ref.watch(clockProvider),

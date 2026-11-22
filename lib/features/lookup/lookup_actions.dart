@@ -21,6 +21,7 @@ Future<void> openTermLookup(
   required String practiceName,
   required int? sessionId,
   required int? questionId,
+  String subtopic = '',
   Rect? anchor,
 }) async {
   final settings = ref.read(settingsProvider).value ?? const AppSettings();
@@ -33,6 +34,7 @@ Future<void> openTermLookup(
       practiceName: practiceName,
       sessionId: sessionId,
       questionId: questionId,
+      subtopic: subtopic,
       anchor: anchor,
       onSearchWeb: () => openWebLookup(
         context,
@@ -42,6 +44,7 @@ Future<void> openTermLookup(
         practiceName: practiceName,
         sessionId: sessionId,
         questionId: questionId,
+        subtopic: subtopic,
       ),
     );
     return;
@@ -54,6 +57,7 @@ Future<void> openTermLookup(
     practiceName: practiceName,
     sessionId: sessionId,
     questionId: questionId,
+    subtopic: subtopic,
   );
 }
 
@@ -66,6 +70,7 @@ Future<void> openWebLookup(
   required String practiceName,
   required int? sessionId,
   required int? questionId,
+  String subtopic = '',
 }) async {
   await M3EBottomSheet.show<void>(
     context,
@@ -77,6 +82,7 @@ Future<void> openWebLookup(
       practiceName: practiceName,
       sessionId: sessionId,
       questionId: questionId,
+      subtopic: subtopic,
     ),
   );
 }

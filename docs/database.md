@@ -21,7 +21,7 @@ land without regenerated documentation.
 ## Tables, columns and indexes
 
 <!-- BEGIN GENERATED: database -->
-Current schema version: **10** (`AppDatabase.schemaVersion`).
+Current schema version: **16** (`AppDatabase.schemaVersion`).
 
 Table names below are the SQL names Drift creates. Every column, default, reference, cascade, primary key, unique key and index is read from `lib/core/database/tables.dart` and `app_database.dart`; the feature/model/repository notes come from the documented mapping in `tool/docs/update_docs.dart`.
 
@@ -43,6 +43,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `priority` | INTEGER | NULL | — | — | — |
 | `anki_deck` | TEXT | NULL | — | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
+| `minimum_score` | INTEGER | NOT NULL | `70` | — | — |
+| `target_score` | INTEGER | NOT NULL | `80` | — | — |
 | `archived` | INTEGER (boolean) | NOT NULL | `false` | — | — |
 
 **Keys and indexes**
@@ -96,7 +98,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `questions_practice`: (`practice_id`)
+- Index `questions_practice_position`: (`practice_id`, `position`)
 
 #### `sessions`
 
@@ -122,7 +124,8 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `sessions_status`: (`status`)
+- Index `sessions_status_finished`: (`status`, `finished_at`)
+- Index `sessions_status_started`: (`status`, `started_at`)
 
 #### `session_questions`
 
@@ -147,7 +150,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 
 **Drift class:** `Attempts` · **Row class:** `AttemptRow`
 
-**Feature use:** One submitted answer, reasoning, distraction and "I didn't know this" flags, and the done/solved/skipped history.
+**Feature use:** One submitted answer, reasoning, distraction and the legacy unknown flag, plus the done/solved/skipped history.
 
 **Domain model:** `Attempt` · **Repository:** `SessionRepository` · **DAO:** `SessionDao`, `StatsDao`
 
@@ -160,6 +163,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `reasoning` | TEXT | NOT NULL | `''` | — | — |
 | `distracted` | INTEGER (boolean) | NOT NULL | `false` | — | — |
 | `unknown` | INTEGER (boolean) | NOT NULL | `false` | — | — |
+| `mistake_kinds_json` | TEXT | NOT NULL | `'[]'` | — | — |
 | `is_correct` | INTEGER (boolean) | NOT NULL | — | — | — |
 | `answered_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 
@@ -188,6 +192,7 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `extra` | TEXT | NOT NULL | `''` | — | — |
 | `context` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
+| `subtopic` | TEXT | NOT NULL | `''` | — | — |
 | `source` | TEXT | NOT NULL | — | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 | `exported_at` | INTEGER (DateTime) | NULL | — | — | — |
@@ -197,12 +202,13 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 - Primary key: `id` (auto-increment)
 - Index `concepts_session`: (`session_id`)
 - Index `concepts_exported`: (`exported_at`)
+- Index `concepts_created`: (`created_at`)
 
 #### `error_cards`
 
 **Drift class:** `ErrorCards` · **Row class:** `ErrorCardRow`
 
-**Feature use:** Wrong-answer error queue, 48-hour retry, bias/vaccine review, shared card review and Anki export.
+**Feature use:** Wrong-answer error queue, 48-hour retry, shared read-only feedback, bullet-to-card review and Anki export.
 
 **Domain model:** `ErrorCard` · **Repository:** `CardRepository` · **DAO:** `CardDao`, `StatsDao`
 
@@ -221,6 +227,10 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `bias` | TEXT | NOT NULL | `''` | — | — |
 | `vaccine` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
+| `cognitive_type` | TEXT | NOT NULL | `'contrast'` | — | — |
+| `subtopic` | TEXT | NOT NULL | `''` | — | — |
+| `mistake_kinds_json` | TEXT | NOT NULL | `'[]'` | — | — |
+| `distracted` | INTEGER (boolean) | NOT NULL | `false` | — | — |
 | `practice_name` | TEXT | NOT NULL | `''` | — | — |
 | `status` | TEXT | NOT NULL | — | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
@@ -236,16 +246,18 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 - Index `error_cards_due`: (`status`, `due_at`)
 - Index `error_cards_question`: (`question_id`)
 - Index `error_cards_session`: (`session_id`)
+- Index `error_cards_created`: (`created_at`)
+- Index `error_cards_last_wrong`: (`status`, `last_wrong_at`)
 - Partial unique index `error_cards_active_question`: (`question_id`) WHERE `status = 'active'`
 - The partial unique index above enforces at most one `active` error card per question; resolved history rows are unrestricted.
 
-#### `manual_cards`
+#### `basic_cards`
 
-**Drift class:** `ManualCards` · **Row class:** `ManualCardRow`
+**Drift class:** `BasicCards` · **Row class:** `BasicCardRow`
 
-**Feature use:** Basic question/answer cards from skipped questions, Ask or a highlight.
+**Feature use:** Basic question/answer cards from skipped questions, Ask, notes or review bullets.
 
-**Domain model:** `ManualCard` · **Repository:** `CardRepository` · **DAO:** `CardDao`, `StatsDao`
+**Domain model:** `BasicCard` · **Repository:** `CardRepository` · **DAO:** `CardDao`, `StatsDao`
 
 | Column | Type | Null | Default | Constraints | References |
 |---|---|---|---|---|---|
@@ -256,13 +268,16 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | `answer` | TEXT | NOT NULL | — | — | — |
 | `context` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
+| `cognitive_type` | TEXT | NOT NULL | `'fact'` | — | — |
+| `subtopic` | TEXT | NOT NULL | `''` | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 | `exported_at` | INTEGER (DateTime) | NULL | — | — | — |
 
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `manual_cards_exported`: (`exported_at`)
+- Index `basic_cards_exported`: (`exported_at`)
+- Index `basic_cards_created`: (`created_at`)
 
 #### `skipped_questions`
 
@@ -293,36 +308,38 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `skipped_questions_handled`: (`handled_at`)
+- Index `skipped_questions_handled_created`: (`handled_at`, `created_at`)
 - Index `skipped_questions_session`: (`session_id`)
 
-#### `highlights`
+#### `notes`
 
-**Drift class:** `Highlights` · **Row class:** `HighlightRow`
+**Drift class:** `Notes` · **Row class:** `NoteRow`
 
-**Feature use:** Selected passages painted during practice, kept or converted into a concept/basic card, downloaded as plain text.
+**Feature use:** Passages saved from a question, kept or converted into a concept/basic card, downloaded as plain text.
 
-**Domain model:** `StudyHighlight` · **Repository:** `CardRepository` · **DAO:** `CardDao`
+**Domain model:** `Note` · **Repository:** `CardRepository` · **DAO:** `CardDao`
 
 | Column | Type | Null | Default | Constraints | References |
 |---|---|---|---|---|---|
 | `id` | INTEGER | NOT NULL | — | AUTOINCREMENT, PRIMARY KEY | — |
 | `session_id` | INTEGER | NULL | — | — | `sessions.id` ON DELETE CASCADE |
 | `question_id` | INTEGER | NULL | — | — | `questions.id` ON DELETE SET NULL |
-| `phrase` | TEXT | NOT NULL | — | — | — |
+| `text` | TEXT | NOT NULL | — | — | — |
 | `context` | TEXT | NOT NULL | `''` | — | — |
 | `topic_name` | TEXT | NOT NULL | `''` | — | — |
+| `subtopic` | TEXT | NOT NULL | `''` | — | — |
 | `practice_name` | TEXT | NOT NULL | `''` | — | — |
 | `created_at` | INTEGER (DateTime) | NOT NULL | — | — | — |
 | `kept_at` | INTEGER (DateTime) | NULL | — | — | — |
 | `card_created_at` | INTEGER (DateTime) | NULL | — | — | — |
-| `manual_card_id` | INTEGER | NULL | — | — | `manual_cards.id` ON DELETE SET NULL |
+| `basic_card_id` | INTEGER | NULL | — | — | `basic_cards.id` ON DELETE SET NULL |
 
 **Keys and indexes**
 
 - Primary key: `id` (auto-increment)
-- Index `highlights_session`: (`session_id`)
-- Index `highlights_question`: (`question_id`)
+- Index `notes_session`: (`session_id`)
+- Index `notes_question`: (`question_id`)
+- Index `notes_created`: (`created_at`)
 
 #### `settings`
 
@@ -347,44 +364,76 @@ Table names below are the SQL names Drift creates. Every column, default, refere
 | Index | Table | Columns | Kind | Condition |
 |---|---|---|---|---|
 | `practices_topic` | `practices` | `topic_id` | INDEX | — |
-| `questions_practice` | `questions` | `practice_id` | INDEX | — |
-| `sessions_status` | `sessions` | `status` | INDEX | — |
+| `questions_practice_position` | `questions` | `practice_id`, `position` | INDEX | — |
+| `sessions_status_finished` | `sessions` | `status`, `finished_at` | INDEX | — |
+| `sessions_status_started` | `sessions` | `status`, `started_at` | INDEX | — |
 | `session_questions_question` | `session_questions` | `question_id` | INDEX | — |
 | `attempts_session` | `attempts` | `session_id` | INDEX | — |
 | `attempts_question` | `attempts` | `question_id` | INDEX | — |
 | `concepts_session` | `concepts` | `session_id` | INDEX | — |
 | `concepts_exported` | `concepts` | `exported_at` | INDEX | — |
+| `concepts_created` | `concepts` | `created_at` | INDEX | — |
 | `error_cards_due` | `error_cards` | `status`, `due_at` | INDEX | — |
 | `error_cards_question` | `error_cards` | `question_id` | INDEX | — |
 | `error_cards_session` | `error_cards` | `session_id` | INDEX | — |
-| `manual_cards_exported` | `manual_cards` | `exported_at` | INDEX | — |
-| `skipped_questions_handled` | `skipped_questions` | `handled_at` | INDEX | — |
+| `error_cards_created` | `error_cards` | `created_at` | INDEX | — |
+| `error_cards_last_wrong` | `error_cards` | `status`, `last_wrong_at` | INDEX | — |
+| `basic_cards_exported` | `basic_cards` | `exported_at` | INDEX | — |
+| `basic_cards_created` | `basic_cards` | `created_at` | INDEX | — |
+| `skipped_questions_handled_created` | `skipped_questions` | `handled_at`, `created_at` | INDEX | — |
 | `skipped_questions_session` | `skipped_questions` | `session_id` | INDEX | — |
-| `highlights_session` | `highlights` | `session_id` | INDEX | — |
-| `highlights_question` | `highlights` | `question_id` | INDEX | — |
+| `notes_session` | `notes` | `session_id` | INDEX | — |
+| `notes_question` | `notes` | `question_id` | INDEX | — |
+| `notes_created` | `notes` | `created_at` | INDEX | — |
 | `error_cards_active_question` | `error_cards` | `question_id` | UNIQUE | `status = 'active'` |
 <!-- END GENERATED: database -->
+
+## Indexes and query plans
+
+The indexes above match the query patterns in `lib/core/database/daos/`. The
+composites put the equality filter first and the leading sort column second:
+`questions_practice_position` serves `WHERE practice_id = ? ORDER BY position`,
+`sessions_status_started` serves the in-progress queries
+(`ORDER BY started_at DESC, id DESC`), and the `created_at` indexes serve the
+card, note and concept lists.
+
+The recency and history lists also end with `id ASC` so rows sharing a
+timestamp keep a stable order. When the leading sort column is descending, that tie-break runs
+in the opposite direction, so the index alone cannot produce the full order:
+SQLite still uses it for the equality filter and the leading term, then adds a
+temp B-tree for the trailing `id` term (`USE TEMP B-TREE FOR LAST TERM OF
+ORDER BY`). That is a sort of the rows the index already narrowed, not a full
+table sort. Without the tie-break the same query is served entirely from the
+index, but tied rows come back in an unspecified order. The
+`error_cards_last_wrong` index behaves the same way: `status` equality comes
+from the index and `ORDER BY last_wrong_at DESC, id ASC` sorts the match.
+
+Every index is maintained on insert, update and delete of its table. The three
+single-column indexes replaced by a composite (`questions_practice`,
+`sessions_status`, `skipped_questions_handled`) are dropped in the version 15
+upgrade so no table carries both; a database that cannot build the replacement
+keeps the single-column index.
 
 ## Relationships and deletion behaviour
 
 - `topics` own `practices`; deleting a topic deletes its practices and
   questions, and every session belonging to those practices. Session-linked
-  cards, skipped questions and highlights go with the session; question-only
+  cards, skipped questions and notes go with the session; question-only
   snapshots lose their question link as described below. There is no soft
   delete for content.
 - `practices` own `questions`. Deleting a practice or topic removes its
   questions, attempts, session links, error cards and skipped records.
 - `sessions` own `session_questions` and `attempts`. Deleting a session removes
-  those rows, plus cards, concepts, skipped questions and highlights that
+  those rows, plus cards, concepts, skipped questions and notes that
   captured that session. Resolved error history tied to the session is removed
   too; error cards are history for a question, not an independent archive.
-- `concepts`, `manual_cards`, `skipped_questions` and `highlights` reference a
+- `concepts`, `basic_cards`, `skipped_questions` and `notes` reference a
   question only while it exists. When a question is deleted, concepts, basic
-  cards and highlights keep their snapshot and their `question_id` becomes
+  cards and notes keep their snapshot and their `question_id` becomes
   `NULL` (`ON DELETE SET NULL`). Skipped-question and error-card rows are
   deleted with the question (`ON DELETE CASCADE`).
-- `highlights.manual_card_id` becomes `NULL` if the basic card made from the
-  highlight is deleted; the highlight itself remains.
+- `notes.basic_card_id` becomes `NULL` if the basic card made from the
+  note is deleted; the note itself remains.
 - The partial unique index `error_cards_active_question` allows at most one
   `active` error card per question while leaving any number of resolved rows.
 - `PRAGMA foreign_keys = ON` is executed in `beforeOpen`, so SQLite enforces all
@@ -426,7 +475,7 @@ without changing its topic.
    with `subtopic`, question/attempted/answered/correct counts, accuracy and
    progress when at least one group is named. See
    [Architecture](architecture.md#statistics-and-statistics-export).
-7. **Backup.** Backup v2 serialises `questions` as database rows, so
+7. **Backup.** Backup v3 serialises `questions` as database rows, so
    `subtopic` travels with every question. A v1 backup without that column
    restores it as `NULL`; the question then appears under Uncategorized.
 
@@ -439,9 +488,9 @@ defaults; the sort values use the `field:direction` form from `ListSort`.
 |---|---|---|
 | `lookup_mode` | `web` or `ai` | Define lookup mode; Ask always uses AI |
 | `web_engine` | `duckDuckGo` or `wikipedia` | Web lookup engine |
-| `ai_provider` | `openai`, `groq`, `openRouter`, `gemini`, `custom` | AI lookup and review checks |
+| `ai_provider` | `openai`, `groq`, `openRouter`, `gemini`, `custom` | AI lookup and card suggestions |
 | `ai_base_url` | URL string | Custom/OpenAI-compatible endpoint |
-| `ai_model` | model id | AI lookup and review checks |
+| `ai_model` | model id | AI lookup and card suggestions |
 | `dynamic_color` | `true` or `false` | Material You wallpaper colors |
 | `sounds_enabled` | `true` or `false` | Practice correct/wrong/finished cues |
 | `sound_volume` | `0.05`–`1` | Practice sound volume |
@@ -455,7 +504,7 @@ The AI API key is not in this table. It lives in Android secure storage through
 ## Migration history
 
 <!-- BEGIN GENERATED: migrations -->
-Current schema version: **10**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
+Current schema version: **16**. Migration steps are read from `AppDatabase.migration.onUpgrade`; `onCreate` creates every table and the custom partial indexes listed above.
 
 | Version | Changes |
 |---|---|
@@ -465,44 +514,56 @@ Current schema version: **10**. Migration steps are read from `AppDatabase.migra
 | 4 | Added `explanation` to `error_cards`. Added `alternative_explanations_json` to `error_cards`. |
 | 5 | Added `is_done` to `practices`. |
 | 6 | Added `unknown` to `attempts`. Added `extra` to `concepts`. |
-| 7 | Added `question_id` to `manual_cards`. Added `context` to `manual_cards`. Created table `skipped_questions`. |
+| 7 | Created table `skipped_questions`. Added `question_id` to `manual_cards`. Added `context` to `manual_cards`. |
 | 8 | Created table `highlights`. |
 | 9 | Added `archived` to `topics`. |
 | 10 | Added `subtopic` to `questions`. |
+| 11 | Added `minimum_score` to `topics`. Added `target_score` to `topics`. Added `mistake_kinds_json` to `attempts`. Added `subtopic` to `concepts`. Added `cognitive_type` to `error_cards`. Added `subtopic` to `error_cards`. Added `mistake_kinds_json` to `error_cards`. Added `cognitive_type` to `manual_cards`. Added `subtopic` to `manual_cards`. Added `subtopic` to `highlights`. |
+| 12 | Renamed table `highlights` to `notes`. Renamed column `phrase` to `text` in `notes`. Created index `notes_session`, `notes_question`. Dropped index `highlights_session`, `highlights_question`. |
+| 13 | Added `distracted` to `error_cards`. |
+| 14 | Custom SQL backfilled `error_cards`. |
+| 15 | Created index `questions_practice_position`, `sessions_status_finished`, `sessions_status_started`, `concepts_created`, `manual_cards_created`, `notes_created`, `error_cards_created`, `error_cards_last_wrong`, `skipped_questions_handled_created`. Dropped index `questions_practice`, `sessions_status`, `skipped_questions_handled`. |
+| 16 | Renamed table `manual_cards` to `basic_cards`. Renamed column `manual_card_id` to `basic_card_id` in `notes`. Created index `basic_cards_exported`, `basic_cards_created`. Dropped index `manual_cards_exported`, `manual_cards_created`. |
 
-The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 10.
+The database opens with `PRAGMA foreign_keys = ON`, so every reference and cascade in the table map is enforced. Versions are cumulative: a database at version 1 runs every step from 2 through 16.
 <!-- END GENERATED: migrations -->
+
+The current schema has `basic_cards` and `notes.basic_card_id`. The old
+`manual_cards` table and `notes.manual_card_id` column exist only in migration
+steps that upgrade older databases; they are not present at version 16.
 
 ## Backup coverage
 
 <!-- BEGIN GENERATED: backup -->
-Backup format **v2**; minimum readable format **v1**. Files record app version **0.9.11** build **12**, the database schema version, export time and per-table row counts.
+Backup format **v3**; minimum readable format **v1**. Files record app version **0.10.0** build **13**, the database schema version, export time and per-table row counts.
 
 | Coverage | Backup keys |
 |---|---|
 | Required in every backup | `topics`, `practices`, `questions`, `sessions`, `sessionQuestions`, `attempts`, `concepts`, `errorCards`, `manualCards`, `settings` |
-| Optional for older files | `skippedQuestions`, `highlights` |
+| Optional for older files | `skippedQuestions`, `notes` |
 
-The required and optional sets together cover every database table exactly once. `settings` stores preferences as key/value rows; the AI API key is in Android secure storage and is never exported.
+The required and optional sets together cover every database table exactly once. `settings` stores preferences as key/value rows; the AI API key is in Android secure storage and is never exported. Logical keys stay frozen across schema changes: `manualCards` is the backup key for the `basic_cards` table, and notes rows keep `manualCardId`.
 <!-- END GENERATED: backup -->
 
 ## Backup format and restore rules
 
-- `BackupService` writes format **v2**. The `tables` object contains every
+- `BackupService` writes format **v3**. The `tables` object contains every
   database table; the canonical SHA-256 checksum is computed over that object
   with sorted keys, so formatting changes do not alter it.
 - The `metadata` block records format version, app version and build, database
   schema version, export time and per-table row counts. The app rejects a file
   whose recorded counts do not match the rows it contains.
-- Required tables must exist. `skippedQuestions` and `highlights` are optional
+- Required tables must exist. `skippedQuestions` and `notes` are optional
   so a file from an older install still restores; unknown tables are ignored.
+  Older files store the notes table and its text column under the legacy
+  `highlights` and `phrase` keys, which import still reads.
 - Rows are read leniently for v1: missing columns use database defaults, and a
   topic deck may arrive as `ankiDeck`, `anki_deck` or `deck`.
 - Validation runs before any write: UTF-8 and 50 MB limit, JSON shape, enum
   values, JSON-array columns, duplicate identities, the one-active-error-card
   rule, and referential integrity for practices, questions, session questions,
-  attempts, concepts, error cards, basic cards, skipped questions and
-  highlights. Each failure reports the table, row and field.
+  attempts, concepts, error cards, basic cards, skipped questions and notes.
+  Each failure reports the table, row and field.
 - Restore replaces all local tables inside one transaction and then refreshes
   every data provider. A failure leaves the previous database untouched.
   **Erase all data** uses the same replacement path and also deletes the

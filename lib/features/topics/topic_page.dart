@@ -7,6 +7,9 @@ import '../../core/data/practice_repository.dart';
 import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
+import '../../core/domain/plural.dart';
+import '../../core/domain/score_band.dart';
+import '../../core/ui/score_band_style.dart';
 import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../practice/domain/session_service.dart';
@@ -15,6 +18,31 @@ import 'practice_actions.dart';
 import 'topic_stats_page.dart';
 
 enum _ResumeChoice { continueSession, discardAndStart }
+
+/// App-bar title for a topic.
+///
+/// Long topic names get a second line instead of an early ellipsis. The title
+/// scale is capped so two lines still fit the compact bar at platform text
+/// sizes up to 2x; body copy keeps the learner's full scale.
+class _TopicTitle extends StatelessWidget {
+  const _TopicTitle({required this.name});
+
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return MediaQuery.withClampedTextScaling(
+      maxScaleFactor: 1.15,
+      child: Text(
+        name,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: theme.typography.baseline.titleLarge.copyWith(height: 1.2),
+      ),
+    );
+  }
+}
 
 class TopicPage extends ConsumerStatefulWidget {
   const TopicPage({required this.topicId, super.key});
@@ -38,16 +66,14 @@ class _TopicPageState extends ConsumerState<TopicPage> {
         ListSort.defaultByName;
     final defaultDeck =
         ref.watch(settingsProvider).value?.ankiDeck ?? 'Question Practice';
+    final topicName = summary.value?.topic.name;
 
     return AppPage(
-      title: summary.value?.topic.name ?? 'Topic',
-      titleWidget: summary.value == null
-          ? null
-          : Text(
-              summary.value!.topic.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+      title: topicName ?? 'Topic',
+      titleWidget: topicName == null ? null : _TopicTitle(name: topicName),
+      // A compact bar gives the two-line title enough height at large text
+      // sizes; the flexible large bar only leaves room for one ellipsized line.
+      variant: M3EAppBarVariant.small,
       showBack: true,
       actions: [
         M3EIconButton(
@@ -94,7 +120,7 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                       const SizedBox(width: 8),
                     ],
                     Pill(
-                      '${data.sessionCount} sessions',
+                      formatCount(data.sessionCount, 'session'),
                       tone: PillTone.neutral,
                     ),
                   ],
@@ -123,7 +149,12 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                   ),
                 ],
                 const SizedBox(height: 20),
-                _TopicHero(summary: data, readiness: readiness.value),
+                _TopicHero(
+                  summary: data,
+                  readiness: readiness.value,
+                  minimumScore: data.topic.minimumScore,
+                  targetScore: data.topic.targetScore,
+                ),
                 const SizedBox(height: 24),
                 SectionTitle(
                   'Practices',
@@ -163,7 +194,11 @@ class _TopicPageState extends ConsumerState<TopicPage> {
                                   ? Icons.play_circle_outline
                                   : Icons.play_arrow_outlined,
                             ),
-                            trailing: _PracticeTrailing(summary: practice),
+                            trailing: _PracticeTrailing(
+                              summary: practice,
+                              minimumScore: data.topic.minimumScore,
+                              targetScore: data.topic.targetScore,
+                            ),
                             onTap: _starting
                                 ? null
                                 : () => _openPractice(practice),
@@ -254,6 +289,9 @@ class _TopicPageState extends ConsumerState<TopicPage> {
         setState(() => _starting = true);
         try {
           await ref.read(sessionServiceProvider).discard(sessionId);
+        } on SessionException catch (error) {
+          if (mounted) await showSnack(context, error.message);
+          return;
         } finally {
           if (mounted) setState(() => _starting = false);
         }
@@ -344,35 +382,19 @@ class _TopicPageState extends ConsumerState<TopicPage> {
       await showSnack(context, 'A split needs at least two questions.');
       return;
     }
-    if (count.isOdd) {
-      await showSnack(
-        context,
-        'A split needs an even number of questions. This practice has $count.',
-      );
-      return;
-    }
-    final confirmed = await confirmDialog(
-      context,
-      title: 'Split practice?',
-      message:
-          'This replaces "${summary.practice.name}" with two practices of '
-          '${count ~/ 2} randomly chosen questions each, named '
-          '"${summary.practice.name} Slice A" and '
-          '"${summary.practice.name} Slice B".\n\n'
-          'Sessions, answers and error cards for the original practice are '
-          'removed.',
-      confirmLabel: 'Split',
-    );
-    if (!confirmed || !mounted) return;
+    final parts = await showSplitPracticeDialog(context, questionCount: count);
+    if (parts == null || !mounted) return;
     setState(() => _starting = true);
     try {
       final result = await ref
           .read(topicRepositoryProvider)
-          .splitPractice(summary.practice.id);
+          .splitPractice(summary.practice.id, parts: parts);
       if (mounted) {
+        final names = [for (final part in result.parts) part.name];
         await showSnack(
           context,
-          'Split into ${result.sliceA.name} and ${result.sliceB.name}.',
+          'Split into ${formatCount(names.length, 'practice')}: '
+          '${_summarizeSplitNames(names)}.',
         );
       }
     } on PracticeSplitException catch (error) {
@@ -383,11 +405,256 @@ class _TopicPageState extends ConsumerState<TopicPage> {
   }
 }
 
+/// Asks how many parts to create and previews their question distribution.
+Future<int?> showSplitPracticeDialog(
+  BuildContext context, {
+  required int questionCount,
+}) {
+  return M3EDialog.show<int>(
+    context,
+    dialog: _SplitPracticeDialog(questionCount: questionCount),
+  );
+}
+
+/// Compact split form: one stepper, a distribution preview and one warning.
+class _SplitPracticeDialog extends StatefulWidget {
+  const _SplitPracticeDialog({required this.questionCount});
+
+  final int questionCount;
+
+  @override
+  State<_SplitPracticeDialog> createState() => _SplitPracticeDialogState();
+}
+
+class _SplitPracticeDialogState extends State<_SplitPracticeDialog> {
+  static const int _minParts = 2;
+
+  int _parts = _minParts;
+
+  int get _maxParts => widget.questionCount;
+
+  bool get _hasRange => _maxParts >= _minParts;
+
+  void _step(int delta) {
+    final next = _parts + delta;
+    if (next < _minParts || next > _maxParts) return;
+    setState(() => _parts = next);
+  }
+
+  void _submit() {
+    if (_hasRange) Navigator.of(context).pop(_parts);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    final sizes = _hasRange
+        ? splitPartSizes(widget.questionCount, _parts)
+        : null;
+    return M3EDialog(
+      title: 'Split practice',
+      icon: const Icon(Icons.call_split),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Divide ${formatCount(widget.questionCount, 'question')} '
+              'into parts.',
+              key: const ValueKey('split-subtitle'),
+              textAlign: TextAlign.center,
+              style: theme.typography.baseline.bodyLarge.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 20),
+            if (_hasRange) ...[
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Row(
+                    children: [
+                      M3EIconButton(
+                        key: const ValueKey('split-parts-remove'),
+                        icon: const Icon(Icons.remove),
+                        semanticLabel: 'Remove a part',
+                        tooltip: 'Remove a part',
+                        variant: M3EIconButtonVariant.outlined,
+                        size: M3EIconButtonSize.md,
+                        onPressed: _parts > _minParts ? () => _step(-1) : null,
+                      ),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Semantics(
+                              label: 'Parts',
+                              value: '$_parts',
+                              liveRegion: true,
+                              excludeSemantics: true,
+                              child: Text(
+                                '$_parts',
+                                key: const ValueKey('split-parts-value'),
+                                maxLines: 1,
+                                style: theme.typography.emphasized.displaySmall
+                                    .copyWith(color: theme.colorScheme.primary),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      M3EIconButton(
+                        key: const ValueKey('split-parts-add'),
+                        icon: const Icon(Icons.add),
+                        semanticLabel: 'Add a part',
+                        tooltip: 'Add a part',
+                        variant: M3EIconButtonVariant.outlined,
+                        size: M3EIconButtonSize.md,
+                        onPressed: _parts < _maxParts ? () => _step(1) : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                key: const ValueKey('split-distribution'),
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (var index = 0; index < sizes!.length; index++)
+                    _PartSizeChip(part: index + 1, questions: sizes[index]),
+                ],
+              ),
+            ] else
+              Row(
+                key: const ValueKey('split-range-error'),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.error_outline,
+                    size: 20,
+                    color: theme.colorScheme.error,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'A split needs at least two questions.',
+                      style: theme.typography.baseline.bodySmall.copyWith(
+                        color: theme.colorScheme.error,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            const SizedBox(height: 20),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    size: 20,
+                    color: theme.colorScheme.warning,
+                    semanticLabel: 'Warning',
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    'Original session history will be removed.',
+                    style: theme.typography.baseline.bodySmall.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        M3EButton.text(
+          key: const ValueKey('split-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        M3EButton.filled(
+          key: const ValueKey('split-confirm'),
+          onPressed: _hasRange ? _submit : null,
+          child: const Text('Split'),
+        ),
+      ],
+    );
+  }
+}
+
+/// One part in the distribution preview, e.g. `Part 2 · 3`.
+class _PartSizeChip extends StatelessWidget {
+  const _PartSizeChip({required this.part, required this.questions});
+
+  final int part;
+  final int questions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = M3ETheme.of(context);
+    return Semantics(
+      label: 'Part $part, ${formatCount(questions, 'question')}',
+      excludeSemantics: true,
+      child: Container(
+        key: ValueKey('split-part-$part'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          'Part $part · $questions',
+          style: theme.typography.baseline.labelLarge.copyWith(
+            color: theme.colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+String _summarizeSplitNames(List<String> names) {
+  if (names.length <= 3) return _joinNames(names);
+  return '${names.first} to ${names.last}';
+}
+
+String _joinNames(List<String> names) {
+  if (names.length == 1) return names.single;
+  return '${names.sublist(0, names.length - 1).join(', ')} and ${names.last}';
+}
+
 class _TopicHero extends StatelessWidget {
-  const _TopicHero({required this.summary, required this.readiness});
+  const _TopicHero({
+    required this.summary,
+    required this.readiness,
+    required this.minimumScore,
+    required this.targetScore,
+  });
 
   final TopicSummary summary;
   final TopicReadiness? readiness;
+  final int minimumScore;
+  final int targetScore;
 
   @override
   Widget build(BuildContext context) {
@@ -396,6 +663,13 @@ class _TopicHero extends StatelessWidget {
     final readinessLabel = hasAnswers
         ? '${(readiness!.value * 100).round()}%'
         : '—';
+    final band = hasAnswers
+        ? scoreBandFor(
+            readiness!.value,
+            minimumScore: minimumScore,
+            targetScore: targetScore,
+          )
+        : null;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -407,12 +681,33 @@ class _TopicHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              ScoreRing(
-                value: hasAnswers ? readiness!.value : 0,
-                label: readinessLabel,
-                caption: 'Readiness',
-                size: 132,
-                strokeWidth: 11,
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ScoreRing(
+                    value: hasAnswers ? readiness!.value : 0,
+                    label: readinessLabel,
+                    caption: 'Readiness',
+                    size: 132,
+                    strokeWidth: 11,
+                    color: band == null ? null : scoreBandColor(context, band),
+                  ),
+                  if (band != null) ...[
+                    const SizedBox(height: 6),
+                    Semantics(
+                      label: scoreSemanticsLabel(
+                        subject: 'Readiness',
+                        percent: (readiness!.value * 100).round(),
+                        band: band,
+                      ),
+                      excludeSemantics: true,
+                      child: Pill(
+                        scoreBandLabel(band),
+                        tone: scoreBandPillTone(band),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(width: 18),
               Expanded(
@@ -464,7 +759,7 @@ class _TopicHero extends StatelessWidget {
                   label: 'Correct answers',
                   value: '${summary.correctCount}/${summary.answeredCount}',
                   icon: Icons.check_circle_outline,
-                  caption: '${summary.sessionCount} sessions',
+                  caption: formatCount(summary.sessionCount, 'session'),
                   tone: MetricTone.success,
                 ),
               ),
@@ -477,14 +772,27 @@ class _TopicHero extends StatelessWidget {
 }
 
 class _PracticeTrailing extends StatelessWidget {
-  const _PracticeTrailing({required this.summary});
+  const _PracticeTrailing({
+    required this.summary,
+    required this.minimumScore,
+    required this.targetScore,
+  });
 
   final PracticeSummary summary;
+  final int minimumScore;
+  final int targetScore;
 
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final score = summary.lastScore;
+    final band = score == null
+        ? null
+        : scoreBandFor(
+            score,
+            minimumScore: minimumScore,
+            targetScore: targetScore,
+          );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
@@ -498,16 +806,24 @@ class _PracticeTrailing extends StatelessWidget {
           const SizedBox(height: 4),
         ],
         Text(
-          '${summary.questionCount} questions',
+          formatCount(summary.questionCount, 'question'),
           style: theme.typography.baseline.labelSmall.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         if (score != null) ...[
           const SizedBox(height: 2),
-          Pill(
-            '${(score * 100).round()}%',
-            tone: score >= 0.7 ? PillTone.success : PillTone.error,
+          Semantics(
+            label: scoreSemanticsLabel(
+              subject: 'Last score',
+              percent: (score * 100).round(),
+              band: band!,
+            ),
+            excludeSemantics: true,
+            child: Pill(
+              '${(score * 100).round()}%',
+              tone: scoreBandPillTone(band),
+            ),
           ),
         ],
         if (summary.practice.isDone) ...[

@@ -10,15 +10,35 @@ import '../../../core/domain/acronyms.dart';
 import '../../../core/domain/models.dart';
 import '../../../core/platform/secure_key_store.dart';
 import '../../../core/platform/web_launcher.dart';
+import '../../export/domain/card_templates.dart';
+
+/// Why a lookup failed, so the creator can show a neutral fallback instead of
+/// an error when no provider is configured.
+enum LookupFailure { noProvider, providerError }
 
 class LookupException implements Exception {
-  const LookupException(this.message, {this.canUseWeb = false});
+  const LookupException(
+    this.message, {
+    this.canUseWeb = false,
+    this.failure = LookupFailure.providerError,
+  });
 
   final String message;
   final bool canUseWeb;
+  final LookupFailure failure;
 
   @override
   String toString() => message;
+}
+
+/// A resolved dictionary-style meaning, without saving a concept.
+class DefinitionSuggestion {
+  const DefinitionSuggestion({required this.definition, required this.extra});
+
+  final String definition;
+
+  /// The full form of an acronym, shown in the Anki extra field.
+  final String extra;
 }
 
 class LookupResult {
@@ -86,6 +106,7 @@ class LookupService {
     required String practiceName,
     required int? sessionId,
     required int? questionId,
+    String subtopic = '',
   }) async {
     final cleanedTerm = term.trim();
     if (cleanedTerm.isEmpty) {
@@ -100,22 +121,15 @@ class LookupService {
         practiceName: practiceName,
         sessionId: sessionId,
         questionId: questionId,
+        subtopic: subtopic,
       );
     }
 
-    final apiKey = await _keyStore.readApiKey();
-    if (apiKey == null || apiKey.trim().isEmpty) {
-      throw const LookupException(
-        'No API key saved. Add one in Settings or use web search.',
-        canUseWeb: true,
-      );
-    }
-    final definition = await _askAi(
-      settings: settings,
-      apiKey: apiKey,
+    final definition = await resolveDefinition(
       term: cleanedTerm,
       question: question,
       topicName: topicName,
+      subtopic: subtopic,
     );
     final id = await _saveConcept(
       term: cleanedTerm,
@@ -123,6 +137,7 @@ class LookupService {
       extra: definition.extra,
       question: question,
       topicName: topicName,
+      subtopic: subtopic,
       sessionId: sessionId,
       questionId: questionId,
       source: ConceptSource.ai,
@@ -137,6 +152,47 @@ class LookupService {
     );
   }
 
+  /// Resolves a meaning from AI without saving a concept.
+  ///
+  /// The creator calls this while the learner types a term. Web lookup mode is
+  /// treated as no provider: resolving a meaning never opens a browser.
+  Future<DefinitionSuggestion> resolveDefinition({
+    required String term,
+    required String question,
+    required String topicName,
+    String subtopic = '',
+  }) async {
+    final cleanedTerm = term.trim();
+    if (cleanedTerm.isEmpty) {
+      throw const LookupException('Select a word or phrase first.');
+    }
+    final settings = await _settings.load();
+    if (settings.lookupMode == LookupMode.web) {
+      throw const LookupException(
+        'Turning on AI lookup in Settings fills the meaning automatically.',
+        failure: LookupFailure.noProvider,
+      );
+    }
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'No API key saved. Add one in Settings.',
+        failure: LookupFailure.noProvider,
+      );
+    }
+    final definition = await _askAi(
+      settings: settings,
+      apiKey: apiKey,
+      term: cleanedTerm,
+      question: question,
+      topicName: topicName,
+    );
+    return DefinitionSuggestion(
+      definition: definition.definition,
+      extra: definition.extra,
+    );
+  }
+
   Future<LookupResult> openWeb({
     required String term,
     required String question,
@@ -144,6 +200,7 @@ class LookupService {
     required String practiceName,
     required int? sessionId,
     required int? questionId,
+    String subtopic = '',
   }) async {
     final cleanedTerm = term.trim();
     final settings = await _settings.load();
@@ -154,6 +211,7 @@ class LookupService {
       extra: '',
       question: question,
       topicName: topicName,
+      subtopic: subtopic,
       sessionId: sessionId,
       questionId: questionId,
       source: ConceptSource.web,
@@ -213,15 +271,15 @@ class LookupService {
       );
     }
     const systemPrompt =
-        "You answer a learner's question about a highlighted passage in a "
-        'study app. Use the highlighted passage, the question around it and '
+        "You answer a learner's question about a selected passage in a "
+        'study app. Use the selected passage, the question around it and '
         'the topic. Be accurate and concise: at most 90 words, plain text, no '
         'markdown. If the passage does not contain the answer, say so and give '
         'a short, grounded explanation.';
     final userPrompt =
         'Topic: $topicName\n'
         'Question context: $question\n'
-        'Highlighted passage: $passage\n'
+        'Selected passage: $passage\n'
         'Learner question: $ask';
     final content = await _requestAi(
       settings: settings,
@@ -248,89 +306,128 @@ class LookupService {
     return trimmed;
   }
 
-  /// Rewrites [text] as a shorter version of the named card field.
+  /// Suggests structured atomic card ideas from a saved note.
   ///
-  /// Used before saving a card, when imported wording is too long to review.
-  Future<String> summarizeText({
-    required String text,
-    required String fieldLabel,
-    String? question,
-  }) async {
-    final source = text.trim();
-    if (source.isEmpty) {
-      throw LookupException('Write the $fieldLabel first.');
-    }
-    final settings = await _settings.load();
-    final apiKey = await _keyStore.readApiKey();
-    if (apiKey == null || apiKey.trim().isEmpty) {
-      throw const LookupException(
-        'Summarizing needs an AI provider. Add an API key in Settings.',
-      );
-    }
-    final label = fieldLabel.trim().isEmpty ? 'text' : fieldLabel.trim();
-    final systemPrompt =
-        'You shorten one field of a study card for a learner. Rewrite the '
-        '$label so it is shorter and easier to review while keeping every '
-        'fact, name and number. Return only the rewritten $label as plain '
-        'text, at most 30 words, with no markdown and no quotation marks.';
-    final context = question?.trim() ?? '';
-    final userPrompt = [
-      if (context.isNotEmpty) 'Question context: $context',
-      'Original $label: $source',
-    ].join('\n');
-    final content = await _requestAi(
-      settings: settings,
-      apiKey: apiKey,
-      systemPrompt: systemPrompt,
-      userPrompt: userPrompt,
-      jsonMode: false,
-    );
-    final trimmed = content
-        .replaceAll(RegExp(r'```(?:json)?', caseSensitive: false), '')
-        .trim();
-    if (trimmed.isEmpty) {
-      throw const LookupException('The AI returned an empty summary.');
-    }
-    return trimmed;
-  }
-
-  /// Suggests a short list of atomic basic cards from a saved highlight.
-  ///
-  /// Each card tests one fact, so a highlight that contains several facts
-  /// becomes several small cards instead of one long paragraph. The result is
-  /// empty when the AI finds nothing worth turning into a card.
-  Future<List<SuggestedCard>> suggestAtomicCards({
-    required String highlight,
+  /// Each idea returns one to three wording variants of the same fact, so the
+  /// learner can keep the variants that help without re-running the request.
+  Future<List<SuggestedCardIdea>> suggestArchetypeCards({
+    required String note,
     required String questionContext,
     required String topicName,
+    String subtopic = '',
   }) async {
-    final passage = highlight.trim();
+    final passage = note.trim();
     if (passage.isEmpty) {
-      throw const LookupException('Select a highlight first.');
+      throw const LookupException('Select a note first.');
     }
     final settings = await _settings.load();
     final apiKey = await _keyStore.readApiKey();
     if (apiKey == null || apiKey.trim().isEmpty) {
       throw const LookupException(
         'Suggesting cards needs an AI provider. Add an API key in Settings.',
+        failure: LookupFailure.noProvider,
       );
     }
     const systemPrompt =
-        'You turn one saved highlight from a study app into atomic basic '
-        'cards. Use the highlight, the question around it and the topic. '
-        'Return exactly one JSON object: '
-        '{"cards":[{"front":"...","back":"..."}]}. Rules: each card tests '
-        'exactly ONE fact; at most 6 cards; the front is a short, specific '
-        'prompt or term, never a paragraph; the back is a concise answer; '
-        'front and back are at most 20 words each; no markdown; only facts '
-        'supported by the highlight or its context; skip trivial or duplicate '
-        'cards.';
+        'You turn one saved note from a study app into atomic card ideas with '
+        'a fixed template. Use the note, the question around it, the topic and '
+        'the subtopic. Return exactly one JSON object: '
+        '{"ideas":[{"template":"definition|contrast|mechanism|heuristic|'
+        'procedure","variants":[{"front":"...","back":"..."}]}]}. Rules: '
+        '- At most 3 ideas. Each idea has 1-3 variants. Variants of one idea '
+        'test the same fact in different wording. '
+        '- definition: front is the term only; back is an atomic meaning that '
+        'never repeats the term. '
+        '- contrast: the front names both options and the criterion; the back '
+        'says what A does while B does. '
+        '- mechanism: the front asks why X causes or requires Y; the back is '
+        'one causal line. '
+        '- heuristic: the front must be exactly "If a scenario asks X but '
+        'restricts with Y, which option is always discarded?"; the back '
+        'starts with "Discard Z because ...". '
+        '- procedure: the front asks what must be true before the next step; '
+        'the back is the condition or command. '
+        '- Each variant tests exactly one idea. Front <= 30 words; back <= 20 '
+        'words. '
+        '- No yes/no questions, no answer clues, no option letters, no '
+        'markdown. '
+        '- Never put the topic or subtopic inside the front or back. Tags are '
+        'applied by the app. '
+        '- Only use ideas supported by the note or its context. Skip trivial '
+        'or duplicate ideas.';
     final context = questionContext.trim();
     final userPrompt = [
       if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
+      if (subtopic.trim().isNotEmpty) 'Subtopic: ${subtopic.trim()}',
       if (context.isNotEmpty) 'Question context: $context',
-      'Highlighted passage: $passage',
+      'Selected passage: $passage',
     ].join('\n');
+    return _requestJsonCardIdeas(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      errorMessage: 'The AI returned invalid card suggestions. Try again.',
+      maxIdeas: 3,
+      maxVariants: 3,
+    );
+  }
+
+  /// Drafts one atomic card from a read-only wrong-answer bullet.
+  ///
+  /// The bullet is the starting point, not the final wording. Returns null
+  /// when the provider answers without a usable card, so the creator can tell
+  /// the learner to write the card instead.
+  Future<SuggestedCard?> suggestCardFromWrongNote({
+    required String note,
+    required String question,
+    required String wrongAnswer,
+    required String correctAnswer,
+    required String explanation,
+    required String topicName,
+    String subtopic = '',
+    List<String> otherNotes = const [],
+  }) async {
+    final bullet = note.trim();
+    if (bullet.isEmpty) {
+      throw const LookupException('Write the bullet first.');
+    }
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'Drafting a card needs an AI provider. Add an API key in Settings.',
+        failure: LookupFailure.noProvider,
+      );
+    }
+    const systemPrompt =
+        'You turn one learner-written wrong-answer note into one atomic study '
+        'card. Return exactly one JSON object: '
+        '{"cards":[{"type":"contrast|heuristic|fact","front":"...",'
+        '"back":"..."}]}. Rules: '
+        '- Give 1-3 candidate cards, but each card tests exactly one idea. '
+        '- Use the note as the basis; fix the wording instead of copying it. '
+        '- contrast when the note names a confusion; heuristic when it names '
+        'a rule or condition; fact otherwise. '
+        '- Front <= 30 words. Back <= 20 words. No yes/no fronts. '
+        '- No answer clues, option letters, markdown or code fences. '
+        '- Never put the topic or subtopic inside the front or back.';
+    final other = otherNotes
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty && item != bullet)
+        .toList();
+    final userPrompt = [
+      if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
+      if (subtopic.trim().isNotEmpty) 'Subtopic: ${subtopic.trim()}',
+      'Question: $question',
+      'Chosen wrong answer: $wrongAnswer',
+      'Correct answer: $correctAnswer',
+      'Explanation: $explanation',
+      if (other.isNotEmpty)
+        'Other notes from this attempt:\n- ${other.join('\n- ')}',
+      'Learner note to turn into a card: $bullet',
+    ].join('\n');
+
     final content = await _requestAi(
       settings: settings,
       apiKey: apiKey,
@@ -343,8 +440,6 @@ class LookupService {
       if (rawCards is! List) {
         throw const FormatException('Missing cards list');
       }
-      final cards = <SuggestedCard>[];
-      final seen = <String>{};
       for (final item in rawCards) {
         if (item is! Map<String, dynamic>) continue;
         final rawFront = item['front'];
@@ -352,17 +447,211 @@ class LookupService {
         final front = rawFront is String ? rawFront.trim() : '';
         final back = rawBack is String ? rawBack.trim() : '';
         if (front.isEmpty || back.isEmpty) continue;
-        final key = '${front.toLowerCase()}\u0000${back.toLowerCase()}';
-        if (!seen.add(key)) continue;
-        cards.add(SuggestedCard(front: front, back: back));
-        if (cards.length == 6) break;
+        final rawType = item['type'];
+        final template = templateFromLegacyType(
+          rawType is String ? rawType : null,
+        );
+        if (template == null || template == CardTemplate.definition) continue;
+        return SuggestedCard(front: front, back: back, template: template);
       }
-      return cards;
+      return null;
+    } on LookupException {
+      rethrow;
     } on Object {
       throw const LookupException(
-        'The AI returned invalid card suggestions. Try again.',
+        'The AI returned invalid card drafts. Try again.',
       );
     }
+  }
+
+  /// Breaks one error into contrast and heuristic ideas.
+  ///
+  /// At most two ideas are returned: a contrast between the chosen wrong
+  /// option and the correct one, and a heuristic whose front follows the
+  /// mandatory exam-heuristic template.
+  Future<List<SuggestedCardIdea>> breakdownErrorCard({
+    required String question,
+    required String wrongAnswer,
+    required String correctAnswer,
+    required String reasoning,
+    required String explanation,
+    required String topicName,
+    String subtopic = '',
+    List<MistakeKind> mistakeKinds = const [],
+    List<String> wrongAnswerBullets = const [],
+  }) async {
+    final settings = await _settings.load();
+    final apiKey = await _keyStore.readApiKey();
+    if (apiKey == null || apiKey.trim().isEmpty) {
+      throw const LookupException(
+        'Breaking down cards needs an AI provider. Add an API key in Settings.',
+        failure: LookupFailure.noProvider,
+      );
+    }
+    const systemPrompt =
+        'You split one study error into atomic card ideas. Return exactly one '
+        'JSON object: {"ideas":[{"template":"contrast|heuristic",'
+        '"variants":[{"front":"...","back":"..."}]}]}. Rules: '
+        '- At most 2 ideas: one contrast and one heuristic. Each has 1-3 '
+        'variants. '
+        '- The contrast uses the chosen wrong answer and the correct answer; '
+        'the front names both options and the criterion, and the back states '
+        'the decisive difference. '
+        '- The heuristic front must use the exact exam-heuristic template: '
+        '"If a scenario asks X but restricts with Y, which option is always '
+        'discarded?" The back starts with "Discard Z because ...". '
+        '- No definition, mechanism, or procedure ideas. '
+        '- Each variant tests exactly one idea. Front <= 30 words; back <= 20 '
+        'words. '
+        '- No yes/no questions, no answer clues, no option letters, no '
+        'markdown. '
+        '- Never put the topic or subtopic inside the front or back. Tags are '
+        'applied by the app. '
+        '- Only use ideas supported by the error context. Skip trivial or '
+        'duplicate ideas.';
+    final mistakes = mistakeKinds.map((kind) => kind.label).join(', ');
+    final bullets = wrongAnswerBullets
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList();
+    final userPrompt = [
+      if (topicName.trim().isNotEmpty) 'Topic: ${topicName.trim()}',
+      if (subtopic.trim().isNotEmpty) 'Subtopic: ${subtopic.trim()}',
+      'Question: $question',
+      'Chosen wrong answer: $wrongAnswer',
+      'Correct answer: $correctAnswer',
+      'Mistake classifications: ${mistakes.isEmpty ? '(none)' : mistakes}',
+      if (bullets.isNotEmpty)
+        'What went wrong (learner\'s own notes, one per line):\n'
+            '- ${bullets.join('\n- ')}',
+      'Learner reasoning: ${reasoning.trim().isEmpty ? '(not written)' : reasoning.trim()}',
+      'Explanation: $explanation',
+    ].join('\n');
+    return _requestJsonCardIdeas(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+      errorMessage: 'The AI returned an invalid card breakdown. Try again.',
+      maxIdeas: 2,
+      maxVariants: 3,
+      allowedTemplates: const {CardTemplate.contrast, CardTemplate.heuristic},
+    );
+  }
+
+  Future<List<SuggestedCardIdea>> _requestJsonCardIdeas({
+    required AppSettings settings,
+    required String apiKey,
+    required String systemPrompt,
+    required String userPrompt,
+    required String errorMessage,
+    required int maxIdeas,
+    required int maxVariants,
+    Set<CardTemplate>? allowedTemplates,
+  }) async {
+    final content = await _requestAi(
+      settings: settings,
+      apiKey: apiKey,
+      systemPrompt: systemPrompt,
+      userPrompt: userPrompt,
+    );
+    try {
+      final payload = _decodeObject(content);
+      final ideas = <SuggestedCardIdea>[];
+      final seenIdeas = <String>{};
+      final rawIdeas = payload['ideas'];
+      if (rawIdeas is List) {
+        for (final rawIdea in rawIdeas) {
+          if (ideas.length >= maxIdeas) break;
+          final idea = _parseIdea(
+            rawIdea,
+            maxVariants: maxVariants,
+            allowedTemplates: allowedTemplates,
+          );
+          if (idea == null) continue;
+          final key =
+              '${idea.template.name}\u0000'
+              '${idea.variants.first.front.toLowerCase()}';
+          if (!seenIdeas.add(key)) continue;
+          ideas.add(idea);
+        }
+        return List.unmodifiable(ideas);
+      }
+
+      final rawCards = payload['cards'];
+      if (rawCards is! List) {
+        throw const FormatException('Missing ideas list');
+      }
+      for (final item in rawCards) {
+        if (ideas.length >= maxIdeas) break;
+        if (item is! Map<String, dynamic>) continue;
+        final rawFront = item['front'];
+        final rawBack = item['back'];
+        final front = rawFront is String ? rawFront.trim() : '';
+        final back = rawBack is String ? rawBack.trim() : '';
+        if (front.isEmpty || back.isEmpty) continue;
+        final rawType = item['type'];
+        final template = templateFromLegacyType(
+          rawType is String ? rawType : null,
+        );
+        if (template == null) continue;
+        if (allowedTemplates != null && !allowedTemplates.contains(template)) {
+          continue;
+        }
+        final key = '${template.name}\u0000${front.toLowerCase()}';
+        if (!seenIdeas.add(key)) continue;
+        ideas.add(
+          SuggestedCardIdea(
+            template: template,
+            variants: [
+              SuggestedCard(front: front, back: back, template: template),
+            ],
+          ),
+        );
+      }
+      return List.unmodifiable(ideas);
+    } on Object {
+      throw LookupException(errorMessage);
+    }
+  }
+
+  SuggestedCardIdea? _parseIdea(
+    Object? rawIdea, {
+    required int maxVariants,
+    Set<CardTemplate>? allowedTemplates,
+  }) {
+    if (rawIdea is! Map<String, dynamic>) return null;
+    final rawTemplate = rawIdea['template'];
+    final template = templateFromName(
+      rawTemplate is String ? rawTemplate : null,
+    );
+    if (allowedTemplates != null && !allowedTemplates.contains(template)) {
+      return null;
+    }
+    final rawVariants = rawIdea['variants'];
+    if (rawVariants is! List) return null;
+    final variants = <SuggestedCard>[];
+    final seenFronts = <String>{};
+    for (final item in rawVariants) {
+      if (variants.length >= maxVariants) break;
+      if (item is! Map<String, dynamic>) continue;
+      final rawFront = item['front'];
+      final rawBack = item['back'];
+      final front = rawFront is String ? rawFront.trim() : '';
+      final back = rawBack is String ? rawBack.trim() : '';
+      if (front.isEmpty || back.isEmpty) continue;
+      if (!seenFronts.add(front.toLowerCase())) continue;
+      variants.add(
+        SuggestedCard(
+          front: front,
+          back: back,
+          template: template,
+          variantIndex: variants.length,
+        ),
+      );
+    }
+    if (variants.isEmpty) return null;
+    return SuggestedCardIdea(template: template, variants: variants);
   }
 
   Future<List<String>> listModels({
@@ -444,6 +733,7 @@ class LookupService {
     required int? sessionId,
     required int? questionId,
     required ConceptSource source,
+    String subtopic = '',
   }) {
     return _cards.createConcept(
       sessionId: sessionId,
@@ -453,6 +743,7 @@ class LookupService {
       extra: extra,
       context: question,
       topicName: topicName,
+      subtopic: subtopic,
       source: source,
       createdAt: _clock.now().toUtc(),
     );
@@ -591,6 +882,7 @@ class LookupService {
       throw const LookupException(
         'No AI model configured. Add a model in Settings.',
         canUseWeb: true,
+        failure: LookupFailure.noProvider,
       );
     }
     final base = settings.aiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
@@ -598,6 +890,7 @@ class LookupService {
       throw const LookupException(
         'No AI endpoint configured. Add one in Settings.',
         canUseWeb: true,
+        failure: LookupFailure.noProvider,
       );
     }
     final isGemini = settings.aiProvider == AiProvider.gemini;

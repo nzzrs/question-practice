@@ -21,6 +21,7 @@ Future<void> showAiDefinitionBubble(
   required String practiceName,
   required int? sessionId,
   required int? questionId,
+  String subtopic = '',
   Rect? anchor,
   VoidCallback? onSearchWeb,
 }) {
@@ -44,6 +45,7 @@ Future<void> showAiDefinitionBubble(
       practiceName: practiceName,
       sessionId: sessionId,
       questionId: questionId,
+      subtopic: subtopic,
       anchor: anchor,
       onSearchWeb: onSearchWeb,
       onClose: close,
@@ -61,6 +63,7 @@ class _AiDefinitionBubble extends ConsumerStatefulWidget {
     required this.practiceName,
     required this.sessionId,
     required this.questionId,
+    required this.subtopic,
     required this.anchor,
     required this.onClose,
     this.onSearchWeb,
@@ -72,6 +75,7 @@ class _AiDefinitionBubble extends ConsumerStatefulWidget {
   final String practiceName;
   final int? sessionId;
   final int? questionId;
+  final String subtopic;
   final Rect? anchor;
   final VoidCallback onClose;
   final VoidCallback? onSearchWeb;
@@ -103,6 +107,7 @@ class _AiDefinitionBubbleState extends ConsumerState<_AiDefinitionBubble> {
             practiceName: widget.practiceName,
             sessionId: widget.sessionId,
             questionId: widget.questionId,
+            subtopic: widget.subtopic,
           );
       if (!mounted) return;
       setState(() {
@@ -273,6 +278,7 @@ class LookupSheet extends ConsumerStatefulWidget {
     required this.practiceName,
     required this.sessionId,
     required this.questionId,
+    this.subtopic = '',
     super.key,
   });
 
@@ -282,6 +288,7 @@ class LookupSheet extends ConsumerStatefulWidget {
   final String practiceName;
   final int? sessionId;
   final int? questionId;
+  final String subtopic;
 
   @override
   ConsumerState<LookupSheet> createState() => _LookupSheetState();
@@ -317,6 +324,7 @@ class _LookupSheetState extends ConsumerState<LookupSheet> {
             practiceName: widget.practiceName,
             sessionId: widget.sessionId,
             questionId: widget.questionId,
+            subtopic: widget.subtopic,
           );
       if (!mounted) return;
       setState(() {
@@ -348,6 +356,7 @@ class _LookupSheetState extends ConsumerState<LookupSheet> {
             practiceName: widget.practiceName,
             sessionId: widget.sessionId,
             questionId: widget.questionId,
+            subtopic: widget.subtopic,
           );
       if (!mounted) return;
       setState(() {

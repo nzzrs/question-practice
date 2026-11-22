@@ -8,6 +8,7 @@ import '../../app/providers.dart';
 import '../../core/domain/list_sort.dart';
 import '../../core/domain/models.dart';
 import '../../core/domain/natural_compare.dart';
+import '../../core/domain/plural.dart';
 import '../../core/ui/sort_dialog.dart';
 import '../../core/ui/widgets.dart';
 import '../errors/past_errors_page.dart';
@@ -20,6 +21,13 @@ import '../settings/settings_page.dart';
 import '../topics/archived_topics_sheet.dart';
 import '../topics/topic_actions.dart';
 import '../topics/topic_page.dart';
+
+/// Text scale from which Home switches to layouts that stack instead of
+/// squeezing two columns side by side.
+const _largeTextThreshold = 1.3;
+
+bool _usesLargeText(BuildContext context) =>
+    MediaQuery.textScalerOf(context).scale(16) / 16 >= _largeTextThreshold;
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -43,10 +51,20 @@ class _HomePageState extends ConsumerState<HomePage> {
         ref.watch(inProgressSessionsProvider).value ??
         const <PracticeSession>[];
     final width = MediaQuery.sizeOf(context).width;
+    final largeText = _usesLargeText(context);
+    final theme = M3ETheme.of(context);
 
     return AppPage(
       title: 'Questions',
-      subtitle: inProgress.isEmpty ? null : _pausedLabel(inProgress.length),
+      // A large app bar cannot grow its fixed title band with the text scale,
+      // so it overflows once the title is scaled up. The small bar keeps the
+      // full title readable, and the paused count moves into the content.
+      variant: largeText
+          ? M3EAppBarVariant.small
+          : M3EAppBarVariant.largeFlexible,
+      subtitle: inProgress.isEmpty || largeText
+          ? null
+          : _pausedLabel(inProgress.length),
       actions: [
         M3EIconButton(
           variant: M3EIconButtonVariant.standard,
@@ -88,6 +106,16 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       children: [
         if (inProgress.isNotEmpty) ...[
+          if (largeText)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                _pausedLabel(inProgress.length),
+                style: theme.typography.baseline.labelLarge.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
           for (final session in inProgress) ...[
             _ResumeCard(
               session: session,
@@ -98,7 +126,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ],
           const SizedBox(height: 16),
         ],
-        _QuickActions(stats: stats, compact: width < 380),
+        _QuickActions(stats: stats, compact: width < 380 || largeText),
         const SizedBox(height: 30),
         SectionTitle(
           'Topics',
@@ -181,8 +209,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  String _pausedLabel(int count) =>
-      count == 1 ? '1 session paused' : '$count sessions paused';
+  String _pausedLabel(int count) => '${formatCount(count, 'session')} paused';
 
   Future<void> _push(Widget page) async {
     await Navigator.of(context)
@@ -274,12 +301,19 @@ class _HomePageState extends ConsumerState<HomePage> {
     final confirmed = await confirmDialog(
       context,
       title: 'Discard session?',
-      message: 'The answers and error cards from this unfinished session will be deleted.',
+      message:
+          'The answers and the error cards this session created will be '
+          'deleted. Earlier cards return to their previous state.',
       confirmLabel: 'Discard',
       destructive: true,
     );
     if (!confirmed) return;
-    await ref.read(sessionServiceProvider).discard(id);
+    try {
+      await ref.read(sessionServiceProvider).discard(id);
+    } on SessionException catch (error) {
+      if (mounted) await showSnack(context, error.message);
+      return;
+    }
     if (mounted) ref.invalidate(homeStatsProvider);
   }
 }
@@ -314,10 +348,15 @@ class _QuickActions extends StatelessWidget {
       title: 'Cards',
       value: cards?.toString() ?? '—',
       subtitle: stats == null
-          ? 'Concepts, errors, basic cards, skipped and highlights'
-          : cards == 0
+          ? 'Concepts, errors, basic cards, skipped questions and notes'
+          : cards == 0 && pending == 0
           ? 'Nothing waiting to export'
-          : '$cards cards ready to export',
+          : cards == 0
+          ? '${formatCount(pending, 'error')} to review'
+          : pending == 0
+          ? '${formatCount(cards!, 'card')} ready to export'
+          : '${formatCount(cards!, 'card')} ready · '
+                '${formatCount(pending, 'error')} to review',
       badge: pending > 0 ? '$pending pending' : null,
       tone: cards != null && cards > 0 ? PillTone.secondary : PillTone.neutral,
       onPressed: () => Navigator.of(
@@ -362,6 +401,16 @@ class _QuickTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final largeText = _usesLargeText(context);
+    final valueText = Text(
+      value,
+      style: theme.typography.emphasized.headlineMedium.copyWith(
+        color: tone == PillTone.error
+            ? theme.colorScheme.error
+            : theme.colorScheme.primary,
+        height: 1,
+      ),
+    );
     return Material(
       color: theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(26),
@@ -385,33 +434,39 @@ class _QuickTile extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 14),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    value,
-                    style: theme.typography.emphasized.headlineMedium.copyWith(
-                      color: tone == PillTone.error
-                          ? theme.colorScheme.error
-                          : theme.colorScheme.primary,
-                      height: 1,
-                    ),
-                  ),
-                  if (badge != null) ...[
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Pill(badge!, tone: PillTone.error),
-                    ),
+              // The count and its status pill stack when large text leaves the
+              // row too narrow, instead of forcing the pill past the card edge.
+              // At the default scale the original bottom-aligned row stays.
+              if (largeText)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    valueText,
+                    if (badge != null) Pill(badge!, tone: PillTone.error),
                   ],
-                ],
-              ),
+                )
+              else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    valueText,
+                    if (badge != null) ...[
+                      const SizedBox(width: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 3),
+                        child: Pill(badge!, tone: PillTone.error),
+                      ),
+                    ],
+                  ],
+                ),
               const SizedBox(height: 3),
               Text(title, style: theme.typography.baseline.titleSmall),
               const SizedBox(height: 2),
               Text(
                 subtitle,
-                maxLines: 2,
+                maxLines: largeText ? 4 : 2,
                 overflow: TextOverflow.ellipsis,
                 style: theme.typography.baseline.bodySmall.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -655,7 +710,24 @@ class _TopicRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
+    final largeText = _usesLargeText(context);
     final accuracy = (summary.accuracy * 100).round();
+    final counts = Text(
+      '${formatCount(summary.practiceCount, 'practice')} · '
+      '${formatCount(summary.relevantQuestionCount, 'question')}',
+      style: theme.typography.baseline.labelSmall.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
+    );
+    final accuracyLabel = Text(
+      summary.answeredCount == 0 ? 'Not started' : '$accuracy% accuracy',
+      style: theme.typography.baseline.labelSmall.copyWith(
+        color: summary.answeredCount == 0
+            ? theme.colorScheme.onSurfaceVariant
+            : theme.colorScheme.primary,
+        fontWeight: FontWeight.w600,
+      ),
+    );
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -686,7 +758,7 @@ class _TopicRow extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 summary.topic.name,
-                                maxLines: 2,
+                                maxLines: largeText ? 4 : 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.typography.baseline.titleMedium,
                               ),
@@ -705,7 +777,7 @@ class _TopicRow extends StatelessWidget {
                           const SizedBox(height: 2),
                           Text(
                             summary.topic.description,
-                            maxLines: 2,
+                            maxLines: largeText ? 4 : 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.typography.baseline.bodySmall.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
@@ -724,34 +796,32 @@ class _TopicRow extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Row(
-                children: [
-                  if (summary.topic.priority != null) ...[
-                    Pill('P${summary.topic.priority}'),
-                    const SizedBox(width: 8),
+              // At large text the counts no longer fit beside the accuracy
+              // figure, so they run onto separate lines instead of squeezing.
+              if (largeText)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (summary.topic.priority != null)
+                      Pill('P${summary.topic.priority}'),
+                    counts,
+                    accuracyLabel,
                   ],
-                  Expanded(
-                    child: Text(
-                      '${summary.practiceCount} practices · ${summary.relevantQuestionCount} questions',
-                      style: theme.typography.baseline.labelSmall.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    summary.answeredCount == 0
-                        ? 'Not started'
-                        : '$accuracy% accuracy',
-                    style: theme.typography.baseline.labelSmall.copyWith(
-                      color: summary.answeredCount == 0
-                          ? theme.colorScheme.onSurfaceVariant
-                          : theme.colorScheme.primary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
+                )
+              else
+                Row(
+                  children: [
+                    if (summary.topic.priority != null) ...[
+                      Pill('P${summary.topic.priority}'),
+                      const SizedBox(width: 8),
+                    ],
+                    Expanded(child: counts),
+                    const SizedBox(width: 8),
+                    accuracyLabel,
+                  ],
+                ),
               const SizedBox(height: 8),
               LinearScore(value: summary.progress),
             ],

@@ -8,6 +8,12 @@ class Topics extends Table {
   IntColumn get priority => integer().nullable()();
   TextColumn get ankiDeck => text().nullable()();
   DateTimeColumn get createdAt => dateTime()();
+
+  /// Percentage below which a score counts as failing this topic.
+  IntColumn get minimumScore => integer().withDefault(const Constant(70))();
+
+  /// Percentage at which a score counts as meeting the topic goal.
+  IntColumn get targetScore => integer().withDefault(const Constant(80))();
   BoolColumn get archived => boolean().withDefault(const Constant(false))();
 }
 
@@ -25,7 +31,10 @@ class Practices extends Table {
 }
 
 @DataClassName('QuestionRow')
-@TableIndex(name: 'questions_practice', columns: {#practiceId})
+@TableIndex(
+  name: 'questions_practice_position',
+  columns: {#practiceId, #position},
+)
 class Questions extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get practiceId =>
@@ -43,7 +52,8 @@ class Questions extends Table {
 }
 
 @DataClassName('SessionRow')
-@TableIndex(name: 'sessions_status', columns: {#status})
+@TableIndex(name: 'sessions_status_finished', columns: {#status, #finishedAt})
+@TableIndex(name: 'sessions_status_started', columns: {#status, #startedAt})
 class Sessions extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get practiceId => integer().nullable().references(
@@ -88,6 +98,9 @@ class Attempts extends Table {
   TextColumn get reasoning => text().withDefault(const Constant(''))();
   BoolColumn get distracted => boolean().withDefault(const Constant(false))();
   BoolColumn get unknown => boolean().withDefault(const Constant(false))();
+
+  /// Quick classifications chosen after a wrong answer.
+  TextColumn get mistakeKindsJson => text().withDefault(const Constant('[]'))();
   BoolColumn get isCorrect => boolean()();
   DateTimeColumn get answeredAt => dateTime()();
 
@@ -100,6 +113,7 @@ class Attempts extends Table {
 @DataClassName('ConceptRow')
 @TableIndex(name: 'concepts_session', columns: {#sessionId})
 @TableIndex(name: 'concepts_exported', columns: {#exportedAt})
+@TableIndex(name: 'concepts_created', columns: {#createdAt})
 class Concepts extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get sessionId => integer().nullable().references(
@@ -117,6 +131,9 @@ class Concepts extends Table {
   TextColumn get extra => text().withDefault(const Constant(''))();
   TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
+
+  /// Optional grouping inside the topic, copied from the source question.
+  TextColumn get subtopic => text().withDefault(const Constant(''))();
   TextColumn get source => text()();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get exportedAt => dateTime().nullable()();
@@ -126,6 +143,8 @@ class Concepts extends Table {
 @TableIndex(name: 'error_cards_due', columns: {#status, #dueAt})
 @TableIndex(name: 'error_cards_question', columns: {#questionId})
 @TableIndex(name: 'error_cards_session', columns: {#sessionId})
+@TableIndex(name: 'error_cards_created', columns: {#createdAt})
+@TableIndex(name: 'error_cards_last_wrong', columns: {#status, #lastWrongAt})
 class ErrorCards extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get questionId =>
@@ -148,6 +167,21 @@ class ErrorCards extends Table {
   TextColumn get bias => text().withDefault(const Constant(''))();
   TextColumn get vaccine => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
+
+  /// Cognitive shape of the card generated from this error.
+  TextColumn get cognitiveType =>
+      text().withDefault(const Constant('contrast'))();
+
+  /// Optional grouping inside the topic, copied from the source question.
+  TextColumn get subtopic => text().withDefault(const Constant(''))();
+
+  /// Quick classifications chosen after the wrong answer.
+  ///
+  /// Legacy data only: practice no longer collects mistake kinds.
+  TextColumn get mistakeKindsJson => text().withDefault(const Constant('[]'))();
+
+  /// A distracted re-test kept the card due instead of counting a new error.
+  BoolColumn get distracted => boolean().withDefault(const Constant(false))();
   TextColumn get practiceName => text().withDefault(const Constant(''))();
   TextColumn get status => text()();
   DateTimeColumn get createdAt => dateTime()();
@@ -158,9 +192,10 @@ class ErrorCards extends Table {
   DateTimeColumn get exportedAt => dateTime().nullable()();
 }
 
-@DataClassName('ManualCardRow')
-@TableIndex(name: 'manual_cards_exported', columns: {#exportedAt})
-class ManualCards extends Table {
+@DataClassName('BasicCardRow')
+@TableIndex(name: 'basic_cards_exported', columns: {#exportedAt})
+@TableIndex(name: 'basic_cards_created', columns: {#createdAt})
+class BasicCards extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get sessionId => integer().nullable().references(
     Sessions,
@@ -178,12 +213,21 @@ class ManualCards extends Table {
   /// Optional source passage shown above the question on the card front.
   TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
+
+  /// Cognitive shape of the card: fact, heuristic, contrast or concept.
+  TextColumn get cognitiveType => text().withDefault(const Constant('fact'))();
+
+  /// Optional grouping inside the topic, copied from the source question.
+  TextColumn get subtopic => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get exportedAt => dateTime().nullable()();
 }
 
 @DataClassName('SkippedQuestionRow')
-@TableIndex(name: 'skipped_questions_handled', columns: {#handledAt})
+@TableIndex(
+  name: 'skipped_questions_handled_created',
+  columns: {#handledAt, #createdAt},
+)
 @TableIndex(name: 'skipped_questions_session', columns: {#sessionId})
 class SkippedQuestions extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -210,10 +254,12 @@ class SkippedQuestions extends Table {
   TextColumn get handledKind => text().nullable()();
 }
 
-@DataClassName('HighlightRow')
-@TableIndex(name: 'highlights_session', columns: {#sessionId})
-@TableIndex(name: 'highlights_question', columns: {#questionId})
-class Highlights extends Table {
+/// A passage the learner saved to revisit, tied to the question it came from.
+@DataClassName('NoteRow')
+@TableIndex(name: 'notes_session', columns: {#sessionId})
+@TableIndex(name: 'notes_question', columns: {#questionId})
+@TableIndex(name: 'notes_created', columns: {#createdAt})
+class Notes extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get sessionId => integer().nullable().references(
     Sessions,
@@ -225,15 +271,22 @@ class Highlights extends Table {
     #id,
     onDelete: KeyAction.setNull,
   )();
-  TextColumn get phrase => text()();
+
+  /// The passage itself. Stored and exported as `text`.
+  @JsonKey('text')
+  TextColumn get noteText => text().named('text')();
   TextColumn get context => text().withDefault(const Constant(''))();
   TextColumn get topicName => text().withDefault(const Constant(''))();
+  TextColumn get subtopic => text().withDefault(const Constant(''))();
   TextColumn get practiceName => text().withDefault(const Constant(''))();
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get keptAt => dateTime().nullable()();
   DateTimeColumn get cardCreatedAt => dateTime().nullable()();
-  IntColumn get manualCardId => integer().nullable().references(
-    ManualCards,
+
+  /// Kept as `manualCardId` in backup JSON for older files and older readers.
+  @JsonKey('manualCardId')
+  IntColumn get basicCardId => integer().nullable().references(
+    BasicCards,
     #id,
     onDelete: KeyAction.setNull,
   )();

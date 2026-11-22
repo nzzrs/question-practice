@@ -3,6 +3,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../app/providers.dart';
+import '../../core/domain/plural.dart';
 import '../../core/ui/widgets.dart';
 
 /// Lists archived topics so they can be restored, edited or deleted.
@@ -76,8 +77,8 @@ class ArchivedTopicsSheet extends ConsumerWidget {
                       AppGroupRow(
                         title: summary.topic.name,
                         subtitle:
-                            '${summary.practiceCount} practices · '
-                            '${summary.relevantQuestionCount} questions',
+                            '${formatCount(summary.practiceCount, 'practice')} · '
+                            '${formatCount(summary.relevantQuestionCount, 'question')}',
                         leading: const IconBadge(Icons.archive_outlined),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => Navigator.of(context).pop(summary),

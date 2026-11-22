@@ -62,14 +62,6 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
         .getSingleOrNull();
   }
 
-  Stream<SessionRow?> watchLatestInProgressSession() {
-    return (select(sessions)
-          ..where((s) => s.status.equals('inProgress'))
-          ..orderBy([(s) => OrderingTerm.desc(s.startedAt)])
-          ..limit(1))
-        .watchSingleOrNull();
-  }
-
   Stream<List<InProgressSessionRow>> watchInProgressSessions() {
     final query = customSelect(
       '''
@@ -122,9 +114,45 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
         .get();
   }
 
-  /// Every recorded attempt, used to derive per-question history.
-  Future<List<AttemptRow>> allAttempts() {
-    return (select(attempts)..orderBy([(a) => OrderingTerm.asc(a.id)])).get();
+  /// Per-question history flags from one grouped scan of the attempts.
+  ///
+  /// An attempt is skipped when it has an empty selection or the "I didn't
+  /// know this" mark. Otherwise it makes the question done. Any correct
+  /// attempt makes the question solved, including one also marked unknown.
+  Future<List<QuestionProgressFlags>> questionProgressFlags() async {
+    final query = customSelect(
+      '''
+      SELECT
+        question_id,
+        MAX(
+          CASE
+            WHEN selected_indexes_json != '[]' AND unknown = 0 THEN 1
+            ELSE 0
+          END
+        ) AS is_done,
+        MAX(CASE WHEN is_correct = 1 THEN 1 ELSE 0 END) AS is_solved,
+        MAX(
+          CASE
+            WHEN selected_indexes_json = '[]' OR unknown = 1 THEN 1
+            ELSE 0
+          END
+        ) AS is_skipped
+      FROM attempts
+      GROUP BY question_id
+      ORDER BY question_id
+      ''',
+      readsFrom: {attempts},
+    );
+    final rows = await query.get();
+    return [
+      for (final row in rows)
+        QuestionProgressFlags(
+          questionId: row.read<int>('question_id'),
+          done: row.read<int>('is_done') == 1,
+          solved: row.read<int>('is_solved') == 1,
+          skipped: row.read<int>('is_skipped') == 1,
+        ),
+    ];
   }
 
   /// Questions that a completed session left out without an answer.
@@ -220,17 +248,6 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     )..where((s) => s.id.isIn(values) & s.status.equals('completed'))).go();
   }
 
-  Stream<List<SessionRow>> watchCompletedSessions() {
-    return (select(sessions)
-          ..where((s) => s.status.equals('completed'))
-          ..orderBy([(s) => OrderingTerm.desc(s.finishedAt)]))
-        .watch();
-  }
-
-  Future<List<PracticeRow>> practicesWithSessions() {
-    return (select(practices)..orderBy([(p) => OrderingTerm.asc(p.id)])).get();
-  }
-
   Future<int> lookupCountForSession(int sessionId) async {
     final query = customSelect(
       'SELECT COUNT(DISTINCT term) AS amount FROM concepts WHERE session_id = ?',
@@ -250,6 +267,20 @@ class SessionDao extends DatabaseAccessor<AppDatabase> with _$SessionDaoMixin {
     final row = await query.getSingle();
     return row.read<int>('amount');
   }
+}
+
+class QuestionProgressFlags {
+  const QuestionProgressFlags({
+    required this.questionId,
+    required this.done,
+    required this.solved,
+    required this.skipped,
+  });
+
+  final int questionId;
+  final bool done;
+  final bool solved;
+  final bool skipped;
 }
 
 class InProgressSessionRow {

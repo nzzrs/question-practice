@@ -641,7 +641,7 @@ void main() {
 
     expect(find.text('Item 2 of 2'), findsOneWidget);
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(1));
   });
@@ -936,10 +936,10 @@ void main() {
 
       expect(service.completeCalls, 2);
       expect(find.text('Review complete'), findsWidgets);
-      final manuals = await tester.runAsync(
-        () => harness.cards.watchManualCards().first,
+      final basics = await tester.runAsync(
+        () => harness.cards.watchBasicCards().first,
       );
-      expect(manuals, hasLength(1));
+      expect(basics, hasLength(1));
       final completed = await tester.runAsync(
         () => harness.cards.errorCardById(seeded.card.id),
       );
@@ -999,10 +999,10 @@ void main() {
 
     final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
     expect(notes!.single.hasCard, isFalse);
-    final manuals = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+    final basics = await tester.runAsync(
+      () => harness.cards.watchBasicCards().first,
     );
-    expect(manuals, hasLength(1));
+    expect(basics, hasLength(1));
   });
 
   testWidgets('AI results stay with their item across steps', (tester) async {

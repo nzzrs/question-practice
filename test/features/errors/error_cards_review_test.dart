@@ -167,7 +167,7 @@ void main() {
     );
     expect(untouched!.needsDetails, isTrue);
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(1));
     expect(cards!.single.subtopic, 'Sub');

@@ -100,7 +100,7 @@ void main() {
     );
     await harness.cards.markExported(
       conceptIds: const [],
-      manualCardIds: const [],
+      basicCardIds: const [],
       exportedAt: harness.clock.now().toUtc(),
     );
 

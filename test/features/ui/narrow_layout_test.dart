@@ -213,7 +213,7 @@ void main() {
       seeded.practiceId,
     )).single;
     await _seedErrorCard(harness, seeded, complete: true);
-    await harness.cards.createManualCard(
+    await harness.cards.createBasicCard(
       sessionId: null,
       questionId: question.id,
       question: 'A heuristic card with a fairly long front for a narrow row',

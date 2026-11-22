@@ -3,12 +3,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:question_practice/core/database/app_database.dart';
 import 'package:sqlite3/sqlite3.dart';
 
-const _schemaFifteenIndexes = <String>[
+const _schemaSixteenIndexes = <String>[
   'questions_practice_position',
   'sessions_status_finished',
   'sessions_status_started',
   'concepts_created',
-  'manual_cards_created',
+  'basic_cards_created',
   'notes_created',
   'error_cards_created',
   'error_cards_last_wrong',
@@ -22,7 +22,7 @@ const _supersededIndexes = <String>[
 ];
 
 void main() {
-  test('schema 15 adds query indexes and keeps every schema 14 row', () async {
+  test('schema 16 renames basic cards and keeps every schema 14 row', () async {
     final sqlite = sqlite3.openInMemory();
     _createSchemaFourteen(sqlite);
     _insertSchemaFourteenRows(sqlite);
@@ -31,10 +31,10 @@ void main() {
     final database = AppDatabase(NativeDatabase.opened(sqlite));
     addTearDown(database.close);
 
-    expect(database.schemaVersion, 15);
+    expect(database.schemaVersion, 16);
 
     final indexes = await _indexNames(database);
-    expect(indexes, containsAll(_schemaFifteenIndexes));
+    expect(indexes, containsAll(_schemaSixteenIndexes));
     expect(
       indexes.intersection(_supersededIndexes.toSet()),
       isEmpty,
@@ -54,7 +54,7 @@ void main() {
       'started_at',
     ]);
     expect(await _indexColumns(database, 'concepts_created'), ['created_at']);
-    expect(await _indexColumns(database, 'manual_cards_created'), [
+    expect(await _indexColumns(database, 'basic_cards_created'), [
       'created_at',
     ]);
     expect(await _indexColumns(database, 'notes_created'), ['created_at']);
@@ -93,10 +93,10 @@ void main() {
     expect(errorCard.read<String>('status'), 'active');
     expect(errorCard.read<int>('last_wrong_at'), 1700000200);
 
-    final manualCard = await database
-        .customSelect('SELECT question FROM manual_cards')
+    final basicCard = await database
+        .customSelect('SELECT question FROM basic_cards')
         .getSingle();
-    expect(manualCard.read<String>('question'), 'Kept basic card?');
+    expect(basicCard.read<String>('question'), 'Kept basic card?');
 
     final note = await database
         .customSelect('SELECT text FROM notes')
@@ -109,7 +109,7 @@ void main() {
     expect(skipped.read<String>('question'), 'Kept skipped question?');
   });
 
-  test('schema 15 upgrade is idempotent when its indexes exist', () async {
+  test('schema 16 upgrade is idempotent when its indexes exist', () async {
     final sqlite = sqlite3.openInMemory();
     _createSchemaFourteen(sqlite);
     _insertSchemaFourteenRows(sqlite);
@@ -122,7 +122,7 @@ void main() {
     addTearDown(database.close);
 
     final indexes = await _indexNames(database);
-    expect(indexes, containsAll(_schemaFifteenIndexes));
+    expect(indexes, containsAll(_schemaSixteenIndexes));
 
     final count = await database
         .customSelect('SELECT COUNT(*) AS amount FROM error_cards')
@@ -130,13 +130,17 @@ void main() {
     expect(count.read<int>('amount'), 1);
   });
 
-  test('a fresh database creates every schema 15 index', () async {
+  test('a fresh database creates every schema 16 index', () async {
     final database = AppDatabase(NativeDatabase.memory());
     addTearDown(database.close);
 
     final indexes = await _indexNames(database);
-    expect(indexes, containsAll(_schemaFifteenIndexes));
+    expect(indexes, containsAll(_schemaSixteenIndexes));
     expect(indexes.intersection(_supersededIndexes.toSet()), isEmpty);
+    expect(indexes, contains('basic_cards_exported'));
+    expect(await _indexColumns(database, 'basic_cards_exported'), [
+      'exported_at',
+    ]);
   });
 
   test('a partial database without indexed columns still upgrades', () async {
@@ -192,7 +196,7 @@ void main() {
     final database = AppDatabase(NativeDatabase.opened(sqlite));
     addTearDown(database.close);
 
-    expect(database.schemaVersion, 15);
+    expect(database.schemaVersion, 16);
 
     final indexes = await _indexNames(database);
     // Indexes whose guard columns are missing are skipped...
@@ -202,7 +206,7 @@ void main() {
     expect(indexes, isNot(contains('error_cards_last_wrong')));
     expect(indexes, isNot(contains('skipped_questions_handled_created')));
     expect(indexes, isNot(contains('concepts_created')));
-    expect(indexes, isNot(contains('manual_cards_created')));
+    expect(indexes, isNot(contains('basic_cards_created')));
     expect(indexes, isNot(contains('notes_created')));
     expect(indexes, isNot(contains('error_cards_created')));
     // ...and a superseded single index is kept when its replacement could

@@ -76,7 +76,7 @@ void main() {
     expect(notes.first.subtopic, 'Storage');
     expect(notes.last.noteText, 'kept note');
     expect(notes.last.sessionId, isNull);
-    expect(notes.last.manualCardId, 3);
+    expect(notes.last.basicCardId, 3);
     expect(
       notes.last.keptAt,
       DateTime.fromMillisecondsSinceEpoch(1700000002000),
@@ -96,7 +96,7 @@ void main() {
     expect(names, contains('notes_question'));
     expect(names, isNot(contains('highlights_session')));
     expect(names, isNot(contains('highlights_question')));
-    expect(database.schemaVersion, 15);
+    expect(database.schemaVersion, 16);
 
     // Renaming keeps the foreign keys attached to the new table.
     final foreignKeys = await database
@@ -109,7 +109,7 @@ void main() {
     expect(targets, {
       'sessions': 'CASCADE',
       'questions': 'SET NULL',
-      'manual_cards': 'SET NULL',
+      'basic_cards': 'SET NULL',
     });
 
     // AUTOINCREMENT keeps counting after the rename instead of reusing ids.
@@ -123,18 +123,18 @@ void main() {
         );
     expect(nextId, 3);
 
-    // ON DELETE SET NULL for the question, then for the manual card.
+    // ON DELETE SET NULL for the question, then for the basic card.
     await database.customStatement('DELETE FROM questions WHERE id = 7');
     final afterQuestion = await database
         .customSelect('SELECT id, question_id FROM notes ORDER BY id')
         .get();
     expect(afterQuestion.first.read<int?>('question_id'), isNull);
 
-    await database.customStatement('DELETE FROM manual_cards WHERE id = 3');
+    await database.customStatement('DELETE FROM basic_cards WHERE id = 3');
     final afterCard = await database
-        .customSelect('SELECT id, manual_card_id FROM notes ORDER BY id')
+        .customSelect('SELECT id, basic_card_id FROM notes ORDER BY id')
         .get();
-    expect(afterCard[1].read<int?>('manual_card_id'), isNull);
+    expect(afterCard[1].read<int?>('basic_card_id'), isNull);
 
     // ON DELETE CASCADE for the session.
     await database.customStatement('DELETE FROM sessions WHERE id = 1');
@@ -236,7 +236,7 @@ void main() {
     expect(rows, hasLength(1));
     expect(rows.single.distracted, isFalse);
     expect(rows.single.reasoning, 'I read too fast.');
-    expect(database.schemaVersion, 15);
+    expect(database.schemaVersion, 16);
 
     final columns = await database
         .customSelect('PRAGMA table_info(error_cards)')

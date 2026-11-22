@@ -53,8 +53,8 @@ ErrorCard _error(int id, {required bool pending, DateTime? exportedAt}) {
   );
 }
 
-ManualCard _manual(int id, {DateTime? exportedAt}) {
-  return ManualCard(
+BasicCard _basic(int id, {DateTime? exportedAt}) {
+  return BasicCard(
     id: id,
     sessionId: null,
     question: 'Basic $id?',
@@ -97,7 +97,7 @@ Note _note(int id) {
     createdAt: _now,
     keptAt: null,
     cardCreatedAt: null,
-    manualCardId: null,
+    basicCardId: null,
   );
 }
 
@@ -107,14 +107,14 @@ void main() {
       final cache = CardsViewCache();
       final concepts = [_concept(1)];
       final errors = [_error(1, pending: false)];
-      final manuals = [_manual(1)];
+      final basics = [_basic(1)];
       final skipped = [_skipped(1)];
       final notes = [_note(1)];
 
       final first = cache.data(
         concepts: concepts,
         errors: errors,
-        manuals: manuals,
+        basics: basics,
         skipped: skipped,
         notes: notes,
         showExported: false,
@@ -122,7 +122,7 @@ void main() {
       final second = cache.data(
         concepts: concepts,
         errors: errors,
-        manuals: manuals,
+        basics: basics,
         skipped: skipped,
         notes: notes,
         showExported: false,
@@ -135,7 +135,7 @@ void main() {
       final third = cache.data(
         concepts: replacement,
         errors: errors,
-        manuals: manuals,
+        basics: basics,
         skipped: skipped,
         notes: notes,
         showExported: false,
@@ -152,7 +152,7 @@ void main() {
       cache.data(
         concepts: concepts,
         errors: const [],
-        manuals: const [],
+        basics: const [],
         skipped: const [],
         notes: const [],
         showExported: false,
@@ -160,7 +160,7 @@ void main() {
       cache.data(
         concepts: concepts,
         errors: const [],
-        manuals: const [],
+        basics: const [],
         skipped: const [],
         notes: const [],
         showExported: true,
@@ -168,7 +168,7 @@ void main() {
       cache.data(
         concepts: concepts,
         errors: const [],
-        manuals: const [],
+        basics: const [],
         skipped: const [],
         notes: const [],
         showExported: true,
@@ -182,7 +182,7 @@ void main() {
       final data = cache.data(
         concepts: const [],
         errors: const [],
-        manuals: const [],
+        basics: const [],
         skipped: const [],
         notes: const [],
         showExported: false,
@@ -231,7 +231,7 @@ void main() {
       _error(2, pending: false),
       _error(3, pending: true, exportedAt: _now),
     ];
-    final manuals = [_manual(1), _manual(2, exportedAt: _now)];
+    final basics = [_basic(1), _basic(2, exportedAt: _now)];
     final skipped = [_skipped(1), _skipped(2)];
     final notes = [_note(1), _note(2)];
 
@@ -239,7 +239,7 @@ void main() {
       return CardsViewCache().data(
         concepts: concepts,
         errors: errors,
-        manuals: manuals,
+        basics: basics,
         skipped: skipped,
         notes: notes,
         showExported: showExported,
@@ -251,7 +251,7 @@ void main() {
 
       expect(data.concepts.map((item) => item.id), [1, 2]);
       expect(data.errors.map((item) => item.id), [1, 2]);
-      expect(data.manuals.map((item) => item.id), [1]);
+      expect(data.basics.map((item) => item.id), [1]);
       expect(data.skipped.map((item) => item.id), [1, 2]);
       expect(data.notes.map((item) => item.id), [1, 2]);
       expect(data.hasAnyRows, isTrue);
@@ -274,7 +274,7 @@ void main() {
 
       expect(data.concepts.map((item) => item.id), [1, 2, 3]);
       expect(data.errors.map((item) => item.id), [1, 2, 3]);
-      expect(data.manuals.map((item) => item.id), [1, 2]);
+      expect(data.basics.map((item) => item.id), [1, 2]);
       expect(data.conceptSelectableIds, [1]);
       expect(data.basicSelectableIds, [1]);
       expect(data.errorSelectableIds, [1, 2]);
@@ -292,7 +292,7 @@ void main() {
       final data = CardsViewCache().data(
         concepts: [_concept(1, exportedAt: _now)],
         errors: const [],
-        manuals: const [],
+        basics: const [],
         skipped: const [],
         notes: const [],
         showExported: false,
@@ -315,9 +315,9 @@ void main() {
         _error(2, pending: false),
         _error(3, pending: true, exportedAt: _now),
       ],
-      manuals: [
-        _manual(1),
-        _manual(2, exportedAt: _now),
+      basics: [
+        _basic(1),
+        _basic(2, exportedAt: _now),
       ],
       skipped: [_skipped(1), _skipped(2)],
       notes: [_note(1), _note(2)],
@@ -337,7 +337,7 @@ void main() {
       );
 
       expect(view.exportSelection.concepts.map((item) => item.id), [1]);
-      expect(view.exportSelection.manualCards.map((item) => item.id), [1]);
+      expect(view.exportSelection.basicCards.map((item) => item.id), [1]);
       expect(view.selectedErrors.map((item) => item.id), [1, 2]);
       expect(view.selectedSkipped.map((item) => item.id), [1]);
       expect(view.selectedNotes.map((item) => item.id), [1]);
@@ -448,7 +448,7 @@ void main() {
     // A new stream value is a new data revision and derives once after it
     // settles.
     await tester.runAsync(() async {
-      await harness.cards.createManualCard(
+      await harness.cards.createBasicCard(
         sessionId: null,
         questionId: questions.single.id,
         question: 'What is a subnet?',

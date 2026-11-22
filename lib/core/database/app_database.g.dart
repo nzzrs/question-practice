@@ -5216,12 +5216,12 @@ class ErrorCardsCompanion extends UpdateCompanion<ErrorCardRow> {
   }
 }
 
-class $ManualCardsTable extends ManualCards
-    with TableInfo<$ManualCardsTable, ManualCardRow> {
+class $BasicCardsTable extends BasicCards
+    with TableInfo<$BasicCardsTable, BasicCardRow> {
   @override
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
-  $ManualCardsTable(this.attachedDatabase, [this._alias]);
+  $BasicCardsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
   late final GeneratedColumn<int> id = GeneratedColumn<int>(
@@ -5371,10 +5371,10 @@ class $ManualCardsTable extends ManualCards
   String get aliasedName => _alias ?? actualTableName;
   @override
   String get actualTableName => $name;
-  static const String $name = 'manual_cards';
+  static const String $name = 'basic_cards';
   @override
   VerificationContext validateIntegrity(
-    Insertable<ManualCardRow> instance, {
+    Insertable<BasicCardRow> instance, {
     bool isInserting = false,
   }) {
     final context = VerificationContext();
@@ -5457,9 +5457,9 @@ class $ManualCardsTable extends ManualCards
   @override
   Set<GeneratedColumn> get $primaryKey => {id};
   @override
-  ManualCardRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+  BasicCardRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return ManualCardRow(
+    return BasicCardRow(
       id: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}id'],
@@ -5508,12 +5508,12 @@ class $ManualCardsTable extends ManualCards
   }
 
   @override
-  $ManualCardsTable createAlias(String alias) {
-    return $ManualCardsTable(attachedDatabase, alias);
+  $BasicCardsTable createAlias(String alias) {
+    return $BasicCardsTable(attachedDatabase, alias);
   }
 }
 
-class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
+class BasicCardRow extends DataClass implements Insertable<BasicCardRow> {
   final int id;
   final int? sessionId;
   final int? questionId;
@@ -5531,7 +5531,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
   final String subtopic;
   final DateTime createdAt;
   final DateTime? exportedAt;
-  const ManualCardRow({
+  const BasicCardRow({
     required this.id,
     this.sessionId,
     this.questionId,
@@ -5567,8 +5567,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     return map;
   }
 
-  ManualCardsCompanion toCompanion(bool nullToAbsent) {
-    return ManualCardsCompanion(
+  BasicCardsCompanion toCompanion(bool nullToAbsent) {
+    return BasicCardsCompanion(
       id: Value(id),
       sessionId: sessionId == null && nullToAbsent
           ? const Value.absent()
@@ -5589,12 +5589,12 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     );
   }
 
-  factory ManualCardRow.fromJson(
+  factory BasicCardRow.fromJson(
     Map<String, dynamic> json, {
     ValueSerializer? serializer,
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
-    return ManualCardRow(
+    return BasicCardRow(
       id: serializer.fromJson<int>(json['id']),
       sessionId: serializer.fromJson<int?>(json['sessionId']),
       questionId: serializer.fromJson<int?>(json['questionId']),
@@ -5626,7 +5626,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     };
   }
 
-  ManualCardRow copyWith({
+  BasicCardRow copyWith({
     int? id,
     Value<int?> sessionId = const Value.absent(),
     Value<int?> questionId = const Value.absent(),
@@ -5638,7 +5638,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     String? subtopic,
     DateTime? createdAt,
     Value<DateTime?> exportedAt = const Value.absent(),
-  }) => ManualCardRow(
+  }) => BasicCardRow(
     id: id ?? this.id,
     sessionId: sessionId.present ? sessionId.value : this.sessionId,
     questionId: questionId.present ? questionId.value : this.questionId,
@@ -5651,8 +5651,8 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
     createdAt: createdAt ?? this.createdAt,
     exportedAt: exportedAt.present ? exportedAt.value : this.exportedAt,
   );
-  ManualCardRow copyWithCompanion(ManualCardsCompanion data) {
-    return ManualCardRow(
+  BasicCardRow copyWithCompanion(BasicCardsCompanion data) {
+    return BasicCardRow(
       id: data.id.present ? data.id.value : this.id,
       sessionId: data.sessionId.present ? data.sessionId.value : this.sessionId,
       questionId: data.questionId.present
@@ -5675,7 +5675,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
 
   @override
   String toString() {
-    return (StringBuffer('ManualCardRow(')
+    return (StringBuffer('BasicCardRow(')
           ..write('id: $id, ')
           ..write('sessionId: $sessionId, ')
           ..write('questionId: $questionId, ')
@@ -5708,7 +5708,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is ManualCardRow &&
+      (other is BasicCardRow &&
           other.id == this.id &&
           other.sessionId == this.sessionId &&
           other.questionId == this.questionId &&
@@ -5722,7 +5722,7 @@ class ManualCardRow extends DataClass implements Insertable<ManualCardRow> {
           other.exportedAt == this.exportedAt);
 }
 
-class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
+class BasicCardsCompanion extends UpdateCompanion<BasicCardRow> {
   final Value<int> id;
   final Value<int?> sessionId;
   final Value<int?> questionId;
@@ -5734,7 +5734,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
   final Value<String> subtopic;
   final Value<DateTime> createdAt;
   final Value<DateTime?> exportedAt;
-  const ManualCardsCompanion({
+  const BasicCardsCompanion({
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
     this.questionId = const Value.absent(),
@@ -5747,7 +5747,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     this.createdAt = const Value.absent(),
     this.exportedAt = const Value.absent(),
   });
-  ManualCardsCompanion.insert({
+  BasicCardsCompanion.insert({
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
     this.questionId = const Value.absent(),
@@ -5762,7 +5762,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
   }) : question = Value(question),
        answer = Value(answer),
        createdAt = Value(createdAt);
-  static Insertable<ManualCardRow> custom({
+  static Insertable<BasicCardRow> custom({
     Expression<int>? id,
     Expression<int>? sessionId,
     Expression<int>? questionId,
@@ -5790,7 +5790,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     });
   }
 
-  ManualCardsCompanion copyWith({
+  BasicCardsCompanion copyWith({
     Value<int>? id,
     Value<int?>? sessionId,
     Value<int?>? questionId,
@@ -5803,7 +5803,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
     Value<DateTime>? createdAt,
     Value<DateTime?>? exportedAt,
   }) {
-    return ManualCardsCompanion(
+    return BasicCardsCompanion(
       id: id ?? this.id,
       sessionId: sessionId ?? this.sessionId,
       questionId: questionId ?? this.questionId,
@@ -5859,7 +5859,7 @@ class ManualCardsCompanion extends UpdateCompanion<ManualCardRow> {
 
   @override
   String toString() {
-    return (StringBuffer('ManualCardsCompanion(')
+    return (StringBuffer('BasicCardsCompanion(')
           ..write('id: $id, ')
           ..write('sessionId: $sessionId, ')
           ..write('questionId: $questionId, ')
@@ -6897,18 +6897,18 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteRow> {
         type: DriftSqlType.dateTime,
         requiredDuringInsert: false,
       );
-  static const VerificationMeta _manualCardIdMeta = const VerificationMeta(
-    'manualCardId',
+  static const VerificationMeta _basicCardIdMeta = const VerificationMeta(
+    'basicCardId',
   );
   @override
-  late final GeneratedColumn<int> manualCardId = GeneratedColumn<int>(
-    'manual_card_id',
+  late final GeneratedColumn<int> basicCardId = GeneratedColumn<int>(
+    'basic_card_id',
     aliasedName,
     true,
     type: DriftSqlType.int,
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'REFERENCES manual_cards (id) ON DELETE SET NULL',
+      'REFERENCES basic_cards (id) ON DELETE SET NULL',
     ),
   );
   @override
@@ -6924,7 +6924,7 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteRow> {
     createdAt,
     keptAt,
     cardCreatedAt,
-    manualCardId,
+    basicCardId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -7011,12 +7011,12 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteRow> {
         ),
       );
     }
-    if (data.containsKey('manual_card_id')) {
+    if (data.containsKey('basic_card_id')) {
       context.handle(
-        _manualCardIdMeta,
-        manualCardId.isAcceptableOrUnknown(
-          data['manual_card_id']!,
-          _manualCardIdMeta,
+        _basicCardIdMeta,
+        basicCardId.isAcceptableOrUnknown(
+          data['basic_card_id']!,
+          _basicCardIdMeta,
         ),
       );
     }
@@ -7073,9 +7073,9 @@ class $NotesTable extends Notes with TableInfo<$NotesTable, NoteRow> {
         DriftSqlType.dateTime,
         data['${effectivePrefix}card_created_at'],
       ),
-      manualCardId: attachedDatabase.typeMapping.read(
+      basicCardId: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
-        data['${effectivePrefix}manual_card_id'],
+        data['${effectivePrefix}basic_card_id'],
       ),
     );
   }
@@ -7100,7 +7100,9 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
   final DateTime createdAt;
   final DateTime? keptAt;
   final DateTime? cardCreatedAt;
-  final int? manualCardId;
+
+  /// Kept as `manualCardId` in backup JSON for older files and older readers.
+  final int? basicCardId;
   const NoteRow({
     required this.id,
     this.sessionId,
@@ -7113,7 +7115,7 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
     required this.createdAt,
     this.keptAt,
     this.cardCreatedAt,
-    this.manualCardId,
+    this.basicCardId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -7137,8 +7139,8 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
     if (!nullToAbsent || cardCreatedAt != null) {
       map['card_created_at'] = Variable<DateTime>(cardCreatedAt);
     }
-    if (!nullToAbsent || manualCardId != null) {
-      map['manual_card_id'] = Variable<int>(manualCardId);
+    if (!nullToAbsent || basicCardId != null) {
+      map['basic_card_id'] = Variable<int>(basicCardId);
     }
     return map;
   }
@@ -7164,9 +7166,9 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
       cardCreatedAt: cardCreatedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(cardCreatedAt),
-      manualCardId: manualCardId == null && nullToAbsent
+      basicCardId: basicCardId == null && nullToAbsent
           ? const Value.absent()
-          : Value(manualCardId),
+          : Value(basicCardId),
     );
   }
 
@@ -7187,7 +7189,7 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       keptAt: serializer.fromJson<DateTime?>(json['keptAt']),
       cardCreatedAt: serializer.fromJson<DateTime?>(json['cardCreatedAt']),
-      manualCardId: serializer.fromJson<int?>(json['manualCardId']),
+      basicCardId: serializer.fromJson<int?>(json['manualCardId']),
     );
   }
   @override
@@ -7205,7 +7207,7 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'keptAt': serializer.toJson<DateTime?>(keptAt),
       'cardCreatedAt': serializer.toJson<DateTime?>(cardCreatedAt),
-      'manualCardId': serializer.toJson<int?>(manualCardId),
+      'manualCardId': serializer.toJson<int?>(basicCardId),
     };
   }
 
@@ -7221,7 +7223,7 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
     DateTime? createdAt,
     Value<DateTime?> keptAt = const Value.absent(),
     Value<DateTime?> cardCreatedAt = const Value.absent(),
-    Value<int?> manualCardId = const Value.absent(),
+    Value<int?> basicCardId = const Value.absent(),
   }) => NoteRow(
     id: id ?? this.id,
     sessionId: sessionId.present ? sessionId.value : this.sessionId,
@@ -7236,7 +7238,7 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
     cardCreatedAt: cardCreatedAt.present
         ? cardCreatedAt.value
         : this.cardCreatedAt,
-    manualCardId: manualCardId.present ? manualCardId.value : this.manualCardId,
+    basicCardId: basicCardId.present ? basicCardId.value : this.basicCardId,
   );
   NoteRow copyWithCompanion(NotesCompanion data) {
     return NoteRow(
@@ -7257,9 +7259,9 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
       cardCreatedAt: data.cardCreatedAt.present
           ? data.cardCreatedAt.value
           : this.cardCreatedAt,
-      manualCardId: data.manualCardId.present
-          ? data.manualCardId.value
-          : this.manualCardId,
+      basicCardId: data.basicCardId.present
+          ? data.basicCardId.value
+          : this.basicCardId,
     );
   }
 
@@ -7277,7 +7279,7 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
           ..write('createdAt: $createdAt, ')
           ..write('keptAt: $keptAt, ')
           ..write('cardCreatedAt: $cardCreatedAt, ')
-          ..write('manualCardId: $manualCardId')
+          ..write('basicCardId: $basicCardId')
           ..write(')'))
         .toString();
   }
@@ -7295,7 +7297,7 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
     createdAt,
     keptAt,
     cardCreatedAt,
-    manualCardId,
+    basicCardId,
   );
   @override
   bool operator ==(Object other) =>
@@ -7312,7 +7314,7 @@ class NoteRow extends DataClass implements Insertable<NoteRow> {
           other.createdAt == this.createdAt &&
           other.keptAt == this.keptAt &&
           other.cardCreatedAt == this.cardCreatedAt &&
-          other.manualCardId == this.manualCardId);
+          other.basicCardId == this.basicCardId);
 }
 
 class NotesCompanion extends UpdateCompanion<NoteRow> {
@@ -7327,7 +7329,7 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
   final Value<DateTime> createdAt;
   final Value<DateTime?> keptAt;
   final Value<DateTime?> cardCreatedAt;
-  final Value<int?> manualCardId;
+  final Value<int?> basicCardId;
   const NotesCompanion({
     this.id = const Value.absent(),
     this.sessionId = const Value.absent(),
@@ -7340,7 +7342,7 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
     this.createdAt = const Value.absent(),
     this.keptAt = const Value.absent(),
     this.cardCreatedAt = const Value.absent(),
-    this.manualCardId = const Value.absent(),
+    this.basicCardId = const Value.absent(),
   });
   NotesCompanion.insert({
     this.id = const Value.absent(),
@@ -7354,7 +7356,7 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
     required DateTime createdAt,
     this.keptAt = const Value.absent(),
     this.cardCreatedAt = const Value.absent(),
-    this.manualCardId = const Value.absent(),
+    this.basicCardId = const Value.absent(),
   }) : noteText = Value(noteText),
        createdAt = Value(createdAt);
   static Insertable<NoteRow> custom({
@@ -7369,7 +7371,7 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
     Expression<DateTime>? createdAt,
     Expression<DateTime>? keptAt,
     Expression<DateTime>? cardCreatedAt,
-    Expression<int>? manualCardId,
+    Expression<int>? basicCardId,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -7383,7 +7385,7 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
       if (createdAt != null) 'created_at': createdAt,
       if (keptAt != null) 'kept_at': keptAt,
       if (cardCreatedAt != null) 'card_created_at': cardCreatedAt,
-      if (manualCardId != null) 'manual_card_id': manualCardId,
+      if (basicCardId != null) 'basic_card_id': basicCardId,
     });
   }
 
@@ -7399,7 +7401,7 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
     Value<DateTime>? createdAt,
     Value<DateTime?>? keptAt,
     Value<DateTime?>? cardCreatedAt,
-    Value<int?>? manualCardId,
+    Value<int?>? basicCardId,
   }) {
     return NotesCompanion(
       id: id ?? this.id,
@@ -7413,7 +7415,7 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
       createdAt: createdAt ?? this.createdAt,
       keptAt: keptAt ?? this.keptAt,
       cardCreatedAt: cardCreatedAt ?? this.cardCreatedAt,
-      manualCardId: manualCardId ?? this.manualCardId,
+      basicCardId: basicCardId ?? this.basicCardId,
     );
   }
 
@@ -7453,8 +7455,8 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
     if (cardCreatedAt.present) {
       map['card_created_at'] = Variable<DateTime>(cardCreatedAt.value);
     }
-    if (manualCardId.present) {
-      map['manual_card_id'] = Variable<int>(manualCardId.value);
+    if (basicCardId.present) {
+      map['basic_card_id'] = Variable<int>(basicCardId.value);
     }
     return map;
   }
@@ -7473,7 +7475,7 @@ class NotesCompanion extends UpdateCompanion<NoteRow> {
           ..write('createdAt: $createdAt, ')
           ..write('keptAt: $keptAt, ')
           ..write('cardCreatedAt: $cardCreatedAt, ')
-          ..write('manualCardId: $manualCardId')
+          ..write('basicCardId: $basicCardId')
           ..write(')'))
         .toString();
   }
@@ -7700,7 +7702,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $AttemptsTable attempts = $AttemptsTable(this);
   late final $ConceptsTable concepts = $ConceptsTable(this);
   late final $ErrorCardsTable errorCards = $ErrorCardsTable(this);
-  late final $ManualCardsTable manualCards = $ManualCardsTable(this);
+  late final $BasicCardsTable basicCards = $BasicCardsTable(this);
   late final $SkippedQuestionsTable skippedQuestions = $SkippedQuestionsTable(
     this,
   );
@@ -7766,13 +7768,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'error_cards_last_wrong',
     'CREATE INDEX error_cards_last_wrong ON error_cards (status, last_wrong_at)',
   );
-  late final Index manualCardsExported = Index(
-    'manual_cards_exported',
-    'CREATE INDEX manual_cards_exported ON manual_cards (exported_at)',
+  late final Index basicCardsExported = Index(
+    'basic_cards_exported',
+    'CREATE INDEX basic_cards_exported ON basic_cards (exported_at)',
   );
-  late final Index manualCardsCreated = Index(
-    'manual_cards_created',
-    'CREATE INDEX manual_cards_created ON manual_cards (created_at)',
+  late final Index basicCardsCreated = Index(
+    'basic_cards_created',
+    'CREATE INDEX basic_cards_created ON basic_cards (created_at)',
   );
   late final Index skippedQuestionsHandledCreated = Index(
     'skipped_questions_handled_created',
@@ -7812,7 +7814,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     attempts,
     concepts,
     errorCards,
-    manualCards,
+    basicCards,
     skippedQuestions,
     notes,
     settings,
@@ -7831,8 +7833,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     errorCardsSession,
     errorCardsCreated,
     errorCardsLastWrong,
-    manualCardsExported,
-    manualCardsCreated,
+    basicCardsExported,
+    basicCardsCreated,
     skippedQuestionsHandledCreated,
     skippedQuestionsSession,
     notesSession,
@@ -7923,14 +7925,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         'sessions',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('manual_cards', kind: UpdateKind.delete)],
+      result: [TableUpdate('basic_cards', kind: UpdateKind.delete)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'questions',
         limitUpdateKind: UpdateKind.delete,
       ),
-      result: [TableUpdate('manual_cards', kind: UpdateKind.update)],
+      result: [TableUpdate('basic_cards', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -7962,7 +7964,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
-        'manual_cards',
+        'basic_cards',
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('notes', kind: UpdateKind.update)],
@@ -9000,19 +9002,19 @@ final class $$QuestionsTableReferences
     );
   }
 
-  static MultiTypedResultKey<$ManualCardsTable, List<ManualCardRow>>
-  _manualCardsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.manualCards,
-    aliasName: 'questions__id__manual_cards__question_id',
+  static MultiTypedResultKey<$BasicCardsTable, List<BasicCardRow>>
+  _basicCardsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.basicCards,
+    aliasName: 'questions__id__basic_cards__question_id',
   );
 
-  $$ManualCardsTableProcessedTableManager get manualCardsRefs {
-    final manager = $$ManualCardsTableTableManager(
+  $$BasicCardsTableProcessedTableManager get basicCardsRefs {
+    final manager = $$BasicCardsTableTableManager(
       $_db,
-      $_db.manualCards,
+      $_db.basicCards,
     ).filter((f) => f.questionId.id.sqlEquals($_itemColumn<int>('id')!));
 
-    final cache = $_typedResult.readTableOrNull(_manualCardsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(_basicCardsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -9230,22 +9232,22 @@ class $$QuestionsTableFilterComposer
     return f(composer);
   }
 
-  Expression<bool> manualCardsRefs(
-    Expression<bool> Function($$ManualCardsTableFilterComposer f) f,
+  Expression<bool> basicCardsRefs(
+    Expression<bool> Function($$BasicCardsTableFilterComposer f) f,
   ) {
-    final $$ManualCardsTableFilterComposer composer = $composerBuilder(
+    final $$BasicCardsTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.manualCards,
+      referencedTable: $db.basicCards,
       getReferencedColumn: (t) => t.questionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$ManualCardsTableFilterComposer(
+          }) => $$BasicCardsTableFilterComposer(
             $db: $db,
-            $table: $db.manualCards,
+            $table: $db.basicCards,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9543,22 +9545,22 @@ class $$QuestionsTableAnnotationComposer
     return f(composer);
   }
 
-  Expression<T> manualCardsRefs<T extends Object>(
-    Expression<T> Function($$ManualCardsTableAnnotationComposer a) f,
+  Expression<T> basicCardsRefs<T extends Object>(
+    Expression<T> Function($$BasicCardsTableAnnotationComposer a) f,
   ) {
-    final $$ManualCardsTableAnnotationComposer composer = $composerBuilder(
+    final $$BasicCardsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.manualCards,
+      referencedTable: $db.basicCards,
       getReferencedColumn: (t) => t.questionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$ManualCardsTableAnnotationComposer(
+          }) => $$BasicCardsTableAnnotationComposer(
             $db: $db,
-            $table: $db.manualCards,
+            $table: $db.basicCards,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9638,7 +9640,7 @@ class $$QuestionsTableTableManager
             bool attemptsRefs,
             bool conceptsRefs,
             bool errorCardsRefs,
-            bool manualCardsRefs,
+            bool basicCardsRefs,
             bool skippedQuestionsRefs,
             bool notesRefs,
           })
@@ -9714,7 +9716,7 @@ class $$QuestionsTableTableManager
                 attemptsRefs = false,
                 conceptsRefs = false,
                 errorCardsRefs = false,
-                manualCardsRefs = false,
+                basicCardsRefs = false,
                 skippedQuestionsRefs = false,
                 notesRefs = false,
               }) {
@@ -9725,7 +9727,7 @@ class $$QuestionsTableTableManager
                     if (attemptsRefs) db.attempts,
                     if (conceptsRefs) db.concepts,
                     if (errorCardsRefs) db.errorCards,
-                    if (manualCardsRefs) db.manualCards,
+                    if (basicCardsRefs) db.basicCards,
                     if (skippedQuestionsRefs) db.skippedQuestions,
                     if (notesRefs) db.notes,
                   ],
@@ -9841,22 +9843,22 @@ class $$QuestionsTableTableManager
                           referencedColumn: 'question_id',
                           typedResults: items,
                         ),
-                      if (manualCardsRefs)
+                      if (basicCardsRefs)
                         await $_getPrefetchedDataByColumns<
                           QuestionRow,
                           $QuestionsTable,
-                          ManualCardRow,
-                          $ManualCardsTable
+                          BasicCardRow,
+                          $BasicCardsTable
                         >(
                           currentTable: table,
                           referencedTable: $$QuestionsTableReferences
-                              ._manualCardsRefsTable(db),
+                              ._basicCardsRefsTable(db),
                           managerFromTypedResult: (p0) =>
                               $$QuestionsTableReferences(
                                 db,
                                 table,
                                 p0,
-                              ).manualCardsRefs,
+                              ).basicCardsRefs,
                           currentColumn: 'id',
                           referencedColumn: 'question_id',
                           typedResults: items,
@@ -9927,7 +9929,7 @@ typedef $$QuestionsTableProcessedTableManager =
         bool attemptsRefs,
         bool conceptsRefs,
         bool errorCardsRefs,
-        bool manualCardsRefs,
+        bool basicCardsRefs,
         bool skippedQuestionsRefs,
         bool notesRefs,
       })
@@ -10052,19 +10054,19 @@ final class $$SessionsTableReferences
     );
   }
 
-  static MultiTypedResultKey<$ManualCardsTable, List<ManualCardRow>>
-  _manualCardsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
-    db.manualCards,
-    aliasName: 'sessions__id__manual_cards__session_id',
+  static MultiTypedResultKey<$BasicCardsTable, List<BasicCardRow>>
+  _basicCardsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.basicCards,
+    aliasName: 'sessions__id__basic_cards__session_id',
   );
 
-  $$ManualCardsTableProcessedTableManager get manualCardsRefs {
-    final manager = $$ManualCardsTableTableManager(
+  $$BasicCardsTableProcessedTableManager get basicCardsRefs {
+    final manager = $$BasicCardsTableTableManager(
       $_db,
-      $_db.manualCards,
+      $_db.basicCards,
     ).filter((f) => f.sessionId.id.sqlEquals($_itemColumn<int>('id')!));
 
-    final cache = $_typedResult.readTableOrNull(_manualCardsRefsTable($_db));
+    final cache = $_typedResult.readTableOrNull(_basicCardsRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -10287,22 +10289,22 @@ class $$SessionsTableFilterComposer
     return f(composer);
   }
 
-  Expression<bool> manualCardsRefs(
-    Expression<bool> Function($$ManualCardsTableFilterComposer f) f,
+  Expression<bool> basicCardsRefs(
+    Expression<bool> Function($$BasicCardsTableFilterComposer f) f,
   ) {
-    final $$ManualCardsTableFilterComposer composer = $composerBuilder(
+    final $$BasicCardsTableFilterComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.manualCards,
+      referencedTable: $db.basicCards,
       getReferencedColumn: (t) => t.sessionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$ManualCardsTableFilterComposer(
+          }) => $$BasicCardsTableFilterComposer(
             $db: $db,
-            $table: $db.manualCards,
+            $table: $db.basicCards,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10604,22 +10606,22 @@ class $$SessionsTableAnnotationComposer
     return f(composer);
   }
 
-  Expression<T> manualCardsRefs<T extends Object>(
-    Expression<T> Function($$ManualCardsTableAnnotationComposer a) f,
+  Expression<T> basicCardsRefs<T extends Object>(
+    Expression<T> Function($$BasicCardsTableAnnotationComposer a) f,
   ) {
-    final $$ManualCardsTableAnnotationComposer composer = $composerBuilder(
+    final $$BasicCardsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
       getCurrentColumn: (t) => t.id,
-      referencedTable: $db.manualCards,
+      referencedTable: $db.basicCards,
       getReferencedColumn: (t) => t.sessionId,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$ManualCardsTableAnnotationComposer(
+          }) => $$BasicCardsTableAnnotationComposer(
             $db: $db,
-            $table: $db.manualCards,
+            $table: $db.basicCards,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10699,7 +10701,7 @@ class $$SessionsTableTableManager
             bool attemptsRefs,
             bool conceptsRefs,
             bool errorCardsRefs,
-            bool manualCardsRefs,
+            bool basicCardsRefs,
             bool skippedQuestionsRefs,
             bool notesRefs,
           })
@@ -10778,7 +10780,7 @@ class $$SessionsTableTableManager
                 attemptsRefs = false,
                 conceptsRefs = false,
                 errorCardsRefs = false,
-                manualCardsRefs = false,
+                basicCardsRefs = false,
                 skippedQuestionsRefs = false,
                 notesRefs = false,
               }) {
@@ -10789,7 +10791,7 @@ class $$SessionsTableTableManager
                     if (attemptsRefs) db.attempts,
                     if (conceptsRefs) db.concepts,
                     if (errorCardsRefs) db.errorCards,
-                    if (manualCardsRefs) db.manualCards,
+                    if (basicCardsRefs) db.basicCards,
                     if (skippedQuestionsRefs) db.skippedQuestions,
                     if (notesRefs) db.notes,
                   ],
@@ -10905,22 +10907,22 @@ class $$SessionsTableTableManager
                           referencedColumn: 'session_id',
                           typedResults: items,
                         ),
-                      if (manualCardsRefs)
+                      if (basicCardsRefs)
                         await $_getPrefetchedDataByColumns<
                           SessionRow,
                           $SessionsTable,
-                          ManualCardRow,
-                          $ManualCardsTable
+                          BasicCardRow,
+                          $BasicCardsTable
                         >(
                           currentTable: table,
                           referencedTable: $$SessionsTableReferences
-                              ._manualCardsRefsTable(db),
+                              ._basicCardsRefsTable(db),
                           managerFromTypedResult: (p0) =>
                               $$SessionsTableReferences(
                                 db,
                                 table,
                                 p0,
-                              ).manualCardsRefs,
+                              ).basicCardsRefs,
                           currentColumn: 'id',
                           referencedColumn: 'session_id',
                           typedResults: items,
@@ -10991,7 +10993,7 @@ typedef $$SessionsTableProcessedTableManager =
         bool attemptsRefs,
         bool conceptsRefs,
         bool errorCardsRefs,
-        bool manualCardsRefs,
+        bool basicCardsRefs,
         bool skippedQuestionsRefs,
         bool notesRefs,
       })
@@ -13191,41 +13193,39 @@ typedef $$ErrorCardsTableProcessedTableManager =
       ErrorCardRow,
       PrefetchHooks Function({bool questionId, bool sessionId})
     >;
-typedef $$ManualCardsTableCreateCompanionBuilder =
-    ManualCardsCompanion Function({
-      Value<int> id,
-      Value<int?> sessionId,
-      Value<int?> questionId,
-      required String question,
-      required String answer,
-      Value<String> context,
-      Value<String> topicName,
-      Value<String> cognitiveType,
-      Value<String> subtopic,
-      required DateTime createdAt,
-      Value<DateTime?> exportedAt,
-    });
-typedef $$ManualCardsTableUpdateCompanionBuilder =
-    ManualCardsCompanion Function({
-      Value<int> id,
-      Value<int?> sessionId,
-      Value<int?> questionId,
-      Value<String> question,
-      Value<String> answer,
-      Value<String> context,
-      Value<String> topicName,
-      Value<String> cognitiveType,
-      Value<String> subtopic,
-      Value<DateTime> createdAt,
-      Value<DateTime?> exportedAt,
-    });
+typedef $$BasicCardsTableCreateCompanionBuilder = BasicCardsCompanion Function({
+  Value<int> id,
+  Value<int?> sessionId,
+  Value<int?> questionId,
+  required String question,
+  required String answer,
+  Value<String> context,
+  Value<String> topicName,
+  Value<String> cognitiveType,
+  Value<String> subtopic,
+  required DateTime createdAt,
+  Value<DateTime?> exportedAt,
+});
+typedef $$BasicCardsTableUpdateCompanionBuilder = BasicCardsCompanion Function({
+  Value<int> id,
+  Value<int?> sessionId,
+  Value<int?> questionId,
+  Value<String> question,
+  Value<String> answer,
+  Value<String> context,
+  Value<String> topicName,
+  Value<String> cognitiveType,
+  Value<String> subtopic,
+  Value<DateTime> createdAt,
+  Value<DateTime?> exportedAt,
+});
 
-final class $$ManualCardsTableReferences
-    extends BaseReferences<_$AppDatabase, $ManualCardsTable, ManualCardRow> {
-  $$ManualCardsTableReferences(super.$_db, super.$_table, super.$_typedResult);
+final class $$BasicCardsTableReferences
+    extends BaseReferences<_$AppDatabase, $BasicCardsTable, BasicCardRow> {
+  $$BasicCardsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
   static $SessionsTable _sessionIdTable(_$AppDatabase db) =>
-      db.sessions.createAlias('manual_cards__session_id__sessions__id');
+      db.sessions.createAlias('basic_cards__session_id__sessions__id');
 
   $$SessionsTableProcessedTableManager? get sessionId {
     final $_column = $_itemColumn<int>('session_id');
@@ -13242,7 +13242,7 @@ final class $$ManualCardsTableReferences
   }
 
   static $QuestionsTable _questionIdTable(_$AppDatabase db) =>
-      db.questions.createAlias('manual_cards__question_id__questions__id');
+      db.questions.createAlias('basic_cards__question_id__questions__id');
 
   $$QuestionsTableProcessedTableManager? get questionId {
     final $_column = $_itemColumn<int>('question_id');
@@ -13262,14 +13262,14 @@ final class $$ManualCardsTableReferences
     _$AppDatabase db,
   ) => MultiTypedResultKey.fromTable(
     db.notes,
-    aliasName: 'manual_cards__id__notes__manual_card_id',
+    aliasName: 'basic_cards__id__notes__basic_card_id',
   );
 
   $$NotesTableProcessedTableManager get notesRefs {
     final manager = $$NotesTableTableManager(
       $_db,
       $_db.notes,
-    ).filter((f) => f.manualCardId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.basicCardId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_notesRefsTable($_db));
     return ProcessedTableManager(
@@ -13278,9 +13278,9 @@ final class $$ManualCardsTableReferences
   }
 }
 
-class $$ManualCardsTableFilterComposer
-    extends Composer<_$AppDatabase, $ManualCardsTable> {
-  $$ManualCardsTableFilterComposer({
+class $$BasicCardsTableFilterComposer
+    extends Composer<_$AppDatabase, $BasicCardsTable> {
+  $$BasicCardsTableFilterComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -13385,7 +13385,7 @@ class $$ManualCardsTableFilterComposer
       composer: this,
       getCurrentColumn: (t) => t.id,
       referencedTable: $db.notes,
-      getReferencedColumn: (t) => t.manualCardId,
+      getReferencedColumn: (t) => t.basicCardId,
       builder:
           (
             joinBuilder, {
@@ -13404,9 +13404,9 @@ class $$ManualCardsTableFilterComposer
   }
 }
 
-class $$ManualCardsTableOrderingComposer
-    extends Composer<_$AppDatabase, $ManualCardsTable> {
-  $$ManualCardsTableOrderingComposer({
+class $$BasicCardsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BasicCardsTable> {
+  $$BasicCardsTableOrderingComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -13505,9 +13505,9 @@ class $$ManualCardsTableOrderingComposer
   }
 }
 
-class $$ManualCardsTableAnnotationComposer
-    extends Composer<_$AppDatabase, $ManualCardsTable> {
-  $$ManualCardsTableAnnotationComposer({
+class $$BasicCardsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BasicCardsTable> {
+  $$BasicCardsTableAnnotationComposer({
     required super.$db,
     required super.$table,
     super.joinBuilder,
@@ -13598,7 +13598,7 @@ class $$ManualCardsTableAnnotationComposer
       composer: this,
       getCurrentColumn: (t) => t.id,
       referencedTable: $db.notes,
-      getReferencedColumn: (t) => t.manualCardId,
+      getReferencedColumn: (t) => t.basicCardId,
       builder:
           (
             joinBuilder, {
@@ -13617,36 +13617,36 @@ class $$ManualCardsTableAnnotationComposer
   }
 }
 
-class $$ManualCardsTableTableManager
+class $$BasicCardsTableTableManager
     extends
         RootTableManager<
           _$AppDatabase,
-          $ManualCardsTable,
-          ManualCardRow,
-          $$ManualCardsTableFilterComposer,
-          $$ManualCardsTableOrderingComposer,
-          $$ManualCardsTableAnnotationComposer,
-          $$ManualCardsTableCreateCompanionBuilder,
-          $$ManualCardsTableUpdateCompanionBuilder,
-          (ManualCardRow, $$ManualCardsTableReferences),
-          ManualCardRow,
+          $BasicCardsTable,
+          BasicCardRow,
+          $$BasicCardsTableFilterComposer,
+          $$BasicCardsTableOrderingComposer,
+          $$BasicCardsTableAnnotationComposer,
+          $$BasicCardsTableCreateCompanionBuilder,
+          $$BasicCardsTableUpdateCompanionBuilder,
+          (BasicCardRow, $$BasicCardsTableReferences),
+          BasicCardRow,
           PrefetchHooks Function({
             bool sessionId,
             bool questionId,
             bool notesRefs,
           })
         > {
-  $$ManualCardsTableTableManager(_$AppDatabase db, $ManualCardsTable table)
+  $$BasicCardsTableTableManager(_$AppDatabase db, $BasicCardsTable table)
     : super(
         TableManagerState(
           db: db,
           table: table,
           createFilteringComposer: () =>
-              $$ManualCardsTableFilterComposer($db: db, $table: table),
+              $$BasicCardsTableFilterComposer($db: db, $table: table),
           createOrderingComposer: () =>
-              $$ManualCardsTableOrderingComposer($db: db, $table: table),
+              $$BasicCardsTableOrderingComposer($db: db, $table: table),
           createComputedFieldComposer: () =>
-              $$ManualCardsTableAnnotationComposer($db: db, $table: table),
+              $$BasicCardsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
@@ -13660,7 +13660,7 @@ class $$ManualCardsTableTableManager
                 Value<String> subtopic = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> exportedAt = const Value.absent(),
-              }) => ManualCardsCompanion(
+              }) => BasicCardsCompanion(
                 id: id,
                 sessionId: sessionId,
                 questionId: questionId,
@@ -13686,7 +13686,7 @@ class $$ManualCardsTableTableManager
                 Value<String> subtopic = const Value.absent(),
                 required DateTime createdAt,
                 Value<DateTime?> exportedAt = const Value.absent(),
-              }) => ManualCardsCompanion.insert(
+              }) => BasicCardsCompanion.insert(
                 id: id,
                 sessionId: sessionId,
                 questionId: questionId,
@@ -13702,8 +13702,8 @@ class $$ManualCardsTableTableManager
           withReferenceMapper: (p0) => p0
               .map(
                 (e) => (
-                  e.readTable<$ManualCardsTable, ManualCardRow>(table),
-                  $$ManualCardsTableReferences(db, table, e),
+                  e.readTable<$BasicCardsTable, BasicCardRow>(table),
+                  $$BasicCardsTableReferences(db, table, e),
                 ),
               )
               .toList(),
@@ -13732,9 +13732,9 @@ class $$ManualCardsTableTableManager
                           state = state.withJoin(
                             currentTable: table,
                             currentColumn: table.sessionId,
-                            referencedTable: $$ManualCardsTableReferences
+                            referencedTable: $$BasicCardsTableReferences
                                 ._sessionIdTable(db),
-                            referencedColumn: $$ManualCardsTableReferences
+                            referencedColumn: $$BasicCardsTableReferences
                                 ._sessionIdTable(db)
                                 .id,
                           ) as T;
@@ -13743,9 +13743,9 @@ class $$ManualCardsTableTableManager
                           state = state.withJoin(
                             currentTable: table,
                             currentColumn: table.questionId,
-                            referencedTable: $$ManualCardsTableReferences
+                            referencedTable: $$BasicCardsTableReferences
                                 ._questionIdTable(db),
-                            referencedColumn: $$ManualCardsTableReferences
+                            referencedColumn: $$BasicCardsTableReferences
                                 ._questionIdTable(db)
                                 .id,
                           ) as T;
@@ -13757,22 +13757,22 @@ class $$ManualCardsTableTableManager
                     return [
                       if (notesRefs)
                         await $_getPrefetchedDataByColumns<
-                          ManualCardRow,
-                          $ManualCardsTable,
+                          BasicCardRow,
+                          $BasicCardsTable,
                           NoteRow,
                           $NotesTable
                         >(
                           currentTable: table,
-                          referencedTable: $$ManualCardsTableReferences
+                          referencedTable: $$BasicCardsTableReferences
                               ._notesRefsTable(db),
                           managerFromTypedResult: (p0) =>
-                              $$ManualCardsTableReferences(
+                              $$BasicCardsTableReferences(
                                 db,
                                 table,
                                 p0,
                               ).notesRefs,
                           currentColumn: 'id',
-                          referencedColumn: 'manual_card_id',
+                          referencedColumn: 'basic_card_id',
                           typedResults: items,
                         ),
                     ];
@@ -13783,18 +13783,18 @@ class $$ManualCardsTableTableManager
       );
 }
 
-typedef $$ManualCardsTableProcessedTableManager =
+typedef $$BasicCardsTableProcessedTableManager =
     ProcessedTableManager<
       _$AppDatabase,
-      $ManualCardsTable,
-      ManualCardRow,
-      $$ManualCardsTableFilterComposer,
-      $$ManualCardsTableOrderingComposer,
-      $$ManualCardsTableAnnotationComposer,
-      $$ManualCardsTableCreateCompanionBuilder,
-      $$ManualCardsTableUpdateCompanionBuilder,
-      (ManualCardRow, $$ManualCardsTableReferences),
-      ManualCardRow,
+      $BasicCardsTable,
+      BasicCardRow,
+      $$BasicCardsTableFilterComposer,
+      $$BasicCardsTableOrderingComposer,
+      $$BasicCardsTableAnnotationComposer,
+      $$BasicCardsTableCreateCompanionBuilder,
+      $$BasicCardsTableUpdateCompanionBuilder,
+      (BasicCardRow, $$BasicCardsTableReferences),
+      BasicCardRow,
       PrefetchHooks Function({bool sessionId, bool questionId, bool notesRefs})
     >;
 typedef $$SkippedQuestionsTableCreateCompanionBuilder =
@@ -14419,7 +14419,7 @@ typedef $$NotesTableCreateCompanionBuilder = NotesCompanion Function({
   required DateTime createdAt,
   Value<DateTime?> keptAt,
   Value<DateTime?> cardCreatedAt,
-  Value<int?> manualCardId,
+  Value<int?> basicCardId,
 });
 typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
   Value<int> id,
@@ -14433,7 +14433,7 @@ typedef $$NotesTableUpdateCompanionBuilder = NotesCompanion Function({
   Value<DateTime> createdAt,
   Value<DateTime?> keptAt,
   Value<DateTime?> cardCreatedAt,
-  Value<int?> manualCardId,
+  Value<int?> basicCardId,
 });
 
 final class $$NotesTableReferences
@@ -14474,17 +14474,17 @@ final class $$NotesTableReferences
     );
   }
 
-  static $ManualCardsTable _manualCardIdTable(_$AppDatabase db) =>
-      db.manualCards.createAlias('notes__manual_card_id__manual_cards__id');
+  static $BasicCardsTable _basicCardIdTable(_$AppDatabase db) =>
+      db.basicCards.createAlias('notes__basic_card_id__basic_cards__id');
 
-  $$ManualCardsTableProcessedTableManager? get manualCardId {
-    final $_column = $_itemColumn<int>('manual_card_id');
+  $$BasicCardsTableProcessedTableManager? get basicCardId {
+    final $_column = $_itemColumn<int>('basic_card_id');
     if ($_column == null) return null;
-    final manager = $$ManualCardsTableTableManager(
+    final manager = $$BasicCardsTableTableManager(
       $_db,
-      $_db.manualCards,
+      $_db.basicCards,
     ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_manualCardIdTable($_db));
+    final item = $_typedResult.readTableOrNull(_basicCardIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -14591,20 +14591,20 @@ class $$NotesTableFilterComposer extends Composer<_$AppDatabase, $NotesTable> {
     return composer;
   }
 
-  $$ManualCardsTableFilterComposer get manualCardId {
-    final $$ManualCardsTableFilterComposer composer = $composerBuilder(
+  $$BasicCardsTableFilterComposer get basicCardId {
+    final $$BasicCardsTableFilterComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.manualCardId,
-      referencedTable: $db.manualCards,
+      getCurrentColumn: (t) => t.basicCardId,
+      referencedTable: $db.basicCards,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$ManualCardsTableFilterComposer(
+          }) => $$BasicCardsTableFilterComposer(
             $db: $db,
-            $table: $db.manualCards,
+            $table: $db.basicCards,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -14715,20 +14715,20 @@ class $$NotesTableOrderingComposer
     return composer;
   }
 
-  $$ManualCardsTableOrderingComposer get manualCardId {
-    final $$ManualCardsTableOrderingComposer composer = $composerBuilder(
+  $$BasicCardsTableOrderingComposer get basicCardId {
+    final $$BasicCardsTableOrderingComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.manualCardId,
-      referencedTable: $db.manualCards,
+      getCurrentColumn: (t) => t.basicCardId,
+      referencedTable: $db.basicCards,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$ManualCardsTableOrderingComposer(
+          }) => $$BasicCardsTableOrderingComposer(
             $db: $db,
-            $table: $db.manualCards,
+            $table: $db.basicCards,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -14825,20 +14825,20 @@ class $$NotesTableAnnotationComposer
     return composer;
   }
 
-  $$ManualCardsTableAnnotationComposer get manualCardId {
-    final $$ManualCardsTableAnnotationComposer composer = $composerBuilder(
+  $$BasicCardsTableAnnotationComposer get basicCardId {
+    final $$BasicCardsTableAnnotationComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.manualCardId,
-      referencedTable: $db.manualCards,
+      getCurrentColumn: (t) => t.basicCardId,
+      referencedTable: $db.basicCards,
       getReferencedColumn: (t) => t.id,
       builder:
           (
             joinBuilder, {
             $addJoinBuilderToRootComposer,
             $removeJoinBuilderFromRootComposer,
-          }) => $$ManualCardsTableAnnotationComposer(
+          }) => $$BasicCardsTableAnnotationComposer(
             $db: $db,
-            $table: $db.manualCards,
+            $table: $db.basicCards,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -14865,7 +14865,7 @@ class $$NotesTableTableManager
           PrefetchHooks Function({
             bool sessionId,
             bool questionId,
-            bool manualCardId,
+            bool basicCardId,
           })
         > {
   $$NotesTableTableManager(_$AppDatabase db, $NotesTable table)
@@ -14892,7 +14892,7 @@ class $$NotesTableTableManager
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> keptAt = const Value.absent(),
                 Value<DateTime?> cardCreatedAt = const Value.absent(),
-                Value<int?> manualCardId = const Value.absent(),
+                Value<int?> basicCardId = const Value.absent(),
               }) => NotesCompanion(
                 id: id,
                 sessionId: sessionId,
@@ -14905,7 +14905,7 @@ class $$NotesTableTableManager
                 createdAt: createdAt,
                 keptAt: keptAt,
                 cardCreatedAt: cardCreatedAt,
-                manualCardId: manualCardId,
+                basicCardId: basicCardId,
               ),
           createCompanionCallback:
               ({
@@ -14920,7 +14920,7 @@ class $$NotesTableTableManager
                 required DateTime createdAt,
                 Value<DateTime?> keptAt = const Value.absent(),
                 Value<DateTime?> cardCreatedAt = const Value.absent(),
-                Value<int?> manualCardId = const Value.absent(),
+                Value<int?> basicCardId = const Value.absent(),
               }) => NotesCompanion.insert(
                 id: id,
                 sessionId: sessionId,
@@ -14933,7 +14933,7 @@ class $$NotesTableTableManager
                 createdAt: createdAt,
                 keptAt: keptAt,
                 cardCreatedAt: cardCreatedAt,
-                manualCardId: manualCardId,
+                basicCardId: basicCardId,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -14944,7 +14944,7 @@ class $$NotesTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({sessionId = false, questionId = false, manualCardId = false}) {
+              ({sessionId = false, questionId = false, basicCardId = false}) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [],
@@ -14986,14 +14986,14 @@ class $$NotesTableTableManager
                                 .id,
                           ) as T;
                         }
-                        if (manualCardId) {
+                        if (basicCardId) {
                           state = state.withJoin(
                             currentTable: table,
-                            currentColumn: table.manualCardId,
+                            currentColumn: table.basicCardId,
                             referencedTable: $$NotesTableReferences
-                                ._manualCardIdTable(db),
+                                ._basicCardIdTable(db),
                             referencedColumn: $$NotesTableReferences
-                                ._manualCardIdTable(db)
+                                ._basicCardIdTable(db)
                                 .id,
                           ) as T;
                         }
@@ -15024,7 +15024,7 @@ typedef $$NotesTableProcessedTableManager =
       PrefetchHooks Function({
         bool sessionId,
         bool questionId,
-        bool manualCardId,
+        bool basicCardId,
       })
     >;
 typedef $$SettingsTableCreateCompanionBuilder = SettingsCompanion Function({
@@ -15184,8 +15184,8 @@ class $AppDatabaseManager {
       $$ConceptsTableTableManager(_db, _db.concepts);
   $$ErrorCardsTableTableManager get errorCards =>
       $$ErrorCardsTableTableManager(_db, _db.errorCards);
-  $$ManualCardsTableTableManager get manualCards =>
-      $$ManualCardsTableTableManager(_db, _db.manualCards);
+  $$BasicCardsTableTableManager get basicCards =>
+      $$BasicCardsTableTableManager(_db, _db.basicCards);
   $$SkippedQuestionsTableTableManager get skippedQuestions =>
       $$SkippedQuestionsTableTableManager(_db, _db.skippedQuestions);
   $$NotesTableTableManager get notes =>

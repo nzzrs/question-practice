@@ -122,7 +122,7 @@ void main() {
       answer: 'A range of IP addresses.',
       topicName: 'Networking',
     );
-    final cards = await harness.cards.watchManualCards().first;
+    final cards = await harness.cards.watchBasicCards().first;
     expect(cards.single.question, 'What is a subnet?');
   });
 
@@ -166,7 +166,7 @@ void main() {
     );
 
     expect(added, 2);
-    final cards = await harness.cards.watchManualCards().first;
+    final cards = await harness.cards.watchBasicCards().first;
     expect(cards, hasLength(2));
     expect(
       cards.map((item) => item.cognitiveType),

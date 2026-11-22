@@ -192,10 +192,10 @@ class ErrorCards extends Table {
   DateTimeColumn get exportedAt => dateTime().nullable()();
 }
 
-@DataClassName('ManualCardRow')
-@TableIndex(name: 'manual_cards_exported', columns: {#exportedAt})
-@TableIndex(name: 'manual_cards_created', columns: {#createdAt})
-class ManualCards extends Table {
+@DataClassName('BasicCardRow')
+@TableIndex(name: 'basic_cards_exported', columns: {#exportedAt})
+@TableIndex(name: 'basic_cards_created', columns: {#createdAt})
+class BasicCards extends Table {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get sessionId => integer().nullable().references(
     Sessions,
@@ -282,8 +282,11 @@ class Notes extends Table {
   DateTimeColumn get createdAt => dateTime()();
   DateTimeColumn get keptAt => dateTime().nullable()();
   DateTimeColumn get cardCreatedAt => dateTime().nullable()();
-  IntColumn get manualCardId => integer().nullable().references(
-    ManualCards,
+
+  /// Kept as `manualCardId` in backup JSON for older files and older readers.
+  @JsonKey('manualCardId')
+  IntColumn get basicCardId => integer().nullable().references(
+    BasicCards,
     #id,
     onDelete: KeyAction.setNull,
   )();

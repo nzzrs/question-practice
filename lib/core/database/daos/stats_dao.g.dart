@@ -13,7 +13,7 @@ mixin _$StatsDaoMixin on DatabaseAccessor<AppDatabase> {
   $AttemptsTable get attempts => attachedDatabase.attempts;
   $ErrorCardsTable get errorCards => attachedDatabase.errorCards;
   $ConceptsTable get concepts => attachedDatabase.concepts;
-  $ManualCardsTable get manualCards => attachedDatabase.manualCards;
+  $BasicCardsTable get basicCards => attachedDatabase.basicCards;
   StatsDaoManager get managers => StatsDaoManager(this);
 }
 
@@ -39,6 +39,6 @@ class StatsDaoManager {
       $$ErrorCardsTableTableManager(_db.attachedDatabase, _db.errorCards);
   $$ConceptsTableTableManager get concepts =>
       $$ConceptsTableTableManager(_db.attachedDatabase, _db.concepts);
-  $$ManualCardsTableTableManager get manualCards =>
-      $$ManualCardsTableTableManager(_db.attachedDatabase, _db.manualCards);
+  $$BasicCardsTableTableManager get basicCards =>
+      $$BasicCardsTableTableManager(_db.attachedDatabase, _db.basicCards);
 }

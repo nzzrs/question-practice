@@ -96,7 +96,7 @@ void main() {
   }
 
   Future<int> seedBasic(TestHarness harness, Question question) {
-    return harness.cards.createManualCard(
+    return harness.cards.createBasicCard(
       sessionId: null,
       questionId: question.id,
       question: 'What is a VPC?',
@@ -537,7 +537,7 @@ void main() {
     final basicId = await seedBasic(harness, question);
     await harness.cards.markExported(
       conceptIds: const [],
-      manualCardIds: [basicId],
+      basicCardIds: [basicId],
       exportedAt: harness.clock.now().toUtc(),
     );
 

@@ -203,11 +203,11 @@ class ReviewService {
     return _cards.keepNote(noteId, _clock.now().toUtc());
   }
 
-  Future<void> markNoteConverted(int noteId, {int? manualCardId}) {
+  Future<void> markNoteConverted(int noteId, {int? basicCardId}) {
     return _cards.markNoteConverted(
       noteId,
       cardCreatedAt: _clock.now().toUtc(),
-      manualCardId: manualCardId,
+      basicCardId: basicCardId,
     );
   }
 
@@ -256,7 +256,7 @@ class ReviewService {
     String subtopic = '',
     CognitiveType cognitiveType = CognitiveType.fact,
   }) async {
-    final id = await _cards.createManualCard(
+    final id = await _cards.createBasicCard(
       sessionId: sessionId,
       questionId: questionId,
       question: question.trim(),

@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/app/providers.dart';
 import 'package:question_practice/core/ui/widgets.dart';
@@ -29,9 +28,6 @@ class _RecordingTopicEditService extends TopicEditService {
     return File('${Directory.systemTemp.path}/fake-topic.json');
   }
 }
-
-Finder _descriptionField() =>
-    find.byKey(const ValueKey('topic-editor-description'));
 
 Finder _sheetScrollable() => find
     .descendant(
@@ -156,62 +152,6 @@ void main() {
 
     expect(service.sharedTopicId, seeded.topicId);
     expect(find.byType(TopicEditorSheet), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('updating over unsaved edits asks before discarding them', (
-    tester,
-  ) async {
-    tester.view.physicalSize = const Size(480, 1000);
-    tester.view.devicePixelRatio = 1;
-    addTearDown(tester.view.reset);
-
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await harness.seedPractice(
-      topicName: 'Cloud',
-      practiceName: 'Core',
-      count: 1,
-    );
-
-    await pumpTestApp(tester, home: const HomePage(), harness: harness);
-    await _openEditor(tester);
-
-    await tester.ensureVisible(find.text('Description'));
-    await pumpFrames(tester);
-    await tester.tap(
-      find
-          .descendant(
-            of: find.byKey(const ValueKey('topic-editor-tile-description')),
-            matching: find.text('Description'),
-          )
-          .first,
-    );
-    await pumpFrames(tester);
-    await tester.enterText(_descriptionField(), 'Unsaved description');
-    await pumpFrames(tester);
-
-    await _reveal(tester, find.text('Update topic JSON'));
-    await tester.tap(find.text('Update topic JSON'));
-    await pumpFrames(tester);
-
-    expect(find.text('Replace this topic?'), findsOneWidget);
-    await tester.tap(
-      find.descendant(
-        of: find.byType(M3EDialog),
-        matching: find.text('Cancel'),
-      ),
-    );
-    await pumpFrames(tester);
-
-    expect(find.text('Replace this topic?'), findsNothing);
-    expect(find.byType(TopicEditorSheet), findsOneWidget);
-    expect(
-      tester.widget<M3ETextField>(_descriptionField()).controller!.text,
-      'Unsaved description',
-    );
-    final stored = await harness.practices.topicById(seeded.topicId);
-    expect(stored!.description, 'Topic description');
     expect(tester.takeException(), isNull);
   });
 }

@@ -21,7 +21,7 @@ BackupInfo _info({
     attempts: attempts,
     concepts: cards,
     errorCards: 0,
-    manualCards: 0,
+    basicCards: 0,
     skippedQuestions: skippedQuestions,
     notes: notes,
     archivedTopics: archivedTopics,

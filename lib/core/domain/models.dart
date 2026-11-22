@@ -666,8 +666,8 @@ class ErrorCard {
 }
 
 @immutable
-class ManualCard {
-  const ManualCard({
+class BasicCard {
+  const BasicCard({
     required this.id,
     required this.sessionId,
     required this.question,
@@ -761,7 +761,7 @@ class Note {
     required this.createdAt,
     required this.keptAt,
     required this.cardCreatedAt,
-    required this.manualCardId,
+    required this.basicCardId,
     this.subtopic = '',
   });
 
@@ -775,7 +775,7 @@ class Note {
   final DateTime createdAt;
   final DateTime? keptAt;
   final DateTime? cardCreatedAt;
-  final int? manualCardId;
+  final int? basicCardId;
 
   /// Optional grouping inside the topic, copied from the source question.
   final String subtopic;

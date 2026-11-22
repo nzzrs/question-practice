@@ -132,7 +132,7 @@ void main() {
       createdAt: createdAt,
       keptAt: null,
       cardCreatedAt: null,
-      manualCardId: null,
+      basicCardId: null,
     );
     return NoteFixture(note: note, question: question);
   }
@@ -276,7 +276,7 @@ void main() {
     expect(created, 2);
     expect(requests, 0);
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(2));
     expect(cards!.map((card) => card.question), [
@@ -334,7 +334,7 @@ void main() {
     await saveAll(tester);
 
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(1));
     expect(cards!.single.cognitiveType, CognitiveType.procedure);
@@ -585,7 +585,7 @@ void main() {
     await saveAll(tester);
     expect(created, 1);
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(1));
     expect(cards!.single.cognitiveType, CognitiveType.fact);
@@ -947,7 +947,7 @@ void main() {
     addTearDown(harness.close);
     await enableAi(harness);
     final fixture = await seedNote(harness);
-    await harness.cards.createManualCard(
+    await harness.cards.createBasicCard(
       sessionId: null,
       question: 'Which layer owns IP addresses?',
       answer: 'The network layer.',
@@ -1326,10 +1326,10 @@ void main() {
     expect(concepts!.single.term, 'VPC');
     expect(concepts.single.definition, 'A private network.');
     expect(concepts.single.source, ConceptSource.ai);
-    final manuals = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+    final basics = await tester.runAsync(
+      () => harness.cards.watchBasicCards().first,
     );
-    expect(manuals, isEmpty);
+    expect(basics, isEmpty);
   });
 
   testWidgets('draft save marks the note converted with the first basic id', (
@@ -1357,12 +1357,12 @@ void main() {
     await saveAll(tester);
 
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
     expect(cards, hasLength(1));
     expect(notes!.single.hasCard, isTrue);
-    expect(notes.single.manualCardId, cards!.single.id);
+    expect(notes.single.basicCardId, cards!.single.id);
   });
 
   testWidgets('draft save completes error details', (tester) async {
@@ -1511,7 +1511,7 @@ void main() {
     expect(created, 1);
     expect(saved, 1);
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(1));
   });
@@ -1645,7 +1645,7 @@ void main() {
       expect(find.text('Cards to save · 1'), findsOneWidget);
       expect(find.byKey(const ValueKey('creator-draft-0')), findsOneWidget);
       final cards = await tester.runAsync(
-        () => harness.cards.watchManualCards().first,
+        () => harness.cards.watchBasicCards().first,
       );
       expect(cards, hasLength(1));
       expect(cards!.single.question, 'First saved?');

@@ -65,9 +65,9 @@ void main() {
         await harness.cards.watchUnhandledSkippedQuestions().first,
         isEmpty,
       );
-      final manuals = await harness.cards.watchManualCards().first;
-      expect(manuals.single.context, step.question.prompt);
-      expect(manuals.single.questionId, step.question.id);
+      final basics = await harness.cards.watchBasicCards().first;
+      expect(basics.single.context, step.question.prompt);
+      expect(basics.single.questionId, step.question.id);
       final afterReview = await review.load(start.session.id);
       expect(afterReview!.steps.whereType<SkippedReviewStep>(), isEmpty);
     },

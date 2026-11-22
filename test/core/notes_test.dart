@@ -33,7 +33,7 @@ void main() {
         isTrue,
       );
 
-      final cardId = await harness.cards.createManualCard(
+      final cardId = await harness.cards.createBasicCard(
         sessionId: null,
         questionId: question.id,
         question: 'What is a bucket?',
@@ -44,12 +44,12 @@ void main() {
       await harness.cards.markNoteConverted(
         noteId,
         cardCreatedAt: harness.clock.now().toUtc(),
-        manualCardId: cardId,
+        basicCardId: cardId,
       );
       final converted = (await harness.cards.notesForQuestion(question.id))
           .single;
       expect(converted.hasCard, isTrue);
-      expect(converted.manualCardId, cardId);
+      expect(converted.basicCardId, cardId);
 
       await harness.cards.deleteNote(noteId);
       expect(await harness.cards.notesForQuestion(question.id), isEmpty);
@@ -57,7 +57,7 @@ void main() {
     },
   );
 
-  test('a conversion retry keeps the manual card link', () async {
+  test('a conversion retry keeps the basic card link', () async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
@@ -73,7 +73,7 @@ void main() {
       practiceName: 'Practice',
       createdAt: harness.clock.now().toUtc(),
     );
-    final cardId = await harness.cards.createManualCard(
+    final cardId = await harness.cards.createBasicCard(
       sessionId: null,
       questionId: question.id,
       question: 'What is a bucket?',
@@ -85,7 +85,7 @@ void main() {
     await harness.cards.markNoteConverted(
       noteId,
       cardCreatedAt: harness.clock.now().toUtc(),
-      manualCardId: cardId,
+      basicCardId: cardId,
     );
     harness.clock.advance(const Duration(seconds: 1));
     await harness.cards.markNoteConverted(
@@ -96,6 +96,6 @@ void main() {
     final converted = (await harness.cards.notesForQuestion(question.id))
         .single;
     expect(converted.hasCard, isTrue);
-    expect(converted.manualCardId, cardId);
+    expect(converted.basicCardId, cardId);
   });
 }

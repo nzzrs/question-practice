@@ -6,19 +6,16 @@ import '../../../core/platform/anki_gateway.dart';
 /// Cards chosen for one export. Error cards are no longer exported directly:
 /// the review screen turns them into atomic basic cards first.
 class ExportSelection {
-  const ExportSelection({
-    this.concepts = const [],
-    this.manualCards = const [],
-  });
+  const ExportSelection({this.concepts = const [], this.basicCards = const []});
 
   final List<Concept> concepts;
-  final List<ManualCard> manualCards;
+  final List<BasicCard> basicCards;
 
-  int get total => concepts.length + manualCards.length;
+  int get total => concepts.length + basicCards.length;
   bool get isEmpty => total == 0;
 
   Iterable<int> get conceptIds => concepts.map((concept) => concept.id);
-  Iterable<int> get manualCardIds => manualCards.map((card) => card.id);
+  Iterable<int> get basicCardIds => basicCards.map((card) => card.id);
 }
 
 class ExportFiles {
@@ -80,7 +77,7 @@ class AnkiNoteBuilder {
           fields: conceptFields(concept),
           tags: tagsFor(concept.topicName, concept.subtopic),
         ),
-      for (final card in selection.manualCards)
+      for (final card in selection.basicCards)
         AnkiNote(
           model: AnkiModel.basic,
           deckName: deckFor(card.topicName),
@@ -93,7 +90,7 @@ class AnkiNoteBuilder {
   ExportFiles files(ExportSelection selection) {
     return ExportFiles(
       concepts: _conceptFile(selection.concepts),
-      basic: _basicFile(selection.manualCards),
+      basic: _basicFile(selection.basicCards),
     );
   }
 
@@ -113,7 +110,7 @@ class AnkiNoteBuilder {
     ].join('\n');
   }
 
-  String _basicFile(List<ManualCard> cards) {
+  String _basicFile(List<BasicCard> cards) {
     if (cards.isEmpty) return '';
     return [
       '#separator:Tab',

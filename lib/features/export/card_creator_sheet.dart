@@ -158,7 +158,7 @@ Future<int> showReviewCardCreator(
   return created ?? 0;
 }
 
-/// One creator for manual cards and optional AI suggestions.
+/// One creator for basic cards and optional AI suggestions.
 ///
 /// Lives inside an [M3EBottomSheet], so the review surface behind it keeps the
 /// mistake visible while cards are written. Manual entry never needs an AI
@@ -458,7 +458,7 @@ Future<CardCreatorSaveResult> saveCardCreatorDrafts({
       ? const <CardCreatorDraft>[]
       : List<CardCreatorDraft>.of(pending);
   var created = 0;
-  int? manualCardId;
+  int? basicCardId;
   Object? failure;
   var completionPending = false;
   for (final draft in pending) {
@@ -476,7 +476,7 @@ Future<CardCreatorSaveResult> saveCardCreatorDrafts({
             cognitiveType: draft.template.cognitiveType,
             skippedQuestionId: request.skippedQuestionId,
           );
-          manualCardId ??= id;
+          basicCardId ??= id;
         case CardCreatorConceptDraft():
           await service.createConcept(
             sessionId: request.sessionId,
@@ -506,7 +506,7 @@ Future<CardCreatorSaveResult> saveCardCreatorDrafts({
         if (noteToConvertId != null) noteToConvertId,
       };
       for (final noteId in noteIds) {
-        await service.markNoteConverted(noteId, manualCardId: manualCardId);
+        await service.markNoteConverted(noteId, basicCardId: basicCardId);
       }
       final error = request.error;
       if (error != null && request.completeErrorOnSave) {

@@ -35,6 +35,13 @@ void main() {
     expect(counts.keys, containsAll(BackupService.optionalTables));
     expect(tables.keys, contains('notes'));
     expect(tables.keys, isNot(contains('highlights')));
+    // Logical backup keys stay frozen even though the table is basic_cards.
+    expect(tables.keys, contains('manualCards'));
+    expect(tables.keys, isNot(contains('basicCards')));
+    final backupNotes = tables['notes'] as List<dynamic>;
+    final backupNote = backupNotes.single as Map<String, dynamic>;
+    expect(backupNote.keys, contains('manualCardId'));
+    expect(backupNote.keys, isNot(contains('basicCardId')));
     for (final entry in counts.entries) {
       expect(
         entry.value,
@@ -75,7 +82,7 @@ void main() {
     expect(info.attempts, 1);
     expect(info.concepts, 1);
     expect(info.errorCards, 1);
-    expect(info.manualCards, 1);
+    expect(info.basicCards, 1);
     expect(info.skippedQuestions, 1);
     expect(info.notes, 1);
     expect(info.archivedTopics, 1);
@@ -117,10 +124,10 @@ void main() {
     expect(errors.single.question, question.prompt);
     expect(errors.single.distracted, isTrue);
     expect(errors.single.reasoning, 'I misread the prompt.');
-    final manuals = await harness.database
-        .select(harness.database.manualCards)
+    final basics = await harness.database
+        .select(harness.database.basicCards)
         .get();
-    expect(manuals.single.answer, 'A container for objects.');
+    expect(basics.single.answer, 'A container for objects.');
     final skipped = await harness.database
         .select(harness.database.skippedQuestions)
         .get();
@@ -263,7 +270,7 @@ void main() {
     expect(info.schemaVersion, 11);
     expect(info.appVersion, '0.9.8');
     expect(info.notes, 1);
-    expect(info.manualCards, 1);
+    expect(info.basicCards, 1);
 
     final notes = await harness.database.select(harness.database.notes).get();
     expect(notes.single.noteText, 'object storage');
@@ -273,7 +280,7 @@ void main() {
     expect(notes.single.practiceName, 'Core');
     expect(notes.single.sessionId, 1);
     expect(notes.single.questionId, 1);
-    expect(notes.single.manualCardId, 1);
+    expect(notes.single.basicCardId, 1);
     expect(notes.single.keptAt?.toUtc(), DateTime.utc(2025, 6, 1, 9, 15));
     expect(
       notes.single.cardCreatedAt?.toUtc(),
@@ -821,7 +828,7 @@ Future<SeededPractice> _seedAllData(TestHarness harness) async {
     dueAfter: const Duration(hours: 48),
     distracted: true,
   );
-  await harness.cards.createManualCard(
+  await harness.cards.createBasicCard(
     sessionId: session.id,
     question: 'What is a bucket?',
     answer: 'A container for objects.',

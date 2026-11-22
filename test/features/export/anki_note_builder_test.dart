@@ -41,7 +41,7 @@ void main() {
 
   test('file headers name the columns and the tags column', () {
     final files = builder.files(
-      ExportSelection(concepts: [_concept()], manualCards: [_manualCard()]),
+      ExportSelection(concepts: [_concept()], basicCards: [_basicCard()]),
     );
 
     expect(files.concepts, contains('#separator:Tab'));
@@ -67,7 +67,7 @@ void main() {
   });
 
   test('basic file has three fields and the tag list', () {
-    final files = builder.files(ExportSelection(manualCards: [_manualCard()]));
+    final files = builder.files(ExportSelection(basicCards: [_basicCard()]));
     final row = files.basic.split('\n').last;
     final fields = row.split('\t');
 
@@ -81,7 +81,7 @@ void main() {
     final notes = builder.notes(
       ExportSelection(
         concepts: [_concept()],
-        manualCards: [_manualCard(topicName: 'Cloud')],
+        basicCards: [_basicCard(topicName: 'Cloud')],
       ),
       defaultDeck: 'Default deck',
       deckByTopic: const {
@@ -96,8 +96,8 @@ void main() {
   });
 
   test('basic cards contain only the question and the answer', () {
-    final basic = _manualCard();
-    final files = builder.files(ExportSelection(manualCards: [basic]));
+    final basic = _basicCard();
+    final files = builder.files(ExportSelection(basicCards: [basic]));
     final row = files.basic.split('\n').last;
     expect(
       row.split('\t').take(2).join('\t'),
@@ -105,7 +105,7 @@ void main() {
     );
     expect(files.basic, isNot(contains('IPv4 addresses are split')));
 
-    final note = builder.notes(ExportSelection(manualCards: [basic])).single;
+    final note = builder.notes(ExportSelection(basicCards: [basic])).single;
     expect(note.model, AnkiModel.basic);
     expect(note.fields.first, 'What is a subnet?');
     expect(note.fields.last, 'A range of IP addresses.');
@@ -115,8 +115,8 @@ void main() {
     final notes = builder.notes(
       ExportSelection(
         concepts: [_concept()],
-        manualCards: [
-          _manualCard(topicName: 'Networking basics', subtopic: 'Layer 4'),
+        basicCards: [
+          _basicCard(topicName: 'Networking basics', subtopic: 'Layer 4'),
         ],
       ),
     );
@@ -131,7 +131,7 @@ void main() {
 
   test('no exported front or back contains a bracketed topic prefix', () {
     final files = builder.files(
-      ExportSelection(concepts: [_concept()], manualCards: [_manualCard()]),
+      ExportSelection(concepts: [_concept()], basicCards: [_basicCard()]),
     );
     for (final file in [files.concepts, files.basic]) {
       for (final line in file.split('\n')) {
@@ -189,11 +189,11 @@ Concept _concept() {
   );
 }
 
-ManualCard _manualCard({
+BasicCard _basicCard({
   String topicName = 'Networking basics',
   String subtopic = '',
 }) {
-  return ManualCard(
+  return BasicCard(
     id: 3,
     sessionId: 1,
     questionId: 7,

@@ -116,7 +116,7 @@ class ExportService {
     if (success) {
       await _cards.markExported(
         conceptIds: selection.conceptIds.toList(),
-        manualCardIds: selection.manualCardIds.toList(),
+        basicCardIds: selection.basicCardIds.toList(),
         exportedAt: _clock.now().toUtc(),
       );
       await _gateway.triggerSync();

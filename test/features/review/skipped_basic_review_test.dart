@@ -58,7 +58,7 @@ void main() {
     await pumpFrames(tester, frames: 24);
 
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(1));
     expect(cards!.single.question, 'Question 1?');

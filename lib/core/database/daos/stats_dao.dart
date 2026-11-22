@@ -15,7 +15,7 @@ part 'stats_dao.g.dart';
     Attempts,
     ErrorCards,
     Concepts,
-    ManualCards,
+    BasicCards,
   ],
 )
 class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
@@ -37,14 +37,14 @@ class StatsDao extends DatabaseAccessor<AppDatabase> with _$StatsDaoMixin {
         ) AS incomplete_error_cards,
         (
           (SELECT COUNT(*) FROM concepts WHERE exported_at IS NULL AND definition <> '')
-          + (SELECT COUNT(*) FROM manual_cards WHERE exported_at IS NULL)
+          + (SELECT COUNT(*) FROM basic_cards WHERE exported_at IS NULL)
         ) AS unexported_cards,
         (SELECT id FROM sessions WHERE status = 'inProgress' ORDER BY started_at DESC LIMIT 1) AS in_progress_session_id,
         (SELECT mode FROM sessions WHERE status = 'inProgress' ORDER BY started_at DESC LIMIT 1) AS in_progress_session_mode,
         (SELECT total FROM sessions WHERE status = 'inProgress' ORDER BY started_at DESC LIMIT 1) AS in_progress_session_total
       ''',
       variables: [Variable.withDateTime(now)],
-      readsFrom: {errorCards, concepts, manualCards, sessions},
+      readsFrom: {errorCards, concepts, basicCards, sessions},
     );
     return query.watchSingle().map(
       (row) => HomeStatsRow(

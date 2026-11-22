@@ -85,12 +85,12 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('creator-save')));
     await pumpFrames(tester, frames: 24);
 
-    final manuals = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+    final basics = await tester.runAsync(
+      () => harness.cards.watchBasicCards().first,
     );
-    expect(manuals, hasLength(1));
-    expect(manuals!.single.subtopic, 'Networking');
-    expect(manuals.single.cognitiveType, CognitiveType.fact);
-    expect(manuals.single.answer, 'It spreads traffic across several servers.');
+    expect(basics, hasLength(1));
+    expect(basics!.single.subtopic, 'Networking');
+    expect(basics.single.cognitiveType, CognitiveType.fact);
+    expect(basics.single.answer, 'It spreads traffic across several servers.');
   });
 }

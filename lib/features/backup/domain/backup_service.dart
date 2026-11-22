@@ -34,7 +34,7 @@ class BackupInfo {
     required this.attempts,
     required this.concepts,
     required this.errorCards,
-    required this.manualCards,
+    required this.basicCards,
     this.skippedQuestions = 0,
     this.notes = 0,
     this.archivedTopics = 0,
@@ -53,7 +53,7 @@ class BackupInfo {
   final int attempts;
   final int concepts;
   final int errorCards;
-  final int manualCards;
+  final int basicCards;
   final int skippedQuestions;
   final int notes;
   final int archivedTopics;
@@ -71,7 +71,7 @@ class BackupInfo {
   /// Rows per table as recorded by the backup, empty when the file has none.
   final Map<String, int> tableCounts;
 
-  int get cards => concepts + errorCards + manualCards;
+  int get cards => concepts + errorCards + basicCards;
 
   String get description {
     final archived = archivedTopics > 0
@@ -128,6 +128,10 @@ class BackupService {
   static const maxImportBytes = 50 * 1024 * 1024;
 
   /// Tables that must be present in every supported backup.
+  ///
+  /// These are logical JSON keys, not SQL table names. `manualCards` stays
+  /// frozen so v1-v3 files keep restoring and current files stay readable by
+  /// older app builds, even though the table is now `basic_cards`.
   static const requiredTables = <String>{
     'topics',
     'practices',
@@ -222,8 +226,8 @@ class BackupService {
           batch.insertAll(_db.errorCards, [
             for (final row in backup.errorCards) row.toCompanion(false),
           ]);
-          batch.insertAll(_db.manualCards, [
-            for (final row in backup.manualCards) row.toCompanion(false),
+          batch.insertAll(_db.basicCards, [
+            for (final row in backup.basicCards) row.toCompanion(false),
           ]);
           batch.insertAll(_db.skippedQuestions, [
             for (final row in backup.skippedQuestions) row.toCompanion(false),
@@ -282,7 +286,7 @@ class BackupService {
     final attempts = await _db.select(_db.attempts).get();
     final concepts = await _db.select(_db.concepts).get();
     final errorCards = await _db.select(_db.errorCards).get();
-    final manualCards = await _db.select(_db.manualCards).get();
+    final basicCards = await _db.select(_db.basicCards).get();
     final skippedQuestions = await _db.select(_db.skippedQuestions).get();
     final notes = await _db.select(_db.notes).get();
     final settings = await _db.select(_db.settings).get();
@@ -296,7 +300,8 @@ class BackupService {
       'attempts': [for (final row in attempts) row.toJson()],
       'concepts': [for (final row in concepts) row.toJson()],
       'errorCards': [for (final row in errorCards) row.toJson()],
-      'manualCards': [for (final row in manualCards) row.toJson()],
+      // Frozen logical key for the `basic_cards` table.
+      'manualCards': [for (final row in basicCards) row.toJson()],
       'skippedQuestions': [for (final row in skippedQuestions) row.toJson()],
       'notes': [for (final row in notes) row.toJson()],
       'settings': [for (final row in settings) row.toJson()],
@@ -365,7 +370,7 @@ class BackupService {
       attempts: content.attempts.length,
       concepts: content.concepts.length,
       errorCards: content.errorCards.length,
-      manualCards: content.manualCards.length,
+      basicCards: content.basicCards.length,
       skippedQuestions: content.skippedQuestions.length,
       notes: content.notes.length,
       archivedTopics: content.topics.where((row) => row.archived).length,
@@ -498,10 +503,10 @@ class BackupService {
         parse: _errorCard,
         identities: (row) => ['id ${row.id}'],
       ),
-      manualCards: _readRows<ManualCardRow>(
+      basicCards: _readRows<BasicCardRow>(
         tables,
         'manualCards',
-        parse: _manualCard,
+        parse: _basicCard,
         identities: (row) => ['id ${row.id}'],
       ),
       skippedQuestions: _readRows<SkippedQuestionRow>(
@@ -630,7 +635,7 @@ class BackupService {
     final practiceIds = {for (final row in content.practices) row.id};
     final questionIds = {for (final row in content.questions) row.id};
     final sessionIds = {for (final row in content.sessions) row.id};
-    final manualCardIds = {for (final row in content.manualCards) row.id};
+    final basicCardIds = {for (final row in content.basicCards) row.id};
 
     for (final row in content.practices) {
       _requireReference('practices', row.id, 'topic', row.topicId, topicIds);
@@ -723,7 +728,7 @@ class BackupService {
         );
       }
     }
-    for (final row in content.manualCards) {
+    for (final row in content.basicCards) {
       final sessionId = row.sessionId;
       final questionId = row.questionId;
       if (sessionId != null) {
@@ -767,20 +772,20 @@ class BackupService {
     for (final row in content.notes) {
       final sessionId = row.sessionId;
       final questionId = row.questionId;
-      final manualCardId = row.manualCardId;
+      final basicCardId = row.basicCardId;
       if (sessionId != null) {
         _requireReference('notes', row.id, 'session', sessionId, sessionIds);
       }
       if (questionId != null) {
         _requireReference('notes', row.id, 'question', questionId, questionIds);
       }
-      if (manualCardId != null) {
+      if (basicCardId != null) {
         _requireReference(
           'notes',
           row.id,
-          'manual card',
-          manualCardId,
-          manualCardIds,
+          'basic card',
+          basicCardId,
+          basicCardIds,
         );
       }
     }
@@ -944,8 +949,8 @@ class BackupService {
     );
   }
 
-  ManualCardRow _manualCard(_Row row) {
-    return ManualCardRow(
+  BasicCardRow _basicCard(_Row row) {
+    return BasicCardRow(
       id: row.requireInt('id'),
       sessionId: row.optionalInt('sessionId'),
       questionId: row.optionalInt('questionId'),
@@ -996,7 +1001,7 @@ class BackupService {
       createdAt: row.requireDate('createdAt'),
       keptAt: row.optionalDate('keptAt'),
       cardCreatedAt: row.optionalDate('cardCreatedAt'),
-      manualCardId: row.optionalInt('manualCardId'),
+      basicCardId: row.optionalInt('manualCardId'),
     );
   }
 
@@ -1188,7 +1193,7 @@ class _BackupTables {
   List<AttemptRow> get attempts => content.attempts;
   List<ConceptRow> get concepts => content.concepts;
   List<ErrorCardRow> get errorCards => content.errorCards;
-  List<ManualCardRow> get manualCards => content.manualCards;
+  List<BasicCardRow> get basicCards => content.basicCards;
   List<SkippedQuestionRow> get skippedQuestions => content.skippedQuestions;
   List<NoteRow> get notes => content.notes;
   List<SettingRow> get settings => content.settings;
@@ -1204,7 +1209,7 @@ class _BackupContent {
     required this.attempts,
     required this.concepts,
     required this.errorCards,
-    required this.manualCards,
+    required this.basicCards,
     required this.skippedQuestions,
     required this.notes,
     required this.settings,
@@ -1218,7 +1223,7 @@ class _BackupContent {
   final List<AttemptRow> attempts;
   final List<ConceptRow> concepts;
   final List<ErrorCardRow> errorCards;
-  final List<ManualCardRow> manualCards;
+  final List<BasicCardRow> basicCards;
   final List<SkippedQuestionRow> skippedQuestions;
   final List<NoteRow> notes;
   final List<SettingRow> settings;

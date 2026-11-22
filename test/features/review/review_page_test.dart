@@ -334,7 +334,7 @@ void main() {
     );
     expect(error!.needsDetails, isFalse);
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(1));
   });

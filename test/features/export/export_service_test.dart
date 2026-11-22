@@ -75,7 +75,7 @@ void main() {
       vaccine: 'Vaccine',
       completedAt: harness.clock.now().toUtc(),
     );
-    final manualId = await harness.cards.createManualCard(
+    final basicId = await harness.cards.createBasicCard(
       sessionId: null,
       question: 'Manual question',
       answer: 'Manual answer',
@@ -84,10 +84,10 @@ void main() {
       createdAt: harness.clock.now().toUtc(),
     );
     final concepts = await harness.cards.watchConcepts().first;
-    final manuals = await harness.cards.watchManualCards().first;
+    final basics = await harness.cards.watchBasicCards().first;
     expect(conceptId, isPositive);
-    expect(manualId, isPositive);
-    return ExportSelection(concepts: concepts, manualCards: manuals);
+    expect(basicId, isPositive);
+    return ExportSelection(concepts: concepts, basicCards: basics);
   }
 
   test('exports all selected notes and marks them exported', () async {
@@ -120,7 +120,7 @@ void main() {
     });
     expect(gateway.syncCount, 1);
     expect(await harness.cards.watchConcepts().first, isEmpty);
-    expect(await harness.cards.watchManualCards().first, isEmpty);
+    expect(await harness.cards.watchBasicCards().first, isEmpty);
     // Errors are reviewed into atomic cards, never exported directly.
     expect(await harness.cards.watchErrorCards().first, isNotEmpty);
   });
@@ -233,7 +233,7 @@ void main() {
         createdAt: harness.clock.now().toUtc(),
         keptAt: harness.clock.now().toUtc(),
         cardCreatedAt: null,
-        manualCardId: null,
+        basicCardId: null,
       ),
       Note(
         id: 2,
@@ -246,7 +246,7 @@ void main() {
         createdAt: harness.clock.now().toUtc(),
         keptAt: null,
         cardCreatedAt: harness.clock.now().toUtc(),
-        manualCardId: 7,
+        basicCardId: 7,
       ),
     ]);
 

@@ -183,7 +183,7 @@ void main() {
     await pumpFrames(tester, frames: 24);
 
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(1));
     expect(cards!.single.cognitiveType, CognitiveType.contrast);
@@ -361,7 +361,7 @@ void main() {
 
     expect(reported, 2);
     final cards = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+      () => harness.cards.watchBasicCards().first,
     );
     expect(cards, hasLength(2));
     final byType = {for (final item in cards!) item.cognitiveType: item};

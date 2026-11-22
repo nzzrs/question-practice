@@ -161,8 +161,8 @@ ErrorCard errorCardFromRow(ErrorCardRow row) {
   );
 }
 
-ManualCard manualCardFromRow(ManualCardRow row) {
-  return ManualCard(
+BasicCard basicCardFromRow(BasicCardRow row) {
+  return BasicCard(
     id: row.id,
     sessionId: row.sessionId,
     questionId: row.questionId,
@@ -209,7 +209,7 @@ Note noteFromRow(NoteRow row) {
     createdAt: row.createdAt.toUtc(),
     keptAt: row.keptAt?.toUtc(),
     cardCreatedAt: row.cardCreatedAt?.toUtc(),
-    manualCardId: row.manualCardId,
+    basicCardId: row.basicCardId,
     subtopic: row.subtopic,
   );
 }

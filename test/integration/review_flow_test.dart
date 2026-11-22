@@ -72,10 +72,10 @@ void main() {
         () => harness.cards.errorCardById(errorCardId),
       );
       expect(completed!.needsDetails, isFalse);
-      final manuals = await tester.runAsync(
-        () => harness.cards.watchManualCards().first,
+      final basics = await tester.runAsync(
+        () => harness.cards.watchBasicCards().first,
       );
-      expect(manuals, hasLength(1));
+      expect(basics, hasLength(1));
 
       await tester.tap(find.text('Done'));
       await pumpFrames(tester, frames: 24);

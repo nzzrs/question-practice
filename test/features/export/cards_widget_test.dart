@@ -110,7 +110,7 @@ void main() {
     CognitiveType cognitiveType = CognitiveType.fact,
     String subtopic = '',
   }) {
-    return harness.cards.createManualCard(
+    return harness.cards.createBasicCard(
       sessionId: null,
       questionId: question.id,
       question: questionText,
@@ -264,11 +264,11 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
-    final manuals = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+    final basics = await tester.runAsync(
+      () => harness.cards.watchBasicCards().first,
     );
-    expect(manuals, hasLength(1));
-    expect(manuals!.single.context, 'Question 1?');
+    expect(basics, hasLength(1));
+    expect(basics!.single.context, 'Question 1?');
     final queued = await tester.runAsync(
       () => harness.cards.watchUnhandledSkippedQuestions().first,
     );
@@ -437,12 +437,12 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('review-dock-save')));
     await pumpFrames(tester, frames: 24);
 
-    final manuals = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+    final basics = await tester.runAsync(
+      () => harness.cards.watchBasicCards().first,
     );
-    expect(manuals, hasLength(3));
+    expect(basics, hasLength(3));
     expect(
-      manuals!.map((card) => card.question),
+      basics!.map((card) => card.question),
       containsAll([
         'How does a VPC differ from a public subnet?',
         'Why does a private subnet need a NAT gateway?',
@@ -450,15 +450,15 @@ void main() {
       ]),
     );
     expect(
-      manuals.map((card) => card.cognitiveType),
+      basics.map((card) => card.cognitiveType),
       containsAll([CognitiveType.contrast, CognitiveType.fact]),
     );
     expect(
-      manuals.where((card) => card.cognitiveType == CognitiveType.heuristic),
+      basics.where((card) => card.cognitiveType == CognitiveType.heuristic),
       isEmpty,
     );
-    expect(manuals.every((card) => card.subtopic == 'Networking'), isTrue);
-    expect(manuals.first.context, question.prompt);
+    expect(basics.every((card) => card.subtopic == 'Networking'), isTrue);
+    expect(basics.first.context, question.prompt);
     final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
     expect(notes!.single.hasCard, isTrue);
   });
@@ -572,10 +572,10 @@ void main() {
     expect(concepts!.single.term, 'managed service');
     expect(concepts.single.definition, 'A service run by the provider.');
     expect(concepts.single.subtopic, 'Networking');
-    final manuals = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+    final basics = await tester.runAsync(
+      () => harness.cards.watchBasicCards().first,
     );
-    expect(manuals, isEmpty);
+    expect(basics, isEmpty);
     final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
     expect(notes!.single.hasCard, isTrue);
   });
@@ -838,11 +838,11 @@ void main() {
 
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     // Created after Cards initialized, so it is not part of the selection.
-    final manualId = await seedBasic(harness, question);
+    final basicId = await seedBasic(harness, question);
     await harness.cards.markNoteConverted(
       firstId,
       cardCreatedAt: harness.clock.now().toUtc(),
-      manualCardId: manualId,
+      basicCardId: basicId,
     );
     await pumpFrames(tester);
 
@@ -873,10 +873,10 @@ void main() {
 
     final notes = await tester.runAsync(() => harness.cards.watchNotes().first);
     expect(notes, isEmpty);
-    final manuals = await tester.runAsync(
-      () => harness.cards.watchManualCards().first,
+    final basics = await tester.runAsync(
+      () => harness.cards.watchBasicCards().first,
     );
-    expect(manuals, hasLength(1));
+    expect(basics, hasLength(1));
   });
 
   testWidgets('selection never moves rows on the cards list', (tester) async {

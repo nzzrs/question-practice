@@ -6,7 +6,7 @@ import 'package:question_practice/features/export/cards_page.dart';
 import '../../helpers/test_harness.dart';
 
 void main() {
-  testWidgets('Cards shows Scenario and rule for a heuristic manual card', (
+  testWidgets('Cards shows Scenario and rule for a heuristic basic card', (
     tester,
   ) async {
     final harness = TestHarness();
@@ -16,7 +16,7 @@ void main() {
       seeded.practiceId,
     );
     final question = questions.single;
-    final cardId = await harness.cards.createManualCard(
+    final cardId = await harness.cards.createBasicCard(
       sessionId: null,
       questionId: question.id,
       question: 'Which rule applies to this scenario?',
@@ -50,7 +50,7 @@ void main() {
     expect(find.text('Exam heuristic'), findsNothing);
   });
 
-  testWidgets('Cards shows Steps for a procedure manual card', (tester) async {
+  testWidgets('Cards shows Steps for a procedure basic card', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
@@ -58,7 +58,7 @@ void main() {
       seeded.practiceId,
     );
     final question = questions.single;
-    final cardId = await harness.cards.createManualCard(
+    final cardId = await harness.cards.createBasicCard(
       sessionId: null,
       questionId: question.id,
       question: 'In the handshake, what must be true before the client sends?',

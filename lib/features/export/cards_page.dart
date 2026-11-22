@@ -289,7 +289,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
   Widget build(BuildContext context) {
     final conceptsAsync = ref.watch(allConceptsProvider);
     final errorsAsync = ref.watch(allErrorCardsProvider);
-    final manualsAsync = ref.watch(allManualCardsProvider);
+    final basicsAsync = ref.watch(allBasicCardsProvider);
     final skippedAsync = ref.watch(skippedQuestionsProvider);
     final notesAsync = ref.watch(notesProvider);
     final topicSummaries = ref.watch(topicSummariesProvider).value ?? const [];
@@ -310,14 +310,14 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
     final allConcepts = conceptsAsync.value ?? const <Concept>[];
     final allErrors = errorsAsync.value ?? const <ErrorCard>[];
-    final allManuals = manualsAsync.value ?? const <ManualCard>[];
+    final allBasics = basicsAsync.value ?? const <BasicCard>[];
     final skipped = skippedAsync.value ?? const <SkippedQuestion>[];
     final notes = notesAsync.value ?? const <Note>[];
 
     final data = _viewCache.data(
       concepts: allConcepts,
       errors: allErrors,
-      manuals: allManuals,
+      basics: allBasics,
       skipped: skipped,
       notes: notes,
       showExported: _showExported,
@@ -336,7 +336,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     if (!_restoreStarted &&
         conceptsAsync.hasValue &&
         errorsAsync.hasValue &&
-        manualsAsync.hasValue &&
+        basicsAsync.hasValue &&
         skippedAsync.hasValue &&
         notesAsync.hasValue) {
       _restoreStarted = true;
@@ -363,8 +363,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
 
     final concepts = data.concepts;
     final errors = data.errors;
-    final manuals = data.manuals;
-    final visibleManuals = manuals;
+    final basics = data.basics;
+    final visibleBasics = basics;
     final showCards = view.showCards;
     final showErrors = view.showErrors;
     final showNotes = view.showNotes;
@@ -372,7 +372,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     final loading =
         conceptsAsync.isLoading ||
         errorsAsync.isLoading ||
-        manualsAsync.isLoading ||
+        basicsAsync.isLoading ||
         skippedAsync.isLoading ||
         notesAsync.isLoading;
     final selectedSkipped = view.selectedSkipped;
@@ -624,10 +624,10 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             const SizedBox(height: 28),
           ],
-          if (showCards && visibleManuals.isNotEmpty) ...[
+          if (showCards && visibleBasics.isNotEmpty) ...[
             SectionTitle(
               'Basic cards',
-              count: visibleManuals.length,
+              count: visibleBasics.length,
               trailing: _SectionSelectAll(
                 key: const ValueKey('basic-select-all'),
                 label: 'basic cards',
@@ -641,8 +641,8 @@ class _CardsPageState extends ConsumerState<CardsPage> {
             ),
             AppGroup(
               children: [
-                for (final card in visibleManuals)
-                  _ManualRow(
+                for (final card in visibleBasics)
+                  _BasicRow(
                     key: ValueKey('basic-row-${card.id}'),
                     card: card,
                     deckName: deckFor(card.topicName),
@@ -650,7 +650,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                     onTap: () => _handleRowTap(
                       _selectedBasic,
                       card.id,
-                      () => _previewManual(card),
+                      () => _previewBasic(card),
                       selectable: card.exportedAt == null,
                     ),
                     onLongPress: () => _handleRowLongPress(
@@ -842,9 +842,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
           _selectedConcepts.removeAll(
             selection.concepts.map((concept) => concept.id),
           );
-          _selectedBasic.removeAll(
-            selection.manualCards.map((card) => card.id),
-          );
+          _selectedBasic.removeAll(selection.basicCards.map((card) => card.id));
           if (!_hasSelection) _selectionActive = false;
         });
         _persistSelection();
@@ -885,7 +883,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         .deleteCards(
           conceptIds: _selectedConcepts.toList(),
           errorCardIds: _selectedErrors.toList(),
-          manualCardIds: _selectedBasic.toList(),
+          basicCardIds: _selectedBasic.toList(),
           skippedQuestionIds: _selectedSkipped.toList(),
           noteIds: _selectedNotes.toList(),
         );
@@ -1175,7 +1173,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
     }
   }
 
-  Future<void> _previewManual(ManualCard card) {
+  Future<void> _previewBasic(BasicCard card) {
     return _previewDialog('Card preview', [
       _previewMeta([
         Pill(card.cognitiveType.label, tone: PillTone.secondary),
@@ -1312,7 +1310,7 @@ class CardsDerivedData {
   const CardsDerivedData._({
     required this.concepts,
     required this.errors,
-    required this.manuals,
+    required this.basics,
     required this.skipped,
     required this.notes,
     required this.conceptSelectableIds,
@@ -1334,7 +1332,7 @@ class CardsDerivedData {
   factory CardsDerivedData._derive({
     required List<Concept> allConcepts,
     required List<ErrorCard> allErrors,
-    required List<ManualCard> allManuals,
+    required List<BasicCard> allBasics,
     required List<SkippedQuestion> allSkipped,
     required List<Note> allNotes,
     required bool showExported,
@@ -1367,12 +1365,12 @@ class CardsDerivedData {
       }
     }
 
-    final manuals = <ManualCard>[];
+    final basics = <BasicCard>[];
     final basicSelectableIds = <int>[];
     final basicSelectableIdSet = <int>{};
-    for (final card in allManuals) {
+    for (final card in allBasics) {
       if (showExported || card.exportedAt == null) {
-        manuals.add(card);
+        basics.add(card);
       }
       if (card.exportedAt == null) {
         basicSelectableIds.add(card.id);
@@ -1396,14 +1394,14 @@ class CardsDerivedData {
     final hasAnyRows =
         concepts.isNotEmpty ||
         errors.isNotEmpty ||
-        manuals.isNotEmpty ||
+        basics.isNotEmpty ||
         allSkipped.isNotEmpty ||
         allNotes.isNotEmpty;
 
     return CardsDerivedData._(
       concepts: List.unmodifiable(concepts),
       errors: List.unmodifiable(errors),
-      manuals: List.unmodifiable(manuals),
+      basics: List.unmodifiable(basics),
       skipped: List.unmodifiable(allSkipped),
       notes: List.unmodifiable(allNotes),
       conceptSelectableIds: List.unmodifiable(conceptSelectableIds),
@@ -1422,7 +1420,7 @@ class CardsDerivedData {
       hasAnyData:
           allConcepts.isNotEmpty ||
           allErrors.isNotEmpty ||
-          allManuals.isNotEmpty ||
+          allBasics.isNotEmpty ||
           allSkipped.isNotEmpty ||
           allNotes.isNotEmpty,
     );
@@ -1430,7 +1428,7 @@ class CardsDerivedData {
 
   final List<Concept> concepts;
   final List<ErrorCard> errors;
-  final List<ManualCard> manuals;
+  final List<BasicCard> basics;
   final List<SkippedQuestion> skipped;
   final List<Note> notes;
   final List<int> conceptSelectableIds;
@@ -1496,15 +1494,15 @@ class CardsPageView {
         exportConcepts.add(concept);
       }
     }
-    final exportManuals = <ManualCard>[];
-    for (final card in data.manuals) {
+    final exportBasics = <BasicCard>[];
+    for (final card in data.basics) {
       if (card.exportedAt == null && selectedBasic.contains(card.id)) {
-        exportManuals.add(card);
+        exportBasics.add(card);
       }
     }
     final exportSelection = ExportSelection(
       concepts: exportConcepts,
-      manualCards: exportManuals,
+      basicCards: exportBasics,
     );
 
     final selectedErrorCards = <ErrorCard>[];
@@ -1535,7 +1533,7 @@ class CardsPageView {
       (count, group) => count + group.$2.length,
     );
     final hasVisibleRows =
-        (showCards && (data.concepts.isNotEmpty || data.manuals.isNotEmpty)) ||
+        (showCards && (data.concepts.isNotEmpty || data.basics.isNotEmpty)) ||
         (showErrors && (data.errors.isNotEmpty || data.skipped.isNotEmpty)) ||
         (showNotes && data.notes.isNotEmpty);
 
@@ -1595,7 +1593,7 @@ class CardsViewCache {
 
   List<Concept>? _sourceConcepts;
   List<ErrorCard>? _sourceErrors;
-  List<ManualCard>? _sourceManuals;
+  List<BasicCard>? _sourceBasics;
   List<SkippedQuestion>? _sourceSkipped;
   List<Note>? _sourceNotes;
   bool? _sourceShowExported;
@@ -1609,7 +1607,7 @@ class CardsViewCache {
   CardsDerivedData data({
     required List<Concept> concepts,
     required List<ErrorCard> errors,
-    required List<ManualCard> manuals,
+    required List<BasicCard> basics,
     required List<SkippedQuestion> skipped,
     required List<Note> notes,
     required bool showExported,
@@ -1618,7 +1616,7 @@ class CardsViewCache {
     if (cached != null &&
         identical(_sourceConcepts, concepts) &&
         identical(_sourceErrors, errors) &&
-        identical(_sourceManuals, manuals) &&
+        identical(_sourceBasics, basics) &&
         identical(_sourceSkipped, skipped) &&
         identical(_sourceNotes, notes) &&
         _sourceShowExported == showExported) {
@@ -1626,14 +1624,14 @@ class CardsViewCache {
     }
     _sourceConcepts = concepts;
     _sourceErrors = errors;
-    _sourceManuals = manuals;
+    _sourceBasics = basics;
     _sourceSkipped = skipped;
     _sourceNotes = notes;
     _sourceShowExported = showExported;
     final derived = CardsDerivedData._derive(
       allConcepts: concepts,
       allErrors: errors,
-      allManuals: manuals,
+      allBasics: basics,
       allSkipped: skipped,
       allNotes: notes,
       showExported: showExported,
@@ -2049,8 +2047,8 @@ class _ErrorRow extends StatelessWidget {
   }
 }
 
-class _ManualRow extends StatelessWidget {
-  const _ManualRow({
+class _BasicRow extends StatelessWidget {
+  const _BasicRow({
     required this.card,
     required this.deckName,
     required this.selected,
@@ -2059,7 +2057,7 @@ class _ManualRow extends StatelessWidget {
     super.key,
   });
 
-  final ManualCard card;
+  final BasicCard card;
   final String deckName;
   final bool selected;
   final VoidCallback onTap;

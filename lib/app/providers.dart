@@ -150,13 +150,13 @@ final allErrorCardsProvider = StreamProvider<List<ErrorCard>>(
       ref.watch(cardRepositoryProvider).watchErrorCards(includeExported: true),
 );
 
-final manualCardsProvider = StreamProvider<List<ManualCard>>(
-  (ref) => ref.watch(cardRepositoryProvider).watchManualCards(),
+final basicCardsProvider = StreamProvider<List<BasicCard>>(
+  (ref) => ref.watch(cardRepositoryProvider).watchBasicCards(),
 );
 
-final allManualCardsProvider = StreamProvider<List<ManualCard>>(
+final allBasicCardsProvider = StreamProvider<List<BasicCard>>(
   (ref) =>
-      ref.watch(cardRepositoryProvider).watchManualCards(includeExported: true),
+      ref.watch(cardRepositoryProvider).watchBasicCards(includeExported: true),
 );
 
 final skippedQuestionsProvider = StreamProvider<List<SkippedQuestion>>(
@@ -166,11 +166,10 @@ final skippedQuestionsProvider = StreamProvider<List<SkippedQuestion>>(
 /// Fronts and terms of saved cards, used to keep AI suggestions from
 /// repeating a card the learner already has.
 final existingCardTextsProvider = Provider<List<String>>((ref) {
-  final manuals =
-      ref.watch(allManualCardsProvider).value ?? const <ManualCard>[];
+  final basics = ref.watch(allBasicCardsProvider).value ?? const <BasicCard>[];
   final concepts = ref.watch(allConceptsProvider).value ?? const <Concept>[];
   return [
-    for (final card in manuals)
+    for (final card in basics)
       if (card.question.trim().isNotEmpty) card.question,
     for (final concept in concepts)
       if (concept.term.trim().isNotEmpty) concept.term,

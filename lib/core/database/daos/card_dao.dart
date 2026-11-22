@@ -9,7 +9,7 @@ import '../tables.dart';
 part 'card_dao.g.dart';
 
 @DriftAccessor(
-  tables: [Concepts, ErrorCards, ManualCards, SkippedQuestions, Notes],
+  tables: [Concepts, ErrorCards, BasicCards, SkippedQuestions, Notes],
 )
 class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   CardDao(super.db);
@@ -38,8 +38,8 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     return query.watch();
   }
 
-  Stream<List<ManualCardRow>> watchManualCards({bool includeExported = false}) {
-    final query = select(manualCards);
+  Stream<List<BasicCardRow>> watchBasicCards({bool includeExported = false}) {
+    final query = select(basicCards);
     if (!includeExported) {
       query.where((m) => m.exportedAt.isNull());
     }
@@ -326,8 +326,8 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     await (delete(errorCards)..where((e) => e.id.isIn(ids))).go();
   }
 
-  Future<int> insertManualCard(ManualCardsCompanion card) {
-    return into(manualCards).insert(card);
+  Future<int> insertBasicCard(BasicCardsCompanion card) {
+    return into(basicCards).insert(card);
   }
 
   Stream<List<SkippedQuestionRow>> watchUnhandledSkippedQuestions() {
@@ -443,16 +443,16 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
   Future<void> markNoteConverted(
     int id, {
     required DateTime cardCreatedAt,
-    int? manualCardId,
+    int? basicCardId,
   }) {
     return (update(notes)..where((n) => n.id.equals(id))).write(
       NotesCompanion(
         cardCreatedAt: Value(cardCreatedAt),
-        // A retry after a concept-only save has no manual card to link, so it
+        // A retry after a concept-only save has no basic card to link, so it
         // must not clear the link an earlier basic card already set.
-        manualCardId: manualCardId == null
+        basicCardId: basicCardId == null
             ? const Value.absent()
-            : Value(manualCardId),
+            : Value(basicCardId),
       ),
     );
   }
@@ -466,18 +466,18 @@ class CardDao extends DatabaseAccessor<AppDatabase> with _$CardDaoMixin {
     await (delete(notes)..where((n) => n.id.isIn(ids))).go();
   }
 
-  Future<void> markManualCardsExported(
+  Future<void> markBasicCardsExported(
     List<int> ids,
     DateTime exportedAt,
   ) async {
     if (ids.isEmpty) return;
-    await (update(manualCards)..where((m) => m.id.isIn(ids))).write(
-      ManualCardsCompanion(exportedAt: Value(exportedAt)),
+    await (update(basicCards)..where((m) => m.id.isIn(ids))).write(
+      BasicCardsCompanion(exportedAt: Value(exportedAt)),
     );
   }
 
-  Future<void> deleteManualCards(List<int> ids) async {
+  Future<void> deleteBasicCards(List<int> ids) async {
     if (ids.isEmpty) return;
-    await (delete(manualCards)..where((m) => m.id.isIn(ids))).go();
+    await (delete(basicCards)..where((m) => m.id.isIn(ids))).go();
   }
 }

@@ -27,8 +27,8 @@ void refreshDataProviders(WidgetRef ref) {
   ref.invalidate(allConceptsProvider);
   ref.invalidate(errorCardsProvider);
   ref.invalidate(allErrorCardsProvider);
-  ref.invalidate(manualCardsProvider);
-  ref.invalidate(allManualCardsProvider);
+  ref.invalidate(basicCardsProvider);
+  ref.invalidate(allBasicCardsProvider);
   ref.invalidate(skippedQuestionsProvider);
   ref.invalidate(notesProvider);
   ref.invalidate(inProgressSessionProvider);

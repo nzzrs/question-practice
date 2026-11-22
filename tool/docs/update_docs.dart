@@ -154,6 +154,7 @@ class SchemaModel {
     required this.version,
     required this.tables,
     required this.migrations,
+    required this.renamedFrom,
     required this.extraIndexes,
     required this.daosByTable,
   });
@@ -161,6 +162,9 @@ class SchemaModel {
   final int version;
   final List<TableSchema> tables;
   final List<MigrationStep> migrations;
+
+  /// SQL table name to the name it had before the migration renamed it.
+  final Map<String, String> renamedFrom;
   final List<TableIndexSchema> extraIndexes;
   final Map<String, List<String>> daosByTable;
 
@@ -302,7 +306,8 @@ SchemaModel parseSchema(Directory root) {
   _requireDocumentedColumns(tables);
 
   final extraIndexes = _parseCustomIndexes(databaseSource, tables);
-  final migrations = _parseMigrations(databaseSource, version, tables);
+  final migrationResult = _parseMigrations(databaseSource, version, tables);
+  final migrations = migrationResult.steps;
 
   _validateTableDocs(tables, modelSource);
   final daosByTable = _parseDaos(root, tables);
@@ -311,6 +316,7 @@ SchemaModel parseSchema(Directory root) {
     version: version,
     tables: tables,
     migrations: migrations,
+    renamedFrom: migrationResult.renamedFrom,
     extraIndexes: extraIndexes,
     daosByTable: daosByTable,
   );
@@ -810,7 +816,7 @@ List<TableIndexSchema> _parseCustomIndexes(
   return indexes;
 }
 
-List<MigrationStep> _parseMigrations(
+({List<MigrationStep> steps, Map<String, String> renamedFrom}) _parseMigrations(
   String source,
   int version,
   List<TableSchema> tables,
@@ -1036,16 +1042,24 @@ List<MigrationStep> _parseMigrations(
     return current;
   }
 
-  return [
-    for (final step in steps)
-      MigrationStep(
-        version: step.version,
-        changes: step.changes,
-        createdTables: {
-          for (final name in step.createdTables) resolvedTable(name),
-        },
-      ),
-  ];
+  final renamedFrom = <String, String>{};
+  for (final old in renames.keys) {
+    renamedFrom.putIfAbsent(resolvedTable(old), () => old);
+  }
+
+  return (
+    steps: [
+      for (final step in steps)
+        MigrationStep(
+          version: step.version,
+          changes: step.changes,
+          createdTables: {
+            for (final name in step.createdTables) resolvedTable(name),
+          },
+        ),
+    ],
+    renamedFrom: renamedFrom,
+  );
 }
 
 TableSchema _tableByClass(List<TableSchema> tables, String identifier) {
@@ -1173,6 +1187,18 @@ BackupCoverage parseBackupCoverage(Directory root, SchemaModel schema) {
   final backupToSchema = {
     for (final table in schema.tables) _lowerCamelCase(table.className): table,
   };
+  // Frozen backup keys that no longer match the SQL table name. Renaming the
+  // table must not change the file format.
+  const logicalKeys = <String, String>{'manualCards': 'basic_cards'};
+  for (final entry in logicalKeys.entries) {
+    final table = schema.bySqlName[entry.value];
+    if (table == null) {
+      throw FormatException(
+        'Backup key "${entry.key}" maps to missing table "${entry.value}".',
+      );
+    }
+    backupToSchema[entry.key] = table;
+  }
   final seen = <String>{};
   for (final name in [...requiredTables, ...optionalTables]) {
     if (!seen.add(name)) {
@@ -1284,10 +1310,10 @@ const _tableDocs = <String, _TableDoc>{
     'ErrorCard',
     'CardRepository',
   ),
-  'manual_cards': _TableDoc(
+  'basic_cards': _TableDoc(
     'Basic question/answer cards from skipped questions, Ask, notes or review '
         'bullets.',
-    'ManualCard',
+    'BasicCard',
     'CardRepository',
   ),
   'skipped_questions': _TableDoc(
@@ -1457,7 +1483,8 @@ String _migrationsMarkdown(SchemaModel schema) {
   };
   final baselineTables = [
     for (final table in schema.tables)
-      if (!createdByMigrations.contains(table.sqlName)) table.sqlName,
+      if (!createdByMigrations.contains(table.sqlName))
+        schema.renamedFrom[table.sqlName] ?? table.sqlName,
   ];
   final lines = <String>[
     'Current schema version: **${schema.version}**. Migration steps are read '
@@ -1501,7 +1528,9 @@ String _backupMarkdown(BackupCoverage backup) {
     '',
     'The required and optional sets together cover every database table '
         'exactly once. `settings` stores preferences as key/value rows; the AI '
-        'API key is in Android secure storage and is never exported.',
+        'API key is in Android secure storage and is never exported. Logical '
+        'keys stay frozen across schema changes: `manualCards` is the backup '
+        'key for the `basic_cards` table, and notes rows keep `manualCardId`.',
   ]);
 }
 

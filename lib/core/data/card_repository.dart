@@ -23,10 +23,10 @@ class CardRepository {
         .map((rows) => rows.map(errorCardFromRow).toList());
   }
 
-  Stream<List<ManualCard>> watchManualCards({bool includeExported = false}) {
+  Stream<List<BasicCard>> watchBasicCards({bool includeExported = false}) {
     return _db.cardDao
-        .watchManualCards(includeExported: includeExported)
-        .map((rows) => rows.map(manualCardFromRow).toList());
+        .watchBasicCards(includeExported: includeExported)
+        .map((rows) => rows.map(basicCardFromRow).toList());
   }
 
   Stream<List<ErrorCard>> watchDueErrors() {
@@ -258,7 +258,7 @@ class CardRepository {
     return _db.cardDao.resolveError(id, resolvedAt);
   }
 
-  Future<int> createManualCard({
+  Future<int> createBasicCard({
     required int? sessionId,
     required String question,
     required String answer,
@@ -269,8 +269,8 @@ class CardRepository {
     String subtopic = '',
     CognitiveType cognitiveType = CognitiveType.fact,
   }) {
-    return _db.cardDao.insertManualCard(
-      ManualCardsCompanion.insert(
+    return _db.cardDao.insertBasicCard(
+      BasicCardsCompanion.insert(
         sessionId: Value(sessionId),
         questionId: Value(questionId),
         question: question,
@@ -429,12 +429,12 @@ class CardRepository {
   Future<void> markNoteConverted(
     int id, {
     required DateTime cardCreatedAt,
-    int? manualCardId,
+    int? basicCardId,
   }) {
     return _db.cardDao.markNoteConverted(
       id,
       cardCreatedAt: cardCreatedAt,
-      manualCardId: manualCardId,
+      basicCardId: basicCardId,
     );
   }
 
@@ -448,26 +448,26 @@ class CardRepository {
 
   Future<void> markExported({
     required List<int> conceptIds,
-    required List<int> manualCardIds,
+    required List<int> basicCardIds,
     required DateTime exportedAt,
   }) {
     return _db.transaction(() async {
       await _db.cardDao.markConceptsExported(conceptIds, exportedAt);
-      await _db.cardDao.markManualCardsExported(manualCardIds, exportedAt);
+      await _db.cardDao.markBasicCardsExported(basicCardIds, exportedAt);
     });
   }
 
   Future<void> deleteCards({
     required List<int> conceptIds,
     required List<int> errorCardIds,
-    required List<int> manualCardIds,
+    required List<int> basicCardIds,
     List<int> skippedQuestionIds = const [],
     List<int> noteIds = const [],
   }) {
     return _db.transaction(() async {
       await _db.cardDao.deleteConcepts(conceptIds);
       await _db.cardDao.deleteErrorCards(errorCardIds);
-      await _db.cardDao.deleteManualCards(manualCardIds);
+      await _db.cardDao.deleteBasicCards(basicCardIds);
       await _db.cardDao.deleteSkippedQuestions(skippedQuestionIds);
       await _db.cardDao.deleteNotes(noteIds);
     });

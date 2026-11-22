@@ -9,7 +9,7 @@ import '../errors/error_card_review_view.dart';
 import '../export/card_creator_controller.dart';
 import '../export/card_creator_sheet.dart';
 import '../export/cards_page.dart';
-import '../feedback/domain/wrong_notes.dart';
+import '../feedback/domain/wrong_answer_bullets.dart';
 import '../feedback/feedback_step_header.dart';
 import 'domain/review_service.dart';
 import 'note_review_view.dart';
@@ -143,7 +143,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           correctAnswer: card.correctAnswer,
           reasoning: card.reasoning,
           explanation: card.explanation,
-          wrongNotes: WrongNotes.parse(card.reasoning),
+          wrongNotes: WrongAnswerBullets.parse(card.reasoning),
         ),
       ),
       SkippedReviewStep() => CardCreatorRequest(

@@ -38,38 +38,41 @@ void main() {
     expect(find.byType(EditableText), findsNothing);
   });
 
-  test('updating wrong notes also refreshes the linked error card', () async {
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await harness.seedPractice(count: 1);
-    final service = SessionService(
-      practices: harness.practices,
-      sessions: harness.sessions,
-      cards: harness.cards,
-      clock: harness.clock,
-    );
-    final start = await service.startPractice(seeded.practiceId);
-    final item = start.items.single;
+  test(
+    'updating wrong-answer bullets also refreshes the linked error card',
+    () async {
+      final harness = TestHarness();
+      addTearDown(harness.close);
+      final seeded = await harness.seedPractice(count: 1);
+      final service = SessionService(
+        practices: harness.practices,
+        sessions: harness.sessions,
+        cards: harness.cards,
+        clock: harness.clock,
+      );
+      final start = await service.startPractice(seeded.practiceId);
+      final item = start.items.single;
 
-    await service.submitAnswer(
-      start: start,
-      item: item,
-      selectedIndexes: const [1],
-      reasoning: '',
-      distracted: false,
-    );
-    await service.setWrongNotes(
-      start: start,
-      item: item,
-      notes: const ['I rushed the second line.'],
-    );
+      await service.submitAnswer(
+        start: start,
+        item: item,
+        selectedIndexes: const [1],
+        reasoning: '',
+        distracted: false,
+      );
+      await service.setWrongAnswerBullets(
+        start: start,
+        item: item,
+        bullets: const ['I rushed the second line.'],
+      );
 
-    final attempt = await harness.sessions.attemptForQuestion(
-      start.session.id,
-      item.question.id,
-    );
-    expect(attempt?.reasoning, 'I rushed the second line.');
-    final card = await harness.cards.activeErrorForQuestion(item.question.id);
-    expect(card?.reasoning, 'I rushed the second line.');
-  });
+      final attempt = await harness.sessions.attemptForQuestion(
+        start.session.id,
+        item.question.id,
+      );
+      expect(attempt?.reasoning, 'I rushed the second line.');
+      final card = await harness.cards.activeErrorForQuestion(item.question.id);
+      expect(card?.reasoning, 'I rushed the second line.');
+    },
+  );
 }

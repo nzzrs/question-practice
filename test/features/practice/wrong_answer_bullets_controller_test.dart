@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:question_practice/features/feedback/wrong_notes_controller.dart';
+import 'package:question_practice/features/feedback/wrong_answer_bullets_controller.dart';
 
 void main() {
   test(
@@ -9,7 +9,7 @@ void main() {
     () async {
       final firstSave = Completer<void>();
       final saves = <List<String>>[];
-      final controller = WrongNotesController(
+      final controller = WrongAnswerBulletsController(
         initial: const [],
         onSave: (notes) async {
           saves.add(notes);
@@ -21,7 +21,7 @@ void main() {
       controller.setRow(0, 'first');
       final running = controller.save();
       await Future<void>.delayed(Duration.zero);
-      expect(controller.saveState, WrongNotesSaveState.saving);
+      expect(controller.saveState, WrongAnswerBulletsSaveState.saving);
 
       controller.setRow(0, 'second');
       final flushed = controller.flush();
@@ -34,13 +34,13 @@ void main() {
         ['second'],
       ]);
       expect(controller.isDirty, isFalse);
-      expect(controller.saveState, WrongNotesSaveState.clean);
+      expect(controller.saveState, WrongAnswerBulletsSaveState.clean);
     },
   );
 
   test('a failed save stays dirty so a later flush retries it', () async {
     var attempts = 0;
-    final controller = WrongNotesController(
+    final controller = WrongAnswerBulletsController(
       initial: const [],
       onSave: (notes) async {
         attempts++;
@@ -51,12 +51,12 @@ void main() {
 
     controller.setRow(0, 'keep me');
     expect(await controller.flush(), isFalse);
-    expect(controller.saveState, WrongNotesSaveState.failed);
+    expect(controller.saveState, WrongAnswerBulletsSaveState.failed);
     expect(controller.isDirty, isTrue);
 
     expect(await controller.flush(), isTrue);
     expect(attempts, 2);
-    expect(controller.saveState, WrongNotesSaveState.clean);
+    expect(controller.saveState, WrongAnswerBulletsSaveState.clean);
     expect(controller.isDirty, isFalse);
   });
 }

@@ -7,7 +7,7 @@ import '../../core/domain/models.dart';
 import '../../core/ui/widgets.dart';
 import '../export/card_creator_controller.dart';
 import '../export/card_creator_sheet.dart';
-import '../feedback/domain/wrong_notes.dart';
+import '../feedback/domain/wrong_answer_bullets.dart';
 import '../feedback/feedback_step_header.dart';
 import '../review/review_shell.dart';
 import '../review/skipped_question_view.dart';
@@ -94,7 +94,7 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
           correctAnswer: card.correctAnswer,
           reasoning: card.reasoning,
           explanation: card.explanation,
-          wrongNotes: WrongNotes.parse(card.reasoning),
+          wrongNotes: WrongAnswerBullets.parse(card.reasoning),
         ),
       ),
       _SkippedStep(:final question) => CardCreatorRequest(

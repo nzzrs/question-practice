@@ -806,6 +806,11 @@ void main() {
     await pumpFrames(tester);
     expect(find.text('Delete selected cards?'), findsOneWidget);
     expect(
+      find.textContaining('Concepts and basic cards are removed permanently'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('heuristics'), findsNothing);
+    expect(
       find.textContaining('Skipped questions are removed'),
       findsOneWidget,
     );

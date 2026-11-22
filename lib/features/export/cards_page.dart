@@ -537,7 +537,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
                 key: const ValueKey('review-all-pending'),
                 style: M3EButtonStyle.text,
                 icon: const Icon(Icons.playlist_add_check_circle_outlined),
-                label: const Text('Review all pending'),
+                label: const Text(
+                  'Review all pending',
+                  maxLines: 3,
+                  textWidthBasis: TextWidthBasis.longestLine,
+                ),
                 tooltip: 'Review all pending cards',
                 semanticLabel: 'Review all pending cards',
                 onPressed: () => _reviewCards(allPendingErrors, skipped),
@@ -548,7 +552,11 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               icon: Icon(
                 allVisibleSelected ? Icons.deselect : Icons.select_all,
               ),
-              label: Text(allVisibleSelected ? 'Deselect all' : 'Select all'),
+              label: Text(
+                allVisibleSelected ? 'Deselect all' : 'Select all',
+                maxLines: 2,
+                textWidthBasis: TextWidthBasis.longestLine,
+              ),
               tooltip: allVisibleSelected
                   ? 'Deselect all visible items'
                   : 'Select all visible items',
@@ -808,7 +816,9 @@ class _CardsPageState extends ConsumerState<CardsPage> {
               key: ValueKey('cards-info-basic'),
               icon: Icons.quiz_outlined,
               title: 'Basic cards',
-              detail: 'Facts, heuristics and contrasts. Each has a front and a back.',
+              detail:
+                  'Basic cards come from the Contrast, Cause and effect, '
+                  'Exam tip and Steps templates. Each has a front and a back.',
             ),
             _InfoRow(
               key: ValueKey('cards-info-tags'),
@@ -926,7 +936,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
       context,
       title: 'Delete selected cards?',
       message:
-          'Concepts, facts, heuristics and contrasts are removed permanently. Deleting an '
+          'Concepts and basic cards are removed permanently. Deleting an '
           'active error card also removes it from the 48-hour review queue. '
           'Skipped questions are removed from the skipped queue; their '
           'questions stay in the practice. Notes are removed from this '
@@ -1168,6 +1178,7 @@ class _CardsPageState extends ConsumerState<CardsPage> {
         if (note.topicName.trim().isNotEmpty) Pill(note.topicName),
         if (note.subtopic.trim().isNotEmpty)
           Pill('subtopic: ${note.subtopic.trim()}'),
+        if (note.practiceName.trim().isNotEmpty) Pill(note.practiceName),
         if (note.isKept) const Pill('Kept', tone: PillTone.success),
         if (note.hasCard) const Pill('Card made', tone: PillTone.success),
       ]),
@@ -1423,9 +1434,9 @@ class _FilterBar extends StatelessWidget {
 
 /// Page-level card actions, directly under the filters and aligned right.
 ///
-/// The row stays short. When labels grow with the text scale, the content
-/// scrolls horizontally and starts at the right edge, so the last action is
-/// never clipped by an overflow.
+/// The actions stay on one line when they fit. At a narrow width or a large
+/// text scale they wrap into right-aligned lines instead of scrolling, so no
+/// action is hidden beside the screen edge.
 class _ActionRow extends StatelessWidget {
   const _ActionRow({required this.children});
 
@@ -1433,27 +1444,16 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          key: const ValueKey('cards-action-row'),
-          scrollDirection: Axis.horizontal,
-          reverse: true,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: constraints.maxWidth),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                for (var index = 0; index < children.length; index++) ...[
-                  if (index > 0) const SizedBox(width: 4),
-                  children[index],
-                ],
-              ],
-            ),
-          ),
-        );
-      },
+    return Align(
+      key: const ValueKey('cards-action-row'),
+      alignment: Alignment.centerRight,
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 4,
+        runSpacing: 4,
+        children: children,
+      ),
     );
   }
 }

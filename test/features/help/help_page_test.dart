@@ -54,8 +54,16 @@ void main() {
         'Shuffled practice',
         'JSON example',
         'Copy JSON example',
-        'Long-press a card to select it. While selection is active, a tap toggles that card; the close icon in the app bar clears the selection. Rows have no checkboxes or action icons.',
+        'Long-press a card to select it. While selection is active, a tap toggles that card. Tap the selected rows again to clear the selection; there is no separate clear action. Rows have no checkboxes or action icons.',
       ]),
+    );
+    expect(
+      texts.any((text) => text.contains('close icon in the app bar')),
+      isFalse,
+    );
+    expect(
+      texts.any((text) => text.contains('Select all in the app bar')),
+      isFalse,
     );
     expect(
       texts.any((text) => text.contains('Tap a note to open Note preview')),
@@ -64,8 +72,9 @@ void main() {
     expect(
       texts.any(
         (text) => text.contains(
-          'Review all pending opens every pending error and skipped question, '
-          'even ones not selected.',
+          'Review all pending sits beside Select all below the filters. It '
+          'opens every pending error and skipped question, even ones not '
+          'selected.',
         ),
       ),
       isTrue,

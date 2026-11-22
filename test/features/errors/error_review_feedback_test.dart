@@ -11,6 +11,12 @@ import 'package:question_practice/features/feedback/question_feedback_view.dart'
 
 import '../../helpers/test_harness.dart';
 
+const _aiSettings = AppSettings(
+  lookupMode: LookupMode.ai,
+  aiModel: 'test-model',
+  aiBaseUrl: 'https://example.test/v1',
+);
+
 Future<({ErrorCard card, Question question})> _seedCard(
   TestHarness harness, {
   String reasoning = 'I confused the network and transport layers.\nI read reliable as secure.',
@@ -45,6 +51,38 @@ Future<({ErrorCard card, Question question})> _seedCard(
     );
   }
   return (card: (await harness.cards.errorCardById(id))!, question: question);
+}
+
+Future<void> _openNoteMenu(WidgetTester tester, int noteId) async {
+  final more = find.byKey(ValueKey('feedback-note-more-$noteId'));
+  await tester.ensureVisible(more);
+  await pumpFrames(tester);
+  await tester.tap(more);
+  await pumpFrames(tester);
+}
+
+Finder _noteAction(int noteId, String action) =>
+    find.byKey(ValueKey('feedback-note-$action-$noteId'));
+
+Future<void> _openBulletMenu(WidgetTester tester, int index) async {
+  final more = find.byKey(ValueKey('wrong-note-more-$index'));
+  await tester.ensureVisible(more);
+  await pumpFrames(tester);
+  await tester.tap(more);
+  await pumpFrames(tester);
+}
+
+Finder _bulletAction(int index, String action) =>
+    find.byKey(ValueKey('wrong-note-$action-$index'));
+
+bool _menuItemEnabled(WidgetTester tester, Finder item) {
+  final row = find.ancestor(of: item, matching: find.byType(M3ETappable));
+  return tester.widget<M3ETappable>(row).enabled;
+}
+
+Future<void> _dismissMenu(WidgetTester tester) async {
+  await tester.tapAt(const Offset(2, 2));
+  await pumpFrames(tester);
 }
 
 void main() {
@@ -150,20 +188,14 @@ void main() {
     expect(find.byKey(ValueKey('feedback-note-$noteId')), findsOneWidget);
     expect(find.byType(SelectionArea), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(ValueKey('feedback-note-copy-$noteId')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(ValueKey('feedback-note-copy-$noteId')));
+    await _openNoteMenu(tester, noteId);
+    await tester.tap(_noteAction(noteId, 'copy'));
     await pumpFrames(tester);
     expect(copied, 'a managed service removes host maintenance');
     expect(find.text('Note copied.'), findsOneWidget);
 
-    await tester.ensureVisible(
-      find.byKey(ValueKey('feedback-note-card-$noteId')),
-    );
-    await pumpFrames(tester);
-    await tester.tap(find.byKey(ValueKey('feedback-note-card-$noteId')));
+    await _openNoteMenu(tester, noteId);
+    await tester.tap(_noteAction(noteId, 'card'));
     await pumpFrames(tester);
     expect(find.byType(CardCreatorSheet), findsOneWidget);
     expect(find.byType(CardCreatorPane), findsNothing);
@@ -239,6 +271,196 @@ void main() {
     );
     expect(notes, isEmpty);
     expect(find.byKey(ValueKey('feedback-note-$noteId')), findsNothing);
+  });
+
+  testWidgets('a saved note opens one compact action menu', (tester) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: seeded.card.sessionId,
+      questionId: seeded.question.id,
+      text: 'a managed service removes host maintenance',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final noteMore = find.byKey(ValueKey('feedback-note-more-$noteId'));
+    expect(noteMore, findsOneWidget);
+    expect(tester.getSemantics(noteMore).label, 'Note actions');
+    expect(_noteAction(noteId, 'copy'), findsNothing);
+    expect(_noteAction(noteId, 'card'), findsNothing);
+    expect(find.text('Copy'), findsNothing);
+    expect(find.text('Create card'), findsNothing);
+
+    await _openNoteMenu(tester, noteId);
+    expect(find.text('Copy'), findsOneWidget);
+    expect(find.text('Create card'), findsOneWidget);
+    expect(find.text('Define'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(find.text('Ask'), findsNothing);
+    expect(_noteAction(noteId, 'copy'), findsOneWidget);
+    expect(_noteAction(noteId, 'card'), findsOneWidget);
+    expect(_noteAction(noteId, 'delete'), findsOneWidget);
+    await _dismissMenu(tester);
+  });
+
+  testWidgets('the note menu offers Ask only with an AI provider', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.settings.save(_aiSettings);
+    await harness.keyStore.writeApiKey('secret-key');
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: seeded.card.sessionId,
+      questionId: seeded.question.id,
+      text: 'a managed service removes host maintenance',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    await _openNoteMenu(tester, noteId);
+    expect(find.text('Ask'), findsOneWidget);
+    expect(_noteAction(noteId, 'ask'), findsOneWidget);
+    await _dismissMenu(tester);
+  });
+
+  testWidgets('a note with a card shows a disabled Card created row', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: seeded.card.sessionId,
+      questionId: seeded.question.id,
+      text: 'a managed service removes host maintenance',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+    await harness.cards.markNoteConverted(
+      noteId,
+      cardCreatedAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    await _openNoteMenu(tester, noteId);
+    expect(find.text('Card created'), findsOneWidget);
+    expect(find.text('Create card'), findsNothing);
+    expect(_menuItemEnabled(tester, _noteAction(noteId, 'card')), isFalse);
+    await _dismissMenu(tester);
+  });
+
+  testWidgets('a bullet menu copies the bullet and seeds its AI card', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    String? copied;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      if (call.method == 'Clipboard.setData') {
+        copied = (call.arguments as Map<Object?, Object?>)['text'] as String?;
+      }
+      return null;
+    });
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(SystemChannels.platform, null),
+    );
+    final seeded = await _seedCard(harness);
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+
+    final firstMore = find.byKey(const ValueKey('wrong-note-more-0'));
+    expect(firstMore, findsOneWidget);
+    expect(find.byKey(const ValueKey('wrong-note-more-1')), findsOneWidget);
+    expect(tester.getSemantics(firstMore).label, 'Bullet actions');
+    expect(_bulletAction(0, 'copy'), findsNothing);
+    expect(_bulletAction(0, 'card'), findsNothing);
+
+    await _openBulletMenu(tester, 0);
+    expect(find.text('Copy'), findsOneWidget);
+    expect(find.text('Create card with AI'), findsOneWidget);
+    expect(_bulletAction(0, 'copy'), findsOneWidget);
+    expect(_bulletAction(0, 'card'), findsOneWidget);
+
+    await tester.tap(_bulletAction(0, 'copy'));
+    await pumpFrames(tester);
+    expect(copied, 'I confused the network and transport layers.');
+    expect(find.text('Bullet copied.'), findsOneWidget);
+  });
+
+  testWidgets('note and bullet menus fit 320 dp at 2.0 text scale', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await _seedCard(harness);
+    final noteId = await harness.cards.createNote(
+      sessionId: seeded.card.sessionId,
+      questionId: seeded.question.id,
+      text: 'A narrow note that has to wrap.',
+      context: seeded.question.prompt,
+      topicName: 'Topic',
+      practiceName: 'Practice',
+      createdAt: harness.clock.now().toUtc(),
+    );
+
+    await pumpTestApp(
+      tester,
+      home: ErrorCardsReviewPage(cards: [seeded.card]),
+      harness: harness,
+    );
+    expect(tester.takeException(), isNull);
+
+    await _openNoteMenu(tester, noteId);
+    expect(find.text('Copy'), findsOneWidget);
+    expect(find.text('Create card'), findsOneWidget);
+    expect(find.text('Define'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _dismissMenu(tester);
+
+    await _openBulletMenu(tester, 0);
+    expect(find.text('Copy'), findsOneWidget);
+    expect(find.text('Create card with AI'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await _dismissMenu(tester);
   });
 
   testWidgets('the review fits 360 dp at 2.0 text scale', (tester) async {

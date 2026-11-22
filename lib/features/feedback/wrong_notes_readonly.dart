@@ -1,8 +1,13 @@
+import 'package:flutter/services.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../core/ui/widgets.dart';
 import '../practice/selectable_linkified_text.dart';
 import 'feedback_actions.dart';
+import 'row_action_menu.dart';
+
+enum _BulletRowAction { copy, createCard }
 
 /// Read-only bullet list used by the error review.
 class WrongNotesReadonly extends StatelessWidget {
@@ -49,72 +54,73 @@ class WrongNotesReadonly extends StatelessWidget {
                 final active = activeBulletId == bulletId;
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Column(
+                  child: Row(
+                    key: ValueKey('wrong-notes-readonly-$index'),
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        key: ValueKey('wrong-notes-readonly-$index'),
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(left: 4, top: 8),
-                            child: Icon(
-                              Icons.circle,
-                              size: 6,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: SelectableLinkifiedText(
-                              text: notes[index],
-                              style: theme.typography.baseline.bodyMedium
-                                  .copyWith(height: 1.45),
-                              useSelectionArea: false,
-                              onDefine: actions.onDefine,
-                              onOpenUrl: actions.onOpenUrl,
-                              onNote: actions.onSaveNote,
-                              onAsk: actions.onAsk,
-                              onNoteTap: actions.onNoteTap,
-                            ),
-                          ),
-                        ],
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, top: 14),
+                        child: Icon(
+                          Icons.circle,
+                          size: 6,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
-                      if (onTurnBulletIntoCard != null)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 20, top: 2),
-                          child: Semantics(
-                            button: true,
-                            label: added
-                                ? 'Bullet added to cards'
-                                : active
-                                ? 'Drafting a card from this bullet'
-                                : 'Turn this bullet into a card',
-                            child: M3EIconButton(
-                              key: ValueKey('wrong-note-card-$index'),
-                              variant: M3EIconButtonVariant.standard,
-                              size: M3EIconButtonSize.sm,
-                              icon: Icon(
-                                added
-                                    ? Icons.check
-                                    : active
-                                    ? Icons.hourglass_top
-                                    : Icons.auto_awesome_outlined,
-                              ),
-                              tooltip: added
-                                  ? 'Bullet added to cards'
-                                  : active
-                                  ? 'Drafting a card from this bullet'
-                                  : 'Turn this bullet into a card',
-                              onPressed: added || bulletBusy
-                                  ? null
-                                  : () => onTurnBulletIntoCard!(
-                                      bulletId,
-                                      notes[index],
-                                    ),
-                            ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: SelectableLinkifiedText(
+                            text: notes[index],
+                            style: theme.typography.baseline.bodyMedium
+                                .copyWith(height: 1.45),
+                            useSelectionArea: false,
+                            onDefine: actions.onDefine,
+                            onOpenUrl: actions.onOpenUrl,
+                            onNote: actions.onSaveNote,
+                            onAsk: actions.onAsk,
+                            onNoteTap: actions.onNoteTap,
                           ),
                         ),
+                      ),
+                      const SizedBox(width: 4),
+                      RowActionMenu<_BulletRowAction>(
+                        menuKey: ValueKey('wrong-note-more-$index'),
+                        tooltip: 'Bullet actions',
+                        items: [
+                          RowActionItem(
+                            value: _BulletRowAction.copy,
+                            label: 'Copy',
+                            icon: Icons.copy_all_outlined,
+                            key: ValueKey('wrong-note-copy-$index'),
+                          ),
+                          if (onTurnBulletIntoCard != null)
+                            RowActionItem(
+                              value: _BulletRowAction.createCard,
+                              label: added
+                                  ? 'Card created'
+                                  : 'Create card with AI',
+                              icon: added
+                                  ? Icons.check
+                                  : active
+                                  ? Icons.hourglass_top
+                                  : Icons.auto_awesome_outlined,
+                              key: ValueKey('wrong-note-card-$index'),
+                              enabled: !added && !bulletBusy,
+                            ),
+                        ],
+                        onSelected: (action) {
+                          switch (action) {
+                            case _BulletRowAction.copy:
+                              _copy(context, notes[index]);
+                            case _BulletRowAction.createCard:
+                              onTurnBulletIntoCard?.call(
+                                bulletId,
+                                notes[index],
+                              );
+                          }
+                        },
+                      ),
                     ],
                   ),
                 );
@@ -122,5 +128,10 @@ class WrongNotesReadonly extends StatelessWidget {
             ),
       ],
     );
+  }
+
+  Future<void> _copy(BuildContext context, String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) await showSnack(context, 'Bullet copied.');
   }
 }

@@ -50,6 +50,9 @@ void main() {
 
     expect(find.text('Define'), findsOneWidget);
     expect(find.text('Delete note'), findsOneWidget);
+    expect(find.text('Copy'), findsNothing);
+    expect(find.text('Create card'), findsNothing);
+    expect(find.text('Create card with AI'), findsNothing);
 
     await tester.tap(find.text('Delete note'));
     await pumpFrames(tester);

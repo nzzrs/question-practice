@@ -15,8 +15,6 @@ import '../lookup/lookup_actions.dart';
 
 export 'error_card_content.dart';
 
-enum _NoteAction { define, ask, delete }
-
 /// Shared error-card study view used by session review and the Cards screen.
 ///
 /// The same feedback surface as practice renders the question, alternatives,
@@ -199,33 +197,6 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
     }
   }
 
-  Future<void> _openNoteActions(Note note) async {
-    var aiAvailable = ref.read(hasApiKeyProvider).value;
-    if (aiAvailable == null) {
-      try {
-        aiAvailable = await ref.read(hasApiKeyProvider.future);
-      } on Object {
-        aiAvailable = false;
-      }
-    }
-    if (!mounted) return;
-    final action = await M3EBottomSheet.show<_NoteAction>(
-      context,
-      initialValue: M3EBottomSheetValue.expanded,
-      builder: (context) =>
-          _NoteActionsSheet(phrase: note.text, showAsk: aiAvailable ?? false),
-    );
-    if (action == null || !mounted) return;
-    switch (action) {
-      case _NoteAction.define:
-        _define(note.text, null);
-      case _NoteAction.ask:
-        await _ask(note.text, null);
-      case _NoteAction.delete:
-        await _deleteNote(note);
-    }
-  }
-
   void _define(String term, Rect? anchor) {
     openTermLookup(
       context,
@@ -260,6 +231,7 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
   Widget build(BuildContext context) {
     final theme = M3ETheme.of(context);
     final card = widget.card;
+    final askAvailable = ref.watch(hasApiKeyProvider).value ?? false;
     return ListenableBuilder(
       listenable: widget.creator,
       builder: (context, _) {
@@ -279,7 +251,9 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
             notes: _notes,
             onCopyNote: _copyNote,
             onCreateCardFromNote: _createCardFromNote,
-            onNoteOverflow: _openNoteActions,
+            onDefineNote: (note) => _define(note.text, null),
+            onAskNote: askAvailable ? (note) => _ask(note.text, null) : null,
+            onDeleteNote: _deleteNote,
             onTurnBulletIntoCard: _turnBulletIntoCard,
             bulletBusy: activeBulletId != null,
             activeBulletId: activeBulletId,
@@ -317,70 +291,6 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
           ),
         );
       },
-    );
-  }
-}
-
-class _NoteActionsSheet extends StatelessWidget {
-  const _NoteActionsSheet({required this.phrase, required this.showAsk});
-
-  final String phrase;
-  final bool showAsk;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = M3ETheme.of(context);
-    return SafeArea(
-      top: false,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    phrase,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.typography.emphasized.titleLarge,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Saved note',
-                    style: theme.typography.baseline.labelSmall.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            OptionTile(
-              icon: Icons.menu_book_outlined,
-              title: 'Define',
-              subtitle: 'Look up this phrase',
-              onTap: () => Navigator.of(context).pop(_NoteAction.define),
-            ),
-            if (showAsk)
-              OptionTile(
-                icon: Icons.auto_awesome_outlined,
-                title: 'Ask',
-                subtitle: 'Ask the configured AI about this passage',
-                onTap: () => Navigator.of(context).pop(_NoteAction.ask),
-              ),
-            OptionTile(
-              icon: Icons.delete_outline,
-              title: 'Delete',
-              subtitle: 'Remove it everywhere for this question',
-              destructive: true,
-              onTap: () => Navigator.of(context).pop(_NoteAction.delete),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

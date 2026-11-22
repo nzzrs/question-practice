@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:clock/clock.dart';
-import 'package:collection/collection.dart';
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart' show Value;
 
@@ -83,14 +82,15 @@ class PracticeRepository {
   }
 
   Stream<List<TopicSummary>> watchArchivedTopicSummaries() {
-    return watchTopicSummaries(includeArchived: true)
-        .map((rows) => rows.where((row) => row.topic.archived).toList());
+    return _db.statsDao
+        .watchArchivedTopicSummaries(_clock.now().toUtc())
+        .map((rows) => rows.map(topicSummaryFromRow).toList());
   }
 
   Stream<TopicSummary?> watchTopicSummary(int topicId) {
-    return watchTopicSummaries(
-      includeArchived: true,
-    ).map((rows) => rows.where((row) => row.topic.id == topicId).firstOrNull);
+    return _db.statsDao
+        .watchTopicSummary(_clock.now().toUtc(), topicId)
+        .map((row) => row == null ? null : topicSummaryFromRow(row));
   }
 
   Stream<List<PracticeSummary>> watchPracticeSummaries(int topicId) {

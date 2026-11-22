@@ -535,7 +535,7 @@ steps that upgrade older databases; they are not present at version 16.
 ## Backup coverage
 
 <!-- BEGIN GENERATED: backup -->
-Backup format **v3**; minimum readable format **v1**. Files record app version **0.9.11** build **12**, the database schema version, export time and per-table row counts.
+Backup format **v3**; minimum readable format **v1**. Files record app version **0.10.0** build **13**, the database schema version, export time and per-table row counts.
 
 | Coverage | Backup keys |
 |---|---|

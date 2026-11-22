@@ -290,12 +290,13 @@ Code: `lib/features/topics/topic_stats_page.dart`,
 - Selection uses long-press, not checkboxes. Long-press any row to enter
   selection mode and select it; while selection mode is active a tap toggles
   that row, and a normal tap otherwise previews it. A note preview offers
-  **Review** to open the note review. The subtitle counts the selection, the
-  app-bar close clears it, and no banner or extra row is inserted, so rows keep
-  their positions as the selection grows. Select all in the app bar covers the
-  rows the current filter shows and ignores rows that cannot be selected. An
-  error row preview is titled **Error preview** and offers **Review** beside
-  **Close**.
+  **Review** to open the note review. The subtitle counts the selection;
+  deselecting the selected rows clears it, and no banner or extra row is
+  inserted, so rows keep their positions as the selection grows. **Select all**
+  and **Review all pending** sit in a right-aligned row directly below the
+  filters. Select all covers the rows the current filter shows and ignores
+  rows that cannot be selected. An error row preview is titled **Error
+  preview** and offers **Review** beside **Close**.
 - Selection is global across families and persists in settings as versioned
   JSON keyed by family. It starts empty, is pruned against currently selectable
   rows on load and on list changes, and is removed when it becomes empty or
@@ -309,8 +310,8 @@ Code: `lib/features/topics/topic_stats_page.dart`,
   **Delete selected** and skip/review flows, but never toward export or share.
 - The main action exports a ready selection. When the selection contains a
   pending error or skipped question it becomes **Review pending** and opens the
-  combined error/skipped review. A separate app-bar **Review all pending**
-  action opens every pending error and skipped question.
+  combined error/skipped review. A separate **Review all pending** action
+  below the filters opens every pending error and skipped question.
 - Tapping a note opens a selectable **Note preview** with the saved text and its
   question context, with **Close** and **Review**. **Review** walks the notes one
   at a time with the shared dock: **Create cards** opens the sheet, **Save and

@@ -154,7 +154,7 @@ void main() {
     await restartCards(tester, harness);
 
     expect(find.text('2 selected'), findsOneWidget);
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
     expect(find.byIcon(Icons.check_circle), findsNWidgets(2));
   });
 
@@ -186,10 +186,13 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('1 selected'), findsOneWidget);
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
   });
 
-  testWidgets('clearing the selection removes the saved value', (tester) async {
+  testWidgets('deselecting the last row removes the saved value', (
+    tester,
+  ) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
@@ -203,11 +206,43 @@ void main() {
     await pumpFrames(tester);
     await settlePersistence(tester);
 
-    await tester.tap(find.byKey(const ValueKey('clear-selection')));
+    await tester.tap(row);
     await pumpFrames(tester);
     await settlePersistence(tester);
 
     expect(find.text('Ready for AnkiDroid'), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    final stored = await tester.runAsync(
+      () => harness.settings.loadCardsSelection(),
+    );
+    expect(stored, isNull);
+  });
+
+  testWidgets('deselecting the last section removes the saved value', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final conceptId = await seedConcept(harness, question);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    final row = find.byKey(ValueKey('concept-row-$conceptId'));
+    await tester.ensureVisible(row);
+    await tester.longPress(row);
+    await pumpFrames(tester);
+    await settlePersistence(tester);
+
+    final section = find.byKey(const ValueKey('concepts-select-all'));
+    await tester.ensureVisible(section);
+    await tester.tap(section);
+    await pumpFrames(tester);
+    await settlePersistence(tester);
+
+    expect(find.text('Ready for AnkiDroid'), findsOneWidget);
+    expect(find.text('Select all'), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
     final stored = await tester.runAsync(
       () => harness.settings.loadCardsSelection(),
     );
@@ -236,7 +271,8 @@ void main() {
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
 
     expect(find.text('1 selected'), findsOneWidget);
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
     await settlePersistence(tester);
 
     final stored = await tester.runAsync(

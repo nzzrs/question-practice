@@ -1,3 +1,4 @@
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -153,11 +154,14 @@ void main() {
     expect(find.byTooltip('Create cards'), findsNothing);
     expect(find.byTooltip('Review skipped question'), findsNothing);
 
-    final globalSelectAll = tester.widget<M3EIconButton>(
+    final globalSelectAll = tester.widget<M3EButton>(
       find.byKey(const ValueKey('select-all')),
     );
-    expect(globalSelectAll.tooltip, 'Select all');
+    expect(globalSelectAll.onPressed, isNotNull);
     expect(globalSelectAll.semanticLabel, 'Select all visible items');
+    expect(find.byKey(const ValueKey('cards-action-row')), findsOneWidget);
+    expect(find.text('Select all'), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-all-pending')), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('notes-download')),
@@ -183,12 +187,54 @@ void main() {
       ),
     );
 
-    // Selection adds the clear action; the app bar must still fit at 320dp
-    // with 2x text.
+    // Selection has no separate clear control. The action row must still fit
+    // at 320dp with 2x text.
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('select-all')),
+      -300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await pumpFrames(tester);
     await tester.tap(find.byKey(const ValueKey('select-all')));
     await pumpFrames(tester);
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
     expect(find.byKey(const ValueKey('select-all')), findsOneWidget);
+    expect(find.text('Deselect all'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('cards page fits a 320dp window at normal text', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    await seedConcept(harness, question);
+    await seedBasic(harness, question);
+    await seedError(harness, question);
+    await seedSkipped(harness, question);
+    await seedNote(harness, question);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    await pumpFrames(tester);
+
+    expect(find.byKey(const ValueKey('cards-status')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-filter-bar')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('review-all-pending')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('select-all')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('cards-info')).hitTestable(),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -211,7 +257,274 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Export to AnkiDroid'), findsOneWidget);
     expect(find.byKey(const ValueKey('cards-filter-bar')), findsOneWidget);
-    expect(find.byKey(const ValueKey('select-all')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-action-row')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('select-all')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('review-all-pending')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey('cards-info')), findsOneWidget);
+  });
+
+  testWidgets('cards page fits a 720dp landscape window at 2x text', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(720, 400);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    await seedConcept(harness, question);
+    await seedBasic(harness, question);
+    await seedError(harness, question);
+    await seedSkipped(harness, question);
+    await seedNote(harness, question);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    await pumpFrames(tester);
+
+    final actionRect = tester.getRect(
+      find.byKey(const ValueKey('cards-action-row')),
+    );
+    final reviewRect = tester.getRect(
+      find.byKey(const ValueKey('review-all-pending')),
+    );
+    final selectRect = tester.getRect(find.byKey(const ValueKey('select-all')));
+
+    final reason = 'row $actionRect review $reviewRect select $selectRect';
+    for (final rect in [reviewRect, selectRect]) {
+      expect(rect.left, greaterThanOrEqualTo(actionRect.left), reason: reason);
+      expect(rect.right, lessThanOrEqualTo(actionRect.right), reason: reason);
+      expect(rect.top, greaterThanOrEqualTo(actionRect.top), reason: reason);
+      expect(rect.bottom, lessThanOrEqualTo(actionRect.bottom), reason: reason);
+    }
+    expect(
+      find.byKey(const ValueKey('cards-info')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('actions sit under the filters, right aligned and in order', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    await seedConcept(harness, question);
+    await seedError(harness, question);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+
+    final filterRect = tester.getRect(
+      find.byKey(const ValueKey('cards-filter-bar')),
+    );
+    final actionRect = tester.getRect(
+      find.byKey(const ValueKey('cards-action-row')),
+    );
+    final review = find.byKey(const ValueKey('review-all-pending'));
+    final selectAll = find.byKey(const ValueKey('select-all'));
+
+    expect(actionRect.top, greaterThanOrEqualTo(filterRect.bottom));
+    expect(find.text('Review all pending'), findsOneWidget);
+    expect(find.text('Select all'), findsOneWidget);
+    expect(
+      tester.getCenter(review).dx,
+      lessThan(tester.getCenter(selectAll).dx),
+    );
+    expect(tester.getTopRight(selectAll).dx, closeTo(actionRect.right, 1));
+    expect(
+      tester.getSize(selectAll).width,
+      lessThanOrEqualTo(actionRect.width),
+    );
+    expect(review.hitTestable(), findsOneWidget);
+    expect(selectAll.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final width in <double>[320, 360]) {
+    testWidgets(
+      'both actions stay on screen at ${width.toInt()}dp with 2x text',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 720);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+        final harness = TestHarness();
+        addTearDown(harness.close);
+        final seeded = await harness.seedPractice(count: 1);
+        final question = await onlyQuestion(harness, seeded);
+        await seedConcept(harness, question);
+        await seedError(harness, question);
+
+        await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+        await pumpFrames(tester);
+
+        final actionRect = tester.getRect(
+          find.byKey(const ValueKey('cards-action-row')),
+        );
+        final review = find.byKey(const ValueKey('review-all-pending'));
+        final selectAll = find.byKey(const ValueKey('select-all'));
+        final reviewRect = tester.getRect(review);
+        final selectRect = tester.getRect(selectAll);
+
+        // Both actions are fully inside the row, stacked in reading order and
+        // flush with its right edge. Nothing hides behind a horizontal scroll.
+        final reason = 'row $actionRect review $reviewRect select $selectRect';
+        for (final rect in [reviewRect, selectRect]) {
+          expect(
+            rect.left,
+            greaterThanOrEqualTo(actionRect.left),
+            reason: reason,
+          );
+          expect(
+            rect.right,
+            lessThanOrEqualTo(actionRect.right),
+            reason: reason,
+          );
+          expect(
+            rect.top,
+            greaterThanOrEqualTo(actionRect.top),
+            reason: reason,
+          );
+          expect(
+            rect.bottom,
+            lessThanOrEqualTo(actionRect.bottom),
+            reason: reason,
+          );
+        }
+        expect(
+          reviewRect.bottom,
+          lessThanOrEqualTo(selectRect.top),
+          reason: reason,
+        );
+        expect(reviewRect.right, closeTo(actionRect.right, 1), reason: reason);
+        expect(selectRect.right, closeTo(actionRect.right, 1), reason: reason);
+        expect(review.hitTestable(), findsOneWidget);
+        expect(selectAll.hitTestable(), findsOneWidget);
+
+        // Large text wraps the longest label instead of clipping it.
+        final reviewLabel = tester.renderObject<RenderParagraph>(
+          find.descendant(
+            of: review,
+            matching: find.text('Review all pending'),
+          ),
+        );
+        expect(reviewLabel.didExceedMaxLines, isFalse);
+
+        await tester.tap(selectAll);
+        await pumpFrames(tester);
+        expect(find.text('Deselect all'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('help icon opens a short structured export guide', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(count: 1);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+
+    expect(find.byIcon(Icons.help_outline), findsOneWidget);
+    expect(find.byIcon(Icons.info_outline), findsNothing);
+    final info = tester.widget<M3EIconButton>(
+      find.byKey(const ValueKey('cards-info')),
+    );
+    expect(info.tooltip, 'What exports to Anki');
+    expect(info.semanticLabel, 'What exports to Anki');
+
+    await tester.tap(find.byKey(const ValueKey('cards-info')));
+    await pumpFrames(tester);
+
+    expect(find.text('What goes to Anki'), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-info-cloze')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-info-basic')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-info-tags')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-info-decks')), findsOneWidget);
+    expect(find.byKey(const ValueKey('cards-info-stays')), findsOneWidget);
+    expect(find.text('Cloze cards'), findsOneWidget);
+    expect(find.text('Basic cards'), findsOneWidget);
+    expect(
+      find.text(
+        'Basic cards come from the Contrast, Cause and effect, Exam tip and '
+        'Steps templates. Each has a front and a back.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Tags'), findsOneWidget);
+    expect(find.text('Decks'), findsOneWidget);
+    expect(find.text('Stays in Question Practice'), findsOneWidget);
+
+    // The guide uses the current card vocabulary and stays short: no old
+    // paragraph plumbing or retired taxonomy leaks into the dialog.
+    expect(find.textContaining('heuristics'), findsNothing);
+    expect(find.textContaining('topic::'), findsNothing);
+    expect(find.textContaining('subtopic::'), findsNothing);
+    expect(find.textContaining('question-practice'), findsNothing);
+    expect(find.textContaining('AI suggestions'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('help dialog fits 320dp with 2x text', (tester) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.view.reset);
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    await harness.seedPractice(count: 1);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    await tester.tap(find.byKey(const ValueKey('cards-info')));
+    await pumpFrames(tester);
+
+    expect(find.text('What goes to Anki'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('concept preview hides raw source names and type pills', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final seeded = await harness.seedPractice(count: 1);
+    final question = await onlyQuestion(harness, seeded);
+    final conceptId = await seedConcept(harness, question);
+
+    await pumpTestApp(tester, home: const CardsPage(), harness: harness);
+    final row = find.byKey(ValueKey('concept-row-$conceptId'));
+    await tester.ensureVisible(row);
+    await tester.tap(row);
+    await pumpFrames(tester);
+
+    expect(find.text('Concept preview'), findsOneWidget);
+    expect(find.text('manual'), findsNothing);
+    expect(find.text('ai'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byType(M3EDialog),
+        matching: find.text('Concept'),
+      ),
+      findsNothing,
+    );
+    expect(find.text('Cloze card'), findsOneWidget);
   });
 
   testWidgets('select all ignores visible rows that cannot be selected', (
@@ -233,7 +546,7 @@ void main() {
     await pumpFrames(tester);
     expect(find.byKey(ValueKey('basic-row-$basicId')), findsOneWidget);
 
-    final globalSelectAll = tester.widget<M3EIconButton>(
+    final globalSelectAll = tester.widget<M3EButton>(
       find.byKey(const ValueKey('select-all')),
     );
     expect(globalSelectAll.onPressed, isNull);
@@ -296,27 +609,25 @@ void main() {
     await pumpTestApp(tester, home: const CardsPage(), harness: harness);
     expect(find.text('Ready for AnkiDroid'), findsOneWidget);
     expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
-    expect(
-      tester.getCenter(find.byKey(const ValueKey('select-all'))).dx,
-      greaterThan(tester.getCenter(find.byIcon(Icons.info_outline)).dx),
-    );
 
     await tester.tap(find.byKey(const ValueKey('select-all')));
     await pumpFrames(tester);
 
     expect(find.text('5 selected · review to export'), findsOneWidget);
     expect(find.text('Review pending'), findsOneWidget);
-    expect(find.byKey(const ValueKey('clear-selection')), findsOneWidget);
-    final selectAll = tester.widget<M3EIconButton>(
+    expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
+    expect(find.text('Deselect all'), findsOneWidget);
+    final selectAll = tester.widget<M3EButton>(
       find.byKey(const ValueKey('select-all')),
     );
-    expect(selectAll.tooltip, 'Deselect all');
+    expect(selectAll.onPressed, isNotNull);
 
     await tester.ensureVisible(find.byKey(const ValueKey('select-all')));
     await tester.tap(find.byKey(const ValueKey('select-all')));
     await pumpFrames(tester);
 
     expect(find.text('Ready for AnkiDroid'), findsOneWidget);
+    expect(find.text('Select all'), findsOneWidget);
     expect(find.byKey(const ValueKey('clear-selection')), findsNothing);
   });
 
@@ -446,6 +757,11 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('Note preview'), findsOneWidget);
+    expect(find.text('Practice'), findsOneWidget);
+    expect(
+      find.descendant(of: find.byType(M3EDialog), matching: find.text('Note')),
+      findsNothing,
+    );
     expect(find.text('Close'), findsOneWidget);
     expect(find.text('Review'), findsOneWidget);
     expect(find.byType(NoteReviewPage), findsNothing);

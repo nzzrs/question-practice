@@ -183,19 +183,17 @@ void main() {
     expect(find.text('Review the note'), findsOneWidget);
     expect(find.text('managed service'), findsOneWidget);
     expect(find.text('From the question'), findsNothing);
-    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
     expect(find.byKey(const ValueKey('note-see-context')), findsOneWidget);
     expect(find.text('Suggest cards with AI'), findsNothing);
     expect(find.text('Save and finish'), findsOneWidget);
     expect(find.text('Finish'), findsNothing);
     expect(find.text('Keep & save'), findsNothing);
-    expect(find.byKey(const ValueKey('review-dock-delete')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-delete')), findsNothing);
     expect(find.text('Delete note'), findsNothing);
   });
 
-  testWidgets('deleting a session note asks before removing it', (
-    tester,
-  ) async {
+  testWidgets('note deletion is not offered inside the review', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await harness.seedPractice(count: 1);
@@ -230,17 +228,13 @@ void main() {
       harness: harness,
     );
 
-    await tester.tap(find.byKey(const ValueKey('review-dock-delete')));
-    await pumpFrames(tester);
-    expect(find.text('Delete note?'), findsOneWidget);
-    await tester.tap(find.text('Delete'));
-    await pumpFrames(tester, frames: 24);
-
+    expect(find.byKey(const ValueKey('review-dock-delete')), findsNothing);
+    expect(find.text('Delete note'), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
     final notes = await tester.runAsync(
       () => harness.cards.notesForSession(start.session.id),
     );
-    expect(notes, isEmpty);
-    expect(find.text('delete this note'), findsNothing);
+    expect(notes, hasLength(1));
   });
 
   testWidgets('error review continues without bias or vaccine notes', (
@@ -273,13 +267,13 @@ void main() {
     expect(find.text('Analyse the error'), findsOneWidget);
     expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorSheet), findsNothing);
-    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
-    expect(find.text('Finish'), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
+    expect(find.text('Save and finish'), findsOneWidget);
     expect(find.text('Check with AI'), findsNothing);
     expect(find.text('Flawed assumption (bias)'), findsNothing);
     expect(find.text('Vaccine (rule / protocol)'), findsNothing);
 
-    await tester.tap(find.text('Finish'));
+    await tester.tap(find.text('Save and finish'));
     await pumpFrames(tester);
 
     expect(find.text('Review complete'), findsWidgets);
@@ -312,7 +306,7 @@ void main() {
       harness: harness,
     );
 
-    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+    await tester.tap(find.byKey(const ValueKey('review-create-fab')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
     await tester.enterText(

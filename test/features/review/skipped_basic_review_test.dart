@@ -36,8 +36,10 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.text('What was missing?'), findsOneWidget);
+    expect(find.text('Save and finish'), findsOneWidget);
+    expect(find.text('Finish'), findsNothing);
 
-    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+    await tester.tap(find.byKey(const ValueKey('review-create-fab')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 

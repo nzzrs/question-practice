@@ -195,7 +195,7 @@ void main() {
     expect(find.text('Edit card content'), findsNothing);
     expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.byType(CardCreatorPane), findsNothing);
-    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
   });
 
   testWidgets('deleting a note from the error review asks first', (

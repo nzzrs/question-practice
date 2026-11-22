@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/errors/error_cards_review_page.dart';
 import 'package:question_practice/features/export/cards_page.dart';
+import 'package:question_practice/features/review/review_shell.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -56,6 +57,7 @@ void main() {
     await pumpFrames(tester);
 
     expect(find.byType(ErrorCardsReviewPage), findsOneWidget);
+    expect(find.byType(ReviewShell), findsOneWidget);
     final route = ModalRoute.of(
       tester.element(find.byType(ErrorCardsReviewPage)),
     );
@@ -98,7 +100,9 @@ void main() {
       await tester.tap(find.byKey(const ValueKey('review-all-pending')));
       await pumpFrames(tester);
 
-      await tester.tap(find.text('Finish'));
+      expect(find.text('Save and finish'), findsOneWidget);
+      expect(find.byKey(const ValueKey('review-dock-delete')), findsNothing);
+      await tester.tap(find.text('Save and finish'));
       await pumpFrames(tester);
       expect(find.text('Review complete'), findsWidgets);
 
@@ -131,7 +135,7 @@ void main() {
       harness: harness,
     );
 
-    await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+    await tester.tap(find.byKey(const ValueKey('review-create-fab')));
     await pumpFrames(tester);
     await expandCardCreatorSheet(tester);
 

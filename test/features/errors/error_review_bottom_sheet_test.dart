@@ -138,7 +138,7 @@ http.Response _ideaResponse({
 }
 
 Future<void> _openCreator(WidgetTester tester) async {
-  await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+  await tester.tap(find.byKey(const ValueKey('review-create-fab')));
   await pumpFrames(tester);
   await expandCardCreatorSheet(tester);
 }
@@ -186,10 +186,11 @@ void main() {
     expect(find.byType(CardCreatorSheet), findsNothing);
     expect(find.byType(QuestionFeedbackView), findsOneWidget);
     expect(find.byKey(const ValueKey('review-dock-back')), findsOneWidget);
-    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
     expect(find.byKey(const ValueKey('review-dock-save')), findsOneWidget);
     expect(find.byKey(const ValueKey('review-dock-next')), findsOneWidget);
-    expect(find.text('Finish'), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-dock-delete')), findsNothing);
+    expect(find.text('Save and finish'), findsOneWidget);
     expect(find.text('Create cards'), findsNothing);
     expect(find.text('Skip'), findsNothing);
   });
@@ -736,8 +737,8 @@ void main() {
     expect(find.byType(AdaptiveSplitView), findsNothing);
     expect(find.text('Review the skipped question'), findsOneWidget);
     expect(find.text('What was missing?'), findsNothing);
-    expect(find.byKey(const ValueKey('review-dock-create')), findsOneWidget);
-    expect(find.text('Finish'), findsOneWidget);
+    expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
+    expect(find.text('Save and finish'), findsOneWidget);
     await _openCreator(tester);
     expect(find.byType(CardCreatorSheet), findsOneWidget);
   });

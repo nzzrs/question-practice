@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -10,7 +8,7 @@ import '../../core/ui/widgets.dart';
 import '../export/card_creator_controller.dart';
 import '../export/card_creator_sheet.dart';
 import 'note_review_view.dart';
-import 'review_action_dock.dart';
+import 'review_shell.dart';
 
 /// Reviews saved notes one at a time.
 ///
@@ -180,49 +178,6 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
     }
   }
 
-  Future<void> _deleteNote(Note note, int length) async {
-    if (_busy) return;
-    final hasDrafts = _creator.snapshotFor(_itemKey(note))?.hasDrafts ?? false;
-    final confirmed = await confirmDialog(
-      context,
-      title: 'Delete note?',
-      message:
-          'The saved note "${note.text}" is removed from Cards. '
-          'Cards already made from it stay.'
-          '${hasDrafts ? ' Unsaved card drafts for this note are discarded.' : ''}',
-      confirmLabel: 'Delete',
-      destructive: true,
-    );
-    if (!confirmed || !mounted) return;
-    setState(() => _busy = true);
-    try {
-      await ref.read(cardRepositoryProvider).deleteNote(note.id);
-      if (!mounted) return;
-      _creator.forgetNote(note.id);
-      _creator.clearSnapshot(_itemKey(note));
-      _completionPending.remove(_itemKey(note));
-      final remaining = math.max(0, length - 1);
-      setState(() {
-        _ids.remove(note.id);
-        if (remaining == 0) {
-          _finished = true;
-        } else {
-          if (_index >= remaining) {
-            _index = remaining - 1;
-          }
-          _creator.resetForStep();
-        }
-      });
-      _resetScroll();
-    } on Object catch (error) {
-      if (mounted) {
-        await showSnack(context, 'Could not delete the note: $error');
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
   Future<void> _requestNext(int index, int length) async {
     if (_busy) return;
     final last = index + 1 >= length;
@@ -275,68 +230,37 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
 
     if (_finished || notes.isEmpty) {
       final changed = _kept > 0 || _cards > 0;
-      return AppPage(
+      return ReviewCompletionPage(
         title: 'Notes reviewed',
-        focus: true,
-        onBack: () => Navigator.of(context).pop(true),
+        heading: notes.isEmpty && !changed
+            ? 'No notes to review'
+            : 'Note review complete',
+        message: changed
+            ? [
+                if (_kept > 0) '$_kept note${_kept == 1 ? '' : 's'} kept',
+                if (_cards > 0) '$_cards card${_cards == 1 ? '' : 's'} created',
+              ].join(' and ')
+            : 'No notes were changed.',
+        onDone: () => Navigator.of(context).pop(true),
         scrollController: _scroll,
-        variant: M3EAppBarVariant.small,
-        children: [
-          const SizedBox(height: 32),
-          Center(child: IconBadge(Icons.check_circle_outline, size: 72)),
-          const SizedBox(height: 16),
-          Text(
-            notes.isEmpty && !changed
-                ? 'No notes to review'
-                : 'Note review complete',
-            textAlign: TextAlign.center,
-            style: theme.typography.emphasized.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            changed
-                ? [
-                    if (_kept > 0) '$_kept note${_kept == 1 ? '' : 's'} kept',
-                    if (_cards > 0)
-                      '$_cards card${_cards == 1 ? '' : 's'} created',
-                  ].join(' and ')
-                : 'No notes were changed.',
-            textAlign: TextAlign.center,
-            style: theme.typography.baseline.bodyMedium.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 24),
-          AppPrimaryButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            label: 'Done',
-            icon: Icons.check,
-          ),
-        ],
       );
     }
 
     final index = _index >= notes.length ? notes.length - 1 : _index;
     final note = notes[index];
     final last = index == notes.length - 1;
-    return AppPage(
+    return ReviewShell(
       title: widget.title,
-      showBack: true,
-      focus: true,
-      onBack: _requestClose,
+      saveLabel: last ? 'Save and finish' : 'Save',
+      onSave: () => _saveNote(note, index, notes.length),
+      onBack: () => _goBack(index),
+      onNext: () => _requestNext(index, notes.length),
+      onClose: _requestClose,
+      canGoBack: index > 0,
+      canGoNext: !last,
+      onCreateCards: () => _openCreator(note),
+      busy: _busy,
       scrollController: _scroll,
-      variant: M3EAppBarVariant.small,
-      bottomBar: ReviewActionDock(
-        busy: _busy,
-        saveLabel: last ? 'Save and finish' : 'Save',
-        onSave: () => _saveNote(note, index, notes.length),
-        onBack: () => _goBack(index),
-        onNext: () => _requestNext(index, notes.length),
-        canGoBack: index > 0,
-        canGoNext: true,
-        onCreateCards: () => _openCreator(note),
-        onDelete: () => _deleteNote(note, notes.length),
-      ),
       children: [
         Text(
           'Item ${index + 1} of ${notes.length}',

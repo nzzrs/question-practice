@@ -43,7 +43,7 @@ void main() {
       await pumpFrames(tester, frames: 24);
       expect(find.text('Complete the error card'), findsOneWidget);
 
-      await tester.tap(find.byKey(const ValueKey('review-dock-create')));
+      await tester.tap(find.byKey(const ValueKey('review-create-fab')));
       await pumpFrames(tester);
       await expandCardCreatorSheet(tester);
       await tester.enterText(

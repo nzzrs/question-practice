@@ -9,7 +9,7 @@ import '../export/card_creator_controller.dart';
 import '../export/card_creator_sheet.dart';
 import '../feedback/domain/wrong_notes.dart';
 import '../feedback/feedback_step_header.dart';
-import '../review/review_action_dock.dart';
+import '../review/review_shell.dart';
 import '../review/skipped_question_view.dart';
 import 'error_card_review_view.dart';
 
@@ -251,7 +251,6 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
   }
 
   Widget _buildPage(BuildContext context) {
-    final theme = M3ETheme.of(context);
     if (_steps.isEmpty) {
       return AppPage(
         title: widget.title,
@@ -269,60 +268,31 @@ class _ErrorCardsReviewPageState extends ConsumerState<ErrorCardsReviewPage> {
       );
     }
     if (_finished) {
-      return AppPage(
+      return ReviewCompletionPage(
         title: 'Review complete',
-        focus: true,
-        onBack: () => Navigator.of(context).pop(true),
+        heading: _saved == 0 ? 'No cards changed' : 'Review complete',
+        message: _saved == 0
+            ? 'No card details were saved.'
+            : '$_saved card${_saved == 1 ? '' : 's'} completed or created.',
+        onDone: () => Navigator.of(context).pop(true),
         scrollController: _scroll,
-        variant: M3EAppBarVariant.small,
-        children: [
-          const SizedBox(height: 32),
-          Center(child: IconBadge(Icons.check_circle_outline, size: 72)),
-          const SizedBox(height: 16),
-          Text(
-            _saved == 0 ? 'No cards changed' : 'Review complete',
-            textAlign: TextAlign.center,
-            style: theme.typography.emphasized.headlineSmall,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            _saved == 0
-                ? 'No card details were saved.'
-                : '$_saved card${_saved == 1 ? '' : 's'} completed or created.',
-            textAlign: TextAlign.center,
-            style: theme.typography.baseline.bodyMedium.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 24),
-          AppPrimaryButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            label: 'Done',
-            icon: Icons.check,
-          ),
-        ],
       );
     }
 
     final step = _step!;
     final last = _index + 1 >= _steps.length;
-    return AppPage(
+    return ReviewShell(
       title: widget.title,
-      showBack: true,
-      focus: true,
-      onBack: _requestClose,
+      saveLabel: last ? 'Save and finish' : 'Save',
+      onSave: _saveAndAdvance,
+      onBack: _goBack,
+      onNext: _requestNext,
+      onClose: _requestClose,
+      canGoBack: _index > 0,
+      canGoNext: !last,
+      onCreateCards: () => _openCreator(step),
+      busy: _busy,
       scrollController: _scroll,
-      variant: M3EAppBarVariant.small,
-      bottomBar: ReviewActionDock(
-        busy: _busy,
-        saveLabel: last ? 'Finish' : 'Save',
-        onSave: _saveAndAdvance,
-        onBack: _goBack,
-        onNext: _requestNext,
-        canGoBack: _index > 0,
-        canGoNext: true,
-        onCreateCards: () => _openCreator(step),
-      ),
       children: [
         ...switch (step) {
           _ErrorStep(:final card) => [

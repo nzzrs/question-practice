@@ -83,7 +83,7 @@ void main() {
       texts.any(
         (text) => text.contains(
           'Valid topic edits save automatically; closing with an invalid value '
-          'offers Discard changes.',
+          'or a failed save offers Discard changes.',
         ),
       ),
       isTrue,

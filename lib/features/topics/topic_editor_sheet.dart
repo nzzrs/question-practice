@@ -123,6 +123,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
   bool _syncingFields = false;
   bool _didSave = false;
   bool _closeBlocked = false;
+  bool _closeFailedSave = false;
   Object? _loadError;
   _TopicField? _expanded;
 
@@ -219,6 +220,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
         _loadError = null;
         _validationRequested = false;
         _closeBlocked = false;
+        _closeFailedSave = false;
         _nameError = null;
         _priorityError = null;
         _minimumScoreError = null;
@@ -272,23 +274,35 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
 
     final validation = _validateDraft();
     if (validation.draft == null) {
+      _closeFailedSave = false;
       _closeBlocked = true;
       _showValidation(validation, revealFirst: true);
       return false;
     }
     _closeBlocked = false;
+    _closeFailedSave = false;
 
     _closing = true;
     try {
       while (_currentKey != _savedKey) {
         final current = _validateDraft();
         if (current.draft == null) {
+          _closeFailedSave = false;
           _closeBlocked = true;
           _showValidation(current, revealFirst: true);
           return false;
         }
         final saved = await _persist();
-        if (!saved || !mounted) return false;
+        if (!mounted) return false;
+        if (!saved) {
+          // A failed write must not trap the learner in the sheet. Keep the
+          // values unsaved, but offer the same escape as an invalid field.
+          setState(() {
+            _closeBlocked = true;
+            _closeFailedSave = true;
+          });
+          return false;
+        }
       }
       return true;
     } finally {
@@ -457,7 +471,10 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
     _priorityError = validation.priorityError;
     _minimumScoreError = validation.minimumScoreError;
     _targetScoreError = validation.targetScoreError;
-    if (validation.draft != null) _closeBlocked = false;
+    if (validation.draft != null) {
+      _closeBlocked = false;
+      _closeFailedSave = false;
+    }
   }
 
   void _showValidation(
@@ -515,6 +532,7 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
       _topicName = saved.name;
       _savedKey = _currentKey;
       _closeBlocked = false;
+      _closeFailedSave = false;
       _validationRequested = false;
       _expanded = null;
       _nameError = null;
@@ -941,7 +959,11 @@ class _TopicEditorSheetState extends ConsumerState<TopicEditorSheet> {
 
   Widget _closeBlockedMessage(M3EThemeData theme) {
     return Text(
-      'Fix the highlighted field, or discard the changes you have not saved.',
+      _closeFailedSave
+          ? 'Could not save. Try again, or discard the changes you have not '
+                'saved.'
+          : 'Fix the highlighted field, or discard the changes you have not '
+                'saved.',
       style: theme.typography.baseline.bodySmall.copyWith(
         height: 1.35,
         color: theme.colorScheme.onErrorContainer,

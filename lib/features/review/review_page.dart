@@ -31,6 +31,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   int _index = 0;
   int _created = 0;
   int _kept = 0;
+  final _keptNoteIds = <int>{};
   bool _busy = false;
   bool _finished = false;
 
@@ -262,6 +263,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         await _requestNext();
         return;
       case ConceptDefinitionStep(:final concept):
+        if (_savedConceptIds.contains(concept.id)) break;
         setState(() => _busy = true);
         try {
           await ref
@@ -278,10 +280,12 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
           if (mounted) setState(() => _busy = false);
         }
       case NoteReviewStep(:final note):
+        if (note.isKept || _keptNoteIds.contains(note.id)) break;
         setState(() => _busy = true);
         try {
           await ref.read(reviewServiceProvider).keepNote(note.id);
           if (!mounted) return;
+          _keptNoteIds.add(note.id);
           _kept++;
         } on Object catch (error) {
           if (mounted) await showSnack(context, 'Could not save: $error');

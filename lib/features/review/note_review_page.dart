@@ -13,9 +13,8 @@ import 'review_shell.dart';
 /// Reviews saved notes one at a time.
 ///
 /// Opened from Cards with every visible note, or with a single note
-/// when its row is tapped. Notes are read live from the database, so a
-/// card made or a note deleted here is reflected without closing the
-/// review.
+/// when its row is tapped. Notes are read live from the database, so a card
+/// made here is reflected without closing the review.
 class NoteReviewPage extends ConsumerStatefulWidget {
   const NoteReviewPage({
     required this.notes,
@@ -36,6 +35,7 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
   final _scroll = ScrollController();
   final _creator = CardCreatorController();
   late final Set<int> _ids;
+  final _keptIds = <int>{};
   late int _index;
   int _kept = 0;
   int _cards = 0;
@@ -161,55 +161,55 @@ class _NoteReviewPageState extends ConsumerState<NoteReviewPage> {
     if (_busy) return;
     if (!await _saveCachedDrafts(note)) return;
     if (!mounted) return;
-    if (note.isKept) {
-      _advanceFrom(index, length);
-      return;
-    }
-    setState(() => _busy = true);
-    try {
-      await ref.read(reviewServiceProvider).keepNote(note.id);
-      _kept++;
+    if (!note.isKept && !_keptIds.contains(note.id)) {
+      setState(() => _busy = true);
+      try {
+        await ref.read(reviewServiceProvider).keepNote(note.id);
+        _keptIds.add(note.id);
+        _kept++;
+      } on Object catch (error) {
+        if (mounted) await showSnack(context, 'Could not save: $error');
+        return;
+      } finally {
+        if (mounted) setState(() => _busy = false);
+      }
       if (!mounted) return;
-      _advanceFrom(index, length);
-    } on Object catch (error) {
-      if (mounted) await showSnack(context, 'Could not save: $error');
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
+    if (index + 1 >= length && !await _confirmDiscardPending()) return;
+    _advanceFrom(index, length);
+  }
+
+  /// Asks before finishing with work cached for another note.
+  ///
+  /// Saving the last note must not silently drop drafts the learner left on an
+  /// earlier step. Declining keeps the review open with every draft intact.
+  Future<bool> _confirmDiscardPending() async {
+    if (!_creator.hasPendingWork) return true;
+    final leave = await confirmDialog(
+      context,
+      title: 'Leave review?',
+      message: 'Drafts and edits for this review are discarded.',
+      confirmLabel: 'Leave',
+      cancelLabel: 'Keep editing',
+      destructive: true,
+    );
+    if (!leave || !mounted) return false;
+    _creator.clearSnapshots();
+    _completionPending.clear();
+    return true;
   }
 
   Future<void> _requestNext(int index, int length) async {
     if (_busy) return;
     final last = index + 1 >= length;
-    if (last && _creator.hasPendingWork) {
-      final leave = await confirmDialog(
-        context,
-        title: 'Leave review?',
-        message: 'Drafts and edits for this review are discarded.',
-        confirmLabel: 'Leave',
-        cancelLabel: 'Keep editing',
-        destructive: true,
-      );
-      if (!leave || !mounted) return;
-      _creator.clearSnapshots();
-      _completionPending.clear();
-    }
+    if (last && !await _confirmDiscardPending()) return;
     _advanceFrom(index, length);
   }
 
   Future<void> _requestClose() async {
     if (_busy) return;
-    if (_creator.hasPendingWork) {
-      final leave = await confirmDialog(
-        context,
-        title: 'Leave review?',
-        message: 'Drafts and edits for this review are discarded.',
-        confirmLabel: 'Leave',
-        cancelLabel: 'Keep editing',
-        destructive: true,
-      );
-      if (!leave || !mounted) return;
-    }
+    if (!await _confirmDiscardPending()) return;
+    if (!mounted) return;
     _creator.clearSnapshots();
     _completionPending.clear();
     Navigator.of(context).pop();

@@ -198,16 +198,14 @@ void main() {
     expect(find.byKey(const ValueKey('review-create-fab')), findsOneWidget);
   });
 
-  testWidgets('deleting a note from the error review asks first', (
-    tester,
-  ) async {
+  testWidgets('error review note actions never offer delete', (tester) async {
     final harness = TestHarness();
     addTearDown(harness.close);
     final seeded = await _seedCard(harness);
     final noteId = await harness.cards.createNote(
       sessionId: seeded.card.sessionId,
       questionId: seeded.question.id,
-      text: 'keep this until I confirm',
+      text: 'keep this note in Cards',
       context: seeded.question.prompt,
       topicName: 'Topic',
       practiceName: 'Practice',
@@ -225,20 +223,17 @@ void main() {
     await pumpFrames(tester);
     await tester.tap(more);
     await pumpFrames(tester);
-    await tester.tap(find.text('Delete'));
-    await pumpFrames(tester);
 
-    expect(find.text('Delete note?'), findsOneWidget);
-    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsOneWidget);
-
-    await tester.tap(find.text('Delete').last);
-    await pumpFrames(tester, frames: 24);
+    expect(find.text('Define'), findsOneWidget);
+    expect(find.text('Delete'), findsNothing);
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+    expect(find.text('Delete note?'), findsNothing);
 
     final notes = await tester.runAsync(
       () => harness.cards.notesForQuestion(seeded.question.id),
     );
-    expect(notes, isEmpty);
-    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsNothing);
+    expect(notes, hasLength(1));
+    expect(find.byKey(ValueKey('feedback-note-$noteId')), findsOneWidget);
   });
 
   testWidgets('the review fits 360 dp at 2.0 text scale', (tester) async {

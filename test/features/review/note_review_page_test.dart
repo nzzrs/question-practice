@@ -3,6 +3,7 @@ import 'package:material_3_expressive/material_3_expressive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:question_practice/core/domain/models.dart';
 import 'package:question_practice/features/review/note_review_page.dart';
+import 'package:question_practice/features/review/review_action_dock.dart';
 
 import '../../helpers/test_harness.dart';
 
@@ -115,6 +116,66 @@ void main() {
     expect(
       saved!.singleWhere((item) => item.text == 'first note').isKept,
       isTrue,
+    );
+  });
+
+  testWidgets('Save and finish asks before dropping another note draft', (
+    tester,
+  ) async {
+    final harness = TestHarness();
+    addTearDown(harness.close);
+    final notes = await seedNotes(tester, harness);
+
+    await pumpTestApp(
+      tester,
+      home: NoteReviewPage(notes: notes),
+      harness: harness,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('review-create-fab')));
+    await pumpFrames(tester);
+    await expandCardCreatorSheet(tester);
+    await tester.enterText(
+      find.byKey(const ValueKey('creator-definition-cloze')),
+      'Definition of {{c1::second note}}: {{c2::kept only after Leave.}}',
+    );
+    await pumpFrames(tester);
+    await tester.ensureVisible(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('creator-add')));
+    await pumpFrames(tester);
+    final close = find.byKey(const ValueKey('creator-close'));
+    await tester.ensureVisible(close);
+    await tester.tap(close);
+    await pumpFrames(tester, frames: 24);
+
+    await tester.tap(find.byKey(ReviewActionDock.nextKey));
+    await pumpFrames(tester);
+    expect(find.text('Item 2 of 2'), findsOneWidget);
+
+    await tester.tap(find.text('Save and finish'));
+    await pumpFrames(tester);
+
+    expect(find.text('Leave review?'), findsOneWidget);
+    await tester.tap(find.text('Keep editing'));
+    await pumpFrames(tester);
+    expect(find.text('Item 2 of 2'), findsOneWidget);
+
+    await tester.tap(find.text('Save and finish'));
+    await pumpFrames(tester, frames: 24);
+    expect(find.text('Leave review?'), findsOneWidget);
+    await tester.tap(find.text('Leave'));
+    await pumpFrames(tester, frames: 24);
+
+    expect(find.text('Note review complete'), findsOneWidget);
+    final saved = await tester.runAsync(() => harness.cards.watchNotes().first);
+    expect(
+      saved!.singleWhere((item) => item.text == 'first note').isKept,
+      isTrue,
+    );
+    expect(
+      saved.singleWhere((item) => item.text == 'second note').isKept,
+      isFalse,
     );
   });
 

@@ -931,56 +931,6 @@ void main() {
     },
   );
 
-  testWidgets('a deleted note no longer seeds the creator from its text', (
-    tester,
-  ) async {
-    final harness = TestHarness();
-    addTearDown(harness.close);
-    final seeded = await _seedCard(harness);
-    final noteId = await harness.cards.createNote(
-      sessionId: null,
-      questionId: seeded.question.id,
-      text: 'managed service',
-      context: seeded.question.prompt,
-      topicName: 'Topic',
-      practiceName: 'Practice',
-      createdAt: harness.clock.now().toUtc(),
-    );
-
-    await pumpTestApp(
-      tester,
-      home: ErrorCardsReviewPage(cards: [seeded.card]),
-      harness: harness,
-    );
-
-    final noteCard = find.byKey(ValueKey('feedback-note-card-$noteId'));
-    await tester.ensureVisible(noteCard);
-    await pumpFrames(tester);
-    await tester.tap(noteCard);
-    await pumpFrames(tester);
-    await expandCardCreatorSheet(tester);
-    expect(find.byKey(const ValueKey('creator-seed-composer')), findsOneWidget);
-    await _closeCreator(tester);
-
-    final more = find.byKey(ValueKey('feedback-note-more-$noteId'));
-    await tester.ensureVisible(more);
-    await pumpFrames(tester);
-    await tester.tap(more);
-    await pumpFrames(tester);
-    await tester.tap(find.text('Delete').last);
-    await pumpFrames(tester);
-    await tester.tap(find.text('Delete').last);
-    await pumpFrames(tester, frames: 24);
-
-    expect(
-      await tester.runAsync(() => harness.cards.watchNotes().first),
-      isEmpty,
-    );
-
-    await _openCreator(tester);
-    expect(find.byKey(const ValueKey('creator-seed-composer')), findsNothing);
-  });
-
   testWidgets('a bullet that replaces a note seed does not convert the note', (
     tester,
   ) async {

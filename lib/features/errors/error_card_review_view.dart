@@ -15,7 +15,7 @@ import '../lookup/lookup_actions.dart';
 
 export 'error_card_content.dart';
 
-enum _NoteAction { define, ask, delete }
+enum _NoteAction { define, ask }
 
 /// Shared error-card study view used by session review and the Cards screen.
 ///
@@ -170,35 +170,6 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
     widget.onSeedRequested();
   }
 
-  Future<void> _deleteNote(Note note) async {
-    final confirmed = await confirmDialog(
-      context,
-      title: 'Delete note?',
-      message:
-          'The saved note "${note.text}" is removed from Cards. '
-          'Cards already made from it stay.',
-      confirmLabel: 'Delete',
-      destructive: true,
-    );
-    if (!confirmed || !mounted) return;
-    try {
-      await ref.read(cardRepositoryProvider).deleteNote(note.id);
-      if (!mounted) return;
-      widget.creator.forgetNote(note.id);
-      setState(() {
-        _notes = [
-          for (final item in _notes)
-            if (item.id != note.id) item,
-        ];
-      });
-      await showSnack(context, 'Note deleted.');
-    } on Object catch (error) {
-      if (mounted) {
-        await showSnack(context, 'Could not delete the note: $error');
-      }
-    }
-  }
-
   Future<void> _openNoteActions(Note note) async {
     var aiAvailable = ref.read(hasApiKeyProvider).value;
     if (aiAvailable == null) {
@@ -221,8 +192,6 @@ class _ErrorCardReviewViewState extends ConsumerState<ErrorCardReviewView> {
         _define(note.text, null);
       case _NoteAction.ask:
         await _ask(note.text, null);
-      case _NoteAction.delete:
-        await _deleteNote(note);
     }
   }
 
@@ -371,13 +340,6 @@ class _NoteActionsSheet extends StatelessWidget {
                 subtitle: 'Ask the configured AI about this passage',
                 onTap: () => Navigator.of(context).pop(_NoteAction.ask),
               ),
-            OptionTile(
-              icon: Icons.delete_outline,
-              title: 'Delete',
-              subtitle: 'Remove it everywhere for this question',
-              destructive: true,
-              onTap: () => Navigator.of(context).pop(_NoteAction.delete),
-            ),
           ],
         ),
       ),
